@@ -458,6 +458,20 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
   }
 });
 
+// --- Get Paystack Public Key ---
+app.get(`${PREFIX}/paystack/public-key`, async (c) => {
+  try {
+    const publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY');
+    if (!publicKey) {
+      return c.json({ error: 'Paystack public key not configured' }, 500);
+    }
+    return c.json({ publicKey });
+  } catch (error: any) {
+    console.error('Error fetching Paystack public key:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // --- Company Registration (creates SuperAdmin for a new company) ---
 app.post(`${PREFIX}/company/register`, async (c) => {
   try {

@@ -15,6 +15,7 @@ export default function CompanySignup() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1 = Company Info, 2 = License Selection & Payment
   const [paystackLoaded, setPaystackLoaded] = useState(false);
+  const [paystackPublicKey, setPaystackPublicKey] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     companyName: '',
     companySize: '',
@@ -100,6 +101,31 @@ export default function CompanySignup() {
         clearInterval(pollingRef.current);
       }
     };
+  }, []);
+
+  // Fetch Paystack public key
+  useEffect(() => {
+    const fetchPublicKey = async () => {
+      try {
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/paystack/public-key`,
+          {
+            headers: { Authorization: `Bearer ${publicAnonKey}` },
+          }
+        );
+        const data = await response.json();
+        if (data.publicKey) {
+          console.log('Paystack public key loaded successfully');
+          setPaystackPublicKey(data.publicKey);
+        } else {
+          console.error('Failed to load Paystack public key:', data.error);
+        }
+      } catch (error) {
+        console.error('Error fetching Paystack public key:', error);
+      }
+    };
+
+    fetchPublicKey();
   }, []);
 
   const handleNextStep = (e: React.FormEvent) => {
@@ -191,9 +217,17 @@ export default function CompanySignup() {
         return;
       }
 
+      // Check if public key is loaded
+      if (!paystackPublicKey) {
+        toast.error('Payment configuration is loading. Please wait a moment and try again.');
+        setLoading(false);
+        return;
+      }
+
       // Initialize Paystack payment directly (using inline popup)
-      const paystackPublicKey = 'pk_test_8c99e5db4a17f59b0bd05312f22b9d5d7dc7ba70';
       const amountInKobo = Math.round(totalAmount * 100);
+      
+      console.log('Initializing Paystack with key:', paystackPublicKey.substring(0, 10) + '...');
       
       const paystackHandler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
