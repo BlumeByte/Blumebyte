@@ -11,12 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Textarea } from './ui/textarea';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import {
   LayoutDashboard, Users, UserPlus, CalendarDays, Clock, Megaphone,
   Loader2, Plus, X, CheckCircle, Copy, AlertCircle, MessageCircle, Pencil, Search,
   Trash2, User, Settings, Briefcase, LogOut, FolderTree, GitMerge, Target,
-  ClipboardList, FileCheck, GraduationCap, BarChart3, UserCheck
+  ClipboardList, FileCheck, GraduationCap, BarChart3, UserCheck, Eye, RefreshCw, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { MessagesModal } from './MessagesModal';
@@ -29,11 +29,7 @@ import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
-import { ReportsPanel } from './ReportsPanel';
-import { AdvancedReportsModule } from './AdvancedReportsModule';
-import { HiringApprovalPanel } from './HiringApprovalPanel';
-import { LeaveApplicationForm } from './LeaveApplicationForm';
-import { AnnouncementsViewer } from './AnnouncementsViewer';
+import { MultiEmployeeSelect } from './MultiEmployeeSelect';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -395,15 +391,25 @@ export function ManagerDashboard() {
   const loadStats = useCallback(async () => {
     const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.log(`Manager fetch ${path} failed:`, e); return []; });
     try {
-      const [users, leaves] = await Promise.all([
+      const [users, leaves, profile] = await Promise.all([
         safeFetch('/users'),
         safeFetch('/leave-requests'),
+        api('/profile', { token: accessToken }).catch(() => null)
       ]);
-      const teamMembers = (Array.isArray(users) ? users : []).filter((u: any) => u.role === 'employee');
+      const managerDepartment = profile?.department || '';
+      // Filter to show only employees in manager's department
+      const departmentEmployees = (Array.isArray(users) ? users : []).filter((u: any) => 
+        u.department === managerDepartment && u.role === 'employee'
+      );
+      const departmentLeaves = (Array.isArray(leaves) ? leaves : []).filter((l: any) => {
+        // Find the employee who requested the leave
+        const employee = (Array.isArray(users) ? users : []).find((u: any) => u.userId === l.userId || u.id === l.userId);
+        return employee?.department === managerDepartment;
+      });
       setStats({
-        teamSize: teamMembers.length,
-        pendingLeaves: (Array.isArray(leaves) ? leaves : []).filter((l: any) => l.status === 'pending').length,
-        totalLeaves: (Array.isArray(leaves) ? leaves : []).length,
+        teamSize: departmentEmployees.length,
+        pendingLeaves: departmentLeaves.filter((l: any) => l.status === 'pending').length,
+        totalLeaves: departmentLeaves.length,
       });
     } catch (e) { console.log(e); }
     setLoadingStats(false);
@@ -463,14 +469,8 @@ export function ManagerDashboard() {
             <FolderTree className="w-4 h-4 mr-2" />
             Departments
           </Button>
-          <Button
-            variant={activeTab === 'leave' ? 'default' : 'ghost'}
-            className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('leave')}
-          >
-            <CalendarDays className="w-4 h-4 mr-2" />
-            Leave Requests
-          </Button>
+          {/* Managers cannot approve leave - removed Leave Requests tab */}
+          {/* Managers cannot approve hiring - removed Hiring tab */}
           <Button
             variant={activeTab === 'attendance' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
@@ -552,14 +552,6 @@ export function ManagerDashboard() {
             Advanced Reports
           </Button>
           <Button
-            variant={activeTab === 'hiring' ? 'default' : 'ghost'}
-            className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('hiring')}
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Hiring
-          </Button>
-          <Button
             variant={activeTab === 'meetings' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('meetings')}
@@ -621,7 +613,6 @@ export function ManagerDashboard() {
             {activeTab === 'overview' && 'Overview'}
             {activeTab === 'team' && 'My Team'}
             {activeTab === 'departments' && 'Departments'}
-            {activeTab === 'leave' && 'Leave Requests'}
             {activeTab === 'attendance' && 'Clock In/Out'}
             {activeTab === 'workflows' && 'Workflows'}
             {activeTab === 'performance' && 'Performance Reviews'}
@@ -632,7 +623,6 @@ export function ManagerDashboard() {
             {activeTab === 'training' && 'Training'}
             {activeTab === 'reports' && 'Reports'}
             {activeTab === 'advanced-reports' && 'Advanced Reports'}
-            {activeTab === 'hiring' && 'Hiring'}
             {activeTab === 'meetings' && 'Meetings'}
             {activeTab === 'announcements' && 'Announcements'}
             {activeTab === 'messages' && 'Messages'}
@@ -684,7 +674,7 @@ export function ManagerDashboard() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
                     { label: 'My Team', icon: Users, tab: 'team', color: 'bg-blue-500 hover:bg-blue-600' },
-                    { label: 'Approve Leave', icon: CalendarDays, tab: 'leave', color: 'bg-amber-500 hover:bg-amber-600' },
+                    { label: 'Departments', icon: FolderTree, tab: 'departments', color: 'bg-slate-500 hover:bg-slate-600' },
                     { label: 'Attendance', icon: Clock, tab: 'attendance', color: 'bg-green-500 hover:bg-green-600' },
                     { label: 'Performance', icon: Target, tab: 'performance', color: 'bg-purple-500 hover:bg-purple-600' },
                     { label: 'Tasks', icon: ClipboardList, tab: 'tasks', color: 'bg-indigo-500 hover:bg-indigo-600' },
@@ -709,8 +699,7 @@ export function ManagerDashboard() {
             </div>
           )}
           {activeTab === 'team' && <TeamTab />}
-          {activeTab === 'departments' && <Card><CardContent className="py-16 text-center"><FolderTree className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">View-only access. Contact Admin to manage departments.</p></CardContent></Card>}
-          {activeTab === 'leave' && <LeaveTab />}
+          {activeTab === 'departments' && <TeamTab />}
           {activeTab === 'attendance' && <ClockInOut />}
           {activeTab === 'workflows' && <Card><CardContent className="py-16 text-center"><GitMerge className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">View-only access. Contact Admin to manage workflows.</p></CardContent></Card>}
           {activeTab === 'performance' && <Card><CardContent className="py-16 text-center"><Target className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Performance review module. Contact Admin for access.</p></CardContent></Card>}
@@ -721,7 +710,6 @@ export function ManagerDashboard() {
           {activeTab === 'training' && <TrainingManagement mode="admin" />}
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'advanced-reports' && <AdvancedReportsModule />}
-          {activeTab === 'hiring' && <HiringApprovalPanel />}
           {activeTab === 'meetings' && <MeetingsPanel mode="employee" />}
           {activeTab === 'announcements' && <AnnouncementsViewer />}
           {activeTab === 'messages' && <MessagesPanel />}
