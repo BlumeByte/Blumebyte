@@ -112,7 +112,7 @@ export default function CompanySignup() {
   useEffect(() => {
     const fetchPublicKey = async () => {
       try {
-        const url = `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/paystack/public-key`;
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/paystack/public-key`;
         console.log('Fetching Paystack public key from:', url);
         
         const response = await fetch(url, {
@@ -206,7 +206,7 @@ export default function CompanySignup() {
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/company/payment-status/${reference}`,
+          `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/company/payment-status/${reference}`,
           {
             headers: { Authorization: `Bearer ${publicAnonKey}` },
           }
@@ -327,7 +327,7 @@ export default function CompanySignup() {
       console.log('Creating company account with payment reference:', paymentReference);
       
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/company/register`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/company/register`,
         {
           method: 'POST',
           headers: {
@@ -347,7 +347,15 @@ export default function CompanySignup() {
         }
       );
 
-      const data = await response.json();
+      // Safely parse response - handle non-JSON responses
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error('Server response (not JSON):', text);
+        throw new Error(`Server error (status ${response.status}). Please try again or contact support.`);
+      }
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create company account');
@@ -356,9 +364,9 @@ export default function CompanySignup() {
       console.log('Company created successfully:', data);
       toast.success(`Company created successfully with ${formData.licenses} licenses!`);
       
-      // Redirect to sign in
+      // Redirect to login
       setTimeout(() => {
-        navigate('/signin');
+        navigate('/login');
       }, 1500);
     } catch (error: any) {
       console.error('Registration error:', error);

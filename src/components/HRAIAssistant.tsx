@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, Loader2, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,12 +8,59 @@ import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
+import { useNavigate } from 'react-router';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+}
+
+// Renders markdown-style links [text](url) as clickable in-app navigation links
+function RenderMessageContent({ content, onNavigate }: { content: string; onNavigate: (path: string) => void }) {
+  // Split content by markdown link pattern [text](url)
+  const parts = content.split(/(\[[^\]]+\]\([^)]+\))/g);
+  
+  return (
+    <>
+      {parts.map((part, idx) => {
+        const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (linkMatch) {
+          const [, text, href] = linkMatch;
+          // Internal link (starts with /)
+          if (href.startsWith('/')) {
+            return (
+              <a
+                key={idx}
+                href={href}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onNavigate(href);
+                }}
+                className="text-blue-600 hover:text-blue-800 underline font-medium cursor-pointer"
+              >
+                {text}
+              </a>
+            );
+          }
+          // External link
+          return (
+            <a
+              key={idx}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline font-medium"
+            >
+              {text}
+            </a>
+          );
+        }
+        return <span key={idx}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 export function HRAIAssistant() {
@@ -24,6 +71,7 @@ export function HRAIAssistant() {
   const scrollRef = useRef<React.ElementRef<typeof ScrollArea>>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { getToken } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -36,6 +84,10 @@ export function HRAIAssistant() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const handleInAppNavigate = useCallback((path: string) => {
+    navigate(path);
+  }, [navigate]);
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -52,7 +104,6 @@ export function HRAIAssistant() {
     setIsLoading(true);
 
     try {
-      // Get the user's access token
       const token = await getToken();
       console.log('AI Assistant: Token retrieved:', token ? `${token.substring(0, 20)}...` : 'null');
       
@@ -63,7 +114,7 @@ export function HRAIAssistant() {
       }
 
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/ai-assistant`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/ai-assistant`,
         {
           method: 'POST',
           headers: {
@@ -73,7 +124,7 @@ export function HRAIAssistant() {
           },
           body: JSON.stringify({
             message: userMessage.content,
-            history: messages.slice(-10), // Send last 10 messages for context
+            history: messages.slice(-10),
           }),
         }
       );
@@ -83,7 +134,6 @@ export function HRAIAssistant() {
         const errorMessage = errorData.error || 'Failed to get response';
         const errorDetails = errorData.details || '';
         
-        // Log error details for debugging
         console.log('AI error details:', { 
           status: response.status, 
           errorData, 
@@ -94,7 +144,6 @@ export function HRAIAssistant() {
         });
         console.log('Full error response:', JSON.stringify(errorData, null, 2));
         
-        // Show specific error to user
         if (errorData.statusCode === 401 || errorData.statusCode === 403) {
           toast.error('Blumebyte is not properly configured. Please contact your administrator.');
         } else if (errorData.statusCode === 429) {
@@ -108,7 +157,6 @@ export function HRAIAssistant() {
 
       const data = await response.json();
       
-      // Check if we got an error in the response data
       if (data.error) {
         throw new Error(data.error);
       }
@@ -122,7 +170,6 @@ export function HRAIAssistant() {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error: any) {
-      // Error already logged, just show fallback message
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -225,19 +272,19 @@ export function HRAIAssistant() {
                           onClick={() => setInput("What is the company's vacation policy?")}
                           className="w-full text-left text-xs p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
                         >
-                          💼 What is the vacation policy?
+                          What is the vacation policy?
                         </button>
                         <button
                           onClick={() => setInput('How do I request time off?')}
                           className="w-full text-left text-xs p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
                         >
-                          🏖️ How do I request time off?
+                          How do I request time off?
                         </button>
                         <button
                           onClick={() => setInput('What benefits are available?')}
                           className="w-full text-left text-xs p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
                         >
-                          ✨ What benefits are available?
+                          What benefits are available?
                         </button>
                       </div>
                     </div>
@@ -257,7 +304,13 @@ export function HRAIAssistant() {
                                 : 'bg-muted'
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                            <div className="text-sm whitespace-pre-wrap">
+                              {message.role === 'assistant' ? (
+                                <RenderMessageContent content={message.content} onNavigate={handleInAppNavigate} />
+                              ) : (
+                                message.content
+                              )}
+                            </div>
                             <p
                               className={`text-xs mt-1 ${
                                 message.role === 'user'

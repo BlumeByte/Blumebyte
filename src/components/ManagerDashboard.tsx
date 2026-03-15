@@ -55,6 +55,7 @@ function TeamTab() {
   const [saving, setSaving] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [currentUserDepartment, setCurrentUserDepartment] = useState<string>('');
+  const [currentUserDepartments, setCurrentUserDepartments] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,10 +65,17 @@ function TeamTab() {
         api('/reference-data', { token: accessToken }).catch(() => ({})),
         api('/profile', { token: accessToken }).catch(() => null)
       ]);
+      const managerDepts = profile?.departments || (profile?.department ? [profile.department] : []);
       setCurrentUserDepartment(profile?.department || '');
-      // Only show employees in manager's department
+      setCurrentUserDepartments(managerDepts);
+      
+      // Show employees in any of manager's assigned departments
       const departmentUsers = Array.isArray(data) 
-        ? data.filter((u: any) => u.department === profile?.department && u.role === 'employee') 
+        ? data.filter((u: any) => {
+            // Check if user's department(s) match any of manager's departments
+            const userDepts = u.departments || (u.department ? [u.department] : []);
+            return managerDepts.some((dept: string) => userDepts.includes(dept)) && u.role === 'employee';
+          }) 
         : [];
       setUsers(departmentUsers);
       setCompanies(ref?.companies || []);
@@ -82,9 +90,12 @@ function TeamTab() {
     setSaving(true);
     try {
       if (editUser) {
-        // Managers can only edit employees in their department
-        if (editUser.department !== currentUserDepartment) {
-          toast.error('You can only edit employees in your department');
+        // Managers can only edit employees in their assigned departments
+        const userDepts = editUser.departments || (editUser.department ? [editUser.department] : []);
+        const hasAccess = currentUserDepartments.some((dept: string) => userDepts.includes(dept));
+        
+        if (!hasAccess) {
+          toast.error('You can only edit employees in your assigned departments');
           setSaving(false);
           return;
         }
@@ -401,16 +412,21 @@ export function ManagerDashboard() {
         safeFetch('/leave-requests'),
         api('/profile', { token: accessToken }).catch(() => null)
       ]);
-      const managerDepartment = profile?.department || '';
-      // Filter to show only employees in manager's department
-      const departmentEmployees = (Array.isArray(users) ? users : []).filter((u: any) => 
-        u.department === managerDepartment && u.role === 'employee'
-      );
+      const managerDepartments = profile?.departments || (profile?.department ? [profile.department] : []);
+      
+      // Filter to show only employees in manager's assigned departments
+      const departmentEmployees = (Array.isArray(users) ? users : []).filter((u: any) => {
+        const userDepts = u.departments || (u.department ? [u.department] : []);
+        return managerDepartments.some((dept: string) => userDepts.includes(dept)) && u.role === 'employee';
+      });
+      
       const departmentLeaves = (Array.isArray(leaves) ? leaves : []).filter((l: any) => {
         // Find the employee who requested the leave
         const employee = (Array.isArray(users) ? users : []).find((u: any) => u.userId === l.userId || u.id === l.userId);
-        return employee?.department === managerDepartment;
+        const empDepts = employee?.departments || (employee?.department ? [employee.department] : []);
+        return managerDepartments.some((dept: string) => empDepts.includes(dept));
       });
+      
       setStats({
         teamSize: departmentEmployees.length,
         pendingLeaves: departmentLeaves.filter((l: any) => l.status === 'pending').length,

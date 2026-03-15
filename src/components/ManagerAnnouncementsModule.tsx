@@ -61,7 +61,7 @@ export function ManagerAnnouncementsModule() {
 
   useEffect(() => { loadDepartmentInfo(); }, [loadDepartmentInfo]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 20000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 10000); return () => clearInterval(iv); }, [load]);
 
   const handleCreate = () => {
     setEditItem(null);
@@ -245,8 +245,17 @@ export function ManagerAnnouncementsModule() {
                       {item.targetAudience === 'department' && (
                         <Badge className="bg-green-100 text-green-800">Department</Badge>
                       )}
-                      {item.targetAudience === 'specific' && (
+                      {item.targetAudience === 'specific' && !item.targetDepartments?.length && (
                         <Badge className="bg-amber-100 text-amber-800">Specific Employees</Badge>
+                      )}
+                      {item.targetDepartments?.length > 0 && item.targetAudience !== 'all' && (
+                        <Badge className="bg-teal-100 text-teal-800">{item.targetDepartments.length} Dept{item.targetDepartments.length > 1 ? 's' : ''}</Badge>
+                      )}
+                      {item.createdByRole === 'superadmin' && (
+                        <Badge className="bg-violet-100 text-violet-800">SuperAdmin</Badge>
+                      )}
+                      {item.createdByRole === 'admin' && (
+                        <Badge className="bg-indigo-100 text-indigo-800">Admin</Badge>
                       )}
                     </div>
                     <p className="text-xs text-gray-500">

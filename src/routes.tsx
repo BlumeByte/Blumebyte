@@ -7,6 +7,8 @@ import { EmployeeChat } from './components/EmployeeChat';
 import { Toaster } from './components/ui/sonner';
 
 // Lazy load heavy components for better initial load performance
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./components/LoginPage').then(m => ({ default: m.LoginPage })));
 const CompanySignup = lazy(() => import('./pages/CompanySignup'));
 const DevSettings = lazy(() => import('./pages/DevSettings'));
 const EmployeePortal = lazy(() => import('./pages/EmployeePortal'));
@@ -20,8 +22,6 @@ const LicensePaymentVerification = lazy(() => import('./components/LicensePaymen
 const SecurityPolicy = lazy(() => import('./pages/SecurityPolicy'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsConditions = lazy(() => import('./pages/TermsConditions'));
-import LandingPage from './pages/LandingPage';
-import { LoginPage } from './components/LoginPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Loading fallback component
@@ -48,6 +48,18 @@ function RootLayout() {
 }
 
 // Create component wrappers instead of JSX elements
+const LandingPageWrapper = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <LandingPage />
+  </Suspense>
+);
+
+const LoginPageWrapper = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <LoginPage />
+  </Suspense>
+);
+
 const CompanySignupPage = () => (
   <Suspense fallback={<LoadingFallback />}>
     <CompanySignup />
@@ -148,11 +160,11 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        Component: LandingPage,
+        Component: LandingPageWrapper,
       },
       {
         path: '/login',
-        Component: LoginPage,
+        Component: LoginPageWrapper,
       },
       {
         path: '/company-signup',

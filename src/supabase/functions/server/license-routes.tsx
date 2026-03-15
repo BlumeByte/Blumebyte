@@ -2,7 +2,7 @@ import { Hono } from 'npm:hono';
 import * as kv from './kv_store.tsx';
 import { usdToPaystackAmount, getPaystackCurrency } from './currency-utils.tsx';
 
-const PREFIX = '/make-server-a35148f0';
+const PREFIX = '/make-server-668731fc';
 
 export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSuperAdmin: any, logAudit: any) {
   

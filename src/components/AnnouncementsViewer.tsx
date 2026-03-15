@@ -19,7 +19,7 @@ export function AnnouncementsViewer() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 10000); return () => clearInterval(iv); }, [load]);
 
   if (loading) {
     return (
@@ -43,7 +43,7 @@ export function AnnouncementsViewer() {
       {items.map(i => (
         <Card key={i.id}>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h3 className="font-medium">{i.title}</h3>
               <Badge className={
                 i.priority === 'urgent' ? 'bg-red-100 text-red-800' :
@@ -52,10 +52,15 @@ export function AnnouncementsViewer() {
               }>
                 {i.priority}
               </Badge>
+              {i.createdByRole === 'superadmin' && <Badge className="bg-purple-100 text-purple-800">Company</Badge>}
+              {i.createdByRole === 'admin' && <Badge className="bg-indigo-100 text-indigo-800">Admin</Badge>}
+              {i.targetDepartments?.length > 0 && i.targetAudience !== 'all' && (
+                <Badge className="bg-green-100 text-green-800">{i.targetDepartments.length} Dept{i.targetDepartments.length > 1 ? 's' : ''}</Badge>
+              )}
             </div>
             <p className="text-sm text-gray-600">{i.content}</p>
             <p className="text-xs text-gray-400 mt-2">
-              {i.authorName} • {new Date(i.createdAt).toLocaleDateString()}
+              {i.authorName} {'\u2022'} {new Date(i.createdAt).toLocaleDateString()}
             </p>
           </CardContent>
         </Card>

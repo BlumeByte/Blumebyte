@@ -51,7 +51,7 @@ export function EmployeeChat() {
       if (!token) return;
 
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/chat/messages`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/chat/messages`,
         {
           method: 'GET',
           headers: {
@@ -119,7 +119,7 @@ export function EmployeeChat() {
       }
 
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/chat/send`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/chat/send`,
         {
           method: 'POST',
           headers: {

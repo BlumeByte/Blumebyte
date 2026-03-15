@@ -7,7 +7,7 @@ import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
 
 const app = new Hono();
-const PREFIX = "/make-server-a35148f0"; // v2.1 - Payment-first registration flow
+const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
 
 app.use("*", logger(console.log));
 app.use(
@@ -701,7 +701,7 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
             { display_name: 'Billing Cycle', variable_name: 'billing_cycle', value: billingCycle },
           ],
         },
-        callback_url: `https://${Deno.env.get('SUPABASE_URL')?.replace('https://', '')}/functions/v1/make-server-a35148f0/company/payment-callback`,
+        callback_url: `https://${Deno.env.get('SUPABASE_URL')?.replace('https://', '')}/functions/v1/make-server-668731fc/company/payment-callback`,
       }),
     });
 
@@ -1045,7 +1045,7 @@ app.put(`${PREFIX}/employee/profile`, async (c) => {
       'emergencyContact', 'emergencyPhone'
     ];
     if (['superadmin', 'admin', 'manager'].includes(role)) {
-      allowedFields.push('position', 'department', 'company', 'salary', 'name');
+      allowedFields.push('position', 'department', 'departments', 'company', 'salary', 'name');
     }
     const updates: any = {};
     for (const key of allowedFields) {
@@ -1567,7 +1567,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
   try {
     const { user: authUser } = await requireSuperAdmin(c);
     const body = await c.req.json();
-    const { email, name, role, companyId, department, position } = body;
+    const { email, name, role, companyId, department, departments, position } = body;
     if (!email || !name || !role) {
       return c.json({ error: "Email, name and role are required" }, 400);
     }
@@ -1631,7 +1631,8 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       status: "active",
       companyId: userCompanyId, // Use the super admin's company
       company: company.name,
-      department: department || "",
+      department: department || (departments && departments[0]) || "",
+      departments: departments || (department ? [department] : []),
       position: position || "",
       mustChangePassword: true,
       createdAt: new Date().toISOString(),
@@ -1661,7 +1662,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       await kv.set(`notification:${nid}`, {
         id: nid, userId: emp.userId || emp.id, type: "new-user",
         title: "New Team Member",
-        message: `${name} has joined the organization as ${role}${department ? " in " + department : ""}.`,
+        message: `${name} has joined the organization as ${role}${departments && departments.length > 0 ? " in " + departments.join(", ") : department ? " in " + department : ""}.`,
         read: false, createdAt: new Date().toISOString(),
       });
     }
@@ -2272,11 +2273,20 @@ app.put(`${PREFIX}/users/:userId`, async (c) => {
     if (callerRole !== "superadmin" && body.department && body.department !== existing.department) {
       return c.json({ error: "Only SuperAdmin can change user departments" }, 403);
     }
+    
+    // Only SuperAdmin can change departments array
+    if (callerRole !== "superadmin" && body.departments && JSON.stringify(body.departments) !== JSON.stringify(existing.departments)) {
+      return c.json({ error: "Only SuperAdmin can change user departments" }, 403);
+    }
 
     let companyName = body.company || existing.company || "";
     if (body.companyId && body.companyId !== existing.companyId) {
       companyName = await resolveCompanyName(body.companyId);
     }
+    
+    // Ensure departments array is synced with department field
+    const departments = body.departments || existing.departments || (body.department ? [body.department] : existing.department ? [existing.department] : []);
+    const department = body.department || existing.department || (departments && departments[0]) || '';
     
     const updated = {
       ...existing,
@@ -2284,6 +2294,8 @@ app.put(`${PREFIX}/users/:userId`, async (c) => {
       userId,
       id: userId,
       company: companyName,
+      department,
+      departments,
       updatedAt: new Date().toISOString(),
     };
     await kv.set(`employee:${userId}`, updated);
@@ -3559,10 +3571,10 @@ app.get(`${PREFIX}/attendance/all`, async (c) => {
   }
 });
 
-// SuperAdmin: create attendance record for any user
+// SuperAdmin only: create attendance record for any user
 app.post(`${PREFIX}/attendance/admin-create`, async (c) => {
   try {
-    await requireManagerOrAbove(c);
+    await requireSuperAdmin(c);
     const body = await c.req.json();
     const { userId, date, clockIn, clockOut, status } = body;
     if (!userId || !date) return c.json({ error: "userId and date required" }, 400);
@@ -3594,10 +3606,10 @@ app.post(`${PREFIX}/attendance/admin-create`, async (c) => {
   }
 });
 
-// SuperAdmin: update attendance record
+// SuperAdmin only: update attendance record
 app.put(`${PREFIX}/attendance/admin-update`, async (c) => {
   try {
-    await requireManagerOrAbove(c);
+    await requireSuperAdmin(c);
     const body = await c.req.json();
     const { userId, date } = body;
     if (!userId || !date) return c.json({ error: "userId and date required" }, 400);
@@ -3618,10 +3630,10 @@ app.put(`${PREFIX}/attendance/admin-update`, async (c) => {
   }
 });
 
-// SuperAdmin: delete attendance record
+// SuperAdmin only: delete attendance record
 app.delete(`${PREFIX}/attendance/admin-delete`, async (c) => {
   try {
-    await requireManagerOrAbove(c);
+    await requireSuperAdmin(c);
     const { userId, date } = await c.req.json();
     if (!userId || !date) return c.json({ error: "userId and date required" }, 400);
     const key = `attendance:${userId}:${date}`;
@@ -3655,10 +3667,24 @@ app.get(`${PREFIX}/attendance/history`, async (c) => {
 // ============ ANNOUNCEMENTS ============
 app.get(`${PREFIX}/announcements`, async (c) => {
   try {
-    const { user, role } = await requireAuth(c);
+    const { user, role, kvData } = await requireAuth(c);
     let items = await kv.getByPrefix("announcement:");
     // Apply company filtering
     items = await applyCompanyFilter(items, user.id, role);
+    // Filter by department targeting for non-superadmin/admin users
+    if (role !== "superadmin" && role !== "admin") {
+      const userDept = kvData?.department || "";
+      const userDepts = kvData?.departments || (userDept ? [userDept] : []);
+      items = items.filter((item: any) => {
+        // Show announcements targeted to 'all' departments
+        if (!item.targetDepartments || item.targetDepartments.length === 0 || item.targetAudience === "all") return true;
+        // Show if user's department matches any target department
+        if (userDepts.some((d: string) => item.targetDepartments.includes(d))) return true;
+        // Show if targeted specifically to this user
+        if (item.specificEmployees && item.specificEmployees.includes(user.id)) return true;
+        return false;
+      });
+    }
     return c.json(items || []);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3682,6 +3708,23 @@ app.post(`${PREFIX}/announcements`, async (c) => {
     return c.json(item, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/announcements/:id`, async (c) => {
+  try {
+    await requireAdminOrAbove(c);
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const existing = await kv.get(`announcement:${id}`);
+    if (!existing) return c.json({ error: "Not found" }, 404);
+    const updated = { ...existing, ...body, updatedAt: new Date().toISOString() };
+    await kv.set(`announcement:${id}`, updated);
+    return c.json(updated);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -5260,7 +5303,7 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
         email: userProfile.email,
         amount: amount * 100, // Paystack expects amount in kobo
         reference: reference,
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-a35148f0/subscription/verify-payment?reference=${reference}`,
+        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`,
         metadata: {
           companyId: companyId,
           companyName: company.name,
@@ -5403,7 +5446,7 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
         email: userProfile.email,
         amount: amount * 100,
         reference: reference,
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-a35148f0/subscription/verify-license-upgrade?reference=${reference}`,
+        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-license-upgrade?reference=${reference}`,
         metadata: {
           companyId: companyId,
           companyName: company.name,
@@ -5550,7 +5593,7 @@ app.post(`${PREFIX}/ai-assistant`, async (c) => {
     }));
     
     // System prompt for HR assistant
-    const systemPrompt = `You are Blumebyte, an AI assistant for SAS Finance Group's HR management system. Your role is to help employees with HR-related questions including:
+    const systemPrompt = `You are Blumebyte, an AI assistant for the Blumebyte HR management system. Your role is to help employees with HR-related questions including:
 - Company policies and procedures
 - Leave and vacation policies
 - Benefits and compensation information
@@ -5567,6 +5610,14 @@ Guidelines:
 - Keep responses concise and clear
 - Use bullet points for lists when appropriate
 - Be empathetic and understanding
+- IMPORTANT: When referencing pages or sections of the app, use these exact internal paths as markdown links:
+  - Security Policy: [Security Policy](/security-policy)
+  - Privacy Policy: [Privacy Policy](/privacy-policy)
+  - Terms & Conditions: [Terms & Conditions](/terms-conditions)
+  - Subscription: [Subscription](/subscription)
+  - For dashboard sections, tell users to navigate to their dashboard tab (e.g., "Go to the Leave tab in your dashboard")
+- NEVER link to external URLs for app pages. All links should be relative paths starting with /
+- Format links as markdown: [Link Text](/path)
 
 Current user question: ${message}`;
     
@@ -5678,6 +5729,467 @@ Current user question: ${message}`;
     console.log('AI Assistant: General error:', e.message, e.stack);
     return handleError(e, c, 'ai-assistant');
   }
+});
+
+// ========================================
+// AUTOMATION & WORKFLOWS ENDPOINTS
+// ========================================
+
+// Workflows CRUD
+app.get(`${PREFIX}/automation/workflows`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    const companyId = profile?.companyId;
+    
+    const workflows = await kv.getByPrefix('automation_workflow:');
+    const filtered = workflows.filter((w: any) => w.companyId === companyId || !w.companyId);
+    
+    return c.json({ data: filtered });
+  } catch (e: any) {
+    return handleError(e, c, 'get-workflows');
+  }
+});
+
+app.post(`${PREFIX}/automation/workflows`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const data = await c.req.json();
+    const id = crypto.randomUUID();
+    
+    const workflow = {
+      id,
+      ...data,
+      createdBy: authUser.user.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_workflow:${id}`, workflow);
+    return c.json({ success: true, data: workflow });
+  } catch (e: any) {
+    return handleError(e, c, 'create-workflow');
+  }
+});
+
+app.put(`${PREFIX}/automation/workflows/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    const data = await c.req.json();
+    
+    const existing = await kv.get(`automation_workflow:${id}`);
+    if (!existing) {
+      return c.json({ error: 'Workflow not found' }, 404);
+    }
+    
+    const updated = {
+      ...existing,
+      ...data,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_workflow:${id}`, updated);
+    return c.json({ success: true, data: updated });
+  } catch (e: any) {
+    return handleError(e, c, 'update-workflow');
+  }
+});
+
+app.delete(`${PREFIX}/automation/workflows/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    await kv.del(`automation_workflow:${id}`);
+    
+    return c.json({ success: true });
+  } catch (e: any) {
+    return handleError(e, c, 'delete-workflow');
+  }
+});
+
+// Scheduled Tasks CRUD
+app.get(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    const companyId = profile?.companyId;
+    
+    const tasks = await kv.getByPrefix('automation_task:');
+    const filtered = tasks.filter((t: any) => t.companyId === companyId || !t.companyId);
+    
+    return c.json({ data: filtered });
+  } catch (e: any) {
+    return handleError(e, c, 'get-scheduled-tasks');
+  }
+});
+
+app.post(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const data = await c.req.json();
+    const id = crypto.randomUUID();
+    
+    const task = {
+      id,
+      ...data,
+      createdBy: authUser.user.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_task:${id}`, task);
+    return c.json({ success: true, data: task });
+  } catch (e: any) {
+    return handleError(e, c, 'create-scheduled-task');
+  }
+});
+
+app.put(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    const data = await c.req.json();
+    
+    const existing = await kv.get(`automation_task:${id}`);
+    if (!existing) {
+      return c.json({ error: 'Task not found' }, 404);
+    }
+    
+    const updated = {
+      ...existing,
+      ...data,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_task:${id}`, updated);
+    return c.json({ success: true, data: updated });
+  } catch (e: any) {
+    return handleError(e, c, 'update-scheduled-task');
+  }
+});
+
+app.delete(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    await kv.del(`automation_task:${id}`);
+    
+    return c.json({ success: true });
+  } catch (e: any) {
+    return handleError(e, c, 'delete-scheduled-task');
+  }
+});
+
+// Business Rules CRUD
+app.get(`${PREFIX}/automation/business-rules`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    const companyId = profile?.companyId;
+    
+    const rules = await kv.getByPrefix('automation_rule:');
+    const filtered = rules.filter((r: any) => r.companyId === companyId || !r.companyId);
+    
+    return c.json({ data: filtered });
+  } catch (e: any) {
+    return handleError(e, c, 'get-business-rules');
+  }
+});
+
+app.post(`${PREFIX}/automation/business-rules`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const data = await c.req.json();
+    const id = crypto.randomUUID();
+    
+    const rule = {
+      id,
+      ...data,
+      createdBy: authUser.user.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_rule:${id}`, rule);
+    return c.json({ success: true, data: rule });
+  } catch (e: any) {
+    return handleError(e, c, 'create-business-rule');
+  }
+});
+
+app.put(`${PREFIX}/automation/business-rules/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    const data = await c.req.json();
+    
+    const existing = await kv.get(`automation_rule:${id}`);
+    if (!existing) {
+      return c.json({ error: 'Rule not found' }, 404);
+    }
+    
+    const updated = {
+      ...existing,
+      ...data,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_rule:${id}`, updated);
+    return c.json({ success: true, data: updated });
+  } catch (e: any) {
+    return handleError(e, c, 'update-business-rule');
+  }
+});
+
+app.delete(`${PREFIX}/automation/business-rules/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    await kv.del(`automation_rule:${id}`);
+    
+    return c.json({ success: true });
+  } catch (e: any) {
+    return handleError(e, c, 'delete-business-rule');
+  }
+});
+
+// Notification Templates CRUD
+app.get(`${PREFIX}/automation/notification-templates`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    const companyId = profile?.companyId;
+    
+    const templates = await kv.getByPrefix('automation_template:');
+    const filtered = templates.filter((t: any) => t.companyId === companyId || !t.companyId);
+    
+    return c.json({ data: filtered });
+  } catch (e: any) {
+    return handleError(e, c, 'get-notification-templates');
+  }
+});
+
+app.post(`${PREFIX}/automation/notification-templates`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const data = await c.req.json();
+    const id = crypto.randomUUID();
+    
+    const template = {
+      id,
+      ...data,
+      createdBy: authUser.user.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_template:${id}`, template);
+    return c.json({ success: true, data: template });
+  } catch (e: any) {
+    return handleError(e, c, 'create-notification-template');
+  }
+});
+
+app.put(`${PREFIX}/automation/notification-templates/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    const data = await c.req.json();
+    
+    const existing = await kv.get(`automation_template:${id}`);
+    if (!existing) {
+      return c.json({ error: 'Template not found' }, 404);
+    }
+    
+    const updated = {
+      ...existing,
+      ...data,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`automation_template:${id}`, updated);
+    return c.json({ success: true, data: updated });
+  } catch (e: any) {
+    return handleError(e, c, 'update-notification-template');
+  }
+});
+
+app.delete(`${PREFIX}/automation/notification-templates/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    await kv.del(`automation_template:${id}`);
+    
+    return c.json({ success: true });
+  } catch (e: any) {
+    return handleError(e, c, 'delete-notification-template');
+  }
+});
+
+// Execute workflow manually (for testing)
+app.post(`${PREFIX}/automation/workflows/:id/execute`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await getUserProfile(authUser.user.id);
+    
+    if (!['superadmin', 'admin'].includes(profile?.role)) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
+    
+    const id = c.req.param('id');
+    const workflow = await kv.get(`automation_workflow:${id}`);
+    
+    if (!workflow) {
+      return c.json({ error: 'Workflow not found' }, 404);
+    }
+    
+    if (!workflow.enabled) {
+      return c.json({ error: 'Workflow is not enabled' }, 400);
+    }
+    
+    // Log execution
+    const executionId = crypto.randomUUID();
+    const execution = {
+      id: executionId,
+      workflowId: id,
+      workflowName: workflow.name,
+      executedBy: authUser.user.id,
+      executedAt: new Date().toISOString(),
+      status: 'completed',
+      actions: workflow.actions?.length || 0,
+    };
+    
+    await kv.set(`automation_execution:${executionId}`, execution);
+    
+    return c.json({ success: true, execution });
+  } catch (e: any) {
+    return handleError(e, c, 'execute-workflow');
+  }
+});
+
+// --- Alias: /attendance/today -> same logic as /attendance/my-today ---
+app.get(`${PREFIX}/attendance/today`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const key = `attendance:${user.id}:${today}`;
+    let record = await kv.get(key);
+    if (record?.isPaused && record?.clockIn && !record?.clockOut) {
+      const pauses = record.pauses || [];
+      if (pauses.length > 0 && !pauses[pauses.length - 1].resumedAt) {
+        pauses[pauses.length - 1].resumedAt = now.toISOString();
+      }
+      const totalPausedMs = pauses.reduce((sum: number, p: any) => sum + ((p.resumedAt ? new Date(p.resumedAt).getTime() : now.getTime()) - new Date(p.pausedAt).getTime()), 0);
+      record = { ...record, isPaused: false, pauses, totalPausedMinutes: Math.round(totalPausedMs / 60000), lastActivity: now.toISOString(), updatedAt: now.toISOString() };
+      await kv.set(key, record);
+    }
+    if (record?.clockIn && !record?.clockOut) {
+      const autoSettings = await kv.get("auto-clock-settings");
+      if (autoSettings?.enabled) {
+        const clockOutTime = autoSettings.clockOutTime || "17:00";
+        const [h, m] = clockOutTime.split(":").map(Number);
+        const cutoff = new Date(now); cutoff.setHours(h, m, 0, 0);
+        const applicableUsers = autoSettings.mode === "specific" ? (autoSettings.specificUsers || []) : null;
+        if ((!applicableUsers || applicableUsers.includes(user.id)) && now >= cutoff) {
+          const pauses = record.pauses || [];
+          if (pauses.length > 0 && !pauses[pauses.length - 1].resumedAt) pauses[pauses.length - 1].resumedAt = cutoff.toISOString();
+          const totalPausedMs = pauses.reduce((sum: number, p: any) => sum + ((p.resumedAt ? new Date(p.resumedAt).getTime() : cutoff.getTime()) - new Date(p.pausedAt).getTime()), 0);
+          const totalMinutes = Math.round((cutoff.getTime() - new Date(record.clockIn).getTime()) / 60000);
+          const activeMinutes = Math.max(0, totalMinutes - Math.round(totalPausedMs / 60000));
+          record = { ...record, clockOut: cutoff.toISOString(), isPaused: false, pauses, totalPausedMinutes: Math.round(totalPausedMs / 60000), status: "present", regularMinutes: Math.min(activeMinutes, 480), overtimeMinutes: Math.max(0, activeMinutes - 480), autoClocked: true, autoClockoutApplied: true, updatedAt: now.toISOString() };
+          await kv.set(key, record);
+        }
+      }
+    }
+    return c.json(record || null);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// --- Catch-all 404 handler (returns JSON for better debugging) ---
+app.notFound((c) => {
+  console.log(`404 Not Found: ${c.req.method} ${c.req.url}`);
+  return c.json({ error: `Route not found: ${c.req.method} ${c.req.path}` }, 404);
 });
 
 // Server started with payment-before-registration flow - v2.1 (UPDATED)

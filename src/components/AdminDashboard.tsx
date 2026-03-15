@@ -37,6 +37,7 @@ import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { ComprehensiveReports } from './ComprehensiveReports';
+import { AutomationModule } from './AutomationModule';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -47,6 +48,7 @@ const TABS = [
   { id: 'assets', label: 'Assets', icon: Briefcase },
   { id: 'attendance', label: 'Attendance', icon: Clock },
   { id: 'workflows', label: 'Workflows & Approvals', icon: GitMerge },
+  { id: 'automation', label: 'Automation', icon: Zap },
   { id: 'performance-reviews', label: 'Performance Reviews', icon: Target },
   { id: 'disciplinary', label: 'Disciplinary', icon: AlertCircle },
   { id: 'compliance', label: 'Labour Compliance', icon: FileCheck },
@@ -173,6 +175,7 @@ export function AdminDashboard() {
           {activeTab === 'assets' && <AdminAssets />}
           {activeTab === 'attendance' && <AdminAttendance />}
           {activeTab === 'workflows' && <AdminCrudPanel entityKey="workflows" />}
+          {activeTab === 'automation' && <AutomationModule companyId={profile?.companyId} />}
           {activeTab === 'performance-reviews' && <AdminCrudPanel entityKey="performance-reviews" />}
           {activeTab === 'disciplinary' && <AdminCrudPanel entityKey="disciplinary" />}
           {activeTab === 'compliance' && <AdminCrudPanel entityKey="compliance" />}
@@ -1457,24 +1460,52 @@ function AdminAnnouncements() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({ priority: 'normal' });
+  const [formData, setFormData] = useState<any>({ priority: 'normal', targetAudience: 'all', targetDepartments: [] });
   const [saving, setSaving] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const d = await api('/announcements', { token: accessToken }); setItems(Array.isArray(d) ? d.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []); }
-    catch (e) { console.log(e); }
+    try {
+      const [d, refData] = await Promise.all([
+        api('/announcements', { token: accessToken }),
+        api('/reference-data', { token: accessToken }).catch(() => ({})),
+      ]);
+      setItems(Array.isArray(d) ? d.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
+      if (refData?.departments) setDepartments(refData.departments);
+    } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 10000); return () => clearInterval(iv); }, [load]);
 
   const handleCreate = async () => {
     setSaving(true);
-    try { await api('/admin/announcements', { method: 'POST', body: JSON.stringify(formData), token: accessToken }); toast.success('Published'); setDialogOpen(false); setFormData({ priority: 'normal' }); load(); }
-    catch (e: any) { toast.error(e.message); }
+    try {
+      const payload = {
+        ...formData,
+        targetDepartments: formData.targetAudience === 'all' ? [] : (formData.targetDepartments || []),
+        createdByRole: 'admin',
+      };
+      await api('/admin/announcements', { method: 'POST', body: JSON.stringify(payload), token: accessToken });
+      toast.success('Published');
+      setDialogOpen(false);
+      setFormData({ priority: 'normal', targetAudience: 'all', targetDepartments: [] });
+      load();
+    } catch (e: any) { toast.error(e.message); }
     setSaving(false);
+  };
+
+  const toggleDept = (name: string) => {
+    const current = formData.targetDepartments || [];
+    setFormData({ ...formData, targetDepartments: current.includes(name) ? current.filter((d: string) => d !== name) : [...current, name] });
+  };
+
+  const getTargetLabel = (item: any) => {
+    if (!item.targetAudience || item.targetAudience === 'all') return 'All';
+    if (item.targetDepartments?.length > 0) return `${item.targetDepartments.length} Dept${item.targetDepartments.length > 1 ? 's' : ''}`;
+    return 'All';
   };
 
   return (
@@ -1484,20 +1515,50 @@ function AdminAnnouncements() {
         <Card><CardContent className="text-center py-16 text-gray-400">No announcements</CardContent></Card>
       ) : items.map(i => (
         <Card key={i.id}><CardContent className="pt-4">
-          <div className="flex items-center gap-2 mb-1"><h3 className="font-medium">{i.title}</h3><Badge className={i.priority === 'urgent' ? 'bg-red-100 text-red-800' : i.priority === 'important' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>{i.priority}</Badge></div>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h3 className="font-medium">{i.title}</h3>
+            <Badge className={i.priority === 'urgent' ? 'bg-red-100 text-red-800' : i.priority === 'important' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>{i.priority}</Badge>
+            <Badge className={(!i.targetAudience || i.targetAudience === 'all') ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}>{getTargetLabel(i)}</Badge>
+          </div>
           <p className="text-sm text-gray-600">{i.content}</p>
-          <p className="text-xs text-gray-400 mt-2">{i.authorName} • {new Date(i.createdAt).toLocaleDateString()}</p>
+          {i.targetDepartments?.length > 0 && i.targetAudience !== 'all' && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {i.targetDepartments.map((d: string) => <Badge key={d} variant="outline" className="text-xs">{d}</Badge>)}
+            </div>
+          )}
+          <p className="text-xs text-gray-400 mt-2">{i.authorName} {'\u2022'} {new Date(i.createdAt).toLocaleDateString()}</p>
         </CardContent></Card>
       ))}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>New Announcement</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div><Label className="text-xs">Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
             <div><Label className="text-xs">Content</Label><Textarea value={formData.content || ''} onChange={e => setFormData({ ...formData, content: e.target.value })} rows={4} /></div>
-            <div><Label className="text-xs">Priority</Label>
-              <Select value={formData.priority} onValueChange={v => setFormData({ ...formData, priority: v })}><SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="normal">Normal</SelectItem><SelectItem value="important">Important</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label className="text-xs">Priority</Label>
+                <Select value={formData.priority} onValueChange={v => setFormData({ ...formData, priority: v })}><SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="normal">Normal</SelectItem><SelectItem value="important">Important</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></div>
+              <div><Label className="text-xs">Target</Label>
+                <Select value={formData.targetAudience || 'all'} onValueChange={v => setFormData({ ...formData, targetAudience: v, targetDepartments: v === 'all' ? [] : formData.targetDepartments })}><SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">All Departments</SelectItem><SelectItem value="specific">Specific Department(s)</SelectItem></SelectContent></Select></div>
+            </div>
+            {formData.targetAudience === 'specific' && (
+              <div>
+                <Label className="text-xs">Select Departments</Label>
+                <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-1 mt-1">
+                  {departments.length === 0 ? <p className="text-xs text-gray-400">No departments found</p> : departments.map((dept: any) => {
+                    const name = dept.name || dept.id;
+                    return (
+                      <label key={dept.id || name} className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                        <input type="checkbox" checked={(formData.targetDepartments || []).includes(name)} onChange={() => toggleDept(name)} className="rounded border-gray-300" />
+                        {name}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button onClick={handleCreate} disabled={saving}>Publish</Button></DialogFooter>
         </DialogContent>

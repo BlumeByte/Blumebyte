@@ -51,6 +51,8 @@ import { PayGradesModule } from './PayGradesModule';
 import { FinancialYearsModule } from './FinancialYearsModule';
 import { TaxConfigurationModule } from './TaxConfigurationModule';
 import { BenefitsModule } from './BenefitsModule';
+import { MultiDepartmentSelect } from './MultiDepartmentSelect';
+import { AutomationModule } from './AutomationModule';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -73,6 +75,7 @@ const SIDEBAR_ITEMS = [
   { id: 'feedback-360', label: '360\u00b0 Feedback', icon: MessageSquare, group: 'performance' },
   { id: 'meetings-1on1', label: '1:1 Meetings', icon: Users, group: 'performance' },
   { id: 'workflows-approvals', label: 'Workflows & Approvals', icon: GitMerge, group: 'operations' },
+  { id: 'automation', label: 'Automation & Workflows', icon: Zap, group: 'operations' },
   { id: 'recruitment', label: 'Recruitment', icon: UserPlus, group: 'operations' },
   { id: 'disciplinary', label: 'Disciplinary', icon: AlertCircle, group: 'operations' },
   { id: 'hr-reports', label: 'HR Reports & Analytics', icon: BarChart3, group: 'operations' },
@@ -439,6 +442,7 @@ export function SuperAdminDashboard() {
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;
       case 'recruitment': return <RecruitmentView />;
+      case 'automation': return <div className="p-8"><AutomationModule companyId={user?.companyId || ''} /></div>;
       case 'profile-requests': return <ProfileChangeRequests />;
       case 'billings-subscriptions': return <div className="p-8"><LicenseManagement /></div>;
       default:
@@ -2484,34 +2488,48 @@ function AnnouncementsView() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<any>({ targetAudience: 'all', targetDepartments: [] });
   const [saving, setSaving] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
+  const [departments, setDepartments] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api('/announcements', { token: accessToken });
+      const [data, refData] = await Promise.all([
+        api('/announcements', { token: accessToken }),
+        api('/reference-data', { token: accessToken }).catch(() => ({})),
+      ]);
       setItems(Array.isArray(data) ? data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
+      if (refData?.departments) setDepartments(refData.departments);
     } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  // Real-time polling every 10 seconds
+  useEffect(() => { const iv = setInterval(load, 10000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     if (!formData.title || !formData.content) { toast.error('Title and content required'); return; }
     setSaving(true);
     try {
+      const payload = {
+        ...formData,
+        priority: formData.priority || 'normal',
+        targetAudience: formData.targetAudience || 'all',
+        targetDepartments: formData.targetAudience === 'all' ? [] : (formData.targetDepartments || []),
+        createdByRole: 'superadmin',
+      };
       if (editItem) {
-        await api(`/announcements/${editItem.id}`, { method: 'PUT', body: JSON.stringify({ ...formData }), token: accessToken });
+        await api(`/announcements/${editItem.id}`, { method: 'PUT', body: JSON.stringify(payload), token: accessToken });
         toast.success('Announcement updated');
       } else {
-        await api('/announcements', { method: 'POST', body: JSON.stringify({ ...formData, priority: formData.priority || 'normal' }), token: accessToken });
+        await api('/announcements', { method: 'POST', body: JSON.stringify(payload), token: accessToken });
         toast.success('Announcement created');
       }
       setDialogOpen(false);
-      setFormData({});
+      setFormData({ targetAudience: 'all', targetDepartments: [] });
       setEditItem(null);
       load();
     } catch (e: any) { toast.error(e.message); }
@@ -2523,6 +2541,30 @@ function AnnouncementsView() {
     try { await api(`/announcements/${id}`, { method: 'DELETE', token: accessToken }); toast.success('Deleted'); setItems(prev => prev.filter(i => i.id !== id)); } catch (e: any) { toast.error(e.message); }
   };
 
+  const toggleDepartment = (deptName: string) => {
+    const current = formData.targetDepartments || [];
+    if (current.includes(deptName)) {
+      setFormData({ ...formData, targetDepartments: current.filter((d: string) => d !== deptName) });
+    } else {
+      setFormData({ ...formData, targetDepartments: [...current, deptName] });
+    }
+  };
+
+  const selectAllDepartments = () => {
+    setFormData({ ...formData, targetDepartments: departments.map((d: any) => d.name || d.id) });
+  };
+
+  const clearAllDepartments = () => {
+    setFormData({ ...formData, targetDepartments: [] });
+  };
+
+  const getTargetLabel = (item: any) => {
+    if (!item.targetAudience || item.targetAudience === 'all') return 'All Departments';
+    if (item.targetDepartments?.length > 0) return `${item.targetDepartments.length} Department${item.targetDepartments.length > 1 ? 's' : ''}`;
+    if (item.department) return item.department;
+    return 'All';
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
@@ -2530,7 +2572,7 @@ function AnnouncementsView() {
           <h1 className="text-2xl font-bold">Announcements</h1>
           <p className="text-sm text-gray-500 mt-1">{items.length} announcement{items.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={() => { setEditItem(null); setFormData({}); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Create</Button>
+        <Button onClick={() => { setEditItem(null); setFormData({ targetAudience: 'all', targetDepartments: [] }); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Create</Button>
       </div>
 
       {loading ? (
@@ -2544,15 +2586,25 @@ function AnnouncementsView() {
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h3 className="font-medium">{i.title}</h3>
                       <Badge className={i.priority === 'urgent' ? 'bg-red-100 text-red-800' : i.priority === 'important' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>{i.priority}</Badge>
+                      <Badge className={(!i.targetAudience || i.targetAudience === 'all') ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}>
+                        {getTargetLabel(i)}
+                      </Badge>
                     </div>
                     <p className="text-sm text-gray-600">{i.content}</p>
-                    <p className="text-xs text-gray-400 mt-2">{i.authorName} \u2022 {new Date(i.createdAt).toLocaleDateString()}</p>
+                    {i.targetDepartments?.length > 0 && i.targetAudience !== 'all' && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {i.targetDepartments.map((d: string) => (
+                          <Badge key={d} variant="outline" className="text-xs">{d}</Badge>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-2">{i.authorName} {'\u2022'} {new Date(i.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => { setEditItem(i); setFormData({ ...i }); setDialogOpen(true); }}><Pencil className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setEditItem(i); setFormData({ ...i, targetDepartments: i.targetDepartments || [] }); setDialogOpen(true); }}><Pencil className="w-4 h-4" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => handleDelete(i.id)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                   </div>
                 </div>
@@ -2563,19 +2615,64 @@ function AnnouncementsView() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editItem ? 'Edit Announcement' : 'Create Announcement'}</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div><Label>Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
-            <div><Label>Content</Label><Textarea value={formData.content || ''} onChange={e => setFormData({ ...formData, content: e.target.value })} rows={4} /></div>
-            <div>
-              <Label>Priority</Label>
-              <NativeSelect value={formData.priority || 'normal'} onChange={e => setFormData({ ...formData, priority: e.target.value })}>
-                <option value="normal">Normal</option>
-                <option value="important">Important</option>
-                <option value="urgent">Urgent</option>
-              </NativeSelect>
+          <div className="space-y-4 py-2">
+            <div><Label>Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="Announcement title" /></div>
+            <div><Label>Content</Label><Textarea value={formData.content || ''} onChange={e => setFormData({ ...formData, content: e.target.value })} rows={4} placeholder="Announcement content..." /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Priority</Label>
+                <NativeSelect value={formData.priority || 'normal'} onChange={e => setFormData({ ...formData, priority: e.target.value })}>
+                  <option value="normal">Normal</option>
+                  <option value="important">Important</option>
+                  <option value="urgent">Urgent</option>
+                </NativeSelect>
+              </div>
+              <div>
+                <Label>Target Audience</Label>
+                <NativeSelect value={formData.targetAudience || 'all'} onChange={e => setFormData({ ...formData, targetAudience: e.target.value, targetDepartments: e.target.value === 'all' ? [] : formData.targetDepartments })}>
+                  <option value="all">All Departments</option>
+                  <option value="specific">Specific Department(s)</option>
+                </NativeSelect>
+              </div>
             </div>
+            {formData.targetAudience === 'specific' && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Select Departments</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={selectAllDepartments}>Select All</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={clearAllDepartments}>Clear All</Button>
+                  </div>
+                </div>
+                <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                  {departments.length === 0 ? (
+                    <p className="text-sm text-gray-400">No departments found. Create departments first.</p>
+                  ) : departments.map((dept: any) => {
+                    const name = dept.name || dept.id;
+                    const isSelected = (formData.targetDepartments || []).includes(name);
+                    return (
+                      <label key={dept.id || name} className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleDepartment(name)}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm">{name}</span>
+                        {dept.company && <span className="text-xs text-gray-400 ml-auto">{dept.company}</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+                {(formData.targetDepartments || []).length > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    {formData.targetDepartments.length} department{formData.targetDepartments.length !== 1 ? 's' : ''} selected: {formData.targetDepartments.join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -2743,7 +2840,20 @@ function EmployeesView() {
                       <TableCell className="font-medium">{u.name}</TableCell>
                       <TableCell className="text-sm text-gray-500">{u.email}</TableCell>
                       <TableCell><Badge variant="outline" className={u.role === 'superadmin' ? 'border-red-200 text-red-700' : u.role === 'admin' ? 'border-amber-200 text-amber-700' : u.role === 'manager' ? 'border-blue-200 text-blue-700' : ''}>{u.role}</Badge></TableCell>
-                      <TableCell className="text-sm">{u.department || '—'}</TableCell>
+                      <TableCell className="text-sm">
+                        {u.departments && u.departments.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {u.departments.map((d: string) => (
+                              <Badge key={d} variant="outline" className="text-xs">
+                                {d}
+                                {d === u.department && <span className="ml-1">★</span>}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          u.department || '—'
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm">{u.company || '—'}</TableCell>
                       <TableCell><Badge className={u.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>{u.status || 'active'}</Badge></TableCell>
                     </TableRow>
@@ -2792,12 +2902,19 @@ function UserManagementView() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Prepare data with departments array
+      const payload = {
+        ...formData,
+        departments: formData.departments || (formData.department ? [formData.department] : []),
+        department: formData.department || (formData.departments && formData.departments[0]) || '',
+      };
+      
       if (editUser) {
-        await api(`/users/${editUser.userId}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api(`/users/${editUser.userId}`, { method: 'PUT', body: JSON.stringify(payload), token: accessToken });
         toast.success('User updated');
         setDialogOpen(false);
       } else {
-        const res = await api('/superadmin/users/create', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+        const res = await api('/superadmin/users/create', { method: 'POST', body: JSON.stringify(payload), token: accessToken });
         setTempPassword(res.tempPassword);
         setShowTempPw(true);
         toast.success('User created');
@@ -2830,7 +2947,7 @@ function UserManagementView() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">User Management</h1>
-        <Button onClick={() => { setEditUser(null); setFormData({ role: 'employee' }); setShowTempPw(false); setDialogOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Create User</Button>
+        <Button onClick={() => { setEditUser(null); setFormData({ role: 'employee', departments: [], department: '' }); setShowTempPw(false); setDialogOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Create User</Button>
       </div>
 
       <div className="mb-4">
@@ -2856,10 +2973,32 @@ function UserManagementView() {
                     <TableCell className="text-sm text-gray-500">{u.email}</TableCell>
                     <TableCell><Badge variant="outline">{u.role}</Badge></TableCell>
                     <TableCell className="text-sm">{u.company || u.companyName || '\u2014'}</TableCell>
-                    <TableCell className="text-sm">{u.department || '\u2014'}</TableCell>
+                    <TableCell className="text-sm">
+                      {u.departments && u.departments.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {u.departments.map((d: string) => (
+                            <Badge key={d} variant="outline" className="text-xs">
+                              {d}
+                              {d === u.department && <span className="ml-1">★</span>}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        u.department || '\u2014'
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditUser(u); setFormData({ ...u }); setShowTempPw(false); setDialogOpen(true); }}><Pencil className="w-3.5 h-3.5" /></Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { 
+                          setEditUser(u); 
+                          setFormData({ 
+                            ...u, 
+                            departments: u.departments || (u.department ? [u.department] : []),
+                            department: u.department || (u.departments && u.departments[0]) || ''
+                          }); 
+                          setShowTempPw(false); 
+                          setDialogOpen(true); 
+                        }}><Pencil className="w-3.5 h-3.5" /></Button>
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleResetPassword(u.userId)}><KeyRound className="w-3.5 h-3.5 text-amber-500" /></Button>
                         {(u.role !== 'superadmin' || u.userId === user?.id) && (
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDelete(u.userId)}><Trash2 className="w-3.5 h-3.5 text-red-500" /></Button>
@@ -2906,13 +3045,18 @@ function UserManagementView() {
                     {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </NativeSelect>
                 </div>
-                <div>
-                  <Label>Department</Label>
-                  <NativeSelect value={formData.department || ''} onChange={e => setFormData({ ...formData, department: e.target.value })}>
-                    <option value="">Select department</option>
-                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                  </NativeSelect>
-                </div>
+                
+                {/* Multi-Department Selection */}
+                <MultiDepartmentSelect
+                  departments={departments}
+                  selectedDepartments={formData.departments || []}
+                  onChange={(depts) => setFormData({ ...formData, departments: depts })}
+                  primaryDepartment={formData.department}
+                  onPrimaryChange={(dept) => setFormData({ ...formData, department: dept })}
+                  showPrimary={true}
+                  label="Assigned Departments"
+                />
+                
                 <div><Label>Position</Label><Input value={formData.position || ''} onChange={e => setFormData({ ...formData, position: e.target.value })} /></div>
                 <div>
                   <Label>Grade/Level</Label>

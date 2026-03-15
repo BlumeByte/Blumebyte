@@ -1,6 +1,6 @@
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
-const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0`;
+const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
 
 export function authHeaders(userToken?: string | null, json = true): Record<string, string> {
   const h: Record<string, string> = {
@@ -30,8 +30,8 @@ export async function api(path: string, options: RequestInit & { token?: string 
   try {
     data = JSON.parse(text);
   } catch (parseError) {
-    console.error('API response text:', text);
-    throw new Error('Server returned an invalid response. Please try again later.');
+    console.error(`API response for ${method} ${path}: ${res.status}`, text);
+    throw new Error(`Server returned an invalid response for ${path} (${res.status}). Please try again later.`);
   }
   
   if (!res.ok) {

@@ -54,6 +54,7 @@ export function ReportsPanel() {
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [managerDepartment, setManagerDepartment] = useState<string>('');
+  const [managerDepartments, setManagerDepartments] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,14 +68,19 @@ export function ReportsPanel() {
       ]);
       
       const myDept = profile?.department || '';
+      const myDepts = profile?.departments || (profile?.department ? [profile.department] : []);
       setManagerDepartment(myDept);
+      setManagerDepartments(myDepts);
       
-      // Filter data by manager's department for Manager role
+      // Filter data by manager's departments for Manager role
       const isManager = user?.role === 'manager';
-      setUsersData(Array.isArray(u) ? (isManager ? u.filter(usr => usr.department === myDept) : u) : []);
-      setAttendanceData(Array.isArray(a) ? (isManager ? a.filter(att => att.department === myDept) : a) : []);
-      setDepartmentsData(Array.isArray(d) ? (isManager ? d.filter(dept => dept.name === myDept) : d) : []);
-      setLeavesData(Array.isArray(l) ? (isManager ? l.filter(lv => lv.department === myDept) : l) : []);
+      setUsersData(Array.isArray(u) ? (isManager ? u.filter(usr => {
+        const userDepts = usr.departments || (usr.department ? [usr.department] : []);
+        return myDepts.some((dept: string) => userDepts.includes(dept));
+      }) : u) : []);
+      setAttendanceData(Array.isArray(a) ? (isManager ? a.filter(att => myDepts.includes(att.department)) : a) : []);
+      setDepartmentsData(Array.isArray(d) ? (isManager ? d.filter(dept => myDepts.includes(dept.name)) : d) : []);
+      setLeavesData(Array.isArray(l) ? (isManager ? l.filter(lv => myDepts.includes(lv.department)) : l) : []);
     } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken, user?.role]);
