@@ -46,6 +46,11 @@ import { AuditLogsModule } from './AuditLogsModule';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { LicenseManagement } from './LicenseManagement';
 import { ClientOnlyChart } from './ClientOnlyChart';
+import { CompensationModule } from './CompensationModule';
+import { PayGradesModule } from './PayGradesModule';
+import { FinancialYearsModule } from './FinancialYearsModule';
+import { TaxConfigurationModule } from './TaxConfigurationModule';
+import { BenefitsModule } from './BenefitsModule';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -54,6 +59,7 @@ const SIDEBAR_ITEMS = [
   { id: 'departments', label: 'Departments', icon: FolderTree, group: 'organization' },
   { id: 'assets', label: 'Assets', icon: Briefcase, group: 'assets' },
   { id: 'asset-categories', label: 'Asset Categories', icon: Package, group: 'assets' },
+  { id: 'compensation', label: 'Compensation', icon: TrendingUp, group: 'compensation' },
   { id: 'paygrades', label: 'Pay Grades', icon: DollarSign, group: 'compensation' },
   { id: 'financial-years', label: 'Financial Years', icon: Calendar, group: 'compensation' },
   { id: 'leave-management', label: 'Leave Management', icon: CalendarDays, group: 'time' },
@@ -420,6 +426,11 @@ export function SuperAdminDashboard() {
       case 'attendance': return <AttendanceView />;
       case 'leave-management': return <LeaveManagementView />;
       case 'payroll': return <PayrollView />;
+      case 'compensation': return <div className="p-8"><CompensationModule /></div>;
+      case 'paygrades': return <div className="p-8"><PayGradesModule /></div>;
+      case 'financial-years': return <div className="p-8"><FinancialYearsModule /></div>;
+      case 'tax-configuration': return <div className="p-8"><TaxConfigurationModule /></div>;
+      case 'benefits': return <div className="p-8"><BenefitsModule /></div>;
       case 'hr-reports': return <ReportsPanel />;
       case 'advanced-reports': return <div className="p-8"><AdvancedReportsModule /></div>;
       case 'audit-logs': return <div className="p-8"><AuditLogsModule /></div>;

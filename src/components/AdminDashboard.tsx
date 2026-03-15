@@ -2526,7 +2526,7 @@ const ADMIN_ENTITY_CONFIGS: Record<string, AdminEntityConfig> = {
     title: 'Performance Reviews',
     apiPrefix: '/admin/performance-reviews',
     fields: [
-      { key: 'employeeId', label: 'Employee Name', type: 'user-select' },
+      { key: 'employeeIds', label: 'Employees', type: 'user-multi-select' },
       { key: 'reviewerId', label: 'Reviewer', type: 'user-select' },
       { key: 'period', label: 'Review Period' },
       { key: 'rating', label: 'Rating', type: 'select', options: ['1', '2', '3', '4', '5'] },
@@ -2541,7 +2541,7 @@ const ADMIN_ENTITY_CONFIGS: Record<string, AdminEntityConfig> = {
     title: 'Disciplinary Cases',
     apiPrefix: '/admin/disciplinary-cases',
     fields: [
-      { key: 'employeeId', label: 'Employee', type: 'user-select' },
+      { key: 'employeeIds', label: 'Employees', type: 'user-multi-select' },
       { key: 'type', label: 'Offense Type', type: 'select', options: ['misconduct', 'poor-performance', 'attendance', 'policy-violation', 'harassment', 'insubordination', 'other'] },
       { key: 'description', label: 'Description' },
       { key: 'incidentDate', label: 'Incident Date', type: 'date' },
@@ -2560,7 +2560,7 @@ const ADMIN_ENTITY_CONFIGS: Record<string, AdminEntityConfig> = {
       { key: 'category', label: 'Category', type: 'select', options: ['employment', 'safety', 'wages', 'discrimination', 'benefits', 'record-keeping', 'other'] },
       { key: 'description', label: 'Description' },
       { key: 'dueDate', label: 'Compliance Due Date', type: 'date' },
-      { key: 'responsibleId', label: 'Responsible Person', type: 'user-select' },
+      { key: 'assignedTo', label: 'Assigned Employees', type: 'user-multi-select' },
       { key: 'status', label: 'Status', type: 'select', options: ['compliant', 'non-compliant', 'in-progress', 'pending-review', 'overdue'] },
     ],
   },
@@ -2570,7 +2570,7 @@ const ADMIN_ENTITY_CONFIGS: Record<string, AdminEntityConfig> = {
     fields: [
       { key: 'title', label: 'Task Title' },
       { key: 'description', label: 'Description' },
-      { key: 'assignedTo', label: 'Assigned To', type: 'user-select' },
+      { key: 'assignedToIds', label: 'Assigned To Employees', type: 'user-multi-select' },
       { key: 'assignedBy', label: 'Assigned By', type: 'user-select' },
       { key: 'priority', label: 'Priority', type: 'select', options: ['low', 'medium', 'high', 'urgent'] },
       { key: 'dueDate', label: 'Due Date', type: 'date' },
@@ -2583,7 +2583,7 @@ const ADMIN_ENTITY_CONFIGS: Record<string, AdminEntityConfig> = {
     title: '360\u00b0 Feedback',
     apiPrefix: '/admin/feedback',
     fields: [
-      { key: 'employeeId', label: 'Employee', type: 'user-select' },
+      { key: 'employeeIds', label: 'Employees', type: 'user-multi-select' },
       { key: 'reviewerId', label: 'Reviewer', type: 'user-select' },
       { key: 'type', label: 'Feedback Type', type: 'select', options: ['peer', 'manager', 'self', 'direct-report', 'external'] },
       { key: 'period', label: 'Period' },
@@ -2712,11 +2712,23 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
       return getUserName(val) || val;
     }
     if (field.type === 'user-multi-select') {
-      if (Array.isArray(val)) {
-        const names = val.map((uid: string) => getUserName(uid)).join(', ');
-        return names || '—';
+      if (Array.isArray(val) && val.length > 0) {
+        return (
+          <div className="flex flex-wrap gap-1">
+            {val.slice(0, 2).map((uid: string, idx: number) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {getUserName(uid) || uid}
+              </Badge>
+            ))}
+            {val.length > 2 && (
+              <Badge variant="outline" className="text-xs bg-gray-100">
+                +{val.length - 2}
+              </Badge>
+            )}
+          </div>
+        );
       }
-      return String(val);
+      return <span className="text-gray-400">—</span>;
     }
     if (field.type === 'questions') {
       if (Array.isArray(val)) return `${val.length} question(s)`;

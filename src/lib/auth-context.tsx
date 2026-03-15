@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
 import { api } from './api-client';
+import { authLock } from './auth-lock';
 
 interface User {
   id: string;
@@ -32,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const initializedRef = useRef(false);
+  const tokenCacheRef = useRef<{ token: string; expiresAt: number } | null>(null);
+  const tokenFetchingRef = useRef<Promise<string | null> | null>(null);
 
   const fetchProfile = useCallback(async (token: string) => {
     try {
@@ -45,43 +48,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.log('getSession error (likely expired refresh token):', error.message);
-        // Invalid refresh token – clear state so user is sent back to login
-        setUser(null);
-        setAccessToken(null);
-        await supabase.auth.signOut().catch(() => {});
-        return null;
-      }
-      if (!data?.session) return null;
-      const token = data.session.access_token;
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const now = Math.floor(Date.now() / 1000);
-        if (payload.exp - now < 60) {
-          const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-          if (refreshError) {
-            console.log('Refresh token expired/invalid:', refreshError.message);
+    // If already fetching, wait for that promise
+    if (tokenFetchingRef.current) {
+      return tokenFetchingRef.current;
+    }
+
+    // Use the global auth lock to serialize all auth operations
+    const fetchToken = async (): Promise<string | null> => {
+      return authLock.acquire('getSession', async () => {
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          if (error) {
+            console.log('getSession error (likely expired refresh token):', error.message);
+            // Invalid refresh token – clear state so user is sent back to login
             setUser(null);
             setAccessToken(null);
             await supabase.auth.signOut().catch(() => {});
             return null;
           }
-          if (refreshed?.session) {
-            setAccessToken(refreshed.session.access_token);
-            return refreshed.session.access_token;
-          }
+          if (!data?.session) return null;
+          const token = data.session.access_token;
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const now = Math.floor(Date.now() / 1000);
+            if (payload.exp - now < 60) {
+              const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+              if (refreshError) {
+                console.log('Refresh token expired/invalid:', refreshError.message);
+                setUser(null);
+                setAccessToken(null);
+                await supabase.auth.signOut().catch(() => {});
+                return null;
+              }
+              if (refreshed?.session) {
+                setAccessToken(refreshed.session.access_token);
+                return refreshed.session.access_token;
+              }
+            }
+          } catch (_) {}
+          return token;
+        } catch (e: any) {
+          console.log('getToken unexpected error:', e.message);
+          setUser(null);
+          setAccessToken(null);
+          return null;
         }
+      });
+    };
+
+    tokenFetchingRef.current = fetchToken().finally(() => {
+      tokenFetchingRef.current = null;
+    });
+    
+    const token = await tokenFetchingRef.current;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const expiresAt = payload.exp * 1000;
+        tokenCacheRef.current = { token, expiresAt };
       } catch (_) {}
-      return token;
-    } catch (e: any) {
-      console.log('getToken unexpected error:', e.message);
-      setUser(null);
-      setAccessToken(null);
-      return null;
     }
+    return token;
   }, []);
 
   useEffect(() => {

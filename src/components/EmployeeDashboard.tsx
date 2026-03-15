@@ -17,7 +17,7 @@ import {
   CheckCircle, X, Briefcase, LayoutDashboard, FileText, MessageCircle, LogOut,
   Star, Video, MapPin, Building2, Phone, Mail, Printer, ArrowUpDown, ArrowUp, ArrowDown,
   DollarSign, Download, ListTodo, ClipboardCheck, Target, AlertCircle, ChevronRight,
-  GraduationCap, ClipboardList, RefreshCw
+  GraduationCap, ClipboardList, RefreshCw, FileCheck, GitMerge, BarChart3, TrendingUp
 } from 'lucide-react';
 import { Progress } from './ui/progress';
 import { MessagesPanel } from './MessagesPanel';
@@ -79,6 +79,8 @@ export function EmployeeDashboard() {
             <TabsTrigger value="tasks"><ListTodo className="w-4 h-4 mr-1" />Tasks</TabsTrigger>
             <TabsTrigger value="onboarding"><ClipboardCheck className="w-4 h-4 mr-1" />Onboarding</TabsTrigger>
             <TabsTrigger value="reviews"><Star className="w-4 h-4 mr-1" />Reviews</TabsTrigger>
+            <TabsTrigger value="disciplinary"><AlertCircle className="w-4 h-4 mr-1" />Disciplinary</TabsTrigger>
+            <TabsTrigger value="compliance"><FileCheck className="w-4 h-4 mr-1" />Compliance</TabsTrigger>
             <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
             <TabsTrigger value="meetings"><Video className="w-4 h-4 mr-1" />Meetings</TabsTrigger>
             <TabsTrigger value="messages"><MessageCircle className="w-4 h-4 mr-1" />Messages</TabsTrigger>
@@ -96,6 +98,8 @@ export function EmployeeDashboard() {
           <TabsContent value="tasks"><EmpTasks /></TabsContent>
           <TabsContent value="onboarding"><EmpOnboarding /></TabsContent>
           <TabsContent value="reviews"><EmpReviews /></TabsContent>
+          <TabsContent value="disciplinary"><div className="py-16 text-center text-gray-500">Disciplinary module</div></TabsContent>
+          <TabsContent value="compliance"><div className="py-16 text-center text-gray-500">Compliance module</div></TabsContent>
           <TabsContent value="training"><TrainingManagement mode="employee" /></TabsContent>
           <TabsContent value="questionnaires"><EmpQuestionnaires /></TabsContent>
           <TabsContent value="meetings"><MeetingsPanel mode="employee" /></TabsContent>

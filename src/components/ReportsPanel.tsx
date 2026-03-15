@@ -43,7 +43,7 @@ function printReport(title: string, headers: string[], rows: string[][], chartHt
 type ReportTab = 'overview' | 'users' | 'attendance' | 'departments' | 'leave';
 
 export function ReportsPanel() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const { branding } = useBranding();
   const [activeReport, setActiveReport] = useState<ReportTab>('overview');
   const [usersData, setUsersData] = useState<any[]>([]);
@@ -53,23 +53,31 @@ export function ReportsPanel() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [managerDepartment, setManagerDepartment] = useState<string>('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [u, a, d, l] = await Promise.all([
+      const [u, a, d, l, profile] = await Promise.all([
         api('/reports/users', { token: accessToken }).catch(() => []),
         api('/reports/attendance', { token: accessToken }).catch(() => []),
         api('/admin/departments', { token: accessToken }).catch(() => []),
         api('/leave-requests', { token: accessToken }).catch(() => []),
+        api('/profile', { token: accessToken }).catch(() => null),
       ]);
-      setUsersData(Array.isArray(u) ? u : []);
-      setAttendanceData(Array.isArray(a) ? a : []);
-      setDepartmentsData(Array.isArray(d) ? d : []);
-      setLeavesData(Array.isArray(l) ? l : []);
+      
+      const myDept = profile?.department || '';
+      setManagerDepartment(myDept);
+      
+      // Filter data by manager's department for Manager role
+      const isManager = user?.role === 'manager';
+      setUsersData(Array.isArray(u) ? (isManager ? u.filter(usr => usr.department === myDept) : u) : []);
+      setAttendanceData(Array.isArray(a) ? (isManager ? a.filter(att => att.department === myDept) : a) : []);
+      setDepartmentsData(Array.isArray(d) ? (isManager ? d.filter(dept => dept.name === myDept) : d) : []);
+      setLeavesData(Array.isArray(l) ? (isManager ? l.filter(lv => lv.department === myDept) : l) : []);
     } catch (e) { console.log(e); }
     setLoading(false);
-  }, [accessToken]);
+  }, [accessToken, user?.role]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const iv = setInterval(load, 30000); return () => clearInterval(iv); }, [load]);

@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Loader2, Users } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Users, Info, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
+import { Alert, AlertDescription } from './ui/alert';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
@@ -22,9 +23,10 @@ export function EmployeeChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showClearingAlert, setShowClearingAlert] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { user, getToken } = useAuth();
+  const { user, accessToken } = useAuth();
   const pollInterval = useRef<number>();
 
   // Get user initials for avatar
@@ -45,7 +47,7 @@ export function EmployeeChat() {
   // Fetch messages from server
   const fetchMessages = React.useCallback(async () => {
     try {
-      const token = await getToken();
+      const token = accessToken;
       if (!token) return;
 
       const response = await fetch(
@@ -69,7 +71,7 @@ export function EmployeeChat() {
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
-  }, [getToken]);
+  }, [accessToken]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -110,7 +112,7 @@ export function EmployeeChat() {
     setIsLoading(true);
 
     try {
-      const token = await getToken();
+      const token = accessToken;
       if (!token) {
         toast.error('Please sign in to send messages');
         return;
@@ -209,6 +211,26 @@ export function EmployeeChat() {
               </CardHeader>
 
               <CardContent className="p-0">
+                {/* Weekly Clearing Alert */}
+                {showClearingAlert && (
+                  <Alert className="m-3 mb-0 border-amber-200 bg-amber-50">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800 flex items-start justify-between gap-2">
+                      <span>
+                        <strong>Notice:</strong> Chat messages are automatically cleared every Sunday at midnight for security and privacy. Please save important information elsewhere.
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowClearingAlert(false)}
+                        className="h-4 w-4 p-0 hover:bg-transparent"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 <div className="h-[400px] overflow-y-auto p-4">
                   {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">

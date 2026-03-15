@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -12,18 +12,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Textarea } from './ui/textarea';
 import { Checkbox } from './ui/checkbox';
 import { toast } from 'sonner@2.0.3';
-import { Loader2, Plus, DollarSign, Pencil, Trash2, Eye, TrendingUp, Users, Building2, User } from 'lucide-react';
+import { Loader2, Plus, Heart, Pencil, Trash2, Eye, TrendingUp, User, Building2} from 'lucide-react';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';
 
-export function CompensationModule() {
+export function BenefitsModule() {
   const { accessToken, user } = useAuth();
   const { branding } = useBranding();
-  const [compensations, setCompensations] = useState<any[]>([]);
+  const [benefits, setBenefits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState('createdAt');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sortField, setSortField] = useState('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [formData, setFormData] = useState<any>({});
@@ -41,17 +41,17 @@ export function CompensationModule() {
     setLoading(true);
     try {
       const [data, refData, usersData] = await Promise.all([
-        api('/compensations', { token: accessToken }),
+        api('/benefits', { token: accessToken }),
         api('/reference-data', { token: accessToken }).catch(() => ({})),
         api('/users', { token: accessToken }).catch(() => [])
       ]);
-      setCompensations(Array.isArray(data) ? data : []);
+      setBenefits(Array.isArray(data) ? data : []);
       setDepartments(refData?.departments || []);
       setBranches(refData?.branches || []);
       setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (e) {
-      console.log('Failed to load compensations:', e);
-      setCompensations([]);
+      console.log('Failed to load benefits:', e);
+      setBenefits([]);
     }
     setLoading(false);
   }, [accessToken]);
@@ -63,12 +63,11 @@ export function CompensationModule() {
     setEditItem(null);
     setFormData({
       name: '',
-      type: 'allowance',
-      amount: '',
-      frequency: 'monthly',
-      targetType: 'all', // all, department, branch, user
+      type: 'health', // health, dental, vision, retirement, life_insurance, other
       description: '',
-      taxable: true,
+      employerCost: '',
+      employeeCost: '',
+      targetType: 'all',
       active: true,
     });
     setSelectedUsers([]);
@@ -94,51 +93,52 @@ export function CompensationModule() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (!formData.name || !formData.amount) {
-        toast.error('Name and amount are required');
+      if (!formData.name || !formData.type) {
+        toast.error('Name and type are required');
         setSaving(false);
         return;
       }
 
       const payload = {
         ...formData,
-        amount: parseFloat(formData.amount),
+        employerCost: parseFloat(formData.employerCost) || 0,
+        employeeCost: parseFloat(formData.employeeCost) || 0,
         targetUsers: formData.targetType === 'user' ? selectedUsers : [],
         targetDepartments: formData.targetType === 'department' ? selectedDepts : [],
         targetBranches: formData.targetType === 'branch' ? selectedBranches : [],
       };
 
       if (editItem) {
-        await api(`/compensations/${editItem.id}`, {
+        await api(`/benefits/${editItem.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
           token: accessToken,
         });
-        toast.success('Compensation updated successfully');
+        toast.success('Benefit updated successfully');
       } else {
-        await api('/compensations', {
+        await api('/benefits', {
           method: 'POST',
           body: JSON.stringify(payload),
           token: accessToken,
         });
-        toast.success('Compensation created successfully');
+        toast.success('Benefit created successfully');
       }
       setDialogOpen(false);
       load();
     } catch (e: any) {
-      toast.error(e.message || 'Failed to save compensation');
+      toast.error(e.message || 'Failed to save benefit');
     }
     setSaving(false);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this compensation?')) return;
+    if (!confirm('Are you sure you want to delete this benefit?')) return;
     try {
-      await api(`/compensations/${id}`, { method: 'DELETE', token: accessToken });
-      toast.success('Compensation deleted successfully');
+      await api(`/benefits/${id}`, { method: 'DELETE', token: accessToken });
+      toast.success('Benefit deleted successfully');
       load();
     } catch (e: any) {
-      toast.error(e.message || 'Failed to delete compensation');
+      toast.error(e.message || 'Failed to delete benefit');
     }
   };
 
@@ -160,30 +160,18 @@ export function CompensationModule() {
     );
   };
 
-  const filteredAndSorted = compensations
+  const filteredAndSorted = benefits
     .filter(item => {
       if (!searchTerm) return true;
       const searchLower = searchTerm.toLowerCase();
       return (
         item.name?.toLowerCase().includes(searchLower) ||
-        item.type?.toLowerCase().includes(searchLower) ||
-        item.description?.toLowerCase().includes(searchLower)
+        item.type?.toLowerCase().includes(searchLower)
       );
     })
     .sort((a, b) => {
-      let aVal = a[sortField] || '';
-      let bVal = b[sortField] || '';
-      
-      if (sortField === 'amount') {
-        return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-      
-      if (sortField === 'createdAt') {
-        aVal = new Date(aVal).getTime();
-        bVal = new Date(bVal).getTime();
-        return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-      
+      const aVal = a[sortField] || '';
+      const bVal = b[sortField] || '';
       const comparison = String(aVal).localeCompare(String(bVal));
       return sortDir === 'asc' ? comparison : -comparison;
     });
@@ -191,35 +179,31 @@ export function CompensationModule() {
   const sortOptions = [
     { value: 'name', label: 'Name' },
     { value: 'type', label: 'Type' },
-    { value: 'amount', label: 'Amount' },
-    { value: 'frequency', label: 'Frequency' },
-    { value: 'createdAt', label: 'Created Date' },
+    { value: 'employerCost', label: 'Employer Cost' },
   ];
 
   const isSuperAdmin = user?.role === 'superadmin';
 
   return (
     <div className="space-y-4">
-      {/* Info Banner */}
-      <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+      <div className="p-4 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 rounded-lg">
         <div className="flex items-start gap-3">
-          <DollarSign className="w-5 h-5 text-green-600 mt-0.5" />
+          <Heart className="w-5 h-5 text-pink-600 mt-0.5" />
           <div className="flex-1">
-            <h3 className="font-semibold text-green-900">Compensation Management</h3>
-            <p className="text-sm text-green-700 mt-1">
-              Configure compensation packages, allowances, deductions, and bonuses. Target specific departments, branches, or individual employees.
+            <h3 className="font-semibold text-pink-900">Benefits Management</h3>
+            <p className="text-sm text-pink-700 mt-1">
+              Configure employee benefits including health insurance, retirement plans, and other perks.
             </p>
             {!isSuperAdmin && (
               <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
-                View-only mode. Only SuperAdmin can create or modify compensations.
+                View-only mode. Only SuperAdmin can create or modify benefits.
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Controls */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1">
           <ListControls
@@ -234,32 +218,30 @@ export function CompensationModule() {
               filteredAndSorted.map(item => ({
                 Name: item.name,
                 Type: item.type,
-                Amount: item.amount,
-                Frequency: item.frequency,
+                'Employer Cost': item.employerCost,
+                'Employee Cost': item.employeeCost,
                 Target: item.targetType,
-                Taxable: item.taxable ? 'Yes' : 'No',
                 Active: item.active ? 'Yes' : 'No',
               })),
-              'compensations'
+              'benefits'
             )}
             onExportPDF={() => exportToPDF(
-              'Compensation Report',
+              'Benefits Report',
               filteredAndSorted,
-              ['name', 'type', 'amount', 'frequency', 'targetType'],
+              ['name', 'type', 'employerCost', 'employeeCost'],
               branding.companyName
             )}
-            placeholder="Search compensations..."
+            placeholder="Search benefits..."
           />
         </div>
         {isSuperAdmin && (
           <Button onClick={handleCreate}>
             <Plus className="w-4 h-4 mr-2" />
-            Create Compensation
+            Create Benefit
           </Button>
         )}
       </div>
 
-      {/* Table */}
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -268,12 +250,12 @@ export function CompensationModule() {
             </div>
           ) : filteredAndSorted.length === 0 ? (
             <div className="py-16 text-center">
-              <DollarSign className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-gray-500">No compensations found</p>
+              <Heart className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-gray-500">No benefits found</p>
               {isSuperAdmin && (
                 <Button variant="outline" size="sm" className="mt-3" onClick={handleCreate}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Create First Compensation
+                  Create First Benefit
                 </Button>
               )}
             </div>
@@ -283,10 +265,9 @@ export function CompensationModule() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Frequency</TableHead>
+                  <TableHead>Employer Cost</TableHead>
+                  <TableHead>Employee Cost</TableHead>
                   <TableHead>Target</TableHead>
-                  <TableHead>Taxable</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
@@ -298,17 +279,22 @@ export function CompensationModule() {
                     <TableCell>
                       <Badge
                         className={
-                          item.type === 'salary' ? 'bg-blue-100 text-blue-800' :
-                          item.type === 'allowance' ? 'bg-green-100 text-green-800' :
-                          item.type === 'bonus' ? 'bg-purple-100 text-purple-800' :
-                          'bg-red-100 text-red-800'
+                          item.type === 'health' ? 'bg-red-100 text-red-800' :
+                          item.type === 'dental' ? 'bg-blue-100 text-blue-800' :
+                          item.type === 'vision' ? 'bg-purple-100 text-purple-800' :
+                          item.type === 'retirement' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
                         }
                       >
-                        {item.type}
+                        {item.type.replace('_', ' ')}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold">${item.amount?.toLocaleString()}</TableCell>
-                    <TableCell>{item.frequency}</TableCell>
+                    <TableCell className="font-semibold text-green-600">
+                      ${item.employerCost?.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-semibold text-orange-600">
+                      ${item.employeeCost?.toLocaleString()}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {item.targetType === 'all' && <Badge variant="outline">Company-wide</Badge>}
@@ -331,11 +317,6 @@ export function CompensationModule() {
                           </Badge>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={item.taxable ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}>
-                        {item.taxable ? 'Taxable' : 'Non-taxable'}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge className={item.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
@@ -386,7 +367,7 @@ export function CompensationModule() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editItem ? 'Edit' : 'Create'} Compensation</DialogTitle>
+            <DialogTitle>{editItem ? 'Edit' : 'Create'} Benefit</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -395,23 +376,25 @@ export function CompensationModule() {
                 <Input
                   value={formData.name || ''}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Housing Allowance"
+                  placeholder="e.g., Health Insurance"
                 />
               </div>
               <div>
                 <Label>Type <span className="text-red-500">*</span></Label>
                 <Select
-                  value={formData.type || 'allowance'}
+                  value={formData.type || 'health'}
                   onValueChange={v => setFormData({ ...formData, type: v })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="salary">Base Salary</SelectItem>
-                    <SelectItem value="allowance">Allowance</SelectItem>
-                    <SelectItem value="bonus">Bonus</SelectItem>
-                    <SelectItem value="deduction">Deduction</SelectItem>
+                    <SelectItem value="health">Health Insurance</SelectItem>
+                    <SelectItem value="dental">Dental Insurance</SelectItem>
+                    <SelectItem value="vision">Vision Insurance</SelectItem>
+                    <SelectItem value="retirement">Retirement Plan</SelectItem>
+                    <SelectItem value="life_insurance">Life Insurance</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -419,31 +402,24 @@ export function CompensationModule() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Amount <span className="text-red-500">*</span></Label>
+                <Label>Employer Cost (Monthly)</Label>
                 <Input
                   type="number"
                   step="0.01"
-                  value={formData.amount || ''}
-                  onChange={e => setFormData({ ...formData, amount: e.target.value })}
+                  value={formData.employerCost || ''}
+                  onChange={e => setFormData({ ...formData, employerCost: e.target.value })}
                   placeholder="0.00"
                 />
               </div>
               <div>
-                <Label>Frequency</Label>
-                <Select
-                  value={formData.frequency || 'monthly'}
-                  onValueChange={v => setFormData({ ...formData, frequency: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="annual">Annual</SelectItem>
-                    <SelectItem value="one-time">One-time</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Employee Cost (Monthly)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.employeeCost || ''}
+                  onChange={e => setFormData({ ...formData, employeeCost: e.target.value })}
+                  placeholder="0.00"
+                />
               </div>
             </div>
 
@@ -452,28 +428,18 @@ export function CompensationModule() {
               <Textarea
                 value={formData.description || ''}
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Enter compensation description"
+                placeholder="Enter benefit description"
                 rows={2}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="taxable"
-                  checked={formData.taxable ?? true}
-                  onCheckedChange={checked => setFormData({ ...formData, taxable: checked })}
-                />
-                <Label htmlFor="taxable" className="cursor-pointer">Taxable</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="active"
-                  checked={formData.active ?? true}
-                  onCheckedChange={checked => setFormData({ ...formData, active: checked })}
-                />
-                <Label htmlFor="active" className="cursor-pointer">Active</Label>
-              </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="active"
+                checked={formData.active ?? true}
+                onCheckedChange={checked => setFormData({ ...formData, active: checked })}
+              />
+              <Label htmlFor="active" className="cursor-pointer">Active</Label>
             </div>
 
             <div className="border-t pt-4">
@@ -494,7 +460,6 @@ export function CompensationModule() {
               </Select>
             </div>
 
-            {/* Department Selection */}
             {formData.targetType === 'department' && (
               <div className="border rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
                 <Label className="mb-2 block">Select Departments</Label>
@@ -506,21 +471,13 @@ export function CompensationModule() {
                         checked={selectedDepts.includes(dept)}
                         onCheckedChange={() => toggleDeptSelection(dept)}
                       />
-                      <Label htmlFor={`dept-${dept}`} className="cursor-pointer font-normal">
-                        {dept}
-                      </Label>
+                      <Label htmlFor={`dept-${dept}`} className="cursor-pointer font-normal">{dept}</Label>
                     </div>
                   ))}
                 </div>
-                {selectedDepts.length > 0 && (
-                  <p className="text-xs text-green-600 mt-2">
-                    {selectedDepts.length} department(s) selected
-                  </p>
-                )}
               </div>
             )}
 
-            {/* Branch Selection */}
             {formData.targetType === 'branch' && (
               <div className="border rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
                 <Label className="mb-2 block">Select Branches</Label>
@@ -532,21 +489,13 @@ export function CompensationModule() {
                         checked={selectedBranches.includes(branch)}
                         onCheckedChange={() => toggleBranchSelection(branch)}
                       />
-                      <Label htmlFor={`branch-${branch}`} className="cursor-pointer font-normal">
-                        {branch}
-                      </Label>
+                      <Label htmlFor={`branch-${branch}`} className="cursor-pointer font-normal">{branch}</Label>
                     </div>
                   ))}
                 </div>
-                {selectedBranches.length > 0 && (
-                  <p className="text-xs text-green-600 mt-2">
-                    {selectedBranches.length} branch(es) selected
-                  </p>
-                )}
               </div>
             )}
 
-            {/* User Selection */}
             {formData.targetType === 'user' && (
               <div className="border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
                 <Label className="mb-2 block">Select Users</Label>
@@ -559,26 +508,19 @@ export function CompensationModule() {
                         onCheckedChange={() => toggleUserSelection(u.userId || u.id)}
                       />
                       <Label htmlFor={`user-${u.userId || u.id}`} className="cursor-pointer font-normal">
-                        {u.name} ({u.email}) - {u.department || 'No Dept'}
+                        {u.name} ({u.email})
                       </Label>
                     </div>
                   ))}
                 </div>
-                {selectedUsers.length > 0 && (
-                  <p className="text-xs text-green-600 mt-2">
-                    {selectedUsers.length} user(s) selected
-                  </p>
-                )}
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              {editItem ? 'Save Changes' : 'Create Compensation'}
+              {editItem ? 'Save Changes' : 'Create Benefit'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -588,7 +530,7 @@ export function CompensationModule() {
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Compensation Details</DialogTitle>
+            <DialogTitle>Benefit Details</DialogTitle>
           </DialogHeader>
           {viewItem && (
             <div className="space-y-3">
@@ -604,32 +546,30 @@ export function CompensationModule() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs text-gray-500">Amount</Label>
+                  <Label className="text-xs text-gray-500">Employer Cost</Label>
                   <p className="text-lg font-bold text-green-600 mt-1">
-                    ${viewItem.amount?.toLocaleString()}
+                    ${viewItem.employerCost?.toLocaleString()}/mo
                   </p>
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">Frequency</Label>
-                  <p className="mt-1">{viewItem.frequency}</p>
+                  <Label className="text-xs text-gray-500">Employee Cost</Label>
+                  <p className="text-lg font-bold text-orange-600 mt-1">
+                    ${viewItem.employeeCost?.toLocaleString()}/mo
+                  </p>
                 </div>
               </div>
               <div>
                 <Label className="text-xs text-gray-500">Description</Label>
                 <p className="text-sm mt-1">{viewItem.description || '—'}</p>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-xs text-gray-500">Taxable</Label>
-                  <Badge className="mt-1">{viewItem.taxable ? 'Yes' : 'No'}</Badge>
+                  <Label className="text-xs text-gray-500">Target Type</Label>
+                  <Badge className="mt-1">{viewItem.targetType}</Badge>
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500">Status</Label>
                   <Badge className="mt-1">{viewItem.active ? 'Active' : 'Inactive'}</Badge>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Target Type</Label>
-                  <Badge className="mt-1">{viewItem.targetType}</Badge>
                 </div>
               </div>
               {viewItem.targetDepartments && viewItem.targetDepartments.length > 0 && (
@@ -642,34 +582,10 @@ export function CompensationModule() {
                   </div>
                 </div>
               )}
-              {viewItem.targetBranches && viewItem.targetBranches.length > 0 && (
-                <div>
-                  <Label className="text-xs text-gray-500">Target Branches</Label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {viewItem.targetBranches.map((b: string) => (
-                      <Badge key={b} variant="outline">{b}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {viewItem.targetUsers && viewItem.targetUsers.length > 0 && (
-                <div>
-                  <Label className="text-xs text-gray-500">Target Users</Label>
-                  <p className="text-sm mt-1">{viewItem.targetUsers.length} user(s) selected</p>
-                </div>
-              )}
-              <div>
-                <Label className="text-xs text-gray-500">Created At</Label>
-                <p className="text-sm mt-1">
-                  {viewItem.createdAt ? new Date(viewItem.createdAt).toLocaleString() : '—'}
-                </p>
-              </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
-              Close
-            </Button>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

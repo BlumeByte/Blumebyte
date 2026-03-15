@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { HomepageChatAgent } from '../components/HomepageChatAgent';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -280,6 +281,9 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Homepage Chat Agent for visitors */}
+      <HomepageChatAgent />
     </div>
   );
 }

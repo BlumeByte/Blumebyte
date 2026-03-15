@@ -1778,7 +1778,13 @@ app.get(`${PREFIX}/my-reviews`, async (c) => {
     const { user } = await requireAuth(c);
     const allReviews = await kv.getByPrefix("perf-review:");
     const userName = user.user_metadata?.name || user.email;
-    const myReviews = allReviews.filter((r: any) => r.employeeId === user.id || r.userId === user.id || r.reviewerId === user.id || r.employeeName === userName || r.reviewerName === userName || r.employee === userName || r.reviewer === userName);
+    const myReviews = allReviews.filter((r: any) => {
+      // Support both single employeeId and multi employeeIds array
+      const isSingleEmployee = r.employeeId === user.id || r.userId === user.id || r.employeeName === userName || r.employee === userName;
+      const isInEmployeesArray = Array.isArray(r.employeeIds) && r.employeeIds.includes(user.id);
+      const isReviewer = r.reviewerId === user.id || r.reviewerName === userName || r.reviewer === userName;
+      return isSingleEmployee || isInEmployeesArray || isReviewer;
+    });
     return c.json(myReviews);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -1793,7 +1799,12 @@ app.get(`${PREFIX}/my-tasks`, async (c) => {
     const { user } = await requireAuth(c);
     const allTasks = await kv.getByPrefix("task:");
     const userName = user.user_metadata?.name || user.email;
-    const myTasks = allTasks.filter((t: any) => t.assigneeId === user.id || t.assignedToId === user.id || t.employeeId === user.id || t.userId === user.id || t.assignedTo === user.id || t.assignedTo === userName || t.assignee === userName || t.assignedToName === userName);
+    const myTasks = allTasks.filter((t: any) => {
+      // Support both single assignedTo and multi assignedToIds array
+      const isSingleAssignee = t.assigneeId === user.id || t.assignedToId === user.id || t.employeeId === user.id || t.userId === user.id || t.assignedTo === user.id || t.assignedTo === userName || t.assignee === userName || t.assignedToName === userName;
+      const isInAssigneesArray = Array.isArray(t.assignedToIds) && t.assignedToIds.includes(user.id);
+      return isSingleAssignee || isInAssigneesArray;
+    });
     return c.json(myTasks);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -1890,7 +1901,13 @@ app.get(`${PREFIX}/my-questionnaires`, async (c) => {
     const { user } = await requireAuth(c);
     const allFeedback = await kv.getByPrefix("feedback:");
     const userName = user.user_metadata?.name || user.email;
-    const myFeedback = allFeedback.filter((f: any) => f.employeeId === user.id || f.reviewerId === user.id || f.userId === user.id || f.employeeName === userName || f.reviewerName === userName || f.employee === userName || f.reviewer === userName);
+    const myFeedback = allFeedback.filter((f: any) => {
+      // Support both single employeeId and multi employeeIds array
+      const isSingleEmployee = f.employeeId === user.id || f.userId === user.id || f.employeeName === userName || f.employee === userName;
+      const isInEmployeesArray = Array.isArray(f.employeeIds) && f.employeeIds.includes(user.id);
+      const isReviewer = f.reviewerId === user.id || f.reviewerName === userName || f.reviewer === userName;
+      return isSingleEmployee || isInEmployeesArray || isReviewer;
+    });
     return c.json(myFeedback);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -1917,6 +1934,46 @@ app.put(`${PREFIX}/my-questionnaires/:id`, async (c) => {
     return c.json(updated);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Get my disciplinary cases (any authenticated user)
+app.get(`${PREFIX}/my-disciplinary`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const allCases = await kv.getByPrefix("disciplinary:");
+    const userName = user.user_metadata?.name || user.email;
+    const myCases = allCases.filter((d: any) => {
+      // Support both single employeeId and multi employeeIds array
+      const isSingleEmployee = d.employeeId === user.id || d.userId === user.id || d.employeeName === userName;
+      const isInEmployeesArray = Array.isArray(d.employeeIds) && d.employeeIds.includes(user.id);
+      return isSingleEmployee || isInEmployeesArray;
+    });
+    return c.json(myCases);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    console.log("my disciplinary error:", e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Get my compliance items (any authenticated user)
+app.get(`${PREFIX}/my-compliance`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const allItems = await kv.getByPrefix("compliance:");
+    const userName = user.user_metadata?.name || user.email;
+    const myItems = allItems.filter((c: any) => {
+      // Support assignedTo as array
+      const isSingleAssignee = c.responsibleId === user.id || c.responsibleName === userName || c.assignedTo === user.id;
+      const isInAssigneesArray = Array.isArray(c.assignedTo) && c.assignedTo.includes(user.id);
+      return isSingleAssignee || isInAssigneesArray;
+    });
+    return c.json(myItems);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    console.log("my compliance error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -4846,11 +4903,9 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
       return c.json({ error: 'Message is required' }, 400);
     }
 
-    // Get user profile for name and company
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    // Also check employee data for name
-    const employeeData = await kv.get(`employee:${authUser.user.id}`);
-    const userName = userProfile?.name || employeeData?.name || authUser.user.user_metadata?.name || userProfile?.email?.split('@')[0] || 'Unknown User';
+    // Get user profile for name and company - use employee: key for consistency
+    const userProfile = await kv.get(`employee:${authUser.user.id}`);
+    const userName = userProfile?.name || authUser.user.user_metadata?.name || authUser.user.email?.split('@')[0] || 'Anonymous';
     const companyId = userProfile?.companyId;
 
     if (!companyId) {
@@ -4870,8 +4925,16 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
     // Get existing messages for this company
     const existingMessages = await kv.get(`chat_messages:${companyId}`) || [];
     
+    // Clear messages older than 7 days (weekly clearing)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentMessages = existingMessages.filter((msg: any) => {
+      const msgDate = new Date(msg.timestamp);
+      return msgDate > sevenDaysAgo;
+    });
+    
     // Add new message (keep last 100 messages per company)
-    const updatedMessages = [...existingMessages, chatMessage].slice(-100);
+    const updatedMessages = [...recentMessages, chatMessage].slice(-100);
     
     // Save to KV store with company scope
     await kv.set(`chat_messages:${companyId}`, updatedMessages);
@@ -4889,15 +4952,28 @@ app.get(`${PREFIX}/chat/messages`, async (c) => {
   try {
     const authUser = await requireAuth(c);
     
-    // Get user profile to find company
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    // Get user profile to find company - use employee: key for consistency
+    const userProfile = await kv.get(`employee:${authUser.user.id}`);
     const companyId = userProfile?.companyId;
 
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
     }
     
-    const messages = await kv.get(`chat_messages:${companyId}`) || [];
+    const allMessages = await kv.get(`chat_messages:${companyId}`) || [];
+    
+    // Filter out messages older than 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const messages = allMessages.filter((msg: any) => {
+      const msgDate = new Date(msg.timestamp);
+      return msgDate > sevenDaysAgo;
+    });
+    
+    // Update storage if we filtered any messages
+    if (messages.length !== allMessages.length) {
+      await kv.set(`chat_messages:${companyId}`, messages);
+    }
     
     return c.json({ messages });
   } catch (e: any) {

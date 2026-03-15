@@ -30,6 +30,11 @@ import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { MultiEmployeeSelect } from './MultiEmployeeSelect';
+import { ReportsPanel } from './ReportsPanel';
+import { AdvancedReportsModule } from './AdvancedReportsModule';
+import { AnnouncementsViewer } from './AnnouncementsViewer';
+import { ManagerCrudPanel } from './ManagerCrudPanel';
+import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -701,17 +706,17 @@ export function ManagerDashboard() {
           {activeTab === 'team' && <TeamTab />}
           {activeTab === 'departments' && <TeamTab />}
           {activeTab === 'attendance' && <ClockInOut />}
-          {activeTab === 'workflows' && <Card><CardContent className="py-16 text-center"><GitMerge className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">View-only access. Contact Admin to manage workflows.</p></CardContent></Card>}
-          {activeTab === 'performance' && <Card><CardContent className="py-16 text-center"><Target className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Performance review module. Contact Admin for access.</p></CardContent></Card>}
-          {activeTab === 'disciplinary' && <Card><CardContent className="py-16 text-center"><AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Disciplinary actions module. Contact Admin for access.</p></CardContent></Card>}
-          {activeTab === 'compliance' && <Card><CardContent className="py-16 text-center"><FileCheck className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Labour compliance module. Contact Admin for access.</p></CardContent></Card>}
-          {activeTab === 'tasks' && <Card><CardContent className="py-16 text-center"><ClipboardList className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Task assignments module. Contact Admin for access.</p></CardContent></Card>}
-          {activeTab === 'feedback' && <Card><CardContent className="py-16 text-center"><UserCheck className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">360° feedback module. Contact Admin for access.</p></CardContent></Card>}
+          {activeTab === 'workflows' && <ManagerCrudPanel resourceType="workflows" title="Workflows" description="Manage department workflows and approval processes" icon={GitMerge} />}
+          {activeTab === 'performance' && <ManagerCrudPanel resourceType="performance" title="Performance Reviews" description="Conduct and manage performance reviews for your department employees" icon={Target} />}
+          {activeTab === 'disciplinary' && <ManagerCrudPanel resourceType="disciplinary" title="Disciplinary Actions" description="Document and track disciplinary actions for department employees" icon={AlertCircle} />}
+          {activeTab === 'compliance' && <ManagerCrudPanel resourceType="compliance" title="Labour Compliance" description="Track compliance items and requirements for your department" icon={FileCheck} />}
+          {activeTab === 'tasks' && <ManagerCrudPanel resourceType="tasks" title="Task Assignments" description="Create and assign tasks to employees in your department" icon={ClipboardList} />}
+          {activeTab === 'feedback' && <ManagerCrudPanel resourceType="feedback" title="360° Feedback" description="Collect and manage 360-degree feedback for your department" icon={UserCheck} />}
           {activeTab === 'training' && <TrainingManagement mode="admin" />}
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'advanced-reports' && <AdvancedReportsModule />}
           {activeTab === 'meetings' && <MeetingsPanel mode="employee" />}
-          {activeTab === 'announcements' && <AnnouncementsViewer />}
+          {activeTab === 'announcements' && <ManagerAnnouncementsModule />}
           {activeTab === 'messages' && <MessagesPanel />}
           {activeTab === 'self-service' && <SharedSelfServiceHub onNavigate={handleNavigation} />}
           {activeTab === 'profile' && <SharedMyProfile />}
