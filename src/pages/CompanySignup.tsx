@@ -208,13 +208,17 @@ export default function CompanySignup() {
           plan: formData.billingCycle,
           email: formData.adminEmail.toLowerCase(),
         },
-        callback: async function(response: any) {
+        callback: function(response: any) {
+          // Use regular function (not async) as Paystack requires
           console.log('Payment successful. Reference:', response.reference);
           setPendingReference(response.reference);
           setPaymentWindowOpened(true);
           
-          // Now create the company account with the payment reference
-          await completeRegistration(response.reference);
+          // Create the company account with the payment reference
+          // Use setTimeout to make it async without making the callback async
+          setTimeout(() => {
+            completeRegistration(response.reference);
+          }, 100);
         },
         onClose: function() {
           console.log('Payment window closed');
