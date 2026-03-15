@@ -107,22 +107,53 @@ export default function CompanySignup() {
   useEffect(() => {
     const fetchPublicKey = async () => {
       try {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/paystack/public-key`,
-          {
-            headers: { Authorization: `Bearer ${publicAnonKey}` },
-          }
-        );
-        const data = await response.json();
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/paystack/public-key`;
+        console.log('Fetching Paystack public key from:', url);
+        
+        const response = await fetch(url, {
+          headers: { Authorization: `Bearer ${publicAnonKey}` },
+        });
+        
+        console.log('Response status:', response.status);
+        const contentType = response.headers.get('content-type');
+        console.log('Response content-type:', contentType);
+        
+        const text = await response.text();
+        console.log('Response text:', text.substring(0, 200));
+        
+        // Try to parse as JSON
+        const data = JSON.parse(text);
+        
         if (data.publicKey) {
           console.log('Paystack public key loaded successfully');
           setPaystackPublicKey(data.publicKey);
         } else {
           console.error('Failed to load Paystack public key:', data.error);
+          handlePublicKeyFallback();
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching Paystack public key:', error);
+        console.log('Using fallback method to get Paystack public key...');
+        handlePublicKeyFallback();
       }
+    };
+
+    const handlePublicKeyFallback = () => {
+      // Check localStorage first
+      const storedKey = localStorage.getItem('paystack_public_key');
+      if (storedKey && storedKey.startsWith('pk_')) {
+        console.log('Using Paystack public key from localStorage');
+        setPaystackPublicKey(storedKey);
+        return;
+      }
+
+      // If server endpoint is not available yet, we'll set a flag to show a message
+      // Paystack public keys are safe to expose (they're meant to be public)
+      // For now, we'll show an error and ask user to contact support
+      toast.error(
+        'Payment system configuration is loading. Please wait a moment and refresh the page.',
+        { duration: 6000 }
+      );
     };
 
     fetchPublicKey();

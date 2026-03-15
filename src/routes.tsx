@@ -8,6 +8,7 @@ import { Toaster } from './components/ui/sonner';
 
 // Lazy load heavy components for better initial load performance
 const CompanySignup = lazy(() => import('./pages/CompanySignup'));
+const DevSettings = lazy(() => import('./pages/DevSettings'));
 const EmployeePortal = lazy(() => import('./pages/EmployeePortal'));
 const PaystackSubscription = lazy(() => import('./pages/PaystackSubscription'));
 const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
@@ -50,6 +51,12 @@ function RootLayout() {
 const CompanySignupPage = () => (
   <Suspense fallback={<LoadingFallback />}>
     <CompanySignup />
+  </Suspense>
+);
+
+const DevSettingsPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <DevSettings />
   </Suspense>
 );
 
@@ -182,6 +189,10 @@ export const router = createBrowserRouter([
       {
         path: '/employee-portal',
         Component: EmployeePortalPage,
+      },
+      {
+        path: '/dev-settings',
+        Component: DevSettingsPage,
       },
       {
         path: '/security-policy',
