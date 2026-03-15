@@ -461,7 +461,7 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
 // --- Company Registration (creates SuperAdmin for a new company) ---
 app.post(`${PREFIX}/company/register`, async (c) => {
   try {
-    const { companyName, companySize, industry, adminName, adminEmail, password } = await c.req.json();
+    const { companyName, companySize, industry, adminName, adminEmail, password, paymentReference, selectedLicenses } = await c.req.json();
     
     if (!companyName || !adminEmail || !password || !adminName) {
       return c.json({ error: "Company name, admin name, email and password are required" }, 400);
@@ -478,6 +478,61 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       return c.json({ error: "An account with this email already exists" }, 400);
     }
 
+    // Variables for license management
+    let licensesToSet = 0;
+    let subscriptionStatus = 'none';
+    let subscriptionPlan = 'none';
+    let paymentData = null;
+
+    // If payment reference provided, verify payment first (pay-first flow)
+    if (paymentReference) {
+      console.log('Verifying payment reference:', paymentReference);
+      
+      const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+      if (!paystackSecretKey) {
+        return c.json({ error: 'Payment system not configured' }, 500);
+      }
+
+      try {
+        const verifyResponse = await fetch(
+          `https://api.paystack.co/transaction/verify/${paymentReference}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${paystackSecretKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const verifyData = await verifyResponse.json();
+        console.log('Payment verification response:', verifyData);
+
+        if (!verifyData.status || verifyData.data.status !== 'success') {
+          return c.json({ error: 'Payment verification failed. Please complete payment first.' }, 400);
+        }
+
+        // Extract metadata from payment
+        const metadata = verifyData.data.metadata || {};
+        const paidLicenses = metadata.licenses || selectedLicenses || 0;
+        const paidAmount = verifyData.data.amount / 100;
+        
+        licensesToSet = paidLicenses;
+        subscriptionStatus = 'active';
+        subscriptionPlan = metadata.plan || 'monthly';
+        paymentData = {
+          reference: paymentReference,
+          amount: paidAmount,
+          paidAt: new Date().toISOString(),
+        };
+
+        console.log(`Payment verified: ${paidLicenses} licenses, $${paidAmount}`);
+      } catch (paymentError: any) {
+        console.error('Payment verification error:', paymentError);
+        return c.json({ error: 'Failed to verify payment. Please contact support.' }, 500);
+      }
+    }
+
     // Create company record
     const companyId = crypto.randomUUID();
     const company = {
@@ -487,11 +542,11 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       industry: industry || 'Not specified',
       createdAt: new Date().toISOString(),
       status: 'active',
-      // Pay-first model: Start with 0 licenses
-      licenses: 0,
+      licenses: licensesToSet,
       usedLicenses: 0,
-      subscriptionStatus: 'none',
-      subscriptionPlan: 'none',
+      subscriptionStatus,
+      subscriptionPlan,
+      ...(paymentData && { lastPayment: paymentData }),
     };
     await kv.set(`company:${companyId}`, company);
 
@@ -539,14 +594,21 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       action: 'CREATE',
       resourceType: 'company',
       resourceId: companyId,
-      details: { companyName, adminEmail },
+      details: { 
+        companyName, 
+        adminEmail,
+        ...(paymentReference && { paymentReference, licenses: licensesToSet })
+      },
     });
 
     return c.json({ 
       success: true, 
       userId,
       companyId,
-      message: "Company created successfully. Please sign in to continue."
+      licenses: licensesToSet,
+      message: paymentReference 
+        ? `Company created successfully with ${licensesToSet} licenses. Please sign in to continue.`
+        : "Company created successfully. Please sign in to continue."
     });
   } catch (e: any) {
     console.log("company-registration error:", e);

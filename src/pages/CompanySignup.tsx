@@ -128,44 +128,58 @@ export default function CompanySignup() {
 
     setLoading(true);
 
-    // Open payment window immediately (before async work to avoid popup blockers)
-    const payWindow = window.open('', '_blank');
-    if (payWindow) {
-      payWindow.document.write(`
-        <html>
-          <head><title>Connecting to Paystack...</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-                   display: flex; flex-direction: column; align-items: center;
-                   justify-content: center; min-height: 100vh; margin: 0;
-                   background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%); color: #fff; }
-            .spinner {
-              width: 48px; height: 48px;
-              border: 4px solid rgba(255,255,255,0.3);
-              border-top-color: #fff;
-              border-radius: 50%;
-              animation: spin 0.8s linear infinite;
-              margin-bottom: 24px;
-            }
-            @keyframes spin { to { transform: rotate(360deg); } }
-            h2 { margin: 0 0 8px 0; font-size: 1.5rem; }
-            p  { margin: 0; opacity: 0.8; font-size: 0.95rem; }
-          </style>
-          </head>
-          <body>
-            <div class="spinner"></div>
-            <h2>Connecting to Paystack…</h2>
-            <p>Please wait while we prepare your payment.</p>
-          </body>
-        </html>`);
-      payWindow.document.close();
-    }
-    paymentWindowRef.current = payWindow;
-
     try {
-      // Initialize payment with company registration data
+      // Initialize Paystack payment directly (using inline popup)
+      const paystackPublicKey = 'pk_test_8c99e5db4a17f59b0bd05312f22b9d5d7dc7ba70';
+      const amountInKobo = Math.round(totalAmount * 100);
+      
+      const paystackHandler = (window as any).PaystackPop.setup({
+        key: paystackPublicKey,
+        email: formData.adminEmail.toLowerCase(),
+        amount: amountInKobo,
+        currency: 'NGN',
+        ref: `blumebyte_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        metadata: {
+          companyName: formData.companyName,
+          adminName: formData.adminName,
+          licenses: formData.licenses,
+          plan: formData.billingCycle,
+          email: formData.adminEmail.toLowerCase(),
+        },
+        callback: async function(response: any) {
+          console.log('Payment successful. Reference:', response.reference);
+          setPendingReference(response.reference);
+          setPaymentWindowOpened(true);
+          
+          // Now create the company account with the payment reference
+          await completeRegistration(response.reference);
+        },
+        onClose: function() {
+          console.log('Payment window closed');
+          if (!pendingReference) {
+            toast.warning('Payment was cancelled');
+            setLoading(false);
+          }
+        },
+      });
+
+      // Open Paystack inline popup
+      paystackHandler.openIframe();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to initialize payment');
+      console.error('Payment error:', error);
+      setLoading(false);
+    }
+  };
+
+  // Complete registration after successful payment
+  const completeRegistration = async (paymentReference: string) => {
+    setLoading(true);
+    try {
+      console.log('Creating company account with payment reference:', paymentReference);
+      
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/company/init-payment`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/company/register`,
         {
           method: 'POST',
           headers: {
@@ -179,56 +193,28 @@ export default function CompanySignup() {
             adminName: formData.adminName,
             adminEmail: formData.adminEmail.toLowerCase(),
             password: formData.password,
-            licenses: formData.licenses,
-            billingCycle: formData.billingCycle,
-            amount: totalAmount,
+            paymentReference: paymentReference,
+            selectedLicenses: formData.licenses,
           }),
         }
       );
 
-      const text = await response.text();
-      let data;
+      const data = await response.json();
       
-      try {
-        data = JSON.parse(text);
-      } catch (parseError) {
-        console.error('Response text:', text);
-        console.error('Response status:', response.status);
-        console.error('Response headers:', Object.fromEntries(response.headers.entries()));
-        toast.error(`Server error (${response.status}): ${text.substring(0, 200)}`);
-        throw new Error('Server returned an invalid response. Please try again later.');
-      }
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to initialize payment');
+        throw new Error(data.error || 'Failed to create company account');
       }
 
-      console.log('Payment init success. Authorization URL:', data.authorization_url);
-
-      if (data.authorization_url && data.reference) {
-        setPendingReference(data.reference);
-        setPaymentWindowOpened(true);
-
-        if (payWindow && !payWindow.closed) {
-          // Navigate the already-open tab to Paystack
-          payWindow.location.href = data.authorization_url;
-          
-          // Start polling for payment status
-          pollPaymentStatus(data.reference);
-        } else {
-          // Tab was closed or blocked — fall back to same-window navigation
-          console.warn('Payment tab was closed or blocked; falling back to same-window redirect');
-          window.location.href = data.authorization_url;
-        }
-      } else {
-        throw new Error('Payment initialization failed');
-      }
+      console.log('Company created successfully:', data);
+      toast.success(`Company created successfully with ${formData.licenses} licenses!`);
+      
+      // Redirect to sign in
+      setTimeout(() => {
+        navigate('/signin');
+      }, 1500);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to initialize payment');
-      console.error('Payment error:', error);
-      if (payWindow && !payWindow.closed) {
-        payWindow.close();
-      }
+      console.error('Registration error:', error);
+      toast.error(error.message || 'Failed to create company account');
     } finally {
       setLoading(false);
     }
