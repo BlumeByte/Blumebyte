@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         initializedRef.current = true;
         setSessionLoading(false);
       }
-    }, 3000);
+    }, 800); // Reduced from 3000ms to 800ms for faster initial load
 
     return () => {
       subscription.unsubscribe();

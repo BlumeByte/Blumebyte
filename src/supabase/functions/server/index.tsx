@@ -1142,8 +1142,17 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       return c.json({ error: "Email, name and role are required" }, 400);
     }
     
-    // Check license availability before creating user
-    const subscription = await kv.get(`subscription:${authUser.id}`);
+    // Get company ID from super admin's profile
+    const adminProfile = await kv.get(`user_profile:${authUser.id}`);
+    const userCompanyId = adminProfile?.companyId;
+    
+    if (!userCompanyId) {
+      return c.json({ error: "User not associated with a company" }, 400);
+    }
+    
+    // Check license availability for this company
+    const company = await kv.get(`company_by_id:${userCompanyId}`);
+    const subscription = company?.subscription;
     
     if (!subscription || subscription.status !== 'active') {
       return c.json({ 
@@ -1152,11 +1161,10 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       }, 403);
     }
     
-    // Count existing active users (including superadmin)
-    const allUsers = await kv.getByPrefix('employee:');
-    const activeUsers = allUsers.filter((u: any) => u.status === 'active');
-    const usedLicenses = activeUsers.length;
-    const purchasedLicenses = subscription.purchasedLicenses || 0;
+    // Count existing active users in this company
+    const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
+    const usedLicenses = companyStats.usedLicenses || 1; // At least the super admin
+    const purchasedLicenses = subscription.licenses || 0;
     
     if (usedLicenses >= purchasedLicenses) {
       return c.json({ 
@@ -1182,20 +1190,38 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     if (error) return c.json({ error: error.message }, 400);
     
     const userId = data.user.id;
-    await kv.set(`employee:${userId}`, {
+    
+    // Create user profile with company scoping
+    const userProfile = {
       id: userId,
       userId,
       email,
       name,
       role,
       status: "active",
-      companyId: companyId || "",
-      company: companyName,
+      companyId: userCompanyId, // Use the super admin's company
+      company: company.name,
       department: department || "",
       position: position || "",
       mustChangePassword: true,
       createdAt: new Date().toISOString(),
+      joinDate: new Date().toISOString(),
+      leaveBalance: 20, // Default leave balance
       ...body,
+    };
+    
+    // Store in both user_profile and employee for backward compatibility
+    await kv.set(`user_profile:${userId}`, userProfile);
+    await kv.set(`employee:${userId}`, userProfile);
+    await kv.set(`company_users:${userCompanyId}:${userId}`, userProfile);
+    
+    // Update company stats
+    await kv.set(`company_stats:${userCompanyId}`, {
+      ...companyStats,
+      totalEmployees: (companyStats.totalEmployees || 0) + 1,
+      activeEmployees: (companyStats.activeEmployees || 0) + 1,
+      usedLicenses: usedLicenses + 1,
+      availableLicenses: purchasedLicenses - (usedLicenses + 1),
     });
     // Broadcast: new user joined
     const allEmps = await kv.getByPrefix("employee:");
@@ -3919,6 +3945,116 @@ app.get(`${PREFIX}/assets`, async (c) => {
 });
 
 // ========================================
+// MULTI-TENANT COMPANY ENDPOINTS
+// ========================================
+
+// Company Registration (Public - No Auth Required)
+app.post(`${PREFIX}/company/register`, async (c) => {
+  try {
+    const { companyName, companySize, industry, adminName, adminEmail, password } = await c.req.json();
+
+    // Validation
+    if (!companyName || !adminEmail || !password || !adminName) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    if (password.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters' }, 400);
+    }
+
+    // Check if company with same name exists
+    const existingCompany = await kv.get(`company:${companyName.toLowerCase().replace(/\s+/g, '_')}`);
+    if (existingCompany) {
+      return c.json({ error: 'Company name already exists' }, 400);
+    }
+
+    // Create company ID
+    const companyId = crypto.randomUUID();
+    const companySlug = companyName.toLowerCase().replace(/\s+/g, '_');
+
+    // Create Supabase auth user for admin
+    const sb = supabaseAdmin();
+    const { data: authData, error: authError } = await sb.auth.admin.createUser({
+      email: adminEmail.toLowerCase(),
+      password: password,
+      email_confirm: true,
+      user_metadata: {
+        name: adminName,
+        role: 'superadmin',
+        company_id: companyId,
+        company_name: companyName,
+      },
+    });
+
+    if (authError) {
+      console.error('Auth user creation error:', authError);
+      return c.json({ error: authError.message || 'Failed to create user' }, 400);
+    }
+
+    // Create company record
+    const company = {
+      id: companyId,
+      slug: companySlug,
+      name: companyName,
+      size: companySize || 'unknown',
+      industry: industry || 'other',
+      status: 'trial', // 14-day trial
+      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+      subscription: {
+        plan: 'trial',
+        licenses: 10, // Trial includes 10 licenses
+        status: 'active',
+      },
+    };
+
+    await kv.set(`company:${companySlug}`, company);
+    await kv.set(`company_by_id:${companyId}`, company);
+
+    // Create admin user profile
+    const adminProfile = {
+      id: authData.user.id,
+      companyId: companyId,
+      email: adminEmail.toLowerCase(),
+      name: adminName,
+      role: 'superadmin',
+      status: 'active',
+      department: 'Management',
+      joinDate: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+
+    await kv.set(`user_profile:${authData.user.id}`, adminProfile);
+    await kv.set(`company_users:${companyId}:${authData.user.id}`, adminProfile);
+
+    // Initialize company data
+    await kv.set(`company_stats:${companyId}`, {
+      totalEmployees: 1,
+      activeEmployees: 1,
+      usedLicenses: 1,
+      availableLicenses: 9,
+    });
+
+    return c.json({
+      success: true,
+      company: {
+        id: companyId,
+        name: companyName,
+        slug: companySlug,
+      },
+      admin: {
+        id: authData.user.id,
+        email: adminEmail,
+        name: adminName,
+      },
+    });
+  } catch (e: any) {
+    console.error('Company registration error:', e);
+    return c.json({ error: e.message || 'Failed to register company' }, 500);
+  }
+});
+
+// ========================================
 // EMPLOYEE CHAT ENDPOINTS
 // ========================================
 
@@ -3932,27 +4068,33 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
       return c.json({ error: 'Message is required' }, 400);
     }
 
-    // Get user profile for name
+    // Get user profile for name and company
     const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
     const userName = userProfile?.name || userProfile?.email?.split('@')[0] || 'Anonymous';
+    const companyId = userProfile?.companyId;
+
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
 
     // Create message object
     const chatMessage = {
       id: crypto.randomUUID(),
       userId: authUser.user.id,
       userName: userName,
+      companyId: companyId,
       message: message.trim(),
       timestamp: new Date().toISOString(),
     };
 
-    // Get existing messages
-    const existingMessages = await kv.get('chat_messages') || [];
+    // Get existing messages for this company
+    const existingMessages = await kv.get(`chat_messages:${companyId}`) || [];
     
-    // Add new message (keep last 100 messages)
+    // Add new message (keep last 100 messages per company)
     const updatedMessages = [...existingMessages, chatMessage].slice(-100);
     
-    // Save to KV store
-    await kv.set('chat_messages', updatedMessages);
+    // Save to KV store with company scope
+    await kv.set(`chat_messages:${companyId}`, updatedMessages);
 
     return c.json({ success: true, message: chatMessage });
   } catch (e: any) {
@@ -3962,18 +4104,544 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
   }
 });
 
-// Get chat messages
+// Get chat messages (Company-scoped)
 app.get(`${PREFIX}/chat/messages`, async (c) => {
   try {
-    await requireAuth(c);
+    const authUser = await requireAuth(c);
     
-    const messages = await kv.get('chat_messages') || [];
+    // Get user profile to find company
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
+    
+    const messages = await kv.get(`chat_messages:${companyId}`) || [];
     
     return c.json({ messages });
   } catch (e: any) {
     console.error('Chat messages error:', e);
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ error: 'Failed to fetch messages' }, 500);
+  }
+});
+
+// ========================================
+// EMPLOYEE SELF-SERVICE PORTAL ENDPOINTS
+// ========================================
+
+// Get employee profile
+app.get(`${PREFIX}/employee/profile`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const profile = await kv.get(`user_profile:${authUser.user.id}`);
+    
+    if (!profile) {
+      return c.json({ error: 'Profile not found' }, 404);
+    }
+
+    return c.json(profile);
+  } catch (e: any) {
+    console.error('Get profile error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get profile' }, 500);
+  }
+});
+
+// Submit leave request
+app.post(`${PREFIX}/employee/leave-request`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const { type, startDate, endDate, reason } = await c.req.json();
+
+    if (!type || !startDate || !endDate) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    const leaveRequest = {
+      id: crypto.randomUUID(),
+      userId: authUser.user.id,
+      companyId: companyId,
+      userName: userProfile?.name || 'Unknown',
+      type: type,
+      startDate: startDate,
+      endDate: endDate,
+      days: days,
+      reason: reason || '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    const existingRequests = await kv.get(`leave_requests:${companyId}`) || [];
+    await kv.set(`leave_requests:${companyId}`, [...existingRequests, leaveRequest]);
+
+    return c.json({ success: true, request: leaveRequest });
+  } catch (e: any) {
+    console.error('Leave request error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to submit leave request' }, 500);
+  }
+});
+
+// Get employee leave requests
+app.get(`${PREFIX}/employee/leave-requests`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    const allRequests = await kv.get(`leave_requests:${companyId}`) || [];
+    const userRequests = allRequests.filter((r: any) => r.userId === authUser.user.id);
+
+    return c.json({ requests: userRequests });
+  } catch (e: any) {
+    console.error('Get leave requests error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get leave requests' }, 500);
+  }
+});
+
+// Clock in
+app.post(`${PREFIX}/employee/clock-in`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    const today = new Date().toISOString().split('T')[0];
+    const attendanceKey = `attendance:${companyId}:${today}`;
+    
+    const todayAttendance = await kv.get(attendanceKey) || [];
+    const existing = todayAttendance.find((a: any) => a.userId === authUser.user.id);
+
+    if (existing && existing.clockIn) {
+      return c.json({ error: 'Already clocked in today' }, 400);
+    }
+
+    const attendance = {
+      id: crypto.randomUUID(),
+      userId: authUser.user.id,
+      companyId: companyId,
+      date: today,
+      clockIn: new Date().toISOString(),
+      status: 'present',
+    };
+
+    if (existing) {
+      const updated = todayAttendance.map((a: any) => 
+        a.userId === authUser.user.id ? attendance : a
+      );
+      await kv.set(attendanceKey, updated);
+    } else {
+      await kv.set(attendanceKey, [...todayAttendance, attendance]);
+    }
+
+    return c.json({ success: true, attendance });
+  } catch (e: any) {
+    console.error('Clock in error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to clock in' }, 500);
+  }
+});
+
+// Clock out
+app.post(`${PREFIX}/employee/clock-out`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    const today = new Date().toISOString().split('T')[0];
+    const attendanceKey = `attendance:${companyId}:${today}`;
+    
+    const todayAttendance = await kv.get(attendanceKey) || [];
+    const existing = todayAttendance.find((a: any) => a.userId === authUser.user.id);
+
+    if (!existing || !existing.clockIn) {
+      return c.json({ error: 'Must clock in first' }, 400);
+    }
+
+    if (existing.clockOut) {
+      return c.json({ error: 'Already clocked out today' }, 400);
+    }
+
+    const clockOutTime = new Date();
+    const clockInTime = new Date(existing.clockIn);
+    const hoursWorked = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+
+    const updated = todayAttendance.map((a: any) => 
+      a.userId === authUser.user.id 
+        ? { ...a, clockOut: clockOutTime.toISOString(), hoursWorked } 
+        : a
+    );
+
+    await kv.set(attendanceKey, updated);
+
+    return c.json({ success: true, hoursWorked });
+  } catch (e: any) {
+    console.error('Clock out error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to clock out' }, 500);
+  }
+});
+
+// Get employee attendance
+app.get(`${PREFIX}/employee/attendance`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    const today = new Date().toISOString().split('T')[0];
+    const records: any[] = [];
+
+    // Get last 30 days
+    for (let i = 0; i < 30; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      const attendanceKey = `attendance:${companyId}:${dateStr}`;
+      const dayAttendance = await kv.get(attendanceKey) || [];
+      const userRecord = dayAttendance.find((a: any) => a.userId === authUser.user.id);
+      if (userRecord) {
+        records.push(userRecord);
+      }
+    }
+
+    const todayKey = `attendance:${companyId}:${today}`;
+    const todayAttendance = await kv.get(todayKey) || [];
+    const todayRecord = todayAttendance.find((a: any) => a.userId === authUser.user.id);
+
+    return c.json({ records, today: todayRecord });
+  } catch (e: any) {
+    console.error('Get attendance error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get attendance' }, 500);
+  }
+});
+
+// Get employee payslips
+app.get(`${PREFIX}/employee/payslips`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    const payslips = await kv.get(`payslips:${companyId}:${authUser.user.id}`) || [];
+
+    return c.json({ payslips });
+  } catch (e: any) {
+    console.error('Get payslips error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get payslips' }, 500);
+  }
+});
+
+// ========================================
+// PAYSTACK SUBSCRIPTION & PAYMENT ENDPOINTS
+// ========================================
+
+// Get company info
+app.get(`${PREFIX}/company/info`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
+
+    const company = await kv.get(`company_by_id:${companyId}`);
+    
+    return c.json(company);
+  } catch (e: any) {
+    console.error('Get company info error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get company info' }, 500);
+  }
+});
+
+// Initialize Paystack payment for subscription
+app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const { plan, amount, licenses } = await c.req.json();
+
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
+
+    const company = await kv.get(`company_by_id:${companyId}`);
+    
+    // Create payment reference
+    const reference = `SUB_${companyId.slice(0, 8)}_${Date.now()}`;
+
+    // Initialize Paystack payment
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment system not configured' }, 500);
+    }
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: userProfile.email,
+        amount: amount * 100, // Paystack expects amount in kobo
+        reference: reference,
+        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-a35148f0/subscription/verify-payment?reference=${reference}`,
+        metadata: {
+          companyId: companyId,
+          companyName: company.name,
+          plan: plan,
+          licenses: licenses,
+          userId: authUser.user.id,
+        },
+      }),
+    });
+
+    const data = await paystackResponse.json();
+
+    if (!data.status) {
+      return c.json({ error: data.message || 'Failed to initialize payment' }, 400);
+    }
+
+    // Store pending payment
+    await kv.set(`pending_payment:${reference}`, {
+      reference,
+      companyId,
+      plan,
+      amount,
+      licenses,
+      userId: authUser.user.id,
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
+      authorizationUrl: data.data.authorization_url,
+      reference: reference,
+    });
+  } catch (e: any) {
+    console.error('Initialize payment error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to initialize payment' }, 500);
+  }
+});
+
+// Verify Paystack payment
+app.get(`${PREFIX}/subscription/verify-payment`, async (c) => {
+  try {
+    const reference = c.req.query('reference');
+
+    if (!reference) {
+      return c.json({ error: 'Payment reference is required' }, 400);
+    }
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment system not configured' }, 500);
+    }
+
+    // Verify payment with Paystack
+    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+      },
+    });
+
+    const data = await paystackResponse.json();
+
+    if (!data.status || data.data.status !== 'success') {
+      return c.redirect(`${Deno.env.get('APP_URL')}/subscription?error=payment_failed`);
+    }
+
+    // Get pending payment info
+    const pendingPayment = await kv.get(`pending_payment:${reference}`);
+    
+    if (!pendingPayment) {
+      return c.redirect(`${Deno.env.get('APP_URL')}/subscription?error=invalid_reference`);
+    }
+
+    // Update company subscription
+    const company = await kv.get(`company_by_id:${pendingPayment.companyId}`);
+    
+    const updatedCompany = {
+      ...company,
+      status: 'active',
+      subscription: {
+        plan: pendingPayment.plan,
+        licenses: pendingPayment.licenses,
+        status: 'active',
+        startDate: new Date().toISOString(),
+        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        amount: pendingPayment.amount,
+      },
+    };
+
+    await kv.set(`company_by_id:${pendingPayment.companyId}`, updatedCompany);
+    await kv.set(`company:${company.slug}`, updatedCompany);
+
+    // Update company stats
+    await kv.set(`company_stats:${pendingPayment.companyId}`, {
+      ...(await kv.get(`company_stats:${pendingPayment.companyId}`) || {}),
+      availableLicenses: pendingPayment.licenses,
+    });
+
+    // Delete pending payment
+    await kv.delete(`pending_payment:${reference}`);
+
+    // Redirect to success page
+    return c.redirect(`${Deno.env.get('APP_URL')}/superadmin?subscription=success`);
+  } catch (e: any) {
+    console.error('Verify payment error:', e);
+    return c.redirect(`${Deno.env.get('APP_URL')}/subscription?error=verification_failed`);
+  }
+});
+
+// Upgrade licenses
+app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const { additionalLicenses, amount } = await c.req.json();
+
+    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
+    const companyId = userProfile?.companyId;
+
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
+
+    const company = await kv.get(`company_by_id:${companyId}`);
+    
+    // Create payment reference
+    const reference = `LIC_${companyId.slice(0, 8)}_${Date.now()}`;
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment system not configured' }, 500);
+    }
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: userProfile.email,
+        amount: amount * 100,
+        reference: reference,
+        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-a35148f0/subscription/verify-license-upgrade?reference=${reference}`,
+        metadata: {
+          companyId: companyId,
+          companyName: company.name,
+          additionalLicenses: additionalLicenses,
+          userId: authUser.user.id,
+        },
+      }),
+    });
+
+    const data = await paystackResponse.json();
+
+    if (!data.status) {
+      return c.json({ error: data.message || 'Failed to initialize payment' }, 400);
+    }
+
+    // Store pending payment
+    await kv.set(`pending_license:${reference}`, {
+      reference,
+      companyId,
+      additionalLicenses,
+      amount,
+      userId: authUser.user.id,
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
+      authorizationUrl: data.data.authorization_url,
+      reference: reference,
+    });
+  } catch (e: any) {
+    console.error('Upgrade licenses error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to upgrade licenses' }, 500);
+  }
+});
+
+// Verify license upgrade payment
+app.get(`${PREFIX}/subscription/verify-license-upgrade`, async (c) => {
+  try {
+    const reference = c.req.query('reference');
+
+    if (!reference) {
+      return c.json({ error: 'Payment reference is required' }, 400);
+    }
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment system not configured' }, 500);
+    }
+
+    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+      },
+    });
+
+    const data = await paystackResponse.json();
+
+    if (!data.status || data.data.status !== 'success') {
+      return c.redirect(`${Deno.env.get('APP_URL')}/subscription?error=payment_failed`);
+    }
+
+    const pendingLicense = await kv.get(`pending_license:${reference}`);
+    
+    if (!pendingLicense) {
+      return c.redirect(`${Deno.env.get('APP_URL')}/subscription?error=invalid_reference`);
+    }
+
+    const company = await kv.get(`company_by_id:${pendingLicense.companyId}`);
+    
+    const updatedCompany = {
+      ...company,
+      subscription: {
+        ...company.subscription,
+        licenses: (company.subscription?.licenses || 0) + pendingLicense.additionalLicenses,
+      },
+    };
+
+    await kv.set(`company_by_id:${pendingLicense.companyId}`, updatedCompany);
+    await kv.set(`company:${company.slug}`, updatedCompany);
+
+    const stats = await kv.get(`company_stats:${pendingLicense.companyId}`) || {};
+    await kv.set(`company_stats:${pendingLicense.companyId}`, {
+      ...stats,
+      availableLicenses: (stats.availableLicenses || 0) + pendingLicense.additionalLicenses,
+    });
+
+    await kv.delete(`pending_license:${reference}`);
+
+    return c.redirect(`${Deno.env.get('APP_URL')}/superadmin?licenses=upgraded`);
+  } catch (e: any) {
+    console.error('Verify license upgrade error:', e);
+    return c.redirect(`${Deno.env.get('APP_URL')}/subscription?error=verification_failed`);
   }
 });
 

@@ -189,7 +189,7 @@ export function EmployeeChat() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
-                    <CardTitle className="text-lg">Team Chat</CardTitle>
+                    <CardTitle className="text-lg">Blumebyte Chat</CardTitle>
                   </div>
                   <Button
                     variant="ghost"

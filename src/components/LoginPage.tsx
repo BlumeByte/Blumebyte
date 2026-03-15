@@ -8,6 +8,7 @@ import { Label } from './ui/label';
 import { Eye, EyeOff, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 const BLUMEBYTE_COLOR = '#1d4ed8';
 
@@ -102,11 +103,10 @@ export function LoginPage() {
 
         <Card className="shadow-2xl border-0">
           <CardHeader className="text-center pb-2 pt-8">
-            <div className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: BLUMEBYTE_COLOR + '20' }}>
-              <span className="text-3xl font-bold" style={{ color: BLUMEBYTE_COLOR }}>S</span>
+            <div className="flex justify-center mb-4">
+              <img src={logoImage} alt="Blumebyte" className="h-12" />
             </div>
-            <h1 className="text-2xl tracking-tight text-gray-900" style={{ fontWeight: 700 }}>SAS FINANCE GROUP</h1>
-            <p className="text-sm text-gray-500 mt-1">Human Resource Information System</p>
+            <p className="text-sm text-gray-500 mt-1">Sign in to your company account</p>
           </CardHeader>
           <CardContent className="pt-4 pb-8 px-8">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -155,7 +155,14 @@ export function LoginPage() {
               </Button>
             </form>
             <p className="text-center text-xs text-gray-400 mt-6">
-              Don't have an account? Contact your administrator.
+              New to Blumebyte?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Create a company account
+              </button>
             </p>
           </CardContent>
         </Card>

@@ -46,12 +46,14 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.log('Branding fetch error:', e);
+      // On error, keep using default branding - don't block the app
     }
   }, []);
 
   useEffect(() => {
+    // Fetch branding in background without blocking initial render
     fetchBranding();
-    const iv = setInterval(fetchBranding, 15000); // poll every 15s for real-time branding sync
+    const iv = setInterval(fetchBranding, 30000); // Increased from 15s to 30s to reduce load
     return () => clearInterval(iv);
   }, [fetchBranding]);
 
