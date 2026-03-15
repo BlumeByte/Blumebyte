@@ -14,6 +14,7 @@ export default function CompanySignup() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1 = Company Info, 2 = License Selection & Payment
+  const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [formData, setFormData] = useState({
     companyName: '',
     companySize: '',
@@ -37,6 +38,42 @@ export default function CompanySignup() {
   const pricePerLicense = formData.billingCycle === 'monthly' ? 6 : 5;
   const billingPeriod = formData.billingCycle === 'yearly' ? 12 : 1;
   const totalAmount = formData.licenses * pricePerLicense * billingPeriod;
+
+  // Check if Paystack script is loaded
+  useEffect(() => {
+    const checkPaystack = () => {
+      if (typeof (window as any).PaystackPop !== 'undefined') {
+        console.log('Paystack script loaded successfully');
+        setPaystackLoaded(true);
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately
+    if (checkPaystack()) return;
+
+    console.log('Waiting for Paystack script to load...');
+
+    // If not loaded, check every 100ms for up to 10 seconds
+    const interval = setInterval(() => {
+      if (checkPaystack()) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      if (!paystackLoaded) {
+        console.error('Paystack script failed to load after 10 seconds');
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [paystackLoaded]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -129,6 +166,13 @@ export default function CompanySignup() {
     setLoading(true);
 
     try {
+      // Check if Paystack script is loaded
+      if (!paystackLoaded) {
+        toast.error('Payment system is loading. Please wait a moment and try again.');
+        setLoading(false);
+        return;
+      }
+
       // Initialize Paystack payment directly (using inline popup)
       const paystackPublicKey = 'pk_test_8c99e5db4a17f59b0bd05312f22b9d5d7dc7ba70';
       const amountInKobo = Math.round(totalAmount * 100);
@@ -165,6 +209,7 @@ export default function CompanySignup() {
 
       // Open Paystack inline popup
       paystackHandler.openIframe();
+      setLoading(false); // Set loading to false once popup opens
     } catch (error: any) {
       toast.error(error.message || 'Failed to initialize payment');
       console.error('Payment error:', error);
