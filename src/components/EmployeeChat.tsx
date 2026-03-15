@@ -27,11 +27,6 @@ export function EmployeeChat() {
   const { user, getToken } = useAuth();
   const pollInterval = useRef<number>();
 
-  // Don't render if no user is logged in
-  if (!user) {
-    return null;
-  }
-
   // Get user initials for avatar
   const getInitials = (name: string) => {
     return name
@@ -101,6 +96,11 @@ export function EmployeeChat() {
       }
     };
   }, [isOpen, fetchMessages]);
+
+  // Don't render if no user is logged in (moved after all hooks)
+  if (!user) {
+    return null;
+  }
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading || !user) return;

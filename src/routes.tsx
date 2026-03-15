@@ -1,6 +1,10 @@
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet } from 'react-router';
 import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
+import { AuthProvider } from './lib/auth-context';
+import { BrandingProvider } from './lib/branding-context';
+import { EmployeeChat } from './components/EmployeeChat';
+import { Toaster } from './components/ui/sonner';
 
 // Lazy load heavy components for better initial load performance
 const CompanySignup = lazy(() => import('./pages/CompanySignup'));
@@ -26,88 +30,142 @@ const LoadingFallback = () => (
   </div>
 );
 
-// Wrapper for lazy loaded components with Suspense
-const withSuspense = (Component: React.LazyExoticComponent<any>) => (
+// Root layout that provides context to all routes
+function RootLayout() {
+  return (
+    <BrandingProvider>
+      <AuthProvider>
+        <Toaster richColors position="top-right" />
+        <EmployeeChat />
+        <Outlet />
+      </AuthProvider>
+    </BrandingProvider>
+  );
+}
+
+// Create component wrappers instead of JSX elements
+const CompanySignupPage = () => (
   <Suspense fallback={<LoadingFallback />}>
-    <Component />
+    <CompanySignup />
   </Suspense>
 );
 
+const EmployeePortalPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <EmployeePortal />
+  </Suspense>
+);
+
+const SubscriptionPage = () => (
+  <ProtectedRoute allowedRoles={['superadmin']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <PaystackSubscription />
+    </Suspense>
+  </ProtectedRoute>
+);
+
+const PaymentVerifyPage = () => (
+  <ProtectedRoute allowedRoles={['superadmin']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <PaymentVerification />
+    </Suspense>
+  </ProtectedRoute>
+);
+
+const LicensePaymentVerifyPage = () => (
+  <ProtectedRoute allowedRoles={['superadmin']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <LicensePaymentVerification />
+    </Suspense>
+  </ProtectedRoute>
+);
+
+const SuperAdminPage = () => (
+  <ProtectedRoute allowedRoles={['superadmin']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <SuperAdminDashboard />
+    </Suspense>
+  </ProtectedRoute>
+);
+
+const AdminPage = () => (
+  <ProtectedRoute allowedRoles={['admin']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <AdminDashboard />
+    </Suspense>
+  </ProtectedRoute>
+);
+
+const ManagerPage = () => (
+  <ProtectedRoute allowedRoles={['manager']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <ManagerDashboard />
+    </Suspense>
+  </ProtectedRoute>
+);
+
+const EmployeePage = () => (
+  <ProtectedRoute allowedRoles={['employee']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <EmployeeDashboard />
+    </Suspense>
+  </ProtectedRoute>
+);
+
+const NotFoundPage = () => <Navigate to="/login" replace />;
+
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: <LandingPage />,
-  },
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  {
-    path: '/company-signup',
-    element: withSuspense(CompanySignup),
-  },
-  {
-    path: '/subscription',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        {withSuspense(PaystackSubscription)}
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/payment-verify',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        {withSuspense(PaymentVerification)}
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/payment-verify-license',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        {withSuspense(LicensePaymentVerification)}
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/superadmin',
-    element: (
-      <ProtectedRoute allowedRoles={['superadmin']}>
-        {withSuspense(SuperAdminDashboard)}
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/admin',
-    element: (
-      <ProtectedRoute allowedRoles={['admin']}>
-        {withSuspense(AdminDashboard)}
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/manager',
-    element: (
-      <ProtectedRoute allowedRoles={['manager']}>
-        {withSuspense(ManagerDashboard)}
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/employee',
-    element: (
-      <ProtectedRoute allowedRoles={['employee']}>
-        {withSuspense(EmployeeDashboard)}
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/employee-portal',
-    element: withSuspense(EmployeePortal),
-  },
-  {
-    path: '*',
-    element: <Navigate to="/login" replace />,
+    Component: RootLayout,
+    children: [
+      {
+        path: '/',
+        Component: LandingPage,
+      },
+      {
+        path: '/login',
+        Component: LoginPage,
+      },
+      {
+        path: '/company-signup',
+        Component: CompanySignupPage,
+      },
+      {
+        path: '/subscription',
+        Component: SubscriptionPage,
+      },
+      {
+        path: '/payment-verify',
+        Component: PaymentVerifyPage,
+      },
+      {
+        path: '/payment-verify-license',
+        Component: LicensePaymentVerifyPage,
+      },
+      {
+        path: '/superadmin',
+        Component: SuperAdminPage,
+      },
+      {
+        path: '/admin',
+        Component: AdminPage,
+      },
+      {
+        path: '/manager',
+        Component: ManagerPage,
+      },
+      {
+        path: '/employee',
+        Component: EmployeePage,
+      },
+      {
+        path: '/employee-portal',
+        Component: EmployeePortalPage,
+      },
+      {
+        path: '*',
+        Component: NotFoundPage,
+      },
+    ],
   },
 ]);
