@@ -459,6 +459,11 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       industry: industry || 'Not specified',
       createdAt: new Date().toISOString(),
       status: 'active',
+      // Pay-first model: Start with 0 licenses
+      licenses: 0,
+      usedLicenses: 0,
+      subscriptionStatus: 'none',
+      subscriptionPlan: 'none',
     };
     await kv.set(`company:${companyId}`, company);
 
@@ -520,6 +525,235 @@ app.post(`${PREFIX}/company/register`, async (c) => {
     return c.json({ error: e.message || "Failed to create company" }, 500);
   }
 });
+
+// --- Initialize Payment for Company Registration (Pay-Before-Account-Creation) ---
+app.post(`${PREFIX}/company/init-payment`, async (c) => {
+  try {
+    const { 
+      companyName, companySize, industry, adminName, adminEmail, password,
+      licenses, billingCycle, amount 
+    } = await c.req.json();
+    
+    // Validation
+    if (!companyName || !adminEmail || !password || !adminName) {
+      return c.json({ error: "Company name, admin name, email and password are required" }, 400);
+    }
+
+    if (password.length < 8) {
+      return c.json({ error: "Password must be at least 8 characters" }, 400);
+    }
+
+    if (!licenses || licenses < 1) {
+      return c.json({ error: "At least 1 license is required" }, 400);
+    }
+
+    // Check if email already exists
+    const sb = supabaseAdmin();
+    const { data: existingUser } = await sb.auth.admin.listUsers();
+    if (existingUser?.users?.some((u: any) => u.email === adminEmail.toLowerCase())) {
+      return c.json({ error: "An account with this email already exists" }, 400);
+    }
+
+    // Generate payment reference
+    const reference = `COMP_${Date.now()}_${crypto.randomUUID().substring(0, 8)}`;
+
+    // Store pending registration data (to be used after payment)
+    await kv.set(`pending_registration:${reference}`, {
+      companyName,
+      companySize,
+      industry,
+      adminName,
+      adminEmail: adminEmail.toLowerCase(),
+      password,
+      licenses,
+      billingCycle,
+      amount,
+      reference,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    // Initialize Paystack payment
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('PAYSTACK_SECRET_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: adminEmail.toLowerCase(),
+        amount: Math.round(amount * 100), // Convert to kobo/cents
+        reference,
+        metadata: {
+          type: 'company_registration',
+          companyName,
+          adminName,
+          licenses,
+          billingCycle,
+          custom_fields: [
+            { display_name: 'Company Name', variable_name: 'company_name', value: companyName },
+            { display_name: 'Licenses', variable_name: 'licenses', value: licenses.toString() },
+            { display_name: 'Billing Cycle', variable_name: 'billing_cycle', value: billingCycle },
+          ],
+        },
+        callback_url: `https://${Deno.env.get('SUPABASE_URL')?.replace('https://', '')}/functions/v1/make-server-a35148f0/company/payment-callback`,
+      }),
+    });
+
+    const paystackData = await paystackResponse.json();
+
+    if (!paystackResponse.ok || !paystackData.status) {
+      console.error('Paystack error:', paystackData);
+      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 400);
+    }
+
+    return c.json({
+      success: true,
+      authorization_url: paystackData.data.authorization_url,
+      reference,
+    });
+  } catch (e: any) {
+    console.log("company-payment-init error:", e);
+    return c.json({ error: e.message || "Failed to initialize payment" }, 500);
+  }
+});
+
+// --- Check Payment Status for Company Registration ---
+app.get(`${PREFIX}/company/payment-status/:reference`, async (c) => {
+  try {
+    const reference = c.req.param('reference');
+    
+    // Check if account was created (payment verified)
+    const verifiedRegistration = await kv.get(`verified_registration:${reference}`);
+    if (verifiedRegistration) {
+      return c.json({ status: 'verified', data: verifiedRegistration });
+    }
+
+    // Check pending registration
+    const pendingRegistration = await kv.get(`pending_registration:${reference}`);
+    if (!pendingRegistration) {
+      return c.json({ status: 'unknown' });
+    }
+
+    // Check Paystack payment status
+    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('PAYSTACK_SECRET_KEY')}`,
+      },
+    });
+
+    const paystackData = await paystackResponse.json();
+
+    if (paystackData.status && paystackData.data.status === 'success') {
+      // Payment successful - create the account now
+      const result = await createCompanyAccount(pendingRegistration);
+      
+      if (result.success) {
+        // Mark as verified
+        await kv.set(`verified_registration:${reference}`, {
+          ...result,
+          verifiedAt: new Date().toISOString(),
+        });
+        await kv.del(`pending_registration:${reference}`);
+        
+        return c.json({ status: 'verified', data: result });
+      } else {
+        return c.json({ status: 'failed', error: result.error });
+      }
+    } else if (paystackData.data?.status === 'failed') {
+      return c.json({ status: 'failed', paystackStatus: paystackData.data.status });
+    } else {
+      return c.json({ status: 'pending', paystackStatus: paystackData.data?.status });
+    }
+  } catch (e: any) {
+    console.log("payment-status-check error:", e);
+    return c.json({ status: 'unknown', error: e.message }, 500);
+  }
+});
+
+// Helper function to create company account after payment
+async function createCompanyAccount(registrationData: any) {
+  try {
+    const { companyName, companySize, industry, adminName, adminEmail, password, licenses, billingCycle } = registrationData;
+    
+    const sb = supabaseAdmin();
+    
+    // Create company record
+    const companyId = crypto.randomUUID();
+    const company = {
+      id: companyId,
+      name: companyName,
+      size: companySize || 'Not specified',
+      industry: industry || 'Not specified',
+      createdAt: new Date().toISOString(),
+      status: 'active',
+      // Set purchased licenses
+      licenses: licenses,
+      usedLicenses: 1, // SuperAdmin counts as 1
+      subscriptionStatus: 'active',
+      subscriptionPlan: billingCycle,
+      subscriptionStartDate: new Date().toISOString(),
+    };
+    await kv.set(`company:${companyId}`, company);
+
+    // Create SuperAdmin user in Supabase Auth
+    const { data: authData, error: authError } = await sb.auth.admin.createUser({
+      email: adminEmail,
+      password,
+      user_metadata: { 
+        name: adminName, 
+        role: "superadmin",
+        companyId,
+        companyName,
+      },
+      email_confirm: true,
+    });
+
+    if (authError) {
+      console.log("Account creation auth error:", authError);
+      await kv.del(`company:${companyId}`);
+      return { success: false, error: authError.message };
+    }
+
+    const userId = authData.user.id;
+
+    // Create SuperAdmin employee record
+    await kv.set(`employee:${userId}`, {
+      id: userId,
+      userId,
+      email: adminEmail,
+      name: adminName,
+      role: "superadmin",
+      status: "active",
+      company: companyId,
+      companyId: companyId,
+      companyName: companyName,
+      assignedCompanies: [companyId],
+      createdAt: new Date().toISOString(),
+    });
+
+    // Log audit event
+    await logAudit({
+      userId,
+      userName: adminName,
+      action: 'CREATE',
+      resourceType: 'company',
+      resourceId: companyId,
+      details: { companyName, adminEmail, licenses, billingCycle, source: 'payment' },
+    });
+
+    return {
+      success: true,
+      userId,
+      companyId,
+      companyName,
+      licenses,
+    };
+  } catch (e: any) {
+    console.log("create-company-account error:", e);
+    return { success: false, error: e.message };
+  }
+}
 
 // --- Sync user statuses based on subscription (SuperAdmin only) ---
 app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
@@ -4032,115 +4266,6 @@ app.get(`${PREFIX}/assets`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     return c.json({ error: e.message }, 500);
-  }
-});
-
-// ========================================
-// MULTI-TENANT COMPANY ENDPOINTS
-// ========================================
-
-// Company Registration (Public - No Auth Required)
-app.post(`${PREFIX}/company/register`, async (c) => {
-  try {
-    const { companyName, companySize, industry, adminName, adminEmail, password } = await c.req.json();
-
-    // Validation
-    if (!companyName || !adminEmail || !password || !adminName) {
-      return c.json({ error: 'Missing required fields' }, 400);
-    }
-
-    if (password.length < 8) {
-      return c.json({ error: 'Password must be at least 8 characters' }, 400);
-    }
-
-    // Check if company with same name exists
-    const existingCompany = await kv.get(`company:${companyName.toLowerCase().replace(/\s+/g, '_')}`);
-    if (existingCompany) {
-      return c.json({ error: 'Company name already exists' }, 400);
-    }
-
-    // Create company ID
-    const companyId = crypto.randomUUID();
-    const companySlug = companyName.toLowerCase().replace(/\s+/g, '_');
-
-    // Create Supabase auth user for admin
-    const sb = supabaseAdmin();
-    const { data: authData, error: authError } = await sb.auth.admin.createUser({
-      email: adminEmail.toLowerCase(),
-      password: password,
-      email_confirm: true,
-      user_metadata: {
-        name: adminName,
-        role: 'superadmin',
-        company_id: companyId,
-        company_name: companyName,
-      },
-    });
-
-    if (authError) {
-      console.error('Auth user creation error:', authError);
-      return c.json({ error: authError.message || 'Failed to create user' }, 400);
-    }
-
-    // Create company record
-    const company = {
-      id: companyId,
-      slug: companySlug,
-      name: companyName,
-      size: companySize || 'unknown',
-      industry: industry || 'other',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      subscription: {
-        plan: 'none',
-        licenses: 0,
-        status: 'inactive',
-      },
-    };
-
-    await kv.set(`company:${companySlug}`, company);
-    await kv.set(`company_by_id:${companyId}`, company);
-
-    // Create admin user profile
-    const adminProfile = {
-      id: authData.user.id,
-      companyId: companyId,
-      email: adminEmail.toLowerCase(),
-      name: adminName,
-      role: 'superadmin',
-      status: 'active',
-      department: 'Management',
-      joinDate: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
-
-    await kv.set(`user_profile:${authData.user.id}`, adminProfile);
-    await kv.set(`company_users:${companyId}:${authData.user.id}`, adminProfile);
-
-    // Initialize company data
-    await kv.set(`company_stats:${companyId}`, {
-      totalEmployees: 1,
-      activeEmployees: 1,
-      usedLicenses: 1,
-      availableLicenses: 9,
-    });
-
-    return c.json({
-      success: true,
-      company: {
-        id: companyId,
-        name: companyName,
-        slug: companySlug,
-      },
-      admin: {
-        id: authData.user.id,
-        email: adminEmail,
-        name: adminName,
-      },
-    });
-  } catch (e: any) {
-    console.error('Company registration error:', e);
-    return c.json({ error: e.message || 'Failed to register company' }, 500);
   }
 });
 
