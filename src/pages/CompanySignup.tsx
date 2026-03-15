@@ -193,6 +193,9 @@ export default function CompanySignup() {
         data = JSON.parse(text);
       } catch (parseError) {
         console.error('Response text:', text);
+        console.error('Response status:', response.status);
+        console.error('Response headers:', Object.fromEntries(response.headers.entries()));
+        toast.error(`Server error (${response.status}): ${text.substring(0, 200)}`);
         throw new Error('Server returned an invalid response. Please try again later.');
       }
 

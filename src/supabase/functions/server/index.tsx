@@ -1,3 +1,4 @@
+// Blumebyte HR Management Server - v2.1 - Payment-First Registration
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
@@ -19,6 +20,33 @@ app.use(
     maxAge: 600,
   })
 );
+
+// Test endpoint to verify server is running with latest changes
+app.get(`${PREFIX}/health`, (c) => {
+  return c.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    version: '2.0-payment-flow',
+    endpoints: ['company/init-payment', 'company/payment-status/:reference']
+  });
+});
+
+// Simple test endpoint for payment flow
+app.post(`${PREFIX}/company/test-payment`, async (c) => {
+  console.log('Test payment endpoint called');
+  try {
+    const body = await c.req.json();
+    console.log('Received body:', body);
+    return c.json({ 
+      success: true, 
+      message: 'Test endpoint working',
+      receivedData: body 
+    });
+  } catch (e: any) {
+    console.error('Test payment error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
 
 // --- Supabase Admin Client ---
 const supabaseAdmin = () =>
@@ -528,6 +556,7 @@ app.post(`${PREFIX}/company/register`, async (c) => {
 
 // --- Initialize Payment for Company Registration (Pay-Before-Account-Creation) ---
 app.post(`${PREFIX}/company/init-payment`, async (c) => {
+  console.log('Init payment endpoint called');
   try {
     const { 
       companyName, companySize, industry, adminName, adminEmail, password,
@@ -5039,4 +5068,5 @@ Current user question: ${message}`;
   }
 });
 
+// Server started with payment-before-registration flow - v2.0
 Deno.serve(app.fetch);
