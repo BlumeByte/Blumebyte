@@ -1968,6 +1968,183 @@ app.put(`${PREFIX}/my-training/:id`, async (c) => {
   }
 });
 
+// ============ APPROVAL WORKFLOW (Admin → SuperAdmin) ============
+
+// Admin requests to create a user
+app.post(`${PREFIX}/admin/request-user-create`, async (c) => {
+  try {
+    const { user: adminUser, role } = await requireAdminOrAbove(c);
+    if (role === 'superadmin') {
+      return c.json({ error: 'SuperAdmin should use /users/create directly' }, 400);
+    }
+    
+    const { userData, reason } = await c.req.json();
+    const requestId = `approval_req:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    
+    const approvalRequest = {
+      id: requestId,
+      type: 'user_create',
+      requestedBy: adminUser.id,
+      requestedByName: (await kv.get(`employee:${adminUser.id}`))?.name || 'Admin',
+      userData,
+      reason: reason || 'Admin user creation request',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    
+    await kv.set(requestId, approvalRequest);
+    return c.json({ success: true, requestId, message: 'Request sent to SuperAdmin' });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.log('request-user-create error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Admin requests to update a user
+app.post(`${PREFIX}/admin/request-user-update`, async (c) => {
+  try {
+    const { user: adminUser, role } = await requireAdminOrAbove(c);
+    if (role === 'superadmin') {
+      return c.json({ error: 'SuperAdmin should use PUT /users/:userId directly' }, 400);
+    }
+    
+    const { userId, updates, reason } = await c.req.json();
+    const requestId = `approval_req:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    
+    const existingUser = await kv.get(`employee:${userId}`);
+    if (!existingUser) return c.json({ error: 'User not found' }, 404);
+    
+    const approvalRequest = {
+      id: requestId,
+      type: 'user_update',
+      requestedBy: adminUser.id,
+      requestedByName: (await kv.get(`employee:${adminUser.id}`))?.name || 'Admin',
+      userId,
+      userName: existingUser.name,
+      updates,
+      currentData: existingUser,
+      reason: reason || 'Admin user update request',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    
+    await kv.set(requestId, approvalRequest);
+    return c.json({ success: true, requestId, message: 'Update request sent to SuperAdmin' });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.log('request-user-update error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Get all pending approvals (SuperAdmin only)
+app.get(`${PREFIX}/superadmin/pending-approvals`, async (c) => {
+  try {
+    await requireSuperAdmin(c);
+    const allApprovals = await kv.getByPrefix('approval_req:');
+    const pending = allApprovals.filter((a: any) => a.status === 'pending');
+    return c.json(pending.sort((a: any, b: any) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ));
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.log('pending-approvals error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Approve/Reject approval request (SuperAdmin only)
+app.post(`${PREFIX}/superadmin/approval/:requestId/:action`, async (c) => {
+  try {
+    const { user: superAdmin } = await requireSuperAdmin(c);
+    const requestId = c.req.param('requestId');
+    const action = c.req.param('action'); // 'approve' or 'reject'
+    
+    const request = await kv.get(requestId);
+    if (!request) return c.json({ error: 'Request not found' }, 404);
+    if (request.status !== 'pending') return c.json({ error: 'Request already processed' }, 400);
+    
+    if (action === 'approve') {
+      // Execute the requested action
+      if (request.type === 'user_create') {
+        // Create the user
+        const { email, name, role, companyId, department, position, phone, status } = request.userData;
+        const sb = supabaseAdmin();
+        
+        // Generate temp password
+        const tempPassword = Array.from({ length: 12 }, () => 
+          'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 57)]
+        ).join('');
+        
+        const { data: authData, error: authError } = await sb.auth.admin.createUser({
+          email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { name, role, companyId, department, position },
+        });
+        
+        if (authError) throw new Error(authError.message);
+        const userId = authData.user.id;
+        
+        const employee = {
+          userId,
+          email,
+          name,
+          role: role || 'employee',
+          companyId: companyId || '',
+          department: department || '',
+          position: position || '',
+          phone: phone || '',
+          status: status || 'active',
+          createdAt: new Date().toISOString(),
+        };
+        
+        await kv.set(`employee:${userId}`, employee);
+        await kv.set(requestId, { ...request, status: 'approved', approvedBy: superAdmin.id, approvedAt: new Date().toISOString(), resultUserId: userId });
+        
+        return c.json({ success: true, message: 'User created successfully', userId, tempPassword });
+      } else if (request.type === 'user_update') {
+        // Update the user
+        const existing = await kv.get(`employee:${request.userId}`);
+        if (!existing) {
+          await kv.set(requestId, { ...request, status: 'rejected', rejectedBy: superAdmin.id, rejectedAt: new Date().toISOString(), reason: 'User no longer exists' });
+          return c.json({ error: 'User not found' }, 404);
+        }
+        
+        // Apply updates except department (only SuperAdmin can change department in original data)
+        const updated = { ...existing, ...request.updates, updatedAt: new Date().toISOString() };
+        await kv.set(`employee:${request.userId}`, updated);
+        
+        // Update in Supabase Auth
+        const sb = supabaseAdmin();
+        await sb.auth.admin.updateUserById(request.userId, {
+          user_metadata: updated,
+        });
+        
+        await kv.set(requestId, { ...request, status: 'approved', approvedBy: superAdmin.id, approvedAt: new Date().toISOString() });
+        return c.json({ success: true, message: 'User updated successfully' });
+      }
+    } else if (action === 'reject') {
+      const { reason } = await c.req.json().catch(() => ({}));
+      await kv.set(requestId, { 
+        ...request, 
+        status: 'rejected', 
+        rejectedBy: superAdmin.id, 
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason || 'Rejected by SuperAdmin'
+      });
+      return c.json({ success: true, message: 'Request rejected' });
+    }
+    
+    return c.json({ error: 'Invalid action' }, 400);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.log('approval action error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Update user
 app.put(`${PREFIX}/users/:userId`, async (c) => {
   try {
@@ -1980,6 +2157,11 @@ app.put(`${PREFIX}/users/:userId`, async (c) => {
     
     if (callerRole === "admin" && ["superadmin"].includes(existing.role)) {
       return c.json({ error: "Cannot edit superadmin users" }, 403);
+    }
+    
+    // Only SuperAdmin can change departments
+    if (callerRole !== "superadmin" && body.department && body.department !== existing.department) {
+      return c.json({ error: "Only SuperAdmin can change user departments" }, 403);
     }
 
     let companyName = body.company || existing.company || "";

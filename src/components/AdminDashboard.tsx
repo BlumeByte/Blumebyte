@@ -57,6 +57,7 @@ const TABS = [
   { id: 'reports', label: 'HR Reports', icon: BarChart3 },
   { id: 'advanced-reports', label: 'Advanced Reports', icon: BarChart3 },
   { id: 'audit-logs', label: 'Audit Logs', icon: FileCheck },
+  { id: 'pending-approvals', label: 'Pending Approvals', icon: CheckCircle },
   { id: 'hiring', label: 'Hiring', icon: UserCheck },
   { id: 'profile-requests', label: 'Profile Requests', icon: UserCog },
   { id: 'self-service', label: 'Self-Service', icon: Briefcase },
@@ -111,7 +112,11 @@ export function AdminDashboard() {
         <Separator className="flex-shrink-0" />
         <div className="flex-1 overflow-y-auto overflow-x-hidden py-2" style={{ scrollbarWidth: 'thin' }}>
           <nav className="px-2 space-y-0.5">
-            {TABS.map(t => {
+            {TABS.filter(t => {
+              // Hide "Pending Approvals" from non-SuperAdmin users
+              if (t.id === 'pending-approvals' && user?.role !== 'superadmin') return false;
+              return true;
+            }).map(t => {
               const Icon = t.icon;
               const active = activeTab === t.id;
               return (
@@ -178,6 +183,7 @@ export function AdminDashboard() {
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'advanced-reports' && <AdvancedReportsModule />}
           {activeTab === 'audit-logs' && <AuditLogsModule />}
+          {activeTab === 'pending-approvals' && user?.role === 'superadmin' && <PendingApprovalsPanel />}
           {activeTab === 'hiring' && <AdminHiring />}
           {activeTab === 'profile-requests' && <AdminProfileChangeRequests />}
           {activeTab === 'self-service' && <SharedSelfServiceHub onNavigate={setActiveTab} />}
@@ -498,7 +504,7 @@ function AdminEmployees() {
 }
 
 function AdminUsers() {
-  const { accessToken } = useAuth();
+  const { user, accessToken } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -511,6 +517,8 @@ function AdminUsers() {
   const [companies, setCompanies] = useState<any[]>([]);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [initialDepartment, setInitialDepartment] = useState('');
+  const isSuperAdmin = user?.role === 'superadmin';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -528,13 +536,48 @@ function AdminUsers() {
     setSaving(true);
     try {
       if (editUser) {
-        await api(`/users/${editUser.userId || editUser.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
-        toast.success('Updated'); setDialogOpen(false);
+        // Admin changes require approval workflow
+        if (!isSuperAdmin) {
+          await api('/admin/request-user-update', { 
+            method: 'POST', 
+            body: JSON.stringify({ 
+              userId: editUser.userId || editUser.id,
+              updates: formData,
+              reason: 'Admin user update request'
+            }), 
+            token: accessToken 
+          });
+          toast.success('Update request sent to SuperAdmin for approval');
+        } else {
+          // SuperAdmin can directly update
+          await api(`/users/${editUser.userId || editUser.id}`, { 
+            method: 'PUT', 
+            body: JSON.stringify(formData), 
+            token: accessToken 
+          });
+          toast.success('Updated');
+        }
+        setDialogOpen(false);
       } else {
-        const res = await api('/users/create', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
-        setTempPw(res.tempPassword);
-        setShowTempPw(true);
-        toast.success('Employee created');
+        // Creating new users
+        if (!isSuperAdmin) {
+          await api('/admin/request-user-create', { 
+            method: 'POST', 
+            body: JSON.stringify({ 
+              userData: formData,
+              reason: 'Admin user creation request'
+            }), 
+            token: accessToken 
+          });
+          toast.success('User creation request sent to SuperAdmin for approval');
+          setDialogOpen(false);
+        } else {
+          // SuperAdmin can directly create
+          const res = await api('/users/create', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+          setTempPw(res.tempPassword);
+          setShowTempPw(true);
+          toast.success('Employee created');
+        }
       }
       load();
     } catch (e: any) { toast.error(e.message); }
@@ -1567,6 +1610,245 @@ function AdminProfileChangeRequests() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleReject}>Reject Change Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PendingApprovalsPanel() {
+  const { accessToken } = useAuth();
+  const [approvals, setApprovals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [detailDialog, setDetailDialog] = useState<any>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api('/superadmin/pending-approvals', { token: accessToken });
+      setApprovals(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      console.log('Failed to load approvals:', e);
+      toast.error(e.message);
+    }
+    setLoading(false);
+  }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+
+  const handleApprove = async (requestId: string) => {
+    setProcessing(requestId);
+    try {
+      const res = await api(`/superadmin/approval/${requestId}/approve`, { method: 'POST', token: accessToken });
+      toast.success(res.message || 'Approved successfully');
+      load();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setProcessing(null);
+  };
+
+  const handleReject = async (requestId: string, reason: string) => {
+    setProcessing(requestId);
+    try {
+      await api(`/superadmin/approval/${requestId}/reject`, { 
+        method: 'POST', 
+        body: JSON.stringify({ reason }), 
+        token: accessToken 
+      });
+      toast.success('Request rejected');
+      setDetailDialog(null);
+      load();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setProcessing(null);
+  };
+
+  const pending = approvals.filter(a => a.status === 'pending');
+  const processed = approvals.filter(a => a.status !== 'pending');
+
+  return (
+    <div className="space-y-4 max-w-6xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-blue-600" />
+          <h2 className="text-lg font-semibold">Pending Approvals</h2>
+          {pending.length > 0 && <Badge className="bg-amber-100 text-amber-800">{pending.length} pending</Badge>}
+        </div>
+        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+      </div>
+
+      {loading ? (
+        <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
+      ) : pending.length === 0 ? (
+        <Card><CardContent className="py-16 text-center text-gray-400"><CheckCircle className="w-10 h-10 mx-auto mb-2 opacity-50" /><p>No pending approval requests</p></CardContent></Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Requested By</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="w-40">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pending.map(req => (
+                  <TableRow key={req.id}>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {req.type === 'user_create' ? 'Create User' : req.type === 'user_update' ? 'Update User' : req.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm font-medium">{req.requestedByName}</p>
+                        <p className="text-xs text-gray-400">{req.reason}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {req.type === 'user_create' && (
+                        <div className="text-sm">
+                          <p className="font-medium">{req.userData?.name}</p>
+                          <p className="text-xs text-gray-500">{req.userData?.email} • {req.userData?.role}</p>
+                          <p className="text-xs text-gray-500">{req.userData?.department}</p>
+                        </div>
+                      )}
+                      {req.type === 'user_update' && (
+                        <div className="text-sm">
+                          <p className="font-medium">{req.userName}</p>
+                          <p className="text-xs text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailDialog(req)}>View changes</p>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-500">{new Date(req.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => handleApprove(req.id)}
+                          disabled={processing === req.id}
+                        >
+                          {processing === req.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1" />}
+                          Approve
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => setDetailDialog(req)}
+                          disabled={processing === req.id}
+                        >
+                          <XCircle className="w-3.5 h-3.5 mr-1" />
+                          Reject
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {processed.length > 0 && (
+        <div className="pt-4">
+          <h3 className="text-sm font-semibold text-gray-500 mb-2">Processed Requests</h3>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Requested By</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {processed.slice(0, 10).map(req => (
+                    <TableRow key={req.id}>
+                      <TableCell><Badge variant="outline">{req.type === 'user_create' ? 'Create User' : 'Update User'}</Badge></TableCell>
+                      <TableCell className="text-sm">{req.requestedByName}</TableCell>
+                      <TableCell><Badge className={req.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>{req.status}</Badge></TableCell>
+                      <TableCell className="text-xs text-gray-500">{new Date(req.createdAt).toLocaleDateString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Detail/Reject Dialog */}
+      <Dialog open={!!detailDialog} onOpenChange={() => setDetailDialog(null)}>
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+          <DialogHeader><DialogTitle>Approval Request Details</DialogTitle></DialogHeader>
+          {detailDialog && (
+            <div className="space-y-4 py-2">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-sm font-medium">Requested by: {detailDialog.requestedByName}</p>
+                <p className="text-xs text-gray-500">{detailDialog.reason}</p>
+              </div>
+              
+              {detailDialog.type === 'user_update' && detailDialog.updates && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Proposed Changes:</p>
+                  {Object.entries(detailDialog.updates).map(([key, value]: [string, any]) => (
+                    <div key={key} className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                      <span className="text-sm capitalize text-gray-700">{key.replace(/([A-Z])/g, ' $1')}</span>
+                      <div className="text-right">
+                        <p className="text-xs text-red-500 line-through">{detailDialog.currentData?.[key] || '(empty)'}</p>
+                        <p className="text-xs text-green-600 font-medium">{value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {detailDialog.type === 'user_create' && detailDialog.userData && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">New User Details:</p>
+                  <div className="bg-blue-50 rounded-lg p-3 space-y-1">
+                    <p className="text-sm"><span className="font-medium">Name:</span> {detailDialog.userData.name}</p>
+                    <p className="text-sm"><span className="font-medium">Email:</span> {detailDialog.userData.email}</p>
+                    <p className="text-sm"><span className="font-medium">Role:</span> {detailDialog.userData.role}</p>
+                    <p className="text-sm"><span className="font-medium">Department:</span> {detailDialog.userData.department || '—'}</p>
+                    <p className="text-sm"><span className="font-medium">Position:</span> {detailDialog.userData.position || '—'}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailDialog(null)}>Cancel</Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => handleReject(detailDialog.id, 'Rejected by SuperAdmin')}
+              disabled={processing === detailDialog?.id}
+            >
+              {processing === detailDialog?.id && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Reject
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => { handleApprove(detailDialog.id); setDetailDialog(null); }}
+              disabled={processing === detailDialog?.id}
+            >
+              {processing === detailDialog?.id && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Approve
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

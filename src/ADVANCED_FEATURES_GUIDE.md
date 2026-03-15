@@ -250,7 +250,7 @@ Returns logs for a specific user (users can only see their own)
 ```
 POST /make-server-a35148f0/audit-logs
 Body: {
-  userName: "John Doe",
+  userName: "Blume Byte",
   action: "UPDATE",
   resourceType: "employee",
   resourceId: "emp-123",

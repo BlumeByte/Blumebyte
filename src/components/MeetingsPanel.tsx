@@ -32,16 +32,22 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'calendar'>('all');
   const [rejectDialog, setRejectDialog] = useState<any>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     try {
       const usersEndpoint = mode === 'employee' ? '/users/for-meetings' : '/users';
-      const [m, u] = await Promise.all([
+      const [m, u, leaves, hols] = await Promise.all([
         api('/meetings', { token: accessToken }),
         api(usersEndpoint, { token: accessToken }).catch(() => []),
+        api('/leave-requests', { token: accessToken }).catch(() => []),
+        api('/holidays', { token: accessToken }).catch(() => []),
       ]);
       setMeetings(Array.isArray(m) ? m : []);
       setAllUsers(Array.isArray(u) ? u : []);
+      setLeaveRequests(Array.isArray(leaves) ? leaves.filter((l: any) => l.status === 'approved') : []);
+      setHolidays(Array.isArray(hols) ? hols : []);
     } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken, mode]);
@@ -50,6 +56,58 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
   useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const getUserName = (id: string) => allUsers.find(u => (u.userId || u.id) === id)?.name || id;
+
+  // Check if a date is a weekend
+  const isWeekend = (dateStr: string) => {
+    const day = new Date(dateStr + 'T12:00:00').getDay();
+    return day === 0 || day === 6; // Sunday = 0, Saturday = 6
+  };
+
+  // Check if a date is a holiday
+  const isHoliday = (dateStr: string) => {
+    return holidays.some(h => h.date === dateStr);
+  };
+
+  // Check if any user is on approved leave on a date
+  const getUsersOnLeave = (dateStr: string) => {
+    return leaveRequests.filter(leave => {
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const check = new Date(dateStr);
+      return check >= start && check <= end;
+    }).map(leave => leave.employeeName || leave.userName);
+  };
+
+  // Check if a specific user is on leave
+  const isUserOnLeave = (userId: string, dateStr: string) => {
+    return leaveRequests.some(leave => {
+      if (leave.userId !== userId && leave.employeeId !== userId) return false;
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const check = new Date(dateStr);
+      return check >= start && check <= end;
+    });
+  };
+
+  // Validate meeting date
+  const validateMeetingDate = (dateStr: string, participantIds: string[]) => {
+    if (isWeekend(dateStr)) {
+      toast.error('Cannot schedule meetings on weekends');
+      return false;
+    }
+    const holiday = holidays.find(h => h.date === dateStr);
+    if (holiday) {
+      toast.error(`Cannot schedule meetings on ${holiday.name || 'holiday'}`);
+      return false;
+    }
+    const usersOnLeave = (participantIds || []).filter(uid => isUserOnLeave(uid, dateStr));
+    if (usersOnLeave.length > 0) {
+      const names = usersOnLeave.map(uid => getUserName(uid)).join(', ');
+      toast.error(`Cannot schedule: ${names} ${usersOnLeave.length === 1 ? 'is' : 'are'} on leave`);
+      return false;
+    }
+    return true;
+  };
 
   const handleCreate = async () => {
     setSaving(true);
@@ -64,6 +122,12 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
         
         if (meetingDate < today) {
           toast.error('Cannot create or update meeting in the past. Please select a present or future date.');
+          setSaving(false);
+          return;
+        }
+
+        // Validate weekend, holiday, and leave
+        if (!validateMeetingDate(data.date, data.participantIds || [])) {
           setSaving(false);
           return;
         }
@@ -128,14 +192,33 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
   // Calendar view - show meetings blocked on calendar dates
   const calendarDates = (() => {
     const today = new Date();
-    const dates: { date: string; meetings: any[] }[] = [];
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(today); d.setDate(today.getDate() + i);
-      const ds = d.toISOString().slice(0, 10);
-      const dm = scheduledMeetings.filter(m => m.date === ds);
-      dates.push({ date: ds, meetings: dm });
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startPadding = firstDay.getDay(); // 0 = Sunday
+    const dates: Array<{ date: string; day: number; isCurrentMonth: boolean }> = [];
+    
+    // Add previous month padding
+    for (let i = startPadding - 1; i >= 0; i--) {
+      const d = new Date(year, month, -i);
+      dates.push({ date: d.toISOString().slice(0, 10), day: d.getDate(), isCurrentMonth: false });
     }
-    return dates;
+    
+    // Add current month dates
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      const d = new Date(year, month, i);
+      dates.push({ date: d.toISOString().slice(0, 10), day: i, isCurrentMonth: true });
+    }
+    
+    // Add next month padding to complete grid
+    const remaining = 42 - dates.length; // 6 rows × 7 days
+    for (let i = 1; i <= remaining; i++) {
+      const d = new Date(year, month + 1, i);
+      dates.push({ date: d.toISOString().slice(0, 10), day: d.getDate(), isCurrentMonth: false });
+    }
+    
+    return { dates, monthName: firstDay.toLocaleDateString('en', { month: 'long', year: 'numeric' }) };
   })();
 
   // Check if user is busy at a time
@@ -194,27 +277,69 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
 
       {activeTab === 'calendar' ? (
         <Card>
-          <CardHeader><CardTitle className="text-base">Next 14 Days</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{calendarDates.monthName}</CardTitle></CardHeader>
           <CardContent>
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-xs font-semibold text-gray-500 py-1">{day}</div>
+              ))}
+            </div>
             <div className="grid grid-cols-7 gap-2">
-              {calendarDates.map(d => {
+              {calendarDates.dates.map((d, idx) => {
                 const isToday = d.date === new Date().toISOString().slice(0, 10);
-                const hasMeetings = d.meetings.length > 0;
-                const dayName = new Date(d.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' });
-                const dayNum = new Date(d.date + 'T12:00:00').getDate();
+                const dayMeetings = scheduledMeetings.filter(m => m.date === d.date);
+                const hasMeetings = dayMeetings.length > 0;
+                const weekend = isWeekend(d.date);
+                const holiday = holidays.find(h => h.date === d.date);
+                const usersOnLeave = getUsersOnLeave(d.date);
+                const blocked = weekend || holiday || usersOnLeave.length > 0;
+                
                 return (
-                  <div key={d.date} className={`border rounded-lg p-2 min-h-[80px] ${isToday ? 'border-blue-500 bg-blue-50' : ''} ${hasMeetings ? 'bg-amber-50 border-amber-200' : ''}`}>
-                    <p className={`text-xs font-medium ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>{dayName}</p>
-                    <p className={`text-lg font-bold ${isToday ? 'text-blue-700' : ''}`}>{dayNum}</p>
-                    {d.meetings.map(m => (
-                      <div key={m.id} className="mt-1 p-1 bg-blue-100 rounded text-[10px] text-blue-800 truncate" title={`${m.title} at ${m.startTime}`}>
+                  <div 
+                    key={idx} 
+                    className={`border rounded-lg p-2 min-h-[90px] ${!d.isCurrentMonth ? 'bg-gray-50 text-gray-400' : ''} ${isToday ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : ''} ${hasMeetings ? 'bg-amber-50 border-amber-200' : ''} ${weekend && d.isCurrentMonth ? 'bg-gray-100' : ''} ${holiday && d.isCurrentMonth ? 'bg-red-50 border-red-300' : ''} ${usersOnLeave.length > 0 && d.isCurrentMonth ? 'bg-purple-50 border-purple-200' : ''}`}
+                    title={holiday ? holiday.name : usersOnLeave.length > 0 ? `On Leave: ${usersOnLeave.join(', ')}` : undefined}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <p className={`text-sm font-bold ${isToday ? 'text-blue-700' : weekend ? 'text-red-500' : ''}`}>{d.day}</p>
+                      {blocked && <Badge className="text-[9px] h-4 px-1 bg-red-500 text-white">BLOCKED</Badge>}
+                    </div>
+                    
+                    {holiday && (
+                      <div className="mb-1 p-1 bg-red-100 rounded text-[9px] text-red-800 truncate" title={holiday.name}>
+                        🎉 {holiday.name}
+                      </div>
+                    )}
+                    
+                    {usersOnLeave.slice(0, 2).map((name, i) => (
+                      <div key={i} className="mb-1 p-1 bg-purple-100 rounded text-[9px] text-purple-800 truncate" title={`${name} on leave`}>
+                        🏖️ {name}
+                      </div>
+                    ))}
+                    {usersOnLeave.length > 2 && (
+                      <p className="text-[8px] text-purple-600">+{usersOnLeave.length - 2} more</p>
+                    )}
+                    
+                    {dayMeetings.slice(0, 2).map(m => (
+                      <div key={m.id} className="mt-1 p-1 bg-blue-100 rounded text-[9px] text-blue-800 truncate" title={`${m.title} at ${m.startTime}`}>
                         <CalendarCheck className="w-2.5 h-2.5 inline mr-0.5" />{m.startTime} {m.title}
                       </div>
                     ))}
-                    {hasMeetings && <p className="text-[9px] text-red-500 mt-0.5 font-medium">BOOKED</p>}
+                    {dayMeetings.length > 2 && (
+                      <p className="text-[8px] text-blue-600 mt-0.5">+{dayMeetings.length - 2} more</p>
+                    )}
                   </div>
                 );
               })}
+            </div>
+            
+            {/* Legend */}
+            <div className="mt-4 flex flex-wrap gap-3 text-xs">
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-50 border-2 border-blue-500 rounded"></div><span>Today</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-50 border border-amber-200 rounded"></div><span>Has Meetings</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-100 rounded"></div><span>Weekend</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-50 border border-red-300 rounded"></div><span>Holiday</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-50 border border-purple-200 rounded"></div><span>Leave Day</span></div>
             </div>
           </CardContent>
         </Card>
