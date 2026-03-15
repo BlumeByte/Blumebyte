@@ -458,6 +458,7 @@ function EmpProfile() {
   }, [accessToken]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
+  useEffect(() => { const iv = setInterval(loadProfile, 15000); return () => clearInterval(iv); }, [loadProfile]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -615,6 +616,7 @@ function EmpAttendance() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleClockIn = async () => {
     setClocking(true);
@@ -727,6 +729,7 @@ function EmpLeave() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -806,7 +809,16 @@ function EmpAnnouncements() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { api('/announcements', { token: accessToken }).then(d => setItems(Array.isArray(d) ? d.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])).catch(console.log).finally(() => setLoading(false)); }, [accessToken]);
+  const load = useCallback(async () => {
+    try {
+      const d = await api('/announcements', { token: accessToken });
+      setItems(Array.isArray(d) ? d.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
+    } catch (e) { console.log(e); }
+    setLoading(false);
+  }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   if (loading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 

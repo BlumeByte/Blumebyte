@@ -39,6 +39,7 @@ export function MessagesPanel() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   // Subscribe to realtime updates for messages
   useRealtimeRefresh({

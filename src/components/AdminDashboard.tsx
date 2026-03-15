@@ -893,6 +893,7 @@ function AdminAssets() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1421,6 +1422,7 @@ function AdminAnnouncements() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleCreate = async () => {
     setSaving(true);
@@ -2608,6 +2610,7 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
   }, [accessToken, config.apiPrefix, entityKey]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);

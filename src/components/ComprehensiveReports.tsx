@@ -64,6 +64,7 @@ export function ComprehensiveReports() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   // Helper to get date range based on period
   const getDateRange = (date: string, period: string) => {

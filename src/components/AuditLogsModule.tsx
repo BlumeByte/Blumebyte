@@ -61,7 +61,7 @@ export function AuditLogsModule() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // List controls state
   const [searchValue, setSearchValue] = useState('');

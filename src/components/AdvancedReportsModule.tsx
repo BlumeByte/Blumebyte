@@ -123,6 +123,11 @@ export function AdvancedReportsModule() {
     fetchReportData();
   }, []);
 
+  useEffect(() => {
+    const iv = setInterval(fetchReportData, 20000);
+    return () => clearInterval(iv);
+  }, []);
+
   // Filter data by date range, department, and company
   const filterData = (data: any[]) => {
     if (!data) return [];
