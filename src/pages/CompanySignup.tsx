@@ -64,7 +64,16 @@ export default function CompanySignup() {
         }
       );
 
-      const data = await response.json();
+      // Get response text first to handle non-JSON responses
+      const text = await response.text();
+      let data;
+      
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error('Response text:', text);
+        throw new Error('Server returned an invalid response. Please try again later.');
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create company');

@@ -48,11 +48,18 @@ export default function LandingPage() {
       period: '/employee/month',
       billingCycle: 'Billed monthly',
       features: [
-        'Employee Management',
-        'Leave Management',
-        'Time & Attendance',
-        'Basic Reports',
-        'Email Support',
+        'Operations and Compliance',
+        'Performance Management',
+        'Organization Management',
+        'Compensation and Payroll',
+        'Reporting and Analytics',
+        'Time and Attendance',
+        'People Management',
+        'Learning and Development',
+        'System Administration',
+        'Communication',
+        'Documents',
+        'Assets',
       ],
     },
     {
@@ -61,10 +68,18 @@ export default function LandingPage() {
       period: '/employee/month',
       billingCycle: 'Billed annually at $60/employee',
       features: [
-        'Everything in Monthly Plan',
-        'Save $12 per employee/year',
-        'Advanced Analytics',
-        'Priority Support',
+        'Operations and Compliance',
+        'Performance Management',
+        'Organization Management',
+        'Compensation and Payroll',
+        'Reporting and Analytics',
+        'Time and Attendance',
+        'People Management',
+        'Learning and Development',
+        'System Administration',
+        'Communication',
+        'Documents',
+        'Assets',
       ],
       popular: true,
       savings: '17% savings',
@@ -85,9 +100,9 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
@@ -97,8 +112,8 @@ export default function LandingPage() {
               <Button variant="ghost" onClick={() => navigate('/login')}>
                 Sign In
               </Button>
-              <Button onClick={() => navigate('/company-signup')} className="bg-gradient-to-r from-blue-600 to-purple-600">
-                Start Free Trial
+              <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+                Get Started
               </Button>
             </div>
           </div>
@@ -108,49 +123,43 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 text-blue-700 text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 text-gray-900 text-sm font-medium mb-6 border border-gray-200">
             <Sparkles className="h-4 w-4" />
             AI-Powered HR Management
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight text-black">
             Modern HR Management for Growing Companies
           </h1>
-          <p className="text-xl text-muted-foreground mb-4 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 mb-4 max-w-2xl mx-auto">
             Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more - all in one powerful platform.
           </p>
-          <p className="text-2xl font-bold text-blue-600 mb-8">
+          <p className="text-2xl font-bold text-black mb-8">
             Starting at just $5 per employee/month
           </p>
           <div className="flex gap-4 justify-center">
-            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-gradient-to-r from-blue-600 to-purple-600 text-lg px-8">
-              Get Started Free
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/demo')}>
-              Watch Demo
+            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800 text-lg px-8">
+              Get Started Now
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-4">
-            No credit card required • 14-day free trial • Cancel anytime
-          </p>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 bg-gray-50">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-black">
             Everything you need to manage your team
           </h2>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-gray-600">
             Powerful features designed for modern HR teams
           </p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <Card key={index} className="border-2 hover:border-primary transition-all hover:shadow-lg">
+            <Card key={index} className="border-2 hover:border-black transition-all hover:shadow-lg bg-white">
               <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center mb-4">
-                  <feature.icon className="h-6 w-6 text-blue-600" />
+                <div className="h-12 w-12 rounded-lg bg-black flex items-center justify-center mb-4">
+                  <feature.icon className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle>{feature.title}</CardTitle>
                 <CardDescription>{feature.description}</CardDescription>
@@ -163,10 +172,10 @@ export default function LandingPage() {
       {/* Pricing Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-black">
             Simple, transparent pricing
           </h2>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-gray-600">
             Choose the plan that's right for your business
           </p>
         </div>
@@ -174,12 +183,12 @@ export default function LandingPage() {
           {pricingPlans.map((plan, index) => (
             <Card
               key={index}
-              className={`relative border-2 transition-all hover:shadow-xl ${
-                plan.popular ? 'border-blue-600 shadow-lg scale-105' : ''
+              className={`relative border-2 transition-all hover:shadow-xl bg-white ${
+                plan.popular ? 'border-black shadow-lg scale-105' : 'border-gray-200'
               }`}
             >
               {plan.popular && plan.savings && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium rounded-full">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-black text-white text-sm font-medium rounded-full">
                   {plan.savings}
                 </div>
               )}
@@ -187,15 +196,15 @@ export default function LandingPage() {
                 <CardTitle className="text-2xl">{plan.name}</CardTitle>
                 <CardDescription className="text-sm">{plan.billingCycle}</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground text-sm">{plan.period}</span>
+                  <span className="text-4xl font-bold text-black">{plan.price}</span>
+                  <span className="text-gray-600 text-sm">{plan.period}</span>
                 </div>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3 mb-6">
                   {plan.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="h-5 w-5 text-black shrink-0 mt-0.5" />
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}
@@ -212,13 +221,13 @@ export default function LandingPage() {
                   <Button
                     className={`w-full ${
                       plan.popular
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600'
+                        ? 'bg-black text-white hover:bg-gray-800'
                         : ''
                     }`}
                     variant={plan.popular ? 'default' : 'outline'}
                     onClick={() => navigate('/company-signup')}
                   >
-                    Start Free Trial
+                    Get Started
                   </Button>
                 )}
               </CardContent>
@@ -229,21 +238,21 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <Card className="bg-gradient-to-r from-blue-600 to-purple-600 border-0 text-white">
+        <Card className="bg-black border-0 text-white">
           <CardContent className="p-12 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Ready to transform your HR operations?
             </h2>
-            <p className="text-lg mb-8 opacity-90 max-w-2xl mx-auto">
+            <p className="text-lg mb-8 text-gray-300 max-w-2xl mx-auto">
               Join hundreds of companies already using Blumebyte to streamline their HR processes
             </p>
             <Button
               size="lg"
               variant="secondary"
               onClick={() => navigate('/company-signup')}
-              className="text-lg px-8"
+              className="text-lg px-8 bg-white text-black hover:bg-gray-100"
             >
-              Start Your Free Trial
+              Get Started Today
             </Button>
           </CardContent>
         </Card>

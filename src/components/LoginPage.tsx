@@ -10,10 +10,10 @@ import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
-const BLUMEBYTE_COLOR = '#1d4ed8';
+const BLUMEBYTE_COLOR = '#000000';
 
 function blumeGradientStyle() {
-  return { background: `linear-gradient(135deg, ${BLUMEBYTE_COLOR}, #1e3a8a)` };
+  return { background: 'linear-gradient(135deg, #000000, #1a1a1a)' };
 }
 
 export function LoginPage() {
@@ -159,7 +159,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => navigate('/')}
-                className="text-blue-600 hover:underline font-medium"
+                className="text-black hover:underline font-medium"
               >
                 Create a company account
               </button>

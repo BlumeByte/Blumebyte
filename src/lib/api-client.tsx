@@ -22,7 +22,18 @@ export async function api(path: string, options: RequestInit & { token?: string 
       ...(fetchOpts.headers || {}),
     },
   });
-  const data = await res.json();
+  
+  // Handle non-JSON responses
+  const text = await res.text();
+  let data;
+  
+  try {
+    data = JSON.parse(text);
+  } catch (parseError) {
+    console.error('API response text:', text);
+    throw new Error('Server returned an invalid response. Please try again later.');
+  }
+  
   if (!res.ok) {
     // Create a custom error object with additional context
     const error: any = new Error(data.error || `Request failed (${res.status})`);
@@ -47,7 +58,18 @@ export async function apiUpload(path: string, formData: FormData, token?: string
     headers,
     body: formData,
   });
-  const data = await res.json();
+  
+  // Handle non-JSON responses
+  const text = await res.text();
+  let data;
+  
+  try {
+    data = JSON.parse(text);
+  } catch (parseError) {
+    console.error('Upload response text:', text);
+    throw new Error('Server returned an invalid response. Please try again later.');
+  }
+  
   if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
   return data;
 }
