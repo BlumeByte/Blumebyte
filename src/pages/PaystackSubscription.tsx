@@ -166,7 +166,7 @@ export default function PaystackSubscription() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-lg">Current Plan: {companyInfo.subscription.plan || 'Trial'}</h3>
+                  <h3 className="font-semibold text-lg">Current Plan: {companyInfo.subscription.plan || 'None'}</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     {companyInfo.subscription.licenses} licenses • {companyInfo.subscription.usedLicenses || 0} used
                   </p>

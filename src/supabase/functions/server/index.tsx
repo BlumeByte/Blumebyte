@@ -430,6 +430,97 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
   }
 });
 
+// --- Company Registration (creates SuperAdmin for a new company) ---
+app.post(`${PREFIX}/company/register`, async (c) => {
+  try {
+    const { companyName, companySize, industry, adminName, adminEmail, password } = await c.req.json();
+    
+    if (!companyName || !adminEmail || !password || !adminName) {
+      return c.json({ error: "Company name, admin name, email and password are required" }, 400);
+    }
+
+    if (password.length < 8) {
+      return c.json({ error: "Password must be at least 8 characters" }, 400);
+    }
+
+    // Check if email already exists
+    const sb = supabaseAdmin();
+    const { data: existingUser } = await sb.auth.admin.listUsers();
+    if (existingUser?.users?.some((u: any) => u.email === adminEmail.toLowerCase())) {
+      return c.json({ error: "An account with this email already exists" }, 400);
+    }
+
+    // Create company record
+    const companyId = crypto.randomUUID();
+    const company = {
+      id: companyId,
+      name: companyName,
+      size: companySize || 'Not specified',
+      industry: industry || 'Not specified',
+      createdAt: new Date().toISOString(),
+      status: 'active',
+    };
+    await kv.set(`company:${companyId}`, company);
+
+    // Create SuperAdmin user in Supabase Auth
+    const { data: authData, error: authError } = await sb.auth.admin.createUser({
+      email: adminEmail.toLowerCase(),
+      password,
+      user_metadata: { 
+        name: adminName, 
+        role: "superadmin",
+        companyId,
+        companyName,
+      },
+      email_confirm: true, // Auto-confirm since we don't have email configured
+    });
+
+    if (authError) {
+      console.log("Company registration auth error:", authError);
+      // Clean up company record if user creation failed
+      await kv.del(`company:${companyId}`);
+      return c.json({ error: authError.message }, 400);
+    }
+
+    const userId = authData.user.id;
+
+    // Create SuperAdmin employee record
+    await kv.set(`employee:${userId}`, {
+      id: userId,
+      userId,
+      email: adminEmail.toLowerCase(),
+      name: adminName,
+      role: "superadmin",
+      status: "active",
+      company: companyId,
+      companyId: companyId,
+      companyName: companyName,
+      assignedCompanies: [companyId],
+      createdAt: new Date().toISOString(),
+    });
+
+    // Log audit event
+    await logAudit({
+      userId,
+      userName: adminName,
+      action: 'CREATE',
+      resourceType: 'company',
+      resourceId: companyId,
+      details: { companyName, adminEmail },
+    });
+
+    return c.json({ 
+      success: true, 
+      userId,
+      companyId,
+      message: "Company created successfully. Please sign in to continue."
+    });
+  } catch (e: any) {
+    console.log("company-registration error:", e);
+    return c.json({ error: e.message || "Failed to create company" }, 500);
+  }
+});
+
 // --- Sync user statuses based on subscription (SuperAdmin only) ---
 app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
   try {
@@ -3998,13 +4089,12 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       name: companyName,
       size: companySize || 'unknown',
       industry: industry || 'other',
-      status: 'trial', // 14-day trial
-      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'active',
       createdAt: new Date().toISOString(),
       subscription: {
-        plan: 'trial',
-        licenses: 10, // Trial includes 10 licenses
-        status: 'active',
+        plan: 'none',
+        licenses: 0,
+        status: 'inactive',
       },
     };
 

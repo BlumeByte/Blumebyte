@@ -98,7 +98,7 @@ export default function CompanySignup() {
           </div>
           <CardTitle className="text-3xl">Create Your Company Account</CardTitle>
           <CardDescription>
-            Start your 14-day free trial with 10 employee licenses. No credit card required.
+            Get started with Blumebyte HR Management. Set up your company and start managing your team.
           </CardDescription>
         </CardHeader>
         <CardContent>

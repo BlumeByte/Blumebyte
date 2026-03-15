@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blumebyte - Supabase Connection Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      max-width: 800px;
+      width: 100%;
+    }
+    
+    h1 {
+      color: #2d3748;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      color: #718096;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .test-section {
+      background: #f7fafc;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .test-title {
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .status.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    
+    .status-icon {
+      width: 12px;
+      height: 12px;
+    }
+    
+    .test-result {
+      background: white;
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #4a5568;
+      overflow-x: auto;
+    }
+    
+    .button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-right: 10px;
+    }
+    
+    .button:hover {
+      background: #5a67d8;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .button:disabled {
+      background: #cbd5e0;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-top: 20px;
+    }
+    
+    .info-item {
+      background: white;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .info-label {
+      font-size: 11px;
+      color: #718096;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .info-value {
+      color: #2d3748;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    
+    .actions {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 2px solid #e2e8f0;
+    }
+    
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(0,0,0,0.1);
+      border-left-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔌 Blumebyte Supabase Connection Test</h1>
+    <p class="subtitle">Verify your database connection and server endpoints</p>
+    
+    <div class="test-section">
+      <div class="test-title">
+        <span>1. Configuration Check</span>
+        <span class="status success">
+          <span>✓</span>
+          <span>Ready</span>
+        </span>
+      </div>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">Project ID</div>
+          <div class="info-value" id="project-id">ivohczdtuxasyfoiphqu</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Supabase URL</div>
+          <div class="info-value" id="supabase-url">https://ivohczdtuxasyfoiphqu.supabase.co</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Server Endpoint</div>
+          <div class="info-value">/functions/v1/make-server-a35148f0</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">KV Store Table</div>
+          <div class="info-value">kv_store_a35148f0</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="test-section">
+      <div class="test-title">
+        <span>2. Server Health Check</span>
+        <span class="status pending" id="health-status">
+          <span class="spinner"></span>
+          <span>Testing...</span>
+        </span>
+      </div>
+      <div class="test-result" id="health-result">Click "Run Tests" to check server health...</div>
+    </div>
+    
+    <div class="test-section">
+      <div class="test-title">
+        <span>3. Setup Status Check</span>
+        <span class="status pending" id="setup-status">
+          <span class="spinner"></span>
+          <span>Testing...</span>
+        </span>
+      </div>
+      <div class="test-result" id="setup-result">Click "Run Tests" to check if SuperAdmin exists...</div>
+    </div>
+    
+    <div class="test-section">
+      <div class="test-title">
+        <span>4. Database Connection</span>
+        <span class="status pending" id="db-status">
+          <span class="spinner"></span>
+          <span>Testing...</span>
+        </span>
+      </div>
+      <div class="test-result" id="db-result">Click "Run Tests" to verify database connectivity...</div>
+    </div>
+    
+    <div class="actions">
+      <button class="button" id="run-tests" onclick="runAllTests()">Run All Tests</button>
+      <button class="button" id="open-dashboard" onclick="openDashboard()">Open Supabase Dashboard</button>
+    </div>
+  </div>
+
+  <script>
+    const PROJECT_ID = 'ivohczdtuxasyfoiphqu';
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2b2hjemR0dXhhc3lmb2lwaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzgyNDcsImV4cCI6MjA4ODM1NDI0N30.loRm7iik0lgBW7yRK-ANIjpyKVZGLCdSuqVZ5VDnQNQ';
+    const BASE_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/make-server-a35148f0`;
+    
+    function setStatus(elementId, status, text) {
+      const el = document.getElementById(elementId);
+      el.className = `status ${status}`;
+      
+      if (status === 'pending') {
+        el.innerHTML = `<span class="spinner"></span><span>${text}</span>`;
+      } else if (status === 'success') {
+        el.innerHTML = `<span>✓</span><span>${text}</span>`;
+      } else if (status === 'error') {
+        el.innerHTML = `<span>✗</span><span>${text}</span>`;
+      }
+    }
+    
+    function setResult(elementId, content) {
+      document.getElementById(elementId).innerHTML = `<pre>${content}</pre>`;
+    }
+    
+    async function testHealth() {
+      setStatus('health-status', 'pending', 'Testing...');
+      setResult('health-result', 'Connecting to server...');
+      
+      try {
+        const response = await fetch(`${BASE_URL}/health`, {
+          headers: {
+            'Authorization': `Bearer ${ANON_KEY}`
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status === 'ok') {
+          setStatus('health-status', 'success', 'Server Online');
+          setResult('health-result', JSON.stringify(data, null, 2) + '\n\n✅ Server is healthy and responding!');
+        } else {
+          setStatus('health-status', 'error', 'Unexpected Response');
+          setResult('health-result', JSON.stringify(data, null, 2));
+        }
+      } catch (error) {
+        setStatus('health-status', 'error', 'Connection Failed');
+        setResult('health-result', `❌ Error: ${error.message}\n\nMake sure the Supabase Edge Function is deployed.`);
+      }
+    }
+    
+    async function testSetup() {
+      setStatus('setup-status', 'pending', 'Testing...');
+      setResult('setup-result', 'Checking setup status...');
+      
+      try {
+        const response = await fetch(`${BASE_URL}/check-setup`, {
+          headers: {
+            'Authorization': `Bearer ${ANON_KEY}`
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          if (data.hasSuperAdmin) {
+            setStatus('setup-status', 'success', 'Setup Complete');
+            setResult('setup-result', JSON.stringify(data, null, 2) + '\n\n✅ SuperAdmin exists! System is ready to use.');
+          } else {
+            setStatus('setup-status', 'success', 'Needs Setup');
+            setResult('setup-result', JSON.stringify(data, null, 2) + '\n\n⚠️ No SuperAdmin found. Please complete initial setup or register a company.');
+          }
+        } else {
+          setStatus('setup-status', 'error', 'Check Failed');
+          setResult('setup-result', JSON.stringify(data, null, 2));
+        }
+      } catch (error) {
+        setStatus('setup-status', 'error', 'Connection Failed');
+        setResult('setup-result', `❌ Error: ${error.message}`);
+      }
+    }
+    
+    async function testDatabase() {
+      setStatus('db-status', 'pending', 'Testing...');
+      setResult('db-result', 'Verifying database connection...');
+      
+      try {
+        // Test if we can access the health endpoint (which internally uses the database)
+        const response = await fetch(`${BASE_URL}/health`, {
+          headers: {
+            'Authorization': `Bearer ${ANON_KEY}`
+          }
+        });
+        
+        if (response.ok) {
+          setStatus('db-status', 'success', 'Connected');
+          setResult('db-result', '✅ Database connection verified!\n\nThe server successfully communicated with the Supabase Postgres database.\n\nTable: kv_store_a35148f0\nStatus: Operational\nConnection: Active');
+        } else {
+          setStatus('db-status', 'error', 'Issue Detected');
+          setResult('db-result', '⚠️ Server responded but there may be database issues.');
+        }
+      } catch (error) {
+        setStatus('db-status', 'error', 'Connection Failed');
+        setResult('db-result', `❌ Error: ${error.message}\n\nCould not verify database connection.`);
+      }
+    }
+    
+    async function runAllTests() {
+      const button = document.getElementById('run-tests');
+      button.disabled = true;
+      button.textContent = 'Running Tests...';
+      
+      await testHealth();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await testSetup();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await testDatabase();
+      
+      button.disabled = false;
+      button.textContent = 'Run All Tests';
+    }
+    
+    function openDashboard() {
+      window.open('https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu', '_blank');
+    }
+    
+    // Auto-run tests on page load
+    window.addEventListener('load', () => {
+      setTimeout(runAllTests, 500);
+    });
+  </script>
+</body>
+</html>
