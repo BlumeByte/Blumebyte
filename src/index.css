@@ -4758,6 +4758,12 @@
     background-color: var(--primary);
   }
 
+  @media print {
+    .print\:hidden {
+      display: none;
+    }
+  }
+
   .\[\&_p\]\:leading-relaxed p {
     --tw-leading: var(--leading-relaxed);
     line-height: var(--leading-relaxed);

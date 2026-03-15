@@ -262,6 +262,7 @@ function AdminEmployees() {
   const [tempPw, setTempPw] = useState('');
   const [showTempPw, setShowTempPw] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [deleteReason, setDeleteReason] = useState('');
   const [contractTarget, setContractTarget] = useState<any>(null);
@@ -272,15 +273,20 @@ function AdminEmployees() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, comps] = await Promise.all([api('/users', { token: accessToken }), api('/reference-data', { token: accessToken }).catch(() => ({}))]);
+      const [data, comps, depts] = await Promise.all([
+        api('/users', { token: accessToken }),
+        api('/reference-data', { token: accessToken }).catch(() => ({})),
+        api('/departments', { token: accessToken }).catch(() => [])
+      ]);
       setUsers(Array.isArray(data) ? data : []);
       setCompanies(comps?.companies || []);
+      setDepartmentsList(Array.isArray(depts) ? depts : []);
     } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 30000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -517,6 +523,7 @@ function AdminUsers() {
   const [tempPw, setTempPw] = useState('');
   const [showTempPw, setShowTempPw] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [initialDepartment, setInitialDepartment] = useState('');
@@ -525,14 +532,20 @@ function AdminUsers() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, comps] = await Promise.all([api('/users', { token: accessToken }), api('/reference-data', { token: accessToken }).catch(() => ({}))]);
+      const [data, comps, depts] = await Promise.all([
+        api('/users', { token: accessToken }),
+        api('/reference-data', { token: accessToken }).catch(() => ({})),
+        api('/departments', { token: accessToken }).catch(() => [])
+      ]);
       setUsers(Array.isArray(data) ? data : []);
       setCompanies(comps?.companies || []);
+      setDepartmentsList(Array.isArray(depts) ? depts : []);
     } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);

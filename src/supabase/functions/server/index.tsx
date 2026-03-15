@@ -3035,6 +3035,97 @@ app.delete(`${PREFIX}/leave-requests/:leaveId`, async (c) => {
   }
 });
 
+// ============ TRAINING PROGRAMS ============
+// Get all training programs
+app.get(`${PREFIX}/training-programs`, async (c) => {
+  try {
+    const { user, role } = await requireAuth(c);
+    let allTrainings = await kv.getByPrefix("training:");
+    
+    // For employees, only show trainings they're assigned to
+    if (role === "employee") {
+      return c.json(allTrainings.filter((t: any) => 
+        (t.assignedUsers || []).includes(user.id)
+      ));
+    }
+    
+    // Filter by company scope
+    const employees = await kv.getByPrefix("employee:");
+    const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
+    const companyId = filteredEmployees.length > 0 ? filteredEmployees[0].companyId : null;
+    
+    return c.json(allTrainings.filter((t: any) => t.companyId === companyId));
+  } catch (e: any) {
+    console.log('Get training programs error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Create training program
+app.post(`${PREFIX}/training-programs`, async (c) => {
+  try {
+    const { user, role } = await requireAdminOrAbove(c);
+    const body = await c.req.json();
+    
+    // Get company ID from user profile
+    const userProfile = await kv.get(`user_profile:${user.id}`);
+    const companyId = userProfile?.companyId;
+    
+    const id = `training_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    const training = {
+      ...body,
+      id,
+      companyId,
+      createdBy: user.id,
+      createdByName: user.name,
+      createdAt: new Date().toISOString(),
+      assignedUsers: body.assignedUsers || [],
+    };
+    
+    await kv.set(`training:${id}`, training);
+    return c.json(training, 201);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Update training program
+app.put(`${PREFIX}/training-programs/:id`, async (c) => {
+  try {
+    await requireAdminOrAbove(c);
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    
+    const existing = await kv.get(`training:${id}`);
+    if (!existing) return c.json({ error: "Training not found" }, 404);
+    
+    const updated = { ...existing, ...body, updatedAt: new Date().toISOString() };
+    await kv.set(`training:${id}`, updated);
+    
+    return c.json(updated);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Delete training program
+app.delete(`${PREFIX}/training-programs/:id`, async (c) => {
+  try {
+    await requireAdminOrAbove(c);
+    const id = c.req.param("id");
+    await kv.del(`training:${id}`);
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // ============ AUTO-CLOCK SETTINGS ============
 app.get(`${PREFIX}/auto-clock-settings`, async (c) => {
   try {

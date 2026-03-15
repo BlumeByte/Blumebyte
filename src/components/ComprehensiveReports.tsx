@@ -11,9 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { toast } from 'sonner';
 import {
   Loader2, Download, FileText, Calendar, Users, Clock, Filter, RefreshCw,
-  TrendingUp, BarChart3
+  TrendingUp, BarChart3, Printer
 } from 'lucide-react';
 import { exportToCSV, exportToPDF } from './ListControls';
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
 
 export function ComprehensiveReports() {
   const { accessToken } = useAuth();
@@ -131,7 +135,7 @@ export function ComprehensiveReports() {
         'Leave Type': l.leaveType,
         'Start Date': l.startDate,
         'End Date': l.endDate,
-        Days: l.days || '—',
+        Days: l.days || '��',
         Status: l.status,
         Reason: l.reason || '—',
       })),
@@ -178,6 +182,63 @@ export function ComprehensiveReports() {
     onLeave: filteredUsers.filter(u => u.status === 'on-leave').length,
   };
 
+  // Chart data
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+  // Attendance by employee chart data
+  const attendanceByEmployee = Object.values(
+    filteredAttendance.reduce((acc: any, a) => {
+      const name = a.employeeName || a.userName || 'Unknown';
+      if (!acc[name]) acc[name] = { name, present: 0, late: 0, absent: 0 };
+      if (a.clockIn) acc[name].present++;
+      if (a.status === 'late') acc[name].late++;
+      if (a.status === 'absent') acc[name].absent++;
+      return acc;
+    }, {})
+  );
+
+  // Leave by type chart data
+  const leaveByType = Object.values(
+    filteredLeave.reduce((acc: any, l) => {
+      const type = l.leaveType || 'Other';
+      if (!acc[type]) acc[type] = { name: type, count: 0 };
+      acc[type].count++;
+      return acc;
+    }, {})
+  );
+
+  // Leave status pie chart
+  const leaveStatusData = [
+    { name: 'Approved', value: leaveStats.approved, color: '#10b981' },
+    { name: 'Pending', value: leaveStats.pending, color: '#f59e0b' },
+    { name: 'Rejected', value: leaveStats.rejected, color: '#ef4444' },
+  ].filter(d => d.value > 0);
+
+  // User by department
+  const usersByDepartment = Object.values(
+    filteredUsers.reduce((acc: any, u) => {
+      const dept = u.department || 'Unassigned';
+      if (!acc[dept]) acc[dept] = { name: dept, count: 0 };
+      acc[dept].count++;
+      return acc;
+    }, {})
+  );
+
+  // User by role
+  const usersByRole = Object.values(
+    filteredUsers.reduce((acc: any, u) => {
+      const role = u.role || 'employee';
+      if (!acc[role]) acc[role] = { name: role, count: 0 };
+      acc[role].count++;
+      return acc;
+    }, {})
+  );
+
+  // Print handlers
+  const printReport = () => {
+    window.print();
+  };
+
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
   return (
@@ -187,7 +248,10 @@ export function ComprehensiveReports() {
           <BarChart3 className="w-5 h-5 text-blue-600" />
           <h2 className="text-lg font-semibold">Comprehensive Reports</h2>
         </div>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={printReport} className="print:hidden"><Printer className="w-4 h-4 mr-1" />Print Report</Button>
+          <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+        </div>
       </div>
 
       {/* Report Type Tabs */}
@@ -288,6 +352,33 @@ export function ComprehensiveReports() {
               )}
             </CardContent>
           </Card>
+
+          {/* Charts */}
+          <Card>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={attendanceByEmployee}
+                      margin={{
+                        top: 5, right: 30, left: 20, bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="present" fill="#10b981" />
+                      <Bar dataKey="late" fill="#f59e0b" />
+                      <Bar dataKey="absent" fill="#ef4444" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
 
@@ -386,6 +477,52 @@ export function ComprehensiveReports() {
               )}
             </CardContent>
           </Card>
+
+          {/* Charts */}
+          <Card>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={leaveByType}
+                      margin={{
+                        top: 5, right: 30, left: 20, bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="p-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={leaveStatusData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {leaveStatusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
 
@@ -468,6 +605,48 @@ export function ComprehensiveReports() {
                   </TableBody>
                 </Table>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Charts */}
+          <Card>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={usersByDepartment}
+                      margin={{
+                        top: 5, right: 30, left: 20, bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="p-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={usersByRole}
+                      margin={{
+                        top: 5, right: 30, left: 20, bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </>
