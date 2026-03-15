@@ -4663,7 +4663,9 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
 
     // Get user profile for name and company
     const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const userName = userProfile?.name || userProfile?.email?.split('@')[0] || 'Anonymous';
+    // Also check employee data for name
+    const employeeData = await kv.get(`employee:${authUser.user.id}`);
+    const userName = userProfile?.name || employeeData?.name || authUser.user.user_metadata?.name || userProfile?.email?.split('@')[0] || 'Unknown User';
     const companyId = userProfile?.companyId;
 
     if (!companyId) {

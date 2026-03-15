@@ -930,6 +930,10 @@
     margin-top: calc(var(--spacing) * 12);
   }
 
+  .mt-auto {
+    margin-top: auto;
+  }
+
   .mr-0\.5 {
     margin-right: calc(var(--spacing) * .5);
   }

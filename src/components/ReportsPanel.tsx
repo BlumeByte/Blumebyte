@@ -246,10 +246,10 @@ export function ReportsPanel() {
                       <ClientOnlyChart fallback={<div className="h-[220px] flex items-center justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>}>
                         <ResponsiveContainer width="100%" height={220}>
                           <RechartPie>
-                            <Pie key="pie-1" data={roleDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                            <Pie key="pie-role" data={roleDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                               {roleDistribution.map((entry, i) => <Cell key={`role-${entry.name}-${i}`} fill={COLORS[i % COLORS.length]} />)}
                             </Pie>
-                            <Tooltip key="tooltip-1" />
+                            <Tooltip key="tooltip-role" />
                           </RechartPie>
                         </ResponsiveContainer>
                       </ClientOnlyChart>
@@ -264,11 +264,11 @@ export function ReportsPanel() {
                       <ClientOnlyChart fallback={<div className="h-[220px] flex items-center justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>}>
                         <ResponsiveContainer width="100%" height={220}>
                           <BarChart data={deptDistribution} layout="vertical" margin={{ left: 10 }}>
-                            <CartesianGrid key="grid-1" strokeDasharray="3 3" />
-                            <XAxis key="xaxis-1" type="number" />
-                            <YAxis key="yaxis-1" dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
-                            <Tooltip key="tooltip-1" />
-                            <Bar key="bar-1" dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                            <CartesianGrid key="grid-dept" strokeDasharray="3 3" />
+                            <XAxis key="xaxis-dept" type="number" />
+                            <YAxis key="yaxis-dept" dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
+                            <Tooltip key="tooltip-dept" />
+                            <Bar key="bar-dept" dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </ClientOnlyChart>
@@ -283,13 +283,13 @@ export function ReportsPanel() {
                       <ClientOnlyChart fallback={<div className="h-[220px] flex items-center justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>}>
                         <ResponsiveContainer width="100%" height={220}>
                           <AreaChart data={attendanceTrend}>
-                            <CartesianGrid key="grid-1" strokeDasharray="3 3" />
-                            <XAxis key="xaxis-1" dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
-                            <YAxis key="yaxis-1" tick={{ fontSize: 11 }} />
-                            <Tooltip key="tooltip-1" />
-                            <Legend key="legend-1" />
-                            <Area key="area-1" type="monotone" dataKey="count" name="Attendance" stroke="#3b82f6" fill="#93c5fd" fillOpacity={0.3} />
-                            <Area key="area-2" type="monotone" dataKey="hours" name="Hours" stroke="#10b981" fill="#6ee7b7" fillOpacity={0.2} />
+                            <CartesianGrid key="grid-attend" strokeDasharray="3 3" />
+                            <XAxis key="xaxis-attend" dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                            <YAxis key="yaxis-attend" tick={{ fontSize: 11 }} />
+                            <Tooltip key="tooltip-attend" />
+                            <Legend key="legend-attend" />
+                            <Area key="area-count" type="monotone" dataKey="count" name="Attendance" stroke="#3b82f6" fill="#93c5fd" fillOpacity={0.3} />
+                            <Area key="area-hours" type="monotone" dataKey="hours" name="Hours" stroke="#10b981" fill="#6ee7b7" fillOpacity={0.2} />
                           </AreaChart>
                         </ResponsiveContainer>
                       </ClientOnlyChart>
@@ -304,10 +304,10 @@ export function ReportsPanel() {
                       <ClientOnlyChart fallback={<div className="h-[220px] flex items-center justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>}>
                         <ResponsiveContainer width="100%" height={220}>
                           <RechartPie>
-                            <Pie key="pie-1" data={leaveBreakdown} cx="50%" cy="50%" outerRadius={80} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                            <Pie key="pie-leave" data={leaveBreakdown} cx="50%" cy="50%" outerRadius={80} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
                               {leaveBreakdown.map((entry, i) => <Cell key={`leave-${entry.name}-${i}`} fill={COLORS[(i + 3) % COLORS.length]} />)}
                             </Pie>
-                            <Tooltip key="tooltip-1" />
+                            <Tooltip key="tooltip-leave" />
                           </RechartPie>
                         </ResponsiveContainer>
                       </ClientOnlyChart>

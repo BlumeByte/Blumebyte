@@ -595,6 +595,18 @@ export function ManagerDashboard() {
             My Profile
           </Button>
         </nav>
+
+        {/* Logout Button at Bottom */}
+        <div className="p-3 border-t mt-auto">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-sm h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={logout}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
+          </Button>
+        </div>
       </aside>
 
       {/* Main Content */}
