@@ -17,7 +17,8 @@ import {
   CheckCircle, X, Briefcase, LayoutDashboard, FileText, MessageCircle, LogOut,
   Star, Video, MapPin, Building2, Phone, Mail, Printer, ArrowUpDown, ArrowUp, ArrowDown,
   DollarSign, Download, ListTodo, ClipboardCheck, Target, AlertCircle, ChevronRight,
-  GraduationCap, ClipboardList, RefreshCw, FileCheck, GitMerge, BarChart3, TrendingUp
+  GraduationCap, ClipboardList, RefreshCw, FileCheck, GitMerge, BarChart3, TrendingUp,
+  Shield, Scale, Eye, FileWarning, Ban, Gavel
 } from 'lucide-react';
 import { Progress } from './ui/progress';
 import { MessagesPanel } from './MessagesPanel';
@@ -84,7 +85,6 @@ export function EmployeeDashboard() {
             <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
             <TabsTrigger value="meetings"><Video className="w-4 h-4 mr-1" />Meetings</TabsTrigger>
             <TabsTrigger value="messages"><MessageCircle className="w-4 h-4 mr-1" />Messages</TabsTrigger>
-            <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
             <TabsTrigger value="questionnaires"><ClipboardList className="w-4 h-4 mr-1" />Questionnaires</TabsTrigger>
             <TabsTrigger value="self-service"><Briefcase className="w-4 h-4 mr-1" />Jobs</TabsTrigger>
             <TabsTrigger value="my-profile"><User className="w-4 h-4 mr-1" />My Profile</TabsTrigger>
@@ -98,8 +98,8 @@ export function EmployeeDashboard() {
           <TabsContent value="tasks"><EmpTasks /></TabsContent>
           <TabsContent value="onboarding"><EmpOnboarding /></TabsContent>
           <TabsContent value="reviews"><EmpReviews /></TabsContent>
-          <TabsContent value="disciplinary"><div className="py-16 text-center text-gray-500">Disciplinary module</div></TabsContent>
-          <TabsContent value="compliance"><div className="py-16 text-center text-gray-500">Compliance module</div></TabsContent>
+          <TabsContent value="disciplinary"><EmpDisciplinary /></TabsContent>
+          <TabsContent value="compliance"><EmpCompliance /></TabsContent>
           <TabsContent value="training"><TrainingManagement mode="employee" /></TabsContent>
           <TabsContent value="questionnaires"><EmpQuestionnaires /></TabsContent>
           <TabsContent value="meetings"><MeetingsPanel mode="employee" /></TabsContent>
@@ -1334,6 +1334,274 @@ function EmpQuestionnaires() {
             )}
           </div>)}
           <DialogFooter><Button variant="outline" onClick={() => setSelectedFeedback(null)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function EmpDisciplinary() {
+  const { accessToken } = useAuth();
+  const [cases, setCases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCase, setSelectedCase] = useState<any>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api('/my-disciplinary', { token: accessToken });
+      setCases(Array.isArray(d) ? d.sort((a: any, b: any) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime()) : []);
+    } catch (e) { console.log(e); }
+    setLoading(false);
+  }, [accessToken]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+
+  const severityColor = (s: string) => {
+    switch (s?.toLowerCase()) {
+      case 'critical': case 'termination': return 'bg-red-100 text-red-800 border-red-200';
+      case 'major': case 'suspension': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'warning': case 'written-warning': case 'written_warning': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'verbal': case 'verbal-warning': case 'verbal_warning': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const discStatusColor = (s: string) => {
+    switch (s?.toLowerCase()) {
+      case 'resolved': case 'closed': return 'bg-green-100 text-green-800';
+      case 'open': case 'active': case 'pending': return 'bg-red-100 text-red-800';
+      case 'under-review': case 'under_review': case 'investigating': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const openCases = cases.filter(c => !['resolved', 'closed'].includes(c.status?.toLowerCase()));
+  const resolvedCases = cases.filter(c => ['resolved', 'closed'].includes(c.status?.toLowerCase()));
+
+  if (loading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2"><AlertCircle className="w-5 h-5 text-red-500" />Disciplinary Records</h2>
+          <p className="text-sm text-gray-500">{cases.length} record{cases.length !== 1 ? 's' : ''} · {openCases.length} open · {resolvedCases.length} resolved</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+      </div>
+      {cases.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          <Card><CardContent className="pt-4 text-center"><AlertCircle className="w-5 h-5 mx-auto mb-1 text-gray-500" /><p className="text-xs text-gray-500">Total</p><p className="text-lg font-bold">{cases.length}</p></CardContent></Card>
+          <Card className={openCases.length > 0 ? 'border-red-200' : ''}><CardContent className="pt-4 text-center"><Ban className="w-5 h-5 mx-auto mb-1 text-red-500" /><p className="text-xs text-gray-500">Open</p><p className="text-lg font-bold text-red-600">{openCases.length}</p></CardContent></Card>
+          <Card><CardContent className="pt-4 text-center"><CheckCircle className="w-5 h-5 mx-auto mb-1 text-green-500" /><p className="text-xs text-gray-500">Resolved</p><p className="text-lg font-bold text-green-600">{resolvedCases.length}</p></CardContent></Card>
+        </div>
+      )}
+      {cases.length === 0 ? (
+        <Card><CardContent className="py-16 text-center text-gray-400">
+          <Shield className="w-10 h-10 mx-auto mb-2 opacity-40" />
+          <p className="text-sm font-medium">No disciplinary records</p>
+          <p className="text-xs text-gray-400 mt-1">You have a clean record. Keep up the good work!</p>
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-3">{cases.map((c, i) => (
+          <Card key={c.id || i} className="hover:shadow-sm transition-all cursor-pointer" onClick={() => setSelectedCase(c)}>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="text-sm font-semibold truncate">{c.title || c.type || c.incidentType || 'Disciplinary Case'}</h3>
+                    <Badge className={discStatusColor(c.status)}>{c.status || 'open'}</Badge>
+                    {(c.severity || c.type) && <Badge variant="outline" className={severityColor(c.severity || c.type)}>{c.severity || c.type}</Badge>}
+                  </div>
+                  {c.description && <p className="text-xs text-gray-500 line-clamp-2">{c.description}</p>}
+                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
+                    {(c.date || c.incidentDate) && <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" />{new Date(c.date || c.incidentDate).toLocaleDateString()}</span>}
+                    {c.issuedBy && <span>Issued by: {c.issuedBy}</span>}
+                    {c.department && <span>{c.department}</span>}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 mt-1" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}</div>
+      )}
+      <Dialog open={!!selectedCase} onOpenChange={() => setSelectedCase(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader><DialogTitle>{selectedCase?.title || selectedCase?.type || 'Disciplinary Details'}</DialogTitle></DialogHeader>
+          {selectedCase && (<div className="space-y-4 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={discStatusColor(selectedCase.status)}>{selectedCase.status || 'open'}</Badge>
+              {(selectedCase.severity || selectedCase.type) && <Badge variant="outline" className={severityColor(selectedCase.severity || selectedCase.type)}>{selectedCase.severity || selectedCase.type}</Badge>}
+            </div>
+            {selectedCase.description && <div><Label className="text-xs text-gray-500">Description</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedCase.description}</p></div>}
+            <div className="grid grid-cols-2 gap-3">
+              {(selectedCase.date || selectedCase.incidentDate) && <div><Label className="text-xs text-gray-500">Incident Date</Label><p className="text-sm">{new Date(selectedCase.date || selectedCase.incidentDate).toLocaleDateString()}</p></div>}
+              {selectedCase.issuedBy && <div><Label className="text-xs text-gray-500">Issued By</Label><p className="text-sm">{selectedCase.issuedBy}</p></div>}
+              {selectedCase.department && <div><Label className="text-xs text-gray-500">Department</Label><p className="text-sm">{selectedCase.department}</p></div>}
+              {selectedCase.createdAt && <div><Label className="text-xs text-gray-500">Created</Label><p className="text-sm">{new Date(selectedCase.createdAt).toLocaleDateString()}</p></div>}
+            </div>
+            {selectedCase.actionTaken && <div><Label className="text-xs text-gray-500">Action Taken</Label><p className="text-sm mt-1 p-3 bg-amber-50 rounded-lg border border-amber-100">{selectedCase.actionTaken}</p></div>}
+            {selectedCase.resolution && <div><Label className="text-xs text-gray-500">Resolution</Label><p className="text-sm mt-1 p-3 bg-green-50 rounded-lg border border-green-100">{selectedCase.resolution}</p></div>}
+            {selectedCase.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedCase.notes}</p></div>}
+            {selectedCase.followUpDate && <div><Label className="text-xs text-gray-500">Follow-up Date</Label><p className="text-sm">{new Date(selectedCase.followUpDate).toLocaleDateString()}</p></div>}
+          </div>)}
+          <DialogFooter><Button variant="outline" onClick={() => setSelectedCase(null)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function EmpCompliance() {
+  const { accessToken } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await api('/my-compliance', { token: accessToken });
+      setItems(Array.isArray(d) ? d.sort((a: any, b: any) => new Date(b.createdAt || b.dueDate || 0).getTime() - new Date(a.createdAt || a.dueDate || 0).getTime()) : []);
+    } catch (e) { console.log(e); }
+    setLoading(false);
+  }, [accessToken]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+
+  const compStatusColor = (s: string) => {
+    switch (s?.toLowerCase()) {
+      case 'compliant': case 'completed': case 'met': return 'bg-green-100 text-green-800';
+      case 'non-compliant': case 'non_compliant': case 'overdue': case 'failed': return 'bg-red-100 text-red-800';
+      case 'in-progress': case 'in_progress': case 'pending': return 'bg-amber-100 text-amber-800';
+      case 'under-review': case 'under_review': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const priorityColor = (p: string) => {
+    switch (p?.toLowerCase()) {
+      case 'critical': case 'high': return 'border-red-300 text-red-600';
+      case 'medium': return 'border-amber-300 text-amber-600';
+      default: return 'border-gray-300 text-gray-500';
+    }
+  };
+
+  const checkOverdue = (item: any) => {
+    if (!item.dueDate) return false;
+    return new Date(item.dueDate) < new Date() && !['compliant', 'completed', 'met'].includes(item.status?.toLowerCase());
+  };
+
+  const compliant = items.filter(i => ['compliant', 'completed', 'met'].includes(i.status?.toLowerCase()));
+  const pendingItems = items.filter(i => ['in-progress', 'in_progress', 'pending', 'under-review', 'under_review'].includes(i.status?.toLowerCase()));
+  const overdueItems = items.filter(i => checkOverdue(i));
+
+  if (loading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2"><FileCheck className="w-5 h-5 text-blue-500" />Compliance & Policies</h2>
+          <p className="text-sm text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''} · {compliant.length} compliant · {pendingItems.length} pending</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+      </div>
+      {items.length > 0 && (
+        <div className="grid grid-cols-4 gap-4">
+          <Card><CardContent className="pt-4 text-center"><FileCheck className="w-5 h-5 mx-auto mb-1 text-gray-500" /><p className="text-xs text-gray-500">Total</p><p className="text-lg font-bold">{items.length}</p></CardContent></Card>
+          <Card><CardContent className="pt-4 text-center"><CheckCircle className="w-5 h-5 mx-auto mb-1 text-green-500" /><p className="text-xs text-gray-500">Compliant</p><p className="text-lg font-bold text-green-600">{compliant.length}</p></CardContent></Card>
+          <Card><CardContent className="pt-4 text-center"><Clock className="w-5 h-5 mx-auto mb-1 text-amber-500" /><p className="text-xs text-gray-500">Pending</p><p className="text-lg font-bold text-amber-600">{pendingItems.length}</p></CardContent></Card>
+          <Card className={overdueItems.length > 0 ? 'border-red-200' : ''}><CardContent className="pt-4 text-center"><AlertCircle className="w-5 h-5 mx-auto mb-1 text-red-500" /><p className="text-xs text-gray-500">Overdue</p><p className="text-lg font-bold text-red-600">{overdueItems.length}</p></CardContent></Card>
+        </div>
+      )}
+
+      {overdueItems.length > 0 && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800">You have {overdueItems.length} overdue compliance item{overdueItems.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-red-600 mt-0.5">Please complete these items as soon as possible to remain compliant.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {items.length === 0 ? (
+        <Card><CardContent className="py-16 text-center text-gray-400">
+          <Scale className="w-10 h-10 mx-auto mb-2 opacity-40" />
+          <p className="text-sm font-medium">No compliance items assigned</p>
+          <p className="text-xs text-gray-400 mt-1">Compliance requirements will appear here when assigned by your HR team</p>
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-3">{items.map((item, i) => {
+          const itemOverdue = checkOverdue(item);
+          return (
+            <Card key={item.id || i} className={`hover:shadow-sm transition-all cursor-pointer ${itemOverdue ? 'border-red-200 bg-red-50/30' : ''}`} onClick={() => setSelectedItem(item)}>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className="text-sm font-semibold truncate">{item.title || item.name || item.requirement || 'Compliance Item'}</h3>
+                      <Badge className={compStatusColor(item.status)}>{item.status || 'pending'}</Badge>
+                      {item.priority && <Badge variant="outline" className={priorityColor(item.priority)}>{item.priority}</Badge>}
+                      {item.category && <Badge variant="outline" className="text-[10px]">{item.category}</Badge>}
+                      {itemOverdue && <Badge className="bg-red-500 text-white text-[10px]">OVERDUE</Badge>}
+                    </div>
+                    {item.description && <p className="text-xs text-gray-500 line-clamp-2">{item.description}</p>}
+                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
+                      {item.dueDate && <span className={`flex items-center gap-1 ${itemOverdue ? 'text-red-500 font-medium' : ''}`}><CalendarDays className="w-3 h-3" />Due: {new Date(item.dueDate).toLocaleDateString()}</span>}
+                      {item.responsibleName && <span>Assigned by: {item.responsibleName}</span>}
+                      {item.department && <span>{item.department}</span>}
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300 mt-1" />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}</div>
+      )}
+      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader><DialogTitle>{selectedItem?.title || selectedItem?.name || 'Compliance Details'}</DialogTitle></DialogHeader>
+          {selectedItem && (<div className="space-y-4 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={compStatusColor(selectedItem.status)}>{selectedItem.status || 'pending'}</Badge>
+              {selectedItem.priority && <Badge variant="outline" className={priorityColor(selectedItem.priority)}>{selectedItem.priority}</Badge>}
+              {selectedItem.category && <Badge variant="outline">{selectedItem.category}</Badge>}
+              {checkOverdue(selectedItem) && <Badge className="bg-red-500 text-white">OVERDUE</Badge>}
+            </div>
+            {selectedItem.description && <div><Label className="text-xs text-gray-500">Description</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedItem.description}</p></div>}
+            <div className="grid grid-cols-2 gap-3">
+              {selectedItem.dueDate && <div><Label className="text-xs text-gray-500">Due Date</Label><p className={`text-sm ${checkOverdue(selectedItem) ? 'text-red-600 font-medium' : ''}`}>{new Date(selectedItem.dueDate).toLocaleDateString()}</p></div>}
+              {selectedItem.responsibleName && <div><Label className="text-xs text-gray-500">Assigned By</Label><p className="text-sm">{selectedItem.responsibleName}</p></div>}
+              {selectedItem.department && <div><Label className="text-xs text-gray-500">Department</Label><p className="text-sm">{selectedItem.department}</p></div>}
+              {selectedItem.createdAt && <div><Label className="text-xs text-gray-500">Created</Label><p className="text-sm">{new Date(selectedItem.createdAt).toLocaleDateString()}</p></div>}
+              {selectedItem.lastReviewDate && <div><Label className="text-xs text-gray-500">Last Reviewed</Label><p className="text-sm">{new Date(selectedItem.lastReviewDate).toLocaleDateString()}</p></div>}
+              {selectedItem.nextReviewDate && <div><Label className="text-xs text-gray-500">Next Review</Label><p className="text-sm">{new Date(selectedItem.nextReviewDate).toLocaleDateString()}</p></div>}
+            </div>
+            {selectedItem.requirement && <div><Label className="text-xs text-gray-500">Requirement</Label><p className="text-sm mt-1 p-3 bg-blue-50 rounded-lg border border-blue-100">{selectedItem.requirement}</p></div>}
+            {selectedItem.actions && <div><Label className="text-xs text-gray-500">Required Actions</Label><p className="text-sm mt-1 p-3 bg-amber-50 rounded-lg border border-amber-100">{selectedItem.actions}</p></div>}
+            {selectedItem.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedItem.notes}</p></div>}
+            {Array.isArray(selectedItem.documents) && selectedItem.documents.length > 0 && (
+              <div>
+                <Label className="text-xs text-gray-500 mb-2 block">Related Documents</Label>
+                <div className="space-y-1">
+                  {selectedItem.documents.map((doc: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
+                      <FileText className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{typeof doc === 'string' ? doc : doc.name || doc.title || `Document ${idx + 1}`}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>)}
+          <DialogFooter><Button variant="outline" onClick={() => setSelectedItem(null)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
