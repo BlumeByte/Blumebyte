@@ -461,7 +461,16 @@ function AdminEmployees() {
                     </Select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label className="text-xs">Department</Label><Input value={formData.department || ''} onChange={e => setFormData({ ...formData, department: e.target.value })} /></div>
+                  <div><Label className="text-xs">Department</Label>
+                    <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                      <SelectContent>
+                        {departmentsList.filter(d => d.status === 'active').map(d => (
+                          <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div><Label className="text-xs">Position</Label><Input value={formData.position || ''} onChange={e => setFormData({ ...formData, position: e.target.value })} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -679,7 +688,16 @@ function AdminUsers() {
                     </Select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label className="text-xs">Department</Label><Input value={formData.department || ''} onChange={e => setFormData({ ...formData, department: e.target.value })} /></div>
+                  <div><Label className="text-xs">Department</Label>
+                    <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                      <SelectContent>
+                        {departmentsList.filter(d => d.status === 'active').map(d => (
+                          <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div><Label className="text-xs">Position</Label><Input value={formData.position || ''} onChange={e => setFormData({ ...formData, position: e.target.value })} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

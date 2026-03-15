@@ -53,7 +53,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Fetch branding in background without blocking initial render
     fetchBranding();
-    const iv = setInterval(fetchBranding, 30000); // Increased from 15s to 30s to reduce load
+    const iv = setInterval(fetchBranding, 15000); // Poll every 15 seconds for real-time updates
     return () => clearInterval(iv);
   }, [fetchBranding]);
 

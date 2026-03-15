@@ -15,7 +15,8 @@ import { toast } from 'sonner';
 import {
   LayoutDashboard, Users, UserPlus, CalendarDays, Clock, Megaphone,
   Loader2, Plus, X, CheckCircle, Copy, AlertCircle, MessageCircle, Pencil, Search,
-  Trash2, User, Settings, Briefcase, LogOut
+  Trash2, User, Settings, Briefcase, LogOut, FolderTree, GitMerge, Target,
+  ClipboardList, FileCheck, GraduationCap, BarChart3, UserCheck
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { MessagesModal } from './MessagesModal';
@@ -27,6 +28,11 @@ import { MeetingsPanel } from './MeetingsPanel';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { UserLicenseAlert } from './LicenseStatusBanner';
+import { AdminCrudPanel } from './AdminCrudPanel';
+import { TrainingManagement } from './TrainingManagement';
+import { ReportsPanel } from './ReportsPanel';
+import { AdvancedReportsModule } from './AdvancedReportsModule';
+import { HiringApprovalPanel } from './HiringApprovalPanel';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -68,6 +74,7 @@ function TeamTab() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -236,12 +243,17 @@ function LeaveTab() {
     leaveType: 'all',
   });
 
-  useEffect(() => { 
-    api('/leave-requests', { token: accessToken })
-      .then(d => setLeaves(Array.isArray(d) ? d : []))
-      .catch(console.log)
-      .finally(() => setLoading(false)); 
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await api('/leave-requests', { token: accessToken });
+      setLeaves(Array.isArray(d) ? d : []);
+    } catch (e) { console.log(e); }
+    setLoading(false);
   }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
 
   const handleAction = async (id: string, status: string) => {
     try { 
@@ -404,7 +416,9 @@ export function ManagerDashboard() {
       <header className="border-b bg-white sticky top-0 z-30 shadow-sm">
         <div className="px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Briefcase className="w-6 h-6" style={{ color: branding.primaryColor }} />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
+              {branding.logoUrl ? <img src={branding.logoUrl} alt="" className="w-full h-full object-contain p-0.5" /> : <span className="text-white font-bold text-sm">{branding.companyName?.[0] || 'B'}</span>}
+            </div>
             <div>
               <h1 className="text-xl font-bold" style={{ color: branding.primaryColor }}>
                 {branding.companyName}
@@ -446,6 +460,14 @@ export function ManagerDashboard() {
             My Team
           </Button>
           <Button
+            variant={activeTab === 'departments' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('departments')}
+          >
+            <FolderTree className="w-4 h-4 mr-2" />
+            Departments
+          </Button>
+          <Button
             variant={activeTab === 'leave' ? 'default' : 'ghost'}
             className="w-full justify-start"
             onClick={() => setActiveTab('leave')}
@@ -462,12 +484,84 @@ export function ManagerDashboard() {
             Clock In/Out
           </Button>
           <Button
-            variant={activeTab === 'announcements' ? 'default' : 'ghost'}
+            variant={activeTab === 'workflows' ? 'default' : 'ghost'}
             className="w-full justify-start"
-            onClick={() => setActiveTab('announcements')}
+            onClick={() => setActiveTab('workflows')}
           >
-            <Megaphone className="w-4 h-4 mr-2" />
-            Announcements
+            <GitMerge className="w-4 h-4 mr-2" />
+            Workflows
+          </Button>
+          <Button
+            variant={activeTab === 'performance' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('performance')}
+          >
+            <Target className="w-4 h-4 mr-2" />
+            Performance
+          </Button>
+          <Button
+            variant={activeTab === 'disciplinary' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('disciplinary')}
+          >
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Disciplinary
+          </Button>
+          <Button
+            variant={activeTab === 'compliance' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('compliance')}
+          >
+            <FileCheck className="w-4 h-4 mr-2" />
+            Compliance
+          </Button>
+          <Button
+            variant={activeTab === 'tasks' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('tasks')}
+          >
+            <ClipboardList className="w-4 h-4 mr-2" />
+            Tasks
+          </Button>
+          <Button
+            variant={activeTab === 'feedback' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('feedback')}
+          >
+            <UserCheck className="w-4 h-4 mr-2" />
+            360° Feedback
+          </Button>
+          <Button
+            variant={activeTab === 'training' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('training')}
+          >
+            <GraduationCap className="w-4 h-4 mr-2" />
+            Training
+          </Button>
+          <Button
+            variant={activeTab === 'reports' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('reports')}
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Reports
+          </Button>
+          <Button
+            variant={activeTab === 'advanced-reports' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('advanced-reports')}
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Advanced Reports
+          </Button>
+          <Button
+            variant={activeTab === 'hiring' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('hiring')}
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Hiring
           </Button>
           <Button
             variant={activeTab === 'meetings' ? 'default' : 'ghost'}
@@ -476,6 +570,22 @@ export function ManagerDashboard() {
           >
             <Users className="w-4 h-4 mr-2" />
             Meetings
+          </Button>
+          <Button
+            variant={activeTab === 'announcements' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('announcements')}
+          >
+            <Megaphone className="w-4 h-4 mr-2" />
+            Announcements
+          </Button>
+          <Button
+            variant={activeTab === 'messages' ? 'default' : 'ghost'}
+            className="w-full justify-start"
+            onClick={() => setActiveTab('messages')}
+          >
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Messages
           </Button>
           <Button
             variant={activeTab === 'self-service' ? 'default' : 'ghost'}
@@ -528,22 +638,26 @@ export function ManagerDashboard() {
                   </CardContent>
                 </Card>
               </div>
+              <ClockInOut />
             </div>
           )}
           {activeTab === 'team' && <TeamTab />}
+          {activeTab === 'departments' && <AdminCrudPanel entityKey="departments" config={{ singularName: 'Department', pluralName: 'Departments', apiPath: '/admin/departments', fields: [] }} />}
           {activeTab === 'leave' && <LeaveTab />}
           {activeTab === 'attendance' && <ClockInOut />}
-          {activeTab === 'announcements' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Announcements</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-500">No announcements to display.</p>
-              </CardContent>
-            </Card>
-          )}
+          {activeTab === 'workflows' && <AdminCrudPanel entityKey="workflows" config={{ singularName: 'Workflow', pluralName: 'Workflows', apiPath: '/admin/workflows', fields: [] }} />}
+          {activeTab === 'performance' && <AdminCrudPanel entityKey="performance-reviews" config={{ singularName: 'Performance Review', pluralName: 'Performance Reviews', apiPath: '/admin/performance-reviews', fields: [] }} />}
+          {activeTab === 'disciplinary' && <AdminCrudPanel entityKey="disciplinary" config={{ singularName: 'Disciplinary Action', pluralName: 'Disciplinary Actions', apiPath: '/admin/disciplinary', fields: [] }} />}
+          {activeTab === 'compliance' && <AdminCrudPanel entityKey="compliance" config={{ singularName: 'Compliance Item', pluralName: 'Labour Compliance', apiPath: '/admin/labour-compliance', fields: [] }} />}
+          {activeTab === 'tasks' && <AdminCrudPanel entityKey="tasks" config={{ singularName: 'Task', pluralName: 'Task Assignments', apiPath: '/admin/task-assignments', fields: [] }} />}
+          {activeTab === 'feedback' && <AdminCrudPanel entityKey="feedback" config={{ singularName: 'Feedback', pluralName: '360° Feedback', apiPath: '/admin/360-feedback', fields: [] }} />}
+          {activeTab === 'training' && <TrainingManagement mode="admin" />}
+          {activeTab === 'reports' && <ReportsPanel />}
+          {activeTab === 'advanced-reports' && <AdvancedReportsModule />}
+          {activeTab === 'hiring' && <HiringApprovalPanel />}
           {activeTab === 'meetings' && <MeetingsPanel mode="employee" />}
+          {activeTab === 'announcements' && <MessagesPanel />}
+          {activeTab === 'messages' && <MessagesPanel />}
           {activeTab === 'self-service' && <SharedSelfServiceHub onNavigate={handleNavigation} />}
           {activeTab === 'profile' && <SharedMyProfile />}
         </main>
