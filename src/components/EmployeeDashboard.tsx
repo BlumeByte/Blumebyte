@@ -28,6 +28,7 @@ import { ClockInOut } from './ClockInOut';
 import { MeetingsPanel } from './MeetingsPanel';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { UserLicenseAlert } from './LicenseStatusBanner';
+import { TrainingManagement } from './TrainingManagement';
 
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
@@ -78,6 +79,7 @@ export function EmployeeDashboard() {
             <TabsTrigger value="tasks"><ListTodo className="w-4 h-4 mr-1" />Tasks</TabsTrigger>
             <TabsTrigger value="onboarding"><ClipboardCheck className="w-4 h-4 mr-1" />Onboarding</TabsTrigger>
             <TabsTrigger value="reviews"><Star className="w-4 h-4 mr-1" />Reviews</TabsTrigger>
+            <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
             <TabsTrigger value="meetings"><Video className="w-4 h-4 mr-1" />Meetings</TabsTrigger>
             <TabsTrigger value="messages"><MessageCircle className="w-4 h-4 mr-1" />Messages</TabsTrigger>
             <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
@@ -94,7 +96,7 @@ export function EmployeeDashboard() {
           <TabsContent value="tasks"><EmpTasks /></TabsContent>
           <TabsContent value="onboarding"><EmpOnboarding /></TabsContent>
           <TabsContent value="reviews"><EmpReviews /></TabsContent>
-          <TabsContent value="training"><EmpTraining /></TabsContent>
+          <TabsContent value="training"><TrainingManagement mode="employee" /></TabsContent>
           <TabsContent value="questionnaires"><EmpQuestionnaires /></TabsContent>
           <TabsContent value="meetings"><MeetingsPanel mode="employee" /></TabsContent>
           <TabsContent value="messages"><MessagesPanel /></TabsContent>

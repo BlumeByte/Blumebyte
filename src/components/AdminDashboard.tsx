@@ -20,7 +20,7 @@ import {
   Copy, RefreshCw, PanelLeftClose, PanelLeftOpen, AlertCircle, Settings,
   Clock, CheckCircle, MessageCircle, User, UserCheck, Upload, FileText, Download, LogOut, Camera,
   UserCog, XCircle, Zap, GitMerge, Target, ClipboardList, FileCheck, BarChart3, Eye, ChevronUp, ChevronDown, Play,
-  MessageSquare, BookOpen
+  MessageSquare, BookOpen, GraduationCap
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { NotificationsBell } from './NotificationsBell';
@@ -35,6 +35,8 @@ import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { AuditLogsModule } from './AuditLogsModule';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { UserLicenseAlert } from './LicenseStatusBanner';
+import { TrainingManagement } from './TrainingManagement';
+import { ComprehensiveReports } from './ComprehensiveReports';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -50,14 +52,14 @@ const TABS = [
   { id: 'compliance', label: 'Labour Compliance', icon: FileCheck },
   { id: 'tasks', label: 'Task Assignments', icon: ClipboardList },
   { id: 'feedback-360', label: '360° Feedback', icon: MessageSquare },
-  { id: 'training', label: 'Training Programs', icon: BookOpen },
+  { id: 'training', label: 'Training', icon: GraduationCap },
   { id: 'messages', label: 'Messages', icon: MessageCircle },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'meetings', label: 'Meetings', icon: Users },
-  { id: 'reports', label: 'HR Reports', icon: BarChart3 },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'advanced-reports', label: 'Advanced Reports', icon: BarChart3 },
   { id: 'audit-logs', label: 'Audit Logs', icon: FileCheck },
-  { id: 'pending-approvals', label: 'Pending Approvals', icon: CheckCircle },
+  { id: 'pending-approvals', label: 'Approvals', icon: CheckCircle },
   { id: 'hiring', label: 'Hiring', icon: UserCheck },
   { id: 'profile-requests', label: 'Profile Requests', icon: UserCog },
   { id: 'self-service', label: 'Self-Service', icon: Briefcase },
@@ -176,11 +178,11 @@ export function AdminDashboard() {
           {activeTab === 'compliance' && <AdminCrudPanel entityKey="compliance" />}
           {activeTab === 'tasks' && <AdminCrudPanel entityKey="tasks" />}
           {activeTab === 'feedback-360' && <AdminCrudPanel entityKey="feedback-360" />}
-          {activeTab === 'training' && <AdminCrudPanel entityKey="training" />}
+          {activeTab === 'training' && <TrainingManagement mode="admin" />}
           {activeTab === 'messages' && <MessagesPanel />}
           {activeTab === 'announcements' && <AdminAnnouncements />}
           {activeTab === 'meetings' && <MeetingsPanel mode="admin" />}
-          {activeTab === 'reports' && <ReportsPanel />}
+          {activeTab === 'reports' && <ComprehensiveReports />}
           {activeTab === 'advanced-reports' && <AdvancedReportsModule />}
           {activeTab === 'audit-logs' && <AuditLogsModule />}
           {activeTab === 'pending-approvals' && user?.role === 'superadmin' && <PendingApprovalsPanel />}
