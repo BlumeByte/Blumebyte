@@ -32,6 +32,7 @@ import { TrainingManagement } from './TrainingManagement';
 import { ReportsPanel } from './ReportsPanel';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { HiringApprovalPanel } from './HiringApprovalPanel';
+import { LeaveApplicationForm } from './LeaveApplicationForm';
 
 function TeamTab() {
   const { accessToken } = useAuth();

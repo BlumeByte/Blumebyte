@@ -74,7 +74,11 @@ export function NotificationsBell() {
     try {
       const data = await api('/notifications', { token: accessToken });
       setNotifications(Array.isArray(data) ? data : []);
-    } catch (e) { console.log('Notifications fetch error:', e); }
+    } catch (e: any) { 
+      console.log('Notifications fetch error:', e);
+      // Don't throw error, just set empty array
+      setNotifications([]);
+    }
   }, [accessToken]);
 
   useEffect(() => {

@@ -17,10 +17,11 @@ import {
   FileText, CheckCircle, XCircle, AlertCircle, ChevronRight, Play,
   BookOpen, MessageSquare, CheckSquare, Square
 } from 'lucide-react';
+import { LeaveApplicationForm } from './LeaveApplicationForm';
 
 export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: string) => void }) {
   const { user, accessToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<'jobs' | 'tasks' | 'onboarding' | 'reviews' | 'questionnaires'>('jobs');
+  const [activeTab, setActiveTab] = useState<'jobs' | 'tasks' | 'onboarding' | 'reviews' | 'questionnaires' | 'leave'>('jobs');
   const [jobPostings, setJobPostings] = useState<any[]>([]);
   const [myApplications, setMyApplications] = useState<any[]>([]);
   const [myTasks, setMyTasks] = useState<any[]>([]);
@@ -243,6 +244,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
     { id: 'onboarding', label: 'My Onboarding', icon: GraduationCap },
     { id: 'reviews', label: 'My Reviews', icon: Star },
     { id: 'questionnaires', label: 'My Questionnaires', icon: FileText },
+    { id: 'leave', label: 'Leave Application', icon: BookOpen },
   ];
 
   return (
@@ -559,6 +561,21 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                       ))}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ============ LEAVE APPLICATION ============ */}
+            {activeTab === 'leave' && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-cyan-600" /><CardTitle className="text-base">Leave Application</CardTitle></div>
+                    <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <LeaveApplicationForm />
                 </CardContent>
               </Card>
             )}
