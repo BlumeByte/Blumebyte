@@ -28,7 +28,6 @@ import { MeetingsPanel } from './MeetingsPanel';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { UserLicenseAlert } from './LicenseStatusBanner';
-import { AdminCrudPanel } from './AdminCrudPanel';
 import { TrainingManagement } from './TrainingManagement';
 import { ReportsPanel } from './ReportsPanel';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
@@ -412,40 +411,31 @@ export function ManagerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white sticky top-0 z-30 shadow-sm">
-        <div className="px-6 py-3 flex items-center justify-between">
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <aside className="w-56 bg-white border-r flex flex-col fixed h-screen">
+        <div className="p-4 border-b">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
-              {branding.logoUrl ? <img src={branding.logoUrl} alt="" className="w-full h-full object-contain p-0.5" /> : <span className="text-white font-bold text-sm">{branding.companyName?.[0] || 'B'}</span>}
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
+              {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt="" className="w-full h-full object-contain p-0.5" />
+              ) : (
+                <span className="text-white font-bold text-lg">{branding.companyName?.[0] || 'B'}</span>
+              )}
             </div>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: branding.primaryColor }}>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm font-bold truncate" style={{ color: branding.primaryColor }}>
                 {branding.companyName}
               </h1>
-              <p className="text-xs text-gray-500">Manager Dashboard</p>
+              <p className="text-[10px] text-gray-400">Manager Dashboard</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <NotificationsBell />
-            <Button variant="ghost" size="sm" onClick={() => setShowMessages(!showMessages)}>
-              <MessageCircle className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setActiveTab('profile')}>
-              <User className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={logout}>
-              <LogOut className="w-5 h-5" />
-            </Button>
-          </div>
         </div>
-      </header>
 
-      <div className="flex">
-        <nav className="w-64 bg-white border-r min-h-screen p-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
           <Button
             variant={activeTab === 'overview' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('overview')}
           >
             <LayoutDashboard className="w-4 h-4 mr-2" />
@@ -453,7 +443,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'team' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('team')}
           >
             <Users className="w-4 h-4 mr-2" />
@@ -461,7 +451,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'departments' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('departments')}
           >
             <FolderTree className="w-4 h-4 mr-2" />
@@ -469,7 +459,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'leave' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('leave')}
           >
             <CalendarDays className="w-4 h-4 mr-2" />
@@ -477,7 +467,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'attendance' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('attendance')}
           >
             <Clock className="w-4 h-4 mr-2" />
@@ -485,7 +475,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'workflows' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('workflows')}
           >
             <GitMerge className="w-4 h-4 mr-2" />
@@ -493,7 +483,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'performance' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('performance')}
           >
             <Target className="w-4 h-4 mr-2" />
@@ -501,7 +491,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'disciplinary' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('disciplinary')}
           >
             <AlertCircle className="w-4 h-4 mr-2" />
@@ -509,7 +499,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'compliance' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('compliance')}
           >
             <FileCheck className="w-4 h-4 mr-2" />
@@ -517,7 +507,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'tasks' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('tasks')}
           >
             <ClipboardList className="w-4 h-4 mr-2" />
@@ -525,7 +515,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'feedback' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('feedback')}
           >
             <UserCheck className="w-4 h-4 mr-2" />
@@ -533,7 +523,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'training' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('training')}
           >
             <GraduationCap className="w-4 h-4 mr-2" />
@@ -541,7 +531,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'reports' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('reports')}
           >
             <BarChart3 className="w-4 h-4 mr-2" />
@@ -549,7 +539,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'advanced-reports' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('advanced-reports')}
           >
             <BarChart3 className="w-4 h-4 mr-2" />
@@ -557,7 +547,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'hiring' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('hiring')}
           >
             <UserPlus className="w-4 h-4 mr-2" />
@@ -565,7 +555,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'meetings' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('meetings')}
           >
             <Users className="w-4 h-4 mr-2" />
@@ -573,7 +563,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'announcements' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('announcements')}
           >
             <Megaphone className="w-4 h-4 mr-2" />
@@ -581,7 +571,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'messages' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('messages')}
           >
             <MessageCircle className="w-4 h-4 mr-2" />
@@ -589,7 +579,7 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'self-service' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('self-service')}
           >
             <Briefcase className="w-4 h-4 mr-2" />
@@ -597,15 +587,46 @@ export function ManagerDashboard() {
           </Button>
           <Button
             variant={activeTab === 'profile' ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('profile')}
           >
             <User className="w-4 h-4 mr-2" />
             My Profile
           </Button>
         </nav>
+      </aside>
 
-        <main className="flex-1 p-6">
+      {/* Main Content */}
+      <div className="flex-1 ml-56 transition-all duration-200 min-w-0">
+        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-3 flex items-center justify-between">
+          <h1 className="text-lg font-semibold">
+            {activeTab === 'overview' && 'Overview'}
+            {activeTab === 'team' && 'My Team'}
+            {activeTab === 'departments' && 'Departments'}
+            {activeTab === 'leave' && 'Leave Requests'}
+            {activeTab === 'attendance' && 'Clock In/Out'}
+            {activeTab === 'workflows' && 'Workflows'}
+            {activeTab === 'performance' && 'Performance Reviews'}
+            {activeTab === 'disciplinary' && 'Disciplinary'}
+            {activeTab === 'compliance' && 'Labour Compliance'}
+            {activeTab === 'tasks' && 'Task Assignments'}
+            {activeTab === 'feedback' && '360° Feedback'}
+            {activeTab === 'training' && 'Training'}
+            {activeTab === 'reports' && 'Reports'}
+            {activeTab === 'advanced-reports' && 'Advanced Reports'}
+            {activeTab === 'hiring' && 'Hiring'}
+            {activeTab === 'meetings' && 'Meetings'}
+            {activeTab === 'announcements' && 'Announcements'}
+            {activeTab === 'messages' && 'Messages'}
+            {activeTab === 'self-service' && 'Self Service'}
+            {activeTab === 'profile' && 'My Profile'}
+          </h1>
+          <div className="flex items-center gap-3">
+            <NotificationsBell />
+            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">Manager</Badge>
+          </div>
+        </header>
+        <main className="p-6">
           {/* License Status Alert for Non-SuperAdmin Users */}
           <UserLicenseAlert />
           
@@ -639,18 +660,46 @@ export function ManagerDashboard() {
                 </Card>
               </div>
               <ClockInOut />
+              
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Quick Links</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { label: 'My Team', icon: Users, tab: 'team', color: 'bg-blue-500 hover:bg-blue-600' },
+                    { label: 'Approve Leave', icon: CalendarDays, tab: 'leave', color: 'bg-amber-500 hover:bg-amber-600' },
+                    { label: 'Attendance', icon: Clock, tab: 'attendance', color: 'bg-green-500 hover:bg-green-600' },
+                    { label: 'Performance', icon: Target, tab: 'performance', color: 'bg-purple-500 hover:bg-purple-600' },
+                    { label: 'Tasks', icon: ClipboardList, tab: 'tasks', color: 'bg-indigo-500 hover:bg-indigo-600' },
+                    { label: 'Training', icon: GraduationCap, tab: 'training', color: 'bg-pink-500 hover:bg-pink-600' },
+                    { label: 'Reports', icon: BarChart3, tab: 'reports', color: 'bg-cyan-500 hover:bg-cyan-600' },
+                    { label: 'Meetings', icon: Users, tab: 'meetings', color: 'bg-teal-500 hover:bg-teal-600' },
+                  ].map(link => {
+                    const Icon = link.icon;
+                    return (
+                      <Button
+                        key={link.label}
+                        className={`${link.color} text-white h-auto py-4 flex flex-col items-center gap-2`}
+                        onClick={() => setActiveTab(link.tab)}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-xs">{link.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
           {activeTab === 'team' && <TeamTab />}
-          {activeTab === 'departments' && <AdminCrudPanel entityKey="departments" config={{ singularName: 'Department', pluralName: 'Departments', apiPath: '/admin/departments', fields: [] }} />}
+          {activeTab === 'departments' && <Card><CardContent className="py-16 text-center"><FolderTree className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">View-only access. Contact Admin to manage departments.</p></CardContent></Card>}
           {activeTab === 'leave' && <LeaveTab />}
           {activeTab === 'attendance' && <ClockInOut />}
-          {activeTab === 'workflows' && <AdminCrudPanel entityKey="workflows" config={{ singularName: 'Workflow', pluralName: 'Workflows', apiPath: '/admin/workflows', fields: [] }} />}
-          {activeTab === 'performance' && <AdminCrudPanel entityKey="performance-reviews" config={{ singularName: 'Performance Review', pluralName: 'Performance Reviews', apiPath: '/admin/performance-reviews', fields: [] }} />}
-          {activeTab === 'disciplinary' && <AdminCrudPanel entityKey="disciplinary" config={{ singularName: 'Disciplinary Action', pluralName: 'Disciplinary Actions', apiPath: '/admin/disciplinary', fields: [] }} />}
-          {activeTab === 'compliance' && <AdminCrudPanel entityKey="compliance" config={{ singularName: 'Compliance Item', pluralName: 'Labour Compliance', apiPath: '/admin/labour-compliance', fields: [] }} />}
-          {activeTab === 'tasks' && <AdminCrudPanel entityKey="tasks" config={{ singularName: 'Task', pluralName: 'Task Assignments', apiPath: '/admin/task-assignments', fields: [] }} />}
-          {activeTab === 'feedback' && <AdminCrudPanel entityKey="feedback" config={{ singularName: 'Feedback', pluralName: '360° Feedback', apiPath: '/admin/360-feedback', fields: [] }} />}
+          {activeTab === 'workflows' && <Card><CardContent className="py-16 text-center"><GitMerge className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">View-only access. Contact Admin to manage workflows.</p></CardContent></Card>}
+          {activeTab === 'performance' && <Card><CardContent className="py-16 text-center"><Target className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Performance review module. Contact Admin for access.</p></CardContent></Card>}
+          {activeTab === 'disciplinary' && <Card><CardContent className="py-16 text-center"><AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Disciplinary actions module. Contact Admin for access.</p></CardContent></Card>}
+          {activeTab === 'compliance' && <Card><CardContent className="py-16 text-center"><FileCheck className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Labour compliance module. Contact Admin for access.</p></CardContent></Card>}
+          {activeTab === 'tasks' && <Card><CardContent className="py-16 text-center"><ClipboardList className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">Task assignments module. Contact Admin for access.</p></CardContent></Card>}
+          {activeTab === 'feedback' && <Card><CardContent className="py-16 text-center"><UserCheck className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">360° feedback module. Contact Admin for access.</p></CardContent></Card>}
           {activeTab === 'training' && <TrainingManagement mode="admin" />}
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'advanced-reports' && <AdvancedReportsModule />}

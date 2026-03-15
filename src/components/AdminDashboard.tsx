@@ -246,6 +246,34 @@ function AdminOverview({ setTab }: { setTab: (t: string) => void }) {
           );
         })}
       </div>
+
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Quick Links</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Add Employee', icon: UserPlus, tab: 'employees', color: 'bg-blue-500 hover:bg-blue-600' },
+            { label: 'Add User', icon: UserCog, tab: 'users', color: 'bg-purple-500 hover:bg-purple-600' },
+            { label: 'Workflows', icon: GitMerge, tab: 'workflows', color: 'bg-indigo-500 hover:bg-indigo-600' },
+            { label: 'Reports', icon: BarChart3, tab: 'reports', color: 'bg-green-500 hover:bg-green-600' },
+            { label: 'Training', icon: GraduationCap, tab: 'training', color: 'bg-amber-500 hover:bg-amber-600' },
+            { label: 'Hiring', icon: Briefcase, tab: 'hiring', color: 'bg-pink-500 hover:bg-pink-600' },
+            { label: 'Announcements', icon: Megaphone, tab: 'announcements', color: 'bg-cyan-500 hover:bg-cyan-600' },
+            { label: 'Meetings', icon: MessageSquare, tab: 'meetings', color: 'bg-teal-500 hover:bg-teal-600' },
+          ].map(link => {
+            const Icon = link.icon;
+            return (
+              <Button
+                key={link.label}
+                className={`${link.color} text-white h-auto py-4 flex flex-col items-center gap-2`}
+                onClick={() => setTab(link.tab)}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-xs">{link.label}</span>
+              </Button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
