@@ -55,6 +55,23 @@ export default function CompanySignup() {
 
     console.log('Waiting for Paystack script to load...');
 
+    // Try to load the script dynamically if not already loaded
+    const existingScript = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]');
+    if (!existingScript) {
+      console.log('Dynamically loading Paystack script...');
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      script.onload = () => {
+        console.log('Paystack script loaded dynamically');
+        setPaystackLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load Paystack script dynamically');
+      };
+      document.head.appendChild(script);
+    }
+
     // If not loaded, check every 100ms for up to 10 seconds
     const interval = setInterval(() => {
       if (checkPaystack()) {
@@ -66,6 +83,7 @@ export default function CompanySignup() {
       clearInterval(interval);
       if (!paystackLoaded) {
         console.error('Paystack script failed to load after 10 seconds');
+        toast.error('Payment system failed to load. Please refresh the page and try again.');
       }
     }, 10000);
 
