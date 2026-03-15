@@ -45,17 +45,23 @@ function TeamTab() {
   const [formData, setFormData] = useState<any>({});
   const [editUser, setEditUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [tempPw, setTempPw] = useState('');
-  const [showTempPw, setShowTempPw] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [deleteTarget, setDeleteTarget] = useState<any>(null);
-  const [deleteReason, setDeleteReason] = useState('');
+  const [currentUserDepartment, setCurrentUserDepartment] = useState<string>('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, ref] = await Promise.all([api('/users', { token: accessToken }), api('/reference-data', { token: accessToken }).catch(() => ({}))]);
-      setUsers(Array.isArray(data) ? data : []);
+      const [data, ref, profile] = await Promise.all([
+        api('/users', { token: accessToken }), 
+        api('/reference-data', { token: accessToken }).catch(() => ({})),
+        api('/profile', { token: accessToken }).catch(() => null)
+      ]);
+      setCurrentUserDepartment(profile?.department || '');
+      // Only show employees in manager's department
+      const departmentUsers = Array.isArray(data) 
+        ? data.filter((u: any) => u.department === profile?.department && u.role === 'employee') 
+        : [];
+      setUsers(departmentUsers);
       setCompanies(ref?.companies || []);
     } catch (e) { console.log(e); }
     setLoading(false);
@@ -67,13 +73,17 @@ function TeamTab() {
     setSaving(true);
     try {
       if (editUser) {
+        // Managers can only edit employees in their department
+        if (editUser.department !== currentUserDepartment) {
+          toast.error('You can only edit employees in your department');
+          setSaving(false);
+          return;
+        }
         await api(`/users/${editUser.userId || editUser.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
-        toast.success('Updated'); setDialogOpen(false);
-      } else {
-        const res = await api('/manager/employees', { method: 'POST', body: JSON.stringify({ ...formData, role: 'employee' }), token: accessToken });
-        setTempPw(res.tempPassword); setShowTempPw(true); toast.success('Employee created');
+        toast.success('Updated'); 
+        setDialogOpen(false);
+        load();
       }
-      load();
     } catch (e: any) { toast.error(e.message); }
     setSaving(false);
   };
@@ -132,8 +142,10 @@ function TeamTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button size="sm" onClick={() => { setEditUser(null); setFormData({}); setShowTempPw(false); setDialogOpen(true); }}><UserPlus className="w-4 h-4 mr-1" />Add Employee</Button>
+      {/* Managers cannot add employees - only Admin and SuperAdmin can */}
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+        <p className="font-medium">Department Team Members</p>
+        <p className="text-xs text-blue-600 mt-1">You can edit employees in your department. Contact an Admin to add new employees.</p>
       </div>
       
       <ListControls
@@ -179,8 +191,7 @@ function TeamTab() {
                 <TableCell><Badge className={u.status === 'active' ? 'bg-green-100 text-green-800' : ''}>{u.status || 'active'}</Badge></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditUser(u); setFormData({ ...u }); setShowTempPw(false); setDialogOpen(true); }}><Pencil className="w-3.5 h-3.5" /></Button>
-                    {u.role === 'employee' && <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500" title="Request deletion" onClick={() => { setDeleteTarget(u); setDeleteReason(''); }}><Trash2 className="w-3.5 h-3.5" /></Button>}
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditUser(u); setFormData({ ...u }); setDialogOpen(true); }}><Pencil className="w-3.5 h-3.5" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -188,6 +199,26 @@ function TeamTab() {
           </Table>
         )}
       </CardContent></Card>
+
+      {/* Edit Employee Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Employee</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name</Label><Input value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
+            <div><Label>Email</Label><Input type="email" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} disabled /></div>
+            <div><Label>Position</Label><Input value={formData.position || ''} onChange={e => setFormData({ ...formData, position: e.target.value })} /></div>
+            <div><Label>Phone</Label><Input value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} /></div>
+            <div><Label>Status</Label><Select value={formData.status || 'active'} onValueChange={v => setFormData({ ...formData, status: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving && <Loader2 className="w-4 h-4 animate-spin mr-1" />}Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -341,6 +372,28 @@ export function ManagerDashboard() {
   const { branding } = useBranding();
   const [activeTab, setActiveTab] = useState('overview');
   const [showMessages, setShowMessages] = useState(false);
+  const [stats, setStats] = useState<any>({});
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  const loadStats = useCallback(async () => {
+    const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.log(`Manager fetch ${path} failed:`, e); return []; });
+    try {
+      const [users, leaves] = await Promise.all([
+        safeFetch('/users'),
+        safeFetch('/leave-requests'),
+      ]);
+      const teamMembers = (Array.isArray(users) ? users : []).filter((u: any) => u.role === 'employee');
+      setStats({
+        teamSize: teamMembers.length,
+        pendingLeaves: (Array.isArray(leaves) ? leaves : []).filter((l: any) => l.status === 'pending').length,
+        totalLeaves: (Array.isArray(leaves) ? leaves : []).length,
+      });
+    } catch (e) { console.log(e); }
+    setLoadingStats(false);
+  }, [accessToken]);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => { const iv = setInterval(loadStats, 20000); return () => clearInterval(iv); }, [loadStats]);
 
   const handleNavigation = (section: string) => {
     setActiveTab(section);
@@ -455,7 +508,7 @@ export function ManagerDashboard() {
                     <CardTitle className="text-sm">Team Size</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-3xl font-bold" style={{ color: branding.primaryColor }}>—</p>
+                    <p className="text-3xl font-bold" style={{ color: branding.primaryColor }}>{loadingStats ? '...' : stats.teamSize}</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -463,7 +516,7 @@ export function ManagerDashboard() {
                     <CardTitle className="text-sm">Pending Leave Requests</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-3xl font-bold" style={{ color: branding.primaryColor }}>—</p>
+                    <p className="text-3xl font-bold" style={{ color: branding.primaryColor }}>{loadingStats ? '...' : stats.pendingLeaves}</p>
                   </CardContent>
                 </Card>
                 <Card>

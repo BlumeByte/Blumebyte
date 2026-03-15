@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
@@ -35,10 +35,15 @@ export default function CompanySignup() {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const paymentWindowRef = useRef<Window | null>(null);
 
-  // Pricing calculation
-  const pricePerLicense = formData.billingCycle === 'monthly' ? 6 : 5;
+  // Exchange rate: 1 USD = 15.5 GHS (Ghana Cedis)
+  const USD_TO_GHS = 15.5;
+
+  // Pricing calculation in USD first, then convert to GHS
+  const pricePerLicenseUSD = formData.billingCycle === 'monthly' ? 6 : 5;
+  const pricePerLicenseGHS = pricePerLicenseUSD * USD_TO_GHS;
   const billingPeriod = formData.billingCycle === 'yearly' ? 12 : 1;
-  const totalAmount = formData.licenses * pricePerLicense * billingPeriod;
+  const totalAmountUSD = formData.licenses * pricePerLicenseUSD * billingPeriod;
+  const totalAmountGHS = totalAmountUSD * USD_TO_GHS;
 
   // Check if Paystack script is loaded
   useEffect(() => {
@@ -115,24 +120,36 @@ export default function CompanySignup() {
         });
         
         console.log('Response status:', response.status);
+        
+        // If not successful, use fallback immediately
+        if (!response.ok) {
+          console.log('Server endpoint not available yet (status:', response.status, '), using fallback...');
+          handlePublicKeyFallback();
+          return;
+        }
+        
         const contentType = response.headers.get('content-type');
-        console.log('Response content-type:', contentType);
         
-        const text = await response.text();
-        console.log('Response text:', text.substring(0, 200));
+        // Check if response is JSON
+        if (!contentType || !contentType.includes('application/json')) {
+          console.log('Server returned non-JSON response, using fallback...');
+          handlePublicKeyFallback();
+          return;
+        }
         
-        // Try to parse as JSON
-        const data = JSON.parse(text);
+        const data = await response.json();
         
         if (data.publicKey) {
-          console.log('Paystack public key loaded successfully');
+          console.log('Paystack public key loaded successfully from server');
           setPaystackPublicKey(data.publicKey);
+          // Also store it for future use
+          localStorage.setItem('paystack_public_key', data.publicKey);
         } else {
           console.error('Failed to load Paystack public key:', data.error);
           handlePublicKeyFallback();
         }
       } catch (error: any) {
-        console.error('Error fetching Paystack public key:', error);
+        console.error('Error fetching Paystack public key:', error.message);
         console.log('Using fallback method to get Paystack public key...');
         handlePublicKeyFallback();
       }
@@ -141,18 +158,17 @@ export default function CompanySignup() {
     const handlePublicKeyFallback = () => {
       // Check localStorage first
       const storedKey = localStorage.getItem('paystack_public_key');
-      if (storedKey && storedKey.startsWith('pk_')) {
+      if (storedKey && (storedKey.startsWith('pk_test_') || storedKey.startsWith('pk_live_'))) {
         console.log('Using Paystack public key from localStorage');
         setPaystackPublicKey(storedKey);
         return;
       }
 
-      // If server endpoint is not available yet, we'll set a flag to show a message
-      // Paystack public keys are safe to expose (they're meant to be public)
-      // For now, we'll show an error and ask user to contact support
+      // If no key in localStorage, show message to configure it
+      console.warn('No Paystack public key found. Please configure it in Dev Settings.');
       toast.error(
-        'Payment system configuration is loading. Please wait a moment and refresh the page.',
-        { duration: 6000 }
+        'Payment system needs configuration. Click the settings icon to configure.',
+        { duration: 8000 }
       );
     };
 
@@ -256,7 +272,7 @@ export default function CompanySignup() {
       }
 
       // Initialize Paystack payment directly (using inline popup)
-      const amountInKobo = Math.round(totalAmount * 100);
+      const amountInKobo = Math.round(totalAmountGHS * 100);
       
       console.log('Initializing Paystack with key:', paystackPublicKey.substring(0, 10) + '...');
       
@@ -264,7 +280,7 @@ export default function CompanySignup() {
         key: paystackPublicKey,
         email: formData.adminEmail.toLowerCase(),
         amount: amountInKobo,
-        currency: 'NGN',
+        currency: 'GHS',
         ref: `blumebyte_${Date.now()}_${Math.random().toString(36).substring(7)}`,
         metadata: {
           companyName: formData.companyName,
@@ -354,6 +370,17 @@ export default function CompanySignup() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      {/* Floating Settings Button */}
+      {!paystackPublicKey && (
+        <button
+          onClick={() => navigate('/dev-settings')}
+          className="fixed bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-50"
+          title="Configure Paystack"
+        >
+          <Settings className="h-5 w-5" />
+        </button>
+      )}
+      
       <Card className="w-full max-w-2xl border-2">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -393,11 +420,11 @@ export default function CompanySignup() {
                   <Label htmlFor="companyName">Company Name *</Label>
                   <Input
                     id="companyName"
-                    placeholder="Acme Corporation"
+                    placeholder="Blumebyte"
                     value={formData.companyName}
                     onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                    disabled={loading}
                     required
+                    disabled={loading || paymentWindowOpened}
                   />
                 </div>
 
@@ -456,7 +483,7 @@ export default function CompanySignup() {
                   <Label htmlFor="adminName">Your Name *</Label>
                   <Input
                     id="adminName"
-                    placeholder="John Doe"
+                    placeholder="Blume Byte"
                     value={formData.adminName}
                     onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
                     disabled={loading}
@@ -541,26 +568,27 @@ export default function CompanySignup() {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, billingCycle: 'monthly' })}
-                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                    className={
                       formData.billingCycle === 'monthly'
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                        ? 'p-4 border-2 rounded-lg text-left transition-all border-blue-600 bg-blue-50'
+                        : 'p-4 border-2 rounded-lg text-left transition-all border-gray-200 hover:border-gray-300'
+                    }
                     disabled={loading || paymentWindowOpened}
                   >
                     <div className="font-semibold">Monthly</div>
                     <div className="text-2xl font-bold mt-1">$6<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
                     <div className="text-xs text-gray-600 mt-1">Billed monthly</div>
+                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(6 * USD_TO_GHS).toFixed(2)} GHS</div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, billingCycle: 'yearly' })}
-                    className={`p-4 border-2 rounded-lg text-left transition-all relative ${
+                    className={
                       formData.billingCycle === 'yearly'
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                        ? 'p-4 border-2 rounded-lg text-left transition-all relative border-blue-600 bg-blue-50'
+                        : 'p-4 border-2 rounded-lg text-left transition-all relative border-gray-200 hover:border-gray-300'
+                    }
                     disabled={loading || paymentWindowOpened}
                   >
                     <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
@@ -569,6 +597,7 @@ export default function CompanySignup() {
                     <div className="font-semibold">Yearly</div>
                     <div className="text-2xl font-bold mt-1">$5<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
                     <div className="text-xs text-gray-600 mt-1">Billed annually ($60/user/year)</div>
+                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(5 * USD_TO_GHS).toFixed(2)} GHS</div>
                   </button>
                 </div>
               </div>
@@ -603,21 +632,29 @@ export default function CompanySignup() {
                   <span className="font-medium">{formData.licenses}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Price per license:</span>
-                  <span className="font-medium">${pricePerLicense}/{formData.billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
+                  <span className="text-gray-600">Price per license (USD):</span>
+                  <span className="font-medium">${pricePerLicenseUSD}/{formData.billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Price per license (GHS):</span>
+                  <span className="font-medium">₵{pricePerLicenseGHS.toFixed(2)}/{formData.billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Billing period:</span>
                   <span className="font-medium">{formData.billingCycle === 'monthly' ? 'Monthly' : 'Yearly (12 months)'}</span>
                 </div>
                 <div className="border-t pt-2 mt-2">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total:</span>
-                    <span className="text-blue-600">${totalAmount.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Total (USD):</span>
+                    <span>${totalAmountUSD.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg mt-1">
+                    <span>Total (GHS):</span>
+                    <span className="text-blue-600">₵{totalAmountGHS.toFixed(2)}</span>
                   </div>
                   {formData.billingCycle === 'yearly' && (
                     <p className="text-xs text-gray-600 text-right mt-1">
-                      You save ${(formData.licenses * 12).toFixed(2)} compared to monthly billing
+                      You save ₵{((formData.licenses * 12) * USD_TO_GHS).toFixed(2)} GHS compared to monthly billing
                     </p>
                   )}
                 </div>
@@ -629,6 +666,28 @@ export default function CompanySignup() {
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                     <span className="text-sm font-medium text-blue-900">{pollingStatus}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Paystack Configuration Warning */}
+              {!paystackPublicKey && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-900">Payment Configuration Required</p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        Paystack public key is not configured. Click below to set it up.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => navigate('/dev-settings')}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      <Settings className="h-3 w-3 mr-1" />
+                      Configure
+                    </Button>
                   </div>
                 </div>
               )}

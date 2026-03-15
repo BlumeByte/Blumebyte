@@ -84,7 +84,7 @@ export function SetupSuperAdmin() {
                 )}
                 <div className="space-y-2">
                   <Label>Full Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="John Doe" />
+                  <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Blume Byte" />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
