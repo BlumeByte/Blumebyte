@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="frame-ancestors *">
+  <title>Iframe Compatibility Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #1f2937;
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .status {
+      background: #f3f4f6;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .status-item:last-child { border-bottom: none; }
+    .status-label {
+      font-weight: 600;
+      color: #374151;
+    }
+    .status-value {
+      color: #6b7280;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+    }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+    .warning { color: #f59e0b; }
+    .button {
+      display: inline-block;
+      background: #3b82f6;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      margin: 10px 5px;
+      transition: all 0.2s;
+    }
+    .button:hover {
+      background: #2563eb;
+      transform: translateY(-2px);
+    }
+    .info {
+      background: #dbeafe;
+      border-left: 4px solid #3b82f6;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 8px;
+    }
+    .info-title {
+      font-weight: 700;
+      color: #1e40af;
+      margin-bottom: 8px;
+    }
+    .info-text {
+      color: #1e3a8a;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🖼️ Iframe Compatibility Test</h1>
+    
+    <div class="status">
+      <div class="status-item">
+        <span class="status-label">In Iframe:</span>
+        <span class="status-value" id="iframe-status">Checking...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Referrer:</span>
+        <span class="status-value" id="referrer-status">Checking...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Origin:</span>
+        <span class="status-value" id="origin-status">Checking...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Fetch API:</span>
+        <span class="status-value" id="fetch-status">Testing...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">CORS Headers:</span>
+        <span class="status-value" id="cors-status">Testing...</span>
+      </div>
+    </div>
+
+    <div class="info">
+      <div class="info-title">✓ This page is embeddable in iframes</div>
+      <div class="info-text">
+        If you can see this page in the Figma Make preview, it means basic iframe embedding works. 
+        The main app uses React Router and lazy loading which may have additional requirements.
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="/" class="button">Go to Main App</a>
+      <a href="/debug.html" class="button" style="background: #6b7280;">Debug Tools</a>
+    </div>
+  </div>
+
+  <script>
+    // Check iframe status
+    const isInIframe = window.self !== window.top;
+    const iframeEl = document.getElementById('iframe-status');
+    if (isInIframe) {
+      iframeEl.textContent = 'YES (embedded)';
+      iframeEl.classList.add('warning');
+    } else {
+      iframeEl.textContent = 'NO (standalone)';
+      iframeEl.classList.add('success');
+    }
+
+    // Check referrer
+    const referrerEl = document.getElementById('referrer-status');
+    if (document.referrer) {
+      referrerEl.textContent = document.referrer;
+      if (document.referrer.includes('figma.com')) {
+        referrerEl.classList.add('warning');
+      } else {
+        referrerEl.classList.add('success');
+      }
+    } else {
+      referrerEl.textContent = '(none)';
+      referrerEl.classList.add('success');
+    }
+
+    // Check origin
+    const originEl = document.getElementById('origin-status');
+    originEl.textContent = window.location.origin;
+    originEl.classList.add('success');
+
+    // Test fetch API
+    const fetchEl = document.getElementById('fetch-status');
+    fetch('/health.json')
+      .then(response => {
+        if (response.ok) {
+          fetchEl.textContent = '✓ Working';
+          fetchEl.classList.add('success');
+        } else {
+          fetchEl.textContent = `✗ Error ${response.status}`;
+          fetchEl.classList.add('error');
+        }
+      })
+      .catch(error => {
+        fetchEl.textContent = `✗ Failed: ${error.message}`;
+        fetchEl.classList.add('error');
+      });
+
+    // Test CORS
+    const corsEl = document.getElementById('cors-status');
+    fetch(window.location.origin + '/health.json')
+      .then(response => response.headers)
+      .then(headers => {
+        corsEl.textContent = '✓ Configured';
+        corsEl.classList.add('success');
+      })
+      .catch(error => {
+        corsEl.textContent = '✗ Not configured';
+        corsEl.classList.add('error');
+      });
+
+    // Log environment info
+    console.log('=== IFRAME TEST DIAGNOSTICS ===');
+    console.log('In iframe:', isInIframe);
+    console.log('Referrer:', document.referrer);
+    console.log('Origin:', window.location.origin);
+    console.log('User Agent:', navigator.userAgent);
+    
+    try {
+      console.log('Ancestor origins:', window.location.ancestorOrigins);
+    } catch (e) {
+      console.log('Ancestor origins: Not available');
+    }
+  </script>
+</body>
+</html>

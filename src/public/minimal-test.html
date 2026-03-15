@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal React Test</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.3.1",
+        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client"
+      }
+    }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    h1 {
+      font-size: 42px;
+      margin-bottom: 20px;
+      font-weight: 800;
+    }
+    p {
+      font-size: 18px;
+      line-height: 1.6;
+      opacity: 0.9;
+      margin-bottom: 30px;
+    }
+    .status {
+      display: inline-block;
+      padding: 12px 24px;
+      background: #10b981;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-top: 30px;
+      text-align: left;
+    }
+    .card {
+      background: rgba(255,255,255,0.1);
+      padding: 20px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    .card-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 14px;
+      opacity: 0.7;
+      text-transform: uppercase;
+    }
+    .card-value {
+      font-size: 24px;
+      font-weight: 800;
+    }
+    button {
+      background: white;
+      color: #1e3a8a;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+      transition: all 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    #react-root {
+      min-height: 100px;
+    }
+    .error-box {
+      background: rgba(239, 68, 68, 0.2);
+      border: 2px solid #ef4444;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+      text-align: left;
+    }
+    .error-box h3 {
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    .error-box pre {
+      background: rgba(0,0,0,0.4);
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="react-root"></div>
+  <div id="fallback" class="container" style="display: none;">
+    <h1>⚠️ React Failed to Load</h1>
+    <p>The React app couldn't initialize. This helps identify the problem.</p>
+    <div id="error-details" class="error-box" style="display: none;"></div>
+    <button onclick="location.reload()">🔄 Retry</button>
+    <button onclick="window.location.href='/debug.html'">🔧 Go to Debug Page</button>
+  </div>
+
+  <script type="module">
+    let errorOccurred = false;
+    const errors = [];
+
+    // Catch all errors
+    window.onerror = (msg, url, line, col, error) => {
+      errorOccurred = true;
+      const errorMsg = `${msg} at ${url}:${line}:${col}\n${error?.stack || ''}`;
+      errors.push(errorMsg);
+      showFallback();
+      return false;
+    };
+
+    window.onunhandledrejection = (event) => {
+      errorOccurred = true;
+      errors.push(`Promise rejection: ${event.reason}`);
+      showFallback();
+    };
+
+    function showFallback() {
+      setTimeout(() => {
+        const fallback = document.getElementById('fallback');
+        const errorDetails = document.getElementById('error-details');
+        fallback.style.display = 'block';
+        
+        if (errors.length > 0) {
+          errorDetails.style.display = 'block';
+          errorDetails.innerHTML = `
+            <h3>🔴 Error Details:</h3>
+            <pre>${errors.map((e, i) => `Error ${i + 1}:\n${e}`).join('\n\n')}</pre>
+            <p style="margin-top: 15px; font-size: 14px; opacity: 0.9;">
+              <strong>Copy this error and send it to support.</strong>
+            </p>
+          `;
+        }
+      }, 100);
+    }
+
+    // Try to load React
+    try {
+      const React = await import('react');
+      const ReactDOM = await import('react-dom/client');
+
+      console.log('✓ React loaded successfully');
+
+      // Simple React component
+      function App() {
+        const [count, setCount] = React.useState(0);
+        const [time, setTime] = React.useState(new Date().toLocaleTimeString());
+
+        React.useEffect(() => {
+          const interval = setInterval(() => {
+            setTime(new Date().toLocaleTimeString());
+          }, 1000);
+          return () => clearInterval(interval);
+        }, []);
+
+        return React.createElement('div', { className: 'container' },
+          React.createElement('div', { className: 'status' }, '✅ React is Working!'),
+          React.createElement('h1', null, '🎉 Success!'),
+          React.createElement('p', null, 'If you can see this, React is loading correctly on Vercel. The issue is in your app initialization code, not the deployment.'),
+          
+          React.createElement('div', { className: 'grid' },
+            React.createElement('div', { className: 'card' },
+              React.createElement('div', { className: 'card-title' }, 'React Version'),
+              React.createElement('div', { className: 'card-value' }, React.version)
+            ),
+            React.createElement('div', { className: 'card' },
+              React.createElement('div', { className: 'card-title' }, 'Current Time'),
+              React.createElement('div', { className: 'card-value', style: { fontSize: '18px' } }, time)
+            ),
+            React.createElement('div', { className: 'card' },
+              React.createElement('div', { className: 'card-title' }, 'Click Counter'),
+              React.createElement('div', { className: 'card-value' }, count)
+            ),
+            React.createElement('div', { className: 'card' },
+              React.createElement('div', { className: 'card-title' }, 'Status'),
+              React.createElement('div', { className: 'card-value', style: { fontSize: '20px', color: '#10b981' } }, 'LIVE')
+            )
+          ),
+
+          React.createElement('div', { style: { marginTop: '30px' } },
+            React.createElement('button', {
+              onClick: () => setCount(count + 1)
+            }, `Clicked ${count} times`),
+            React.createElement('button', {
+              onClick: () => window.location.href = '/'
+            }, '🚀 Try Main App'),
+            React.createElement('button', {
+              onClick: () => window.location.href = '/debug.html'
+            }, '🔧 Debug Tools')
+          )
+        );
+      }
+
+      // Render the app
+      const root = ReactDOM.createRoot(document.getElementById('react-root'));
+      root.render(React.createElement(App));
+
+      console.log('✓ React app rendered successfully');
+
+    } catch (error) {
+      console.error('✗ Failed to load React:', error);
+      errorOccurred = true;
+      errors.push(`React import failed: ${error.message}\n${error.stack}`);
+      showFallback();
+    }
+
+    // Timeout fallback
+    setTimeout(() => {
+      if (!errorOccurred && document.getElementById('react-root').children.length === 0) {
+        errorOccurred = true;
+        errors.push('React loaded but did not render anything after 3 seconds');
+        showFallback();
+      }
+    }, 3000);
+  </script>
+</body>
+</html>

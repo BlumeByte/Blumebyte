@@ -1,0 +1,64 @@
+10:05:27.283 Running build in Portland, USA (West) – pdx1
+10:05:27.284 Build machine configuration: 2 cores, 8 GB
+10:05:27.406 Cloning github.com/BlumeByte/Sasfinancegroup (Branch: main, Commit: 0fe407d)
+10:05:27.993 Cloning completed: 586.000ms
+10:05:28.072 Restored build cache from previous deployment (7T1RdaLtpGY6eiZw5AJj7k1Pj9Jx)
+10:05:28.333 Running "vercel build"
+10:05:28.943 Vercel CLI 50.28.0
+10:05:29.541 Running "install" command: `npm install`...
+10:05:34.782 
+10:05:34.783 up to date, audited 285 packages in 5s
+10:05:34.786 
+10:05:34.787 32 packages are looking for funding
+10:05:34.787   run `npm fund` for details
+10:05:34.806 
+10:05:34.807 1 moderate severity vulnerability
+10:05:34.808 
+10:05:34.808 To address all issues, run:
+10:05:34.808   npm audit fix --force
+10:05:34.808 
+10:05:34.809 Run `npm audit` for details.
+10:05:35.043 
+10:05:35.045 > sas@0.1.0 build
+10:05:35.045 > vite build
+10:05:35.046 
+10:05:35.326 [36mvite v6.3.5 [32mbuilding for production...[36m[39m
+10:05:35.390 transforming...
+10:05:42.720 [32m✓[39m 3245 modules transformed.
+10:05:43.175 rendering chunks...
+10:05:43.701 computing gzip size...
+10:05:43.743 [2mbuild/[22m[32mindex.html                                     [39m[1m[2m  0.42 kB[22m[1m[22m[2m │ gzip:   0.27 kB[22m
+10:05:43.744 [2mbuild/[22m[2massets/[22m[35mindex-DptvC6a2.css                      [39m[1m[2m 26.22 kB[22m[1m[22m[2m │ gzip:   6.86 kB[22m
+10:05:43.744 [2mbuild/[22m[2massets/[22m[36mcredit-card-DBJAuuZ3.js                 [39m[1m[2m  0.38 kB[22m[1m[22m[2m │ gzip:   0.30 kB[22m
+10:05:43.744 [2mbuild/[22m[2massets/[22m[36mcircle-x-D9EfY3-6.js                    [39m[1m[2m  0.70 kB[22m[1m[22m[2m │ gzip:   0.36 kB[22m
+10:05:43.744 [2mbuild/[22m[2massets/[22m[36mzap-Bx9h3PvM.js                         [39m[1m[2m  1.14 kB[22m[1m[22m[2m │ gzip:   0.48 kB[22m
+10:05:43.744 [2mbuild/[22m[2massets/[22m[36mSubscriptionPage-FWBSotBi.js            [39m[1m[2m  1.19 kB[22m[1m[22m[2m │ gzip:   0.61 kB[22m
+10:05:43.744 [2mbuild/[22m[2massets/[22m[36malert-sl7qDPCD.js                       [39m[1m[2m  1.19 kB[22m[1m[22m[2m │ gzip:   0.66 kB[22m
+10:05:43.745 [2mbuild/[22m[2massets/[22m[36mLoginPage-CpemalNW.js                   [39m[1m[2m  2.77 kB[22m[1m[22m[2m │ gzip:   1.20 kB[22m
+10:05:43.745 [2mbuild/[22m[2massets/[22m[36mPaymentVerification-DrumToJR.js         [39m[1m[2m  2.88 kB[22m[1m[22m[2m │ gzip:   1.09 kB[22m
+10:05:43.745 [2mbuild/[22m[2massets/[22m[36mprogress-TQCTG72Z.js                    [39m[1m[2m  3.24 kB[22m[1m[22m[2m │ gzip:   1.53 kB[22m
+10:05:43.745 [2mbuild/[22m[2massets/[22m[36mListControls-DZjWS4hw.js                [39m[1m[2m  4.42 kB[22m[1m[22m[2m │ gzip:   1.98 kB[22m
+10:05:43.745 [2mbuild/[22m[2massets/[22m[36mtabs--Hz9vJcu.js                        [39m[1m[2m  7.20 kB[22m[1m[22m[2m │ gzip:   2.95 kB[22m
+10:05:43.745 [2mbuild/[22m[2massets/[22m[36mLicensePaymentVerification-DN7-UgGE.js  [39m[1m[2m  8.10 kB[22m[1m[22m[2m │ gzip:   2.45 kB[22m
+10:05:43.745 [2mbuild/[22m[2massets/[22m[36mManagerDashboard-CCAdX4i8.js            [39m[1m[2m 12.32 kB[22m[1m[22m[2m │ gzip:   3.51 kB[22m
+10:05:43.746 [2mbuild/[22m[2massets/[22m[36mLicenseManagement-D1HB7dEj.js           [39m[1m[2m 35.25 kB[22m[1m[22m[2m │ gzip:  10.99 kB[22m
+10:05:43.746 [2mbuild/[22m[2massets/[22m[36mscroll-area-1IeAdNwH.js                 [39m[1m[2m 51.56 kB[22m[1m[22m[2m │ gzip:  16.50 kB[22m
+10:05:43.746 [2mbuild/[22m[2massets/[22m[36mEmployeeDashboard-D982bZwn.js           [39m[1m[2m 72.87 kB[22m[1m[22m[2m │ gzip:  13.84 kB[22m
+10:05:43.746 [2mbuild/[22m[2massets/[22m[36mAdminDashboard-DlqFgMF3.js              [39m[1m[2m 97.02 kB[22m[1m[22m[2m │ gzip:  20.94 kB[22m
+10:05:43.746 [2mbuild/[22m[2massets/[22m[36mSuperAdminDashboard-CAIkwW9u.js         [39m[1m[2m136.21 kB[22m[1m[22m[2m │ gzip:  30.44 kB[22m
+10:05:43.746 [2mbuild/[22m[2massets/[22m[36mMeetingsPanel-BdaRtjAi.js               [39m[1m[2m174.51 kB[22m[1m[22m[2m │ gzip:  45.85 kB[22m
+10:05:43.747 [2mbuild/[22m[2massets/[22m[36mindex-DhEvSUrg.js                       [39m[1m[2m498.45 kB[22m[1m[22m[2m │ gzip: 150.03 kB[22m
+10:05:43.747 [2mbuild/[22m[2massets/[22m[36mAdvancedReportsModule-B23bThje.js       [39m[1m[33m555.96 kB[39m[22m[2m │ gzip: 148.91 kB[22m
+10:05:43.748 [32m✓ built in 8.39s[39m
+10:05:43.748 [33m
+10:05:43.748 (!) Some chunks are larger than 500 kB after minification. Consider:
+10:05:43.748 - Using dynamic import() to code-split the application
+10:05:43.748 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+10:05:43.750 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+10:05:43.891 Build Completed in /vercel/output [14s]
+10:05:43.986 Deploying outputs...
+10:05:47.145 Deployment completed
+10:05:48.199 Creating build cache...
+10:05:57.292 Created build cache: 9s
+10:05:57.292 Uploading build cache [44.58 MB]
+10:05:58.026 Build cache uploaded: 734.132ms

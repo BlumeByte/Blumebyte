@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnostic Page - SAS Finance HRIS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+    }
+    h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    h2 {
+      color: #333;
+      margin: 30px 0 15px;
+      font-size: 18px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 8px;
+    }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px;
+      background: #f7f7f7;
+      border-radius: 6px;
+      margin: 8px 0;
+      font-size: 14px;
+    }
+    .status.ok { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    .label { font-weight: 600; }
+    .value { font-family: monospace; }
+    .btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+      width: 100%;
+      font-weight: 600;
+    }
+    .btn:hover { background: #5568d3; }
+    .info {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 12px;
+      margin: 15px 0;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #0d47a1;
+    }
+    .code {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      margin: 10px 0;
+      overflow-x: auto;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 SAS Finance HRIS Diagnostic</h1>
+    <p style="color: #666; margin-bottom: 20px;">Deployment health check</p>
+
+    <h2>📦 Build Information</h2>
+    <div class="status ok">
+      <span class="label">Build Status:</span>
+      <span class="value">✓ Deployed Successfully</span>
+    </div>
+    <div class="status ok">
+      <span class="label">Output Directory:</span>
+      <span class="value">build/</span>
+    </div>
+    <div class="status ok">
+      <span class="label">Framework:</span>
+      <span class="value">Vite + React</span>
+    </div>
+
+    <h2>🌐 Environment Check</h2>
+    <div id="env-checks"></div>
+
+    <h2>📝 Files Status</h2>
+    <div class="status ok">
+      <span class="label">index.html:</span>
+      <span class="value">✓ Loaded</span>
+    </div>
+    <div class="status" id="js-status">
+      <span class="label">Main JS Bundle:</span>
+      <span class="value">Checking...</span>
+    </div>
+    <div class="status" id="css-status">
+      <span class="label">CSS Styles:</span>
+      <span class="value">Checking...</span>
+    </div>
+
+    <div class="info">
+      <strong>ℹ️ Note:</strong> If you see this page, the deployment is working but the React app may have runtime errors.
+    </div>
+
+    <div class="code" id="error-log">No errors detected yet...</div>
+
+    <button class="btn" onclick="window.location.href='/'">
+      🚀 Go to Main App
+    </button>
+    
+    <button class="btn" onclick="checkAssets()" style="background: #28a745; margin-top: 10px;">
+      🔄 Recheck Assets
+    </button>
+  </div>
+
+  <script>
+    // Log collection
+    const errors = [];
+    const originalError = console.error;
+    console.error = function(...args) {
+      errors.push(args.join(' '));
+      updateErrorLog();
+      originalError.apply(console, args);
+    };
+
+    function updateErrorLog() {
+      const log = document.getElementById('error-log');
+      if (errors.length === 0) {
+        log.textContent = 'No errors detected yet...';
+        log.style.background = '#d4edda';
+        log.style.color = '#155724';
+      } else {
+        log.innerHTML = errors.map(e => `❌ ${e}`).join('<br>');
+        log.style.background = '#f8d7da';
+        log.style.color = '#721c24';
+      }
+    }
+
+    function checkAssets() {
+      // Check if main.tsx exists
+      fetch('/main.tsx')
+        .then(res => {
+          const status = document.getElementById('js-status');
+          if (res.ok) {
+            status.className = 'status ok';
+            status.innerHTML = '<span class="label">main.tsx:</span><span class="value">✓ Found</span>';
+          } else {
+            status.className = 'status error';
+            status.innerHTML = '<span class="label">main.tsx:</span><span class="value">✗ Not Found (404)</span>';
+          }
+        });
+
+      // Check CSS
+      fetch('/styles/globals.css')
+        .then(res => {
+          const status = document.getElementById('css-status');
+          if (res.ok) {
+            status.className = 'status ok';
+            status.innerHTML = '<span class="label">CSS:</span><span class="value">✓ Loaded</span>';
+          } else {
+            status.className = 'status error';
+            status.innerHTML = '<span class="label">CSS:</span><span class="value">✗ Not Found (404)</span>';
+          }
+        });
+    }
+
+    // Environment checks
+    const envChecks = document.getElementById('env-checks');
+    const checks = [
+      { name: 'Window Object', test: () => typeof window !== 'undefined' },
+      { name: 'Document Ready', test: () => document.readyState === 'complete' || document.readyState === 'interactive' },
+      { name: 'Local Storage', test: () => typeof localStorage !== 'undefined' },
+      { name: 'Fetch API', test: () => typeof fetch !== 'undefined' },
+    ];
+
+    checks.forEach(check => {
+      const div = document.createElement('div');
+      const passed = check.test();
+      div.className = passed ? 'status ok' : 'status error';
+      div.innerHTML = `
+        <span class="label">${check.name}:</span>
+        <span class="value">${passed ? '✓ Available' : '✗ Not Available'}</span>
+      `;
+      envChecks.appendChild(div);
+    });
+
+    // Auto-check assets on load
+    setTimeout(checkAssets, 500);
+
+    // Check for React root
+    setTimeout(() => {
+      const root = document.getElementById('root');
+      if (root) {
+        console.log('✓ React root div found');
+      } else {
+        console.error('✗ React root div NOT found - this will cause app to fail');
+      }
+    }, 1000);
+  </script>
+</body>
+</html>

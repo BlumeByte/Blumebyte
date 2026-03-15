@@ -1,0 +1,189 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from './supabase';
+import { api } from './api-client';
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  [key: string]: any;
+}
+
+interface AuthContextType {
+  user: User | null;
+  accessToken: string | null;
+  sessionLoading: boolean;
+  loginLoading: boolean;
+  loginError: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+  getToken: () => Promise<string | null>;
+  refreshProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const initializedRef = useRef(false);
+
+  const fetchProfile = useCallback(async (token: string) => {
+    try {
+      const profile = await api('/profile', { token });
+      setUser(profile);
+      return profile;
+    } catch (e) {
+      console.log('Failed to fetch profile:', e);
+      return null;
+    }
+  }, []);
+
+  const getToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.log('getSession error (likely expired refresh token):', error.message);
+        // Invalid refresh token – clear state so user is sent back to login
+        setUser(null);
+        setAccessToken(null);
+        await supabase.auth.signOut().catch(() => {});
+        return null;
+      }
+      if (!data?.session) return null;
+      const token = data.session.access_token;
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp - now < 60) {
+          const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            console.log('Refresh token expired/invalid:', refreshError.message);
+            setUser(null);
+            setAccessToken(null);
+            await supabase.auth.signOut().catch(() => {});
+            return null;
+          }
+          if (refreshed?.session) {
+            setAccessToken(refreshed.session.access_token);
+            return refreshed.session.access_token;
+          }
+        }
+      } catch (_) {}
+      return token;
+    } catch (e: any) {
+      console.log('getToken unexpected error:', e.message);
+      setUser(null);
+      setAccessToken(null);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Use onAuthStateChange as the single source of truth for session state.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        // Refresh failed – stale session, force logout
+        console.log('Token refresh failed, logging out');
+        setUser(null);
+        setAccessToken(null);
+        if (!initializedRef.current) {
+          initializedRef.current = true;
+          setSessionLoading(false);
+        }
+        return;
+      }
+
+      if (session) {
+        setAccessToken(session.access_token);
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          await fetchProfile(session.access_token);
+        }
+      } else {
+        setUser(null);
+        setAccessToken(null);
+      }
+
+      // Mark loading done after the first event (INITIAL_SESSION)
+      if (!initializedRef.current) {
+        initializedRef.current = true;
+        setSessionLoading(false);
+      }
+    });
+
+    // Safety fallback: if onAuthStateChange never fires (e.g. no persisted session),
+    // stop loading after a short timeout.
+    const timeout = setTimeout(() => {
+      if (!initializedRef.current) {
+        initializedRef.current = true;
+        setSessionLoading(false);
+      }
+    }, 3000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, [fetchProfile]);
+
+  const login = async (email: string, password: string) => {
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes('invalid login') || msg.includes('invalid_credentials')) {
+          throw new Error('Incorrect email or password. Please double-check your credentials and try again.');
+        }
+        throw new Error(error.message);
+      }
+      if (data?.session) {
+        setAccessToken(data.session.access_token);
+        await fetchProfile(data.session.access_token);
+      }
+    } catch (e: any) {
+      setLoginError(e.message);
+      throw e;
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      // signOut may fail if session is already invalid – that's fine
+      console.log('signOut error (session may already be invalid):', e);
+    }
+    setUser(null);
+    setAccessToken(null);
+  };
+
+  const clearError = () => setLoginError(null);
+
+  const refreshProfile = async () => {
+    const token = await getToken();
+    if (token) {
+      await fetchProfile(token);
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, accessToken, sessionLoading, loginLoading, loginError, login, logout, clearError, getToken, refreshProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}

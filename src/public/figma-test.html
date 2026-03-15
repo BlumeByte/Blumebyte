@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Figma Preview Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: white;
+      padding: 40px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 36px;
+      margin-bottom: 10px;
+      color: #3b82f6;
+    }
+    .subtitle {
+      font-size: 18px;
+      opacity: 0.7;
+      margin-bottom: 40px;
+    }
+    .box {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 12px;
+      padding: 25px;
+      margin: 20px 0;
+    }
+    .box h2 {
+      font-size: 20px;
+      margin-bottom: 15px;
+      color: #60a5fa;
+    }
+    .status {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 14px;
+      margin: 5px 5px 5px 0;
+    }
+    .status.good { background: #10b981; color: white; }
+    .status.bad { background: #ef4444; color: white; }
+    .status.warn { background: #f59e0b; color: white; }
+    code {
+      background: #0f172a;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #60a5fa;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 10px 10px 0 0;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    ul {
+      margin: 15px 0;
+      padding-left: 25px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    .highlight {
+      background: #1e40af;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border-left: 4px solid #3b82f6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Figma Preview Diagnostic</h1>
+    <p class="subtitle">Testing if this page loads in Figma Make preview</p>
+
+    <div class="box">
+      <h2>✅ If You Can See This Page</h2>
+      <p>
+        <span class="status good">GOOD NEWS</span>
+      </p>
+      <p style="margin-top: 15px;">
+        Your Vercel deployment is <strong>WORKING PERFECTLY</strong>! 
+        The app is deployed and accessible.
+      </p>
+      <div class="highlight">
+        <strong>This means:</strong>
+        <ul>
+          <li>✅ Vercel is serving files correctly</li>
+          <li>✅ Your domain/URL is accessible</li>
+          <li>✅ Static HTML pages load fine</li>
+          <li>✅ CORS headers are working (if you see this in Figma)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>🎯 What the Figma Error Means</h2>
+      <p>The error you saw:</p>
+      <code style="display: block; margin: 10px 0; padding: 10px;">
+        TypeError: Failed to fetch<br>
+        at https://www.figma.com/webpack-artifacts/...
+      </code>
+      <p style="margin-top: 15px;">
+        <span class="status warn">EXPLANATION</span>
+      </p>
+      <p style="margin-top: 10px;">
+        This is <strong>Figma's internal error</strong>, not your app's error. 
+        It means Figma's preview system is trying to load your React app but encountering an issue.
+      </p>
+    </div>
+
+    <div class="box">
+      <h2>🔧 Possible Reasons</h2>
+      <ol style="padding-left: 25px;">
+        <li style="margin: 12px 0;">
+          <strong>The React app has a runtime error</strong>
+          <br>
+          <span style="opacity: 0.8; font-size: 14px;">
+            → Visit <code>https://your-app.vercel.app/</code> in Chrome to see the actual error
+          </span>
+        </li>
+        <li style="margin: 12px 0;">
+          <strong>Figma preview URL is not configured</strong>
+          <br>
+          <span style="opacity: 0.8; font-size: 14px;">
+            → Set your Vercel URL in Figma Make's preview settings
+          </span>
+        </li>
+        <li style="margin: 12px 0;">
+          <strong>The React app takes time to load</strong>
+          <br>
+          <span style="opacity: 0.8; font-size: 14px;">
+            → Figma preview might timeout before React initializes
+          </span>
+        </li>
+      </ol>
+    </div>
+
+    <div class="box">
+      <h2>🚀 What to Do Next</h2>
+      <div style="margin-top: 15px;">
+        <p><strong>Step 1:</strong> Get your Vercel URL from the dashboard</p>
+        <p style="margin: 8px 0; opacity: 0.8;">Example: <code>https://sasfinancegroup.vercel.app</code></p>
+        
+        <p style="margin-top: 20px;"><strong>Step 2:</strong> Open these pages in Chrome/Firefox:</p>
+        <ul>
+          <li><code>https://your-app.vercel.app/figma-test.html</code> ← This page</li>
+          <li><code>https://your-app.vercel.app/status.html</code> ← Status check</li>
+          <li><code>https://your-app.vercel.app/</code> ← Main app</li>
+        </ul>
+
+        <p style="margin-top: 20px;"><strong>Step 3:</strong> Check what happens:</p>
+        <ul>
+          <li>✅ If login page shows → App is working! Figma preview is the issue.</li>
+          <li>⚠️ If error screen shows → Click "Technical Details" and send me the error</li>
+          <li>❌ If blank screen → Open DevTools (F12) and screenshot console</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>💡 Important Reminder</h2>
+      <div class="highlight">
+        <p><strong>Your deployed app on Vercel ≠ Figma Make preview</strong></p>
+        <p style="margin-top: 10px; opacity: 0.9;">
+          Even if Figma's preview doesn't work, your app might be perfectly functional on Vercel.
+          Always test on the actual Vercel URL in a real browser!
+        </p>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>🧪 Quick Tests</h2>
+      <button onclick="testMainApp()">Test Main App</button>
+      <button onclick="testHealth()">Test Health Endpoint</button>
+      <button onclick="copyUrl()">Copy This URL</button>
+      <button onclick="window.location.href='/'">Go to Main App</button>
+      
+      <div id="test-results" style="margin-top: 20px; display: none;">
+        <h3 style="font-size: 16px; margin-bottom: 10px;">Test Results:</h3>
+        <div id="results-content" style="background: #0f172a; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 13px;"></div>
+      </div>
+    </div>
+
+    <div class="box" style="border-color: #3b82f6; background: #1e3a8a;">
+      <h2 style="color: white;">📞 Next Message to Send</h2>
+      <p style="opacity: 0.9;">Copy and fill this out:</p>
+      <pre style="background: #0f172a; padding: 15px; border-radius: 8px; margin-top: 10px; overflow-x: auto; font-size: 13px;">
+My Vercel URL: [paste your URL here]
+
+Can I see /figma-test.html? [Yes/No]
+
+Main app (/) shows: [Login page / Error screen / Blank screen / Other]
+
+Testing in: [Figma Make preview / Chrome / Firefox / Safari]
+
+If error, the message is: [paste error here]
+      </pre>
+    </div>
+  </div>
+
+  <script>
+    async function testMainApp() {
+      const results = document.getElementById('results-content');
+      const container = document.getElementById('test-results');
+      container.style.display = 'block';
+      
+      results.textContent = 'Testing main app...\n';
+      
+      try {
+        const response = await fetch('/');
+        results.textContent += `✅ Main app response: ${response.status} ${response.statusText}\n`;
+        
+        if (response.ok) {
+          results.textContent += '✅ App is accessible!\n';
+          results.textContent += '\nNext: Open / in a new tab to see if it renders correctly.\n';
+        } else {
+          results.textContent += `❌ App returned error status: ${response.status}\n`;
+        }
+      } catch (error) {
+        results.textContent += `❌ Failed to fetch main app: ${error.message}\n`;
+      }
+    }
+
+    async function testHealth() {
+      const results = document.getElementById('results-content');
+      const container = document.getElementById('test-results');
+      container.style.display = 'block';
+      
+      results.textContent = 'Testing health endpoint...\n';
+      
+      try {
+        const response = await fetch('/health.json');
+        results.textContent += `✅ Health check response: ${response.status}\n`;
+        
+        if (response.ok) {
+          const data = await response.json();
+          results.textContent += `✅ Health data: ${JSON.stringify(data, null, 2)}\n`;
+        }
+      } catch (error) {
+        results.textContent += `❌ Health check failed: ${error.message}\n`;
+      }
+    }
+
+    function copyUrl() {
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('URL copied to clipboard:\n' + url);
+      }).catch(() => {
+        alert('URL: ' + url);
+      });
+    }
+
+    // Auto-detect environment
+    const inIframe = window.self !== window.top;
+    if (inIframe) {
+      console.log('✅ Running inside an iframe (possibly Figma preview)');
+      
+      // Try to communicate with parent
+      try {
+        window.parent.postMessage({
+          type: 'figma-test-loaded',
+          url: window.location.href,
+          timestamp: new Date().toISOString()
+        }, '*');
+      } catch (e) {
+        console.log('Cannot communicate with parent frame');
+      }
+    } else {
+      console.log('✅ Running in a normal browser tab');
+    }
+  </script>
+</body>
+</html>

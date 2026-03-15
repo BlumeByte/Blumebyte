@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Status - SAS Finance HRIS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 50px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .status-icon {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: 50%;
+      margin: 0 auto 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 50px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    h1 {
+      color: #1f2937;
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 15px;
+    }
+    p {
+      color: #6b7280;
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .info {
+      background: #f3f4f6;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+      text-align: left;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label {
+      color: #6b7280;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .info-value {
+      color: #1f2937;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      background: #10b981;
+      color: white;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin: 5px;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+    }
+    .btn-secondary {
+      background: linear-gradient(135deg, #6b7280, #4b5563);
+    }
+    .timestamp {
+      color: #9ca3af;
+      font-size: 12px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="status-icon">✅</div>
+    <h1>System Online</h1>
+    <p>SAS Finance Group HRIS is deployed and accessible</p>
+    
+    <div class="info">
+      <div class="info-row">
+        <span class="info-label">Deployment Status</span>
+        <span class="status-badge">Live</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Server</span>
+        <span class="info-value">Vercel</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Framework</span>
+        <span class="info-value">React 18 + Vite</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">CORS</span>
+        <span class="info-value">Enabled</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">API</span>
+        <span class="info-value">Supabase</span>
+      </div>
+    </div>
+
+    <button onclick="window.location.href='/'">🚀 Open Application</button>
+    <button onclick="runTests()" class="btn-secondary">🧪 Run Tests</button>
+    
+    <div class="timestamp" id="timestamp"></div>
+  </div>
+
+  <script>
+    // Update timestamp
+    function updateTimestamp() {
+      const now = new Date();
+      document.getElementById('timestamp').textContent = 
+        `Last checked: ${now.toLocaleString()}`;
+    }
+    updateTimestamp();
+    setInterval(updateTimestamp, 1000);
+
+    // Run quick tests
+    async function runTests() {
+      const tests = [
+        { name: 'Index HTML', url: '/index.html' },
+        { name: 'Health Check', url: '/health.json' },
+        { name: 'Main App', url: '/' },
+      ];
+
+      let results = 'Test Results:\n\n';
+      
+      for (const test of tests) {
+        try {
+          const response = await fetch(test.url);
+          const status = response.ok ? '✅ PASS' : '❌ FAIL';
+          results += `${status} ${test.name} (${response.status})\n`;
+        } catch (error) {
+          results += `❌ FAIL ${test.name} (${error.message})\n`;
+        }
+      }
+
+      alert(results);
+    }
+
+    // Send status to parent (for Figma Make preview)
+    if (window.parent !== window) {
+      window.parent.postMessage({
+        type: 'app-status',
+        status: 'online',
+        timestamp: new Date().toISOString()
+      }, '*');
+    }
+
+    // Auto-ping health endpoint
+    setInterval(async () => {
+      try {
+        await fetch('/health.json');
+        console.log('Health check: OK');
+      } catch (e) {
+        console.error('Health check failed:', e);
+      }
+    }, 10000);
+  </script>
+</body>
+</html>
