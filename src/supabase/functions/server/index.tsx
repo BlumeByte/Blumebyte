@@ -7,7 +7,7 @@ import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
 
 const app = new Hono();
-const PREFIX = "/make-server-a35148f0";
+const PREFIX = "/make-server-a35148f0"; // v2.1 - Payment-first registration flow
 
 app.use("*", logger(console.log));
 app.use(
@@ -26,8 +26,8 @@ app.get(`${PREFIX}/health`, (c) => {
   return c.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    version: '2.0-payment-flow',
-    endpoints: ['company/init-payment', 'company/payment-status/:reference']
+    version: '2.1-payment-flow-UPDATED',
+    endpoints: ['company/init-payment', 'company/payment-status/:reference', 'company/test-payment']
   });
 });
 
@@ -5068,5 +5068,5 @@ Current user question: ${message}`;
   }
 });
 
-// Server started with payment-before-registration flow - v2.0
+// Server started with payment-before-registration flow - v2.1 (UPDATED)
 Deno.serve(app.fetch);
