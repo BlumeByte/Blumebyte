@@ -2124,6 +2124,58 @@ app.post(`${PREFIX}/superadmin/approval/:requestId/:action`, async (c) => {
         
         await kv.set(requestId, { ...request, status: 'approved', approvedBy: superAdmin.id, approvedAt: new Date().toISOString() });
         return c.json({ success: true, message: 'User updated successfully' });
+      } else if (request.type === 'hiring') {
+        // Approve hiring request
+        const application = await kv.get(`job-application:${request.applicationId}`);
+        if (!application) {
+          await kv.set(requestId, { ...request, status: 'rejected', rejectedBy: superAdmin.id, rejectedAt: new Date().toISOString(), reason: 'Application not found' });
+          return c.json({ error: 'Application not found' }, 404);
+        }
+        
+        // Proceed with hiring
+        const empData = await kv.get(`employee:${application.applicantId}`);
+        if (empData) {
+          const jobPosting = application.jobPostingId ? await kv.get(`job-posting:${application.jobPostingId}`) : null;
+          const newPosition = jobPosting?.title || application.jobTitle || empData.position;
+          const newDepartment = jobPosting?.department || application.jobDepartment || empData.department;
+          const newSalary = jobPosting?.salary || application.jobSalaryRange || empData.salary || "";
+          const newCompany = jobPosting?.company || application.jobCompany || empData.company || "";
+          const updatedEmp = { ...empData, position: newPosition, department: newDepartment, salary: newSalary, company: newCompany, updatedAt: new Date().toISOString() };
+          await kv.set(`employee:${application.applicantId}`, updatedEmp);
+          const sb = supabaseAdmin();
+          await sb.auth.admin.updateUserById(application.applicantId, { user_metadata: { name: updatedEmp.name, role: updatedEmp.role, company: newCompany } });
+        }
+        
+        // Update application to hired
+        application.status = "hired";
+        application.approvedBy = superAdmin.id;
+        application.approvedAt = new Date().toISOString();
+        await kv.set(`job-application:${request.applicationId}`, application);
+        
+        // Notify applicant
+        const nid1 = crypto.randomUUID();
+        await kv.set(`notification:${nid1}`, { 
+          id: nid1, userId: application.applicantId, type: "hire-approved", 
+          title: "Congratulations! You've Been Hired!", 
+          message: `Your application for ${application.jobTitle} has been approved. Your profile has been updated.`, 
+          read: false, createdAt: new Date().toISOString() 
+        });
+        
+        // Notify all employees
+        const allEmployees = await kv.getByPrefix("employee:");
+        for (const emp of allEmployees) {
+          if (emp.userId === application.applicantId) continue;
+          const nid = crypto.randomUUID();
+          await kv.set(`notification:${nid}`, { 
+            id: nid, userId: emp.userId, type: "new-hire", 
+            title: "New Hire Announcement", 
+            message: `Welcome ${application.applicantName} to the team as ${application.jobTitle}!`, 
+            read: false, createdAt: new Date().toISOString() 
+          });
+        }
+        
+        await kv.set(requestId, { ...request, status: 'approved', approvedBy: superAdmin.id, approvedAt: new Date().toISOString() });
+        return c.json({ success: true, message: 'Hiring approved successfully' });
       }
     } else if (action === 'reject') {
       const { reason } = await c.req.json().catch(() => ({}));
@@ -3704,6 +3756,101 @@ app.delete(`${PREFIX}/admin/announcements/:id`, async (c) => {
   }
 });
 
+// SuperAdmin approve hiring request
+app.post(`${PREFIX}/superadmin/approve-hiring`, async (c) => {
+  try {
+    await requireSuperAdmin(c);
+    const { applicationId, approve, reason } = await c.req.json();
+    
+    if (!applicationId) {
+      return c.json({ error: "applicationId is required" }, 400);
+    }
+    
+    const application = await kv.get(`job-application:${applicationId}`);
+    if (!application) {
+      return c.json({ error: "Application not found" }, 404);
+    }
+    
+    if (approve) {
+      // Proceed with hiring
+      const empData = await kv.get(`employee:${application.applicantId}`);
+      if (empData) {
+        const jobPosting = application.jobPostingId ? await kv.get(`job-posting:${application.jobPostingId}`) : null;
+        const newPosition = jobPosting?.title || application.jobTitle || empData.position;
+        const newDepartment = jobPosting?.department || application.jobDepartment || empData.department;
+        const newSalary = jobPosting?.salary || application.jobSalaryRange || empData.salary || "";
+        const newCompany = jobPosting?.company || application.jobCompany || empData.company || "";
+        const updatedEmp = { ...empData, position: newPosition, department: newDepartment, salary: newSalary, company: newCompany, updatedAt: new Date().toISOString() };
+        await kv.set(`employee:${application.applicantId}`, updatedEmp);
+        const sb = supabaseAdmin();
+        await sb.auth.admin.updateUserById(application.applicantId, { user_metadata: { name: updatedEmp.name, role: updatedEmp.role, company: newCompany } });
+      }
+      
+      // Update application to hired
+      application.status = "hired";
+      application.approvedBy = "superadmin";
+      application.approvedAt = new Date().toISOString();
+      await kv.set(`job-application:${applicationId}`, application);
+      
+      // Notify applicant
+      const nid1 = crypto.randomUUID();
+      await kv.set(`notification:${nid1}`, { 
+        id: nid1, userId: application.applicantId, type: "hire-approved", 
+        title: "Congratulations! You've Been Hired!", 
+        message: `Your application for ${application.jobTitle} has been approved. Your profile has been updated.`, 
+        read: false, createdAt: new Date().toISOString() 
+      });
+      
+      // Notify all employees
+      const allEmployees = await kv.getByPrefix("employee:");
+      for (const emp of allEmployees) {
+        if (emp.userId === application.applicantId) continue;
+        const nid = crypto.randomUUID();
+        await kv.set(`notification:${nid}`, { 
+          id: nid, userId: emp.userId, type: "new-hire", 
+          title: "New Hire Announcement", 
+          message: `Welcome ${application.applicantName} to the team as ${application.jobTitle}!`, 
+          read: false, createdAt: new Date().toISOString() 
+        });
+      }
+      
+      // Delete approval request
+      if (application.pendingApprovalId) {
+        await kv.del(`approval:${application.pendingApprovalId}`);
+      }
+      
+      return c.json({ success: true, message: "Hiring approved successfully" });
+    } else {
+      // Reject hiring
+      application.status = "pending";
+      application.rejectionReason = reason || "SuperAdmin did not approve hiring";
+      delete application.pendingApprovalId;
+      await kv.set(`job-application:${applicationId}`, application);
+      
+      // Notify requesting admin
+      const nid = crypto.randomUUID();
+      await kv.set(`notification:${nid}`, {
+        id: nid, userId: application.requestedBy, type: "approval-rejected",
+        title: "Hiring Request Rejected",
+        message: `Your request to hire ${application.applicantName} was not approved. ${reason || ""}`,
+        read: false, createdAt: new Date().toISOString(),
+      });
+      
+      // Delete approval request
+      if (application.pendingApprovalId) {
+        await kv.del(`approval:${application.pendingApprovalId}`);
+      }
+      
+      return c.json({ success: true, message: "Hiring request rejected" });
+    }
+  } catch (e: any) {
+    console.log('Approve hiring error:', e);
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // ============ NOTIFICATIONS ============
 app.get(`${PREFIX}/notifications`, async (c) => {
   try {
@@ -3840,9 +3987,47 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
     const existing = await kv.get(`job-application:${id}`);
     if (!existing) return c.json({ error: "Not found" }, 404);
     const updated = { ...existing, ...body, updatedAt: new Date().toISOString() };
-    await kv.set(`job-application:${id}`, updated);
-
+    
+    // IMPORTANT: Hiring requires SuperAdmin final approval
     if (body.status === "hired" && existing.status !== "hired") {
+      // Only SuperAdmin can directly hire - others need approval
+      if (role !== "superadmin") {
+        // Create a pending approval request for SuperAdmin
+        const approvalId = `approval_req:hiring_${crypto.randomUUID()}`;
+        await kv.set(approvalId, {
+          id: approvalId,
+          type: "hiring",
+          applicationId: id,
+          applicantName: existing.applicantName,
+          jobTitle: existing.jobTitle,
+          requestedBy: user.id,
+          requestedByName: user.user_metadata?.name || user.email,
+          status: "pending",
+          createdAt: new Date().toISOString(),
+        });
+        
+        // Notify all SuperAdmins
+        const allEmployees = await kv.getByPrefix("employee:");
+        const superadmins = allEmployees.filter((e: any) => e.role === "superadmin");
+        for (const sa of superadmins) {
+          const nid = crypto.randomUUID();
+          await kv.set(`notification:${nid}`, {
+            id: nid, userId: sa.userId, type: "approval-required",
+            title: "Hiring Approval Required",
+            message: `Admin wants to hire ${existing.applicantName} for ${existing.jobTitle}`,
+            read: false, createdAt: new Date().toISOString(),
+          });
+        }
+        
+        // Update job application to "pending-approval" instead of "hired"
+        updated.status = "pending-approval";
+        updated.pendingApprovalId = approvalId;
+        await kv.set(`job-application:${id}`, updated);
+        
+        return c.json(updated);
+      }
+      
+      // SuperAdmin approval - proceed with hiring
       const empData = await kv.get(`employee:${existing.applicantId}`);
       if (empData) {
         const jobPosting = existing.jobPostingId ? await kv.get(`job-posting:${existing.jobPostingId}`) : null;

@@ -32,7 +32,6 @@
         '@radix-ui/react-scroll-area@1.2.3': '@radix-ui/react-scroll-area',
         '@radix-ui/react-radio-group@1.2.3': '@radix-ui/react-radio-group',
         '@radix-ui/react-progress@1.1.2': '@radix-ui/react-progress',
-        '@radix-ui/react-popover@1.1.6': '@radix-ui/react-popover',
         '@radix-ui/react-navigation-menu@1.2.5': '@radix-ui/react-navigation-menu',
         '@radix-ui/react-menubar@1.1.6': '@radix-ui/react-menubar',
         '@radix-ui/react-label@2.1.2': '@radix-ui/react-label',

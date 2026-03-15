@@ -95,8 +95,9 @@ export function HiringApprovalPanel() {
       shortlisted: 'bg-purple-100 text-purple-800',
       hired: 'bg-green-100 text-green-800',
       rejected: 'bg-red-100 text-red-800',
+      'pending-approval': 'bg-orange-100 text-orange-800',
     };
-    return <Badge className={map[status] || 'bg-gray-100 text-gray-800'}>{status}</Badge>;
+    return <Badge className={map[status] || 'bg-gray-100 text-gray-800'}>{status === 'pending-approval' ? 'Awaiting SuperAdmin' : status}</Badge>;
   };
 
   const counts = {

@@ -33,6 +33,7 @@ import { ReportsPanel } from './ReportsPanel';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { HiringApprovalPanel } from './HiringApprovalPanel';
 import { LeaveApplicationForm } from './LeaveApplicationForm';
+import { AnnouncementsViewer } from './AnnouncementsViewer';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -151,8 +152,12 @@ function TeamTab() {
     <div className="space-y-4">
       {/* Managers cannot add employees - only Admin and SuperAdmin can */}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-        <p className="font-medium">Department Team Members</p>
-        <p className="text-xs text-blue-600 mt-1">You can edit employees in your department. Contact an Admin to add new employees.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium">Department Team Members ({filteredAndSorted.length} employees)</p>
+            <p className="text-xs text-blue-600 mt-1">You can edit employees in your department. Contact an Admin to add new employees.</p>
+          </div>
+        </div>
       </div>
       
       <ListControls
@@ -718,7 +723,7 @@ export function ManagerDashboard() {
           {activeTab === 'advanced-reports' && <AdvancedReportsModule />}
           {activeTab === 'hiring' && <HiringApprovalPanel />}
           {activeTab === 'meetings' && <MeetingsPanel mode="employee" />}
-          {activeTab === 'announcements' && <MessagesPanel />}
+          {activeTab === 'announcements' && <AnnouncementsViewer />}
           {activeTab === 'messages' && <MessagesPanel />}
           {activeTab === 'self-service' && <SharedSelfServiceHub onNavigate={handleNavigation} />}
           {activeTab === 'profile' && <SharedMyProfile />}
