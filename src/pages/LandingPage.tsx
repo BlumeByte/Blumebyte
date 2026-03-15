@@ -263,6 +263,17 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <img src={logoImage} alt="Blumebyte" className="h-8" />
+            <div className="flex gap-6 text-sm text-muted-foreground">
+              <button onClick={() => navigate('/security-policy')} className="hover:text-foreground transition-colors">
+                Security
+              </button>
+              <button onClick={() => navigate('/privacy-policy')} className="hover:text-foreground transition-colors">
+                Privacy
+              </button>
+              <button onClick={() => navigate('/terms-conditions')} className="hover:text-foreground transition-colors">
+                Terms
+              </button>
+            </div>
             <p className="text-sm text-muted-foreground">
               © 2026 Blumebyte. All rights reserved.
             </p>

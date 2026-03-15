@@ -16,6 +16,9 @@ const ManagerDashboard = lazy(() => import('./components/ManagerDashboard').then
 const EmployeeDashboard = lazy(() => import('./components/EmployeeDashboard').then(m => ({ default: m.EmployeeDashboard })));
 const PaymentVerification = lazy(() => import('./components/PaymentVerification').then(m => ({ default: m.PaymentVerification })));
 const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification').then(m => ({ default: m.LicensePaymentVerification })));
+const SecurityPolicy = lazy(() => import('./pages/SecurityPolicy'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsConditions = lazy(() => import('./pages/TermsConditions'));
 import LandingPage from './pages/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -112,6 +115,24 @@ const EmployeePage = () => (
   </ProtectedRoute>
 );
 
+const SecurityPolicyPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <SecurityPolicy />
+  </Suspense>
+);
+
+const PrivacyPolicyPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <PrivacyPolicy />
+  </Suspense>
+);
+
+const TermsConditionsPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <TermsConditions />
+  </Suspense>
+);
+
 const NotFoundPage = () => <Navigate to="/login" replace />;
 
 export const router = createBrowserRouter([
@@ -161,6 +182,18 @@ export const router = createBrowserRouter([
       {
         path: '/employee-portal',
         Component: EmployeePortalPage,
+      },
+      {
+        path: '/security-policy',
+        Component: SecurityPolicyPage,
+      },
+      {
+        path: '/privacy-policy',
+        Component: PrivacyPolicyPage,
+      },
+      {
+        path: '/terms-conditions',
+        Component: TermsConditionsPage,
       },
       {
         path: '*',
