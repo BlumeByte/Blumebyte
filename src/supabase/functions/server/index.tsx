@@ -249,8 +249,8 @@ async function resolveCompanyName(companyId: string): Promise<string> {
 
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
-  // Superadmin sees everything
-  if (role === "superadmin") return items;
+  // CRITICAL FIX: SuperAdmin should see items from their company only, not all companies!
+  // This ensures proper multi-tenant isolation
   
   // Get user's assigned companies
   const assignedCompanies = await resolveCompanyScope(userId);
@@ -258,7 +258,7 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
   // If no company restrictions, return all
   if (!assignedCompanies || assignedCompanies.length === 0) return items;
   
-  // Filter items by company
+  // Filter items by company for ALL roles (including SuperAdmin)
   return items.filter((item: any) => {
     // Check if item has a company assignment
     const itemCompany = item.company || item.companyId || item.companyName;
@@ -271,15 +271,14 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
 
 // --- Filter employees by company scope ---
 async function filterEmployeesByCompany(employees: any[], userId: string, role: string): Promise<any[]> {
-  // Superadmin sees everyone
-  if (role === "superadmin") return employees;
-  
+  // CRITICAL FIX: SuperAdmin should see employees from their company only, not all companies!
+  // This ensures proper multi-tenant isolation
   const scope = await resolveCompanyScope(userId);
   
-  // If no scope, return all employees (except filter by role restrictions)
+  // If no scope, return all employees (legacy behavior for users without company assignments)
   if (!scope || scope.length === 0) return employees;
   
-  // Filter by company
+  // Filter by company for ALL roles (including SuperAdmin)
   return employees.filter((e: any) => {
     const empCompany = e.company || e.companyId;
     if (!empCompany) return false; // Exclude employees without company
@@ -629,6 +628,43 @@ app.post(`${PREFIX}/company/register`, async (c) => {
     });
 
     console.log('SuperAdmin employee record created');
+
+    // CRITICAL FIX: Create default company-scoped settings for new tenant
+    await kv.set(`company-settings:${companyId}`, {
+      companyId,
+      companyName: companyName,
+      description: '',
+      primaryColor: '#10b981', // Default green
+      logoUrl: '', // Empty until uploaded
+      logoPath: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Create default auto-clock settings for new tenant
+    await kv.set(`auto-clock-settings:${companyId}`, {
+      companyId,
+      enabled: false,
+      clockInTime: '08:00',
+      clockOutTime: '17:00',
+      mode: 'all',
+      specificUsers: [],
+      inactivityTimeout: 30,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Create default manual-clock settings for new tenant
+    await kv.set(`manual-clock-settings:${companyId}`, {
+      companyId,
+      enabled: true,
+      mode: 'all',
+      specificUsers: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    console.log('Default company settings created for tenant:', companyId);
 
     // Mark registration as verified if payment was provided
     if (paymentReference) {
@@ -1219,9 +1255,11 @@ app.get(`${PREFIX}/users/for-messages`, async (c) => {
 // --- Open job postings (any authenticated user) ---
 app.get(`${PREFIX}/open-job-postings`, async (c) => {
   try {
-    await requireAuth(c);
+    const { user, role } = await requireAuth(c);
     const postings = await kv.getByPrefix("job-posting:");
-    const open = postings.filter((j: any) => j.status === "open" || j.status === "active");
+    // CRITICAL FIX: Filter job postings by company for multi-tenant isolation
+    const filtered = await applyCompanyFilter(postings, user.id, role);
+    const open = filtered.filter((j: any) => j.status === "open" || j.status === "active");
     return c.json(open);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -1527,8 +1565,13 @@ app.get(`${PREFIX}/public/company-branding`, async (c) => {
 
 app.get(`${PREFIX}/company-settings`, async (c) => {
   try {
-    await requireAuth(c);
-    const settings = await kv.get("company-settings");
+    const { user, role } = await requireAuth(c);
+    // CRITICAL FIX: Get company-scoped settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({});
+    
+    const settings = await kv.get(`company-settings:${companyId}`);
     if (!settings) return c.json({});
     // Refresh logo signed URL if path exists
     if (settings.logoPath) {
@@ -1547,13 +1590,19 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
 
 app.put(`${PREFIX}/admin/company-settings`, async (c) => {
   try {
-    await requireAdminOrAbove(c);
+    const { user, role } = await requireAdminOrAbove(c);
     const body = await c.req.json();
-    const existing = await kv.get("company-settings") || {};
+    
+    // CRITICAL FIX: Update company-scoped settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ error: "Company not found" }, 404);
+    
+    const existing = await kv.get(`company-settings:${companyId}`) || {};
     // Strip logoUrl/logoPath from body — only the upload/remove routes should change these
     const { logoUrl: _lu, logoPath: _lp, ...safeBody } = body;
-    const updated = { ...existing, ...safeBody, updatedAt: new Date().toISOString() };
-    await kv.set("company-settings", updated);
+    const updated = { ...existing, ...safeBody, companyId, updatedAt: new Date().toISOString() };
+    await kv.set(`company-settings:${companyId}`, updated);
     // Return with fresh signed URL if logo exists
     if (updated.logoPath) {
       try {
@@ -1613,12 +1662,13 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       return c.json({ error: "Email, name and role are required" }, 400);
     }
     
-    // Get company ID from super admin's profile
-    const adminProfile = await kv.get(`user_profile:${authUser.id}`);
-    const userCompanyId = adminProfile?.companyId;
+    // CRITICAL FIX: Get company ID from super admin's employee record
+    const adminProfile = await kv.get(`employee:${authUser.id}`);
+    const userCompanyId = adminProfile?.companyId || adminProfile?.company;
     
     if (!userCompanyId) {
-      return c.json({ error: "User not associated with a company" }, 400);
+      console.error('SuperAdmin has no companyId:', authUser.id, adminProfile);
+      return c.json({ error: "User not associated with a company. Please contact support." }, 400);
     }
     
     // Check license availability for this company
@@ -1672,6 +1722,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       status: "active",
       companyId: userCompanyId, // Use the super admin's company
       company: company.name,
+      assignedCompanies: [userCompanyId], // CRITICAL FIX: Set assignedCompanies for multi-tenant isolation
       department: department || (departments && departments[0]) || "",
       departments: departments || (department ? [department] : []),
       position: position || "",
@@ -1758,7 +1809,16 @@ app.get(`${PREFIX}/users`, async (c) => {
     const allEmployees = await kv.getByPrefix("employee:");
     
     let filtered = allEmployees;
-    if (role === "admin") {
+    
+    // CRITICAL FIX: SuperAdmin should only see employees from their company
+    if (role === "superadmin") {
+      const scope = await resolveCompanyScope(user.id);
+      if (scope && scope.length > 0) {
+        filtered = allEmployees.filter((e: any) => {
+          return scope.includes(e.companyId) || scope.includes(e.company);
+        });
+      }
+    } else if (role === "admin") {
       const scope = await resolveCompanyScope(user.id);
       filtered = allEmployees.filter((e: any) => {
         if (e.role === "superadmin") return false;
@@ -2140,8 +2200,19 @@ app.post(`${PREFIX}/admin/request-user-update`, async (c) => {
 // Get all pending approvals (SuperAdmin only)
 app.get(`${PREFIX}/superadmin/pending-approvals`, async (c) => {
   try {
-    await requireSuperAdmin(c);
-    const allApprovals = await kv.getByPrefix('approval_req:');
+    const { user } = await requireSuperAdmin(c);
+    let allApprovals = await kv.getByPrefix('approval_req:');
+    
+    // CRITICAL FIX: Filter approvals by company for multi-tenant isolation
+    const scope = await resolveCompanyScope(user.id);
+    if (scope?.length) {
+      // Filter approvals to only show those from the SuperAdmin's company
+      allApprovals = allApprovals.filter((a: any) => {
+        // Check if the approval request has a companyId or relates to a company employee
+        return scope.includes(a.companyId) || scope.includes(a.company);
+      });
+    }
+    
     const pending = allApprovals.filter((a: any) => a.status === 'pending');
     return c.json(pending.sort((a: any, b: any) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -2464,8 +2535,24 @@ app.post(`${PREFIX}/deletion-requests`, async (c) => {
 app.get(`${PREFIX}/deletion-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
-    const all = await kv.getByPrefix("deletion-request:");
-    if (role === "superadmin") return c.json(all.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    let all = await kv.getByPrefix("deletion-request:");
+    
+    // CRITICAL FIX: Filter deletion requests by company for multi-tenant isolation
+    if (role === "superadmin" || role === "admin") {
+      // SuperAdmin/Admin see deletion requests for employees in their company only
+      const scope = await resolveCompanyScope(user.id);
+      if (scope?.length) {
+        const employees = await kv.getByPrefix("employee:");
+        const companyEmployeeIds = new Set(
+          employees
+            .filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company))
+            .map((e: any) => e.id || e.userId)
+        );
+        all = all.filter((r: any) => companyEmployeeIds.has(r.targetUserId));
+      }
+      return c.json(all.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    }
+    
     return c.json(all.filter((r: any) => r.requestedBy === user.id).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -2900,8 +2987,14 @@ makeCrud("admin/training-program", "training:", requireAdminOrAbove);
 // ============ COMPANY LOGO UPLOAD ============
 app.post(`${PREFIX}/upload/company-logo`, async (c) => {
   try {
-    await requireAdminOrAbove(c);
+    const { user, role } = await requireAdminOrAbove(c);
     await ensureBucket();
+    
+    // CRITICAL FIX: Get company scope for logo upload
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ error: "Company not found" }, 404);
+    
     const formData = await c.req.formData();
     const file = formData.get('file');
     if (!file || typeof file === 'string') return c.json({ error: "No file provided" }, 400);
@@ -2915,7 +3008,7 @@ app.post(`${PREFIX}/upload/company-logo`, async (c) => {
     if (!['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
       return c.json({ error: "Only image files are allowed for company logo" }, 400);
     }
-    const storagePath = `company/logo.${ext}`;
+    const storagePath = `company/${companyId}/logo.${ext}`;
     const sb = supabaseAdmin();
     const uint8 = new Uint8Array(arrayBuf);
     await sb.storage.from(BUCKET_NAME).upload(storagePath, uint8, {
@@ -2924,8 +3017,8 @@ app.post(`${PREFIX}/upload/company-logo`, async (c) => {
     });
     const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(storagePath, 60 * 60 * 24 * 365);
     const logoUrl = urlData?.signedUrl || '';
-    const existing = await kv.get("company-settings") || {};
-    await kv.set("company-settings", { ...existing, logoUrl, logoPath: storagePath, updatedAt: new Date().toISOString() });
+    const existing = await kv.get(`company-settings:${companyId}`) || {};
+    await kv.set(`company-settings:${companyId}`, { ...existing, companyId, logoUrl, logoPath: storagePath, updatedAt: new Date().toISOString() });
     return c.json({ logoUrl, success: true }, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -2938,14 +3031,20 @@ app.post(`${PREFIX}/upload/company-logo`, async (c) => {
 // ============ REMOVE COMPANY LOGO ============
 app.delete(`${PREFIX}/admin/remove-company-logo`, async (c) => {
   try {
-    await requireAdminOrAbove(c);
+    const { user, role } = await requireAdminOrAbove(c);
+    
+    // CRITICAL FIX: Get company scope for logo removal
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ error: "Company not found" }, 404);
+    
     const sb = supabaseAdmin();
-    const existing = await kv.get("company-settings") || {};
+    const existing = await kv.get(`company-settings:${companyId}`) || {};
     if (existing.logoPath) {
       await sb.storage.from(BUCKET_NAME).remove([existing.logoPath]);
     }
-    const updated = { ...existing, logoUrl: '', logoPath: '', updatedAt: new Date().toISOString() };
-    await kv.set("company-settings", updated);
+    const updated = { ...existing, companyId, logoUrl: '', logoPath: '', updatedAt: new Date().toISOString() };
+    await kv.set(`company-settings:${companyId}`, updated);
     return c.json({ success: true });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3291,8 +3390,13 @@ app.delete(`${PREFIX}/training-programs/:id`, async (c) => {
 // ============ AUTO-CLOCK SETTINGS ============
 app.get(`${PREFIX}/auto-clock-settings`, async (c) => {
   try {
-    await requireAuth(c);
-    const settings = await kv.get("auto-clock-settings");
+    const { user, role } = await requireAuth(c);
+    // CRITICAL FIX: Get company-scoped auto-clock settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ enabled: false, clockInTime: "08:00", clockOutTime: "17:00", mode: "all", specificUsers: [], inactivityTimeout: 30 });
+    
+    const settings = await kv.get(`auto-clock-settings:${companyId}`);
     return c.json(settings || { enabled: false, clockInTime: "08:00", clockOutTime: "17:00", mode: "all", specificUsers: [], inactivityTimeout: 30 });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3302,10 +3406,16 @@ app.get(`${PREFIX}/auto-clock-settings`, async (c) => {
 
 app.put(`${PREFIX}/auto-clock-settings`, async (c) => {
   try {
-    await requireAdminOrAbove(c);
+    const { user, role } = await requireAdminOrAbove(c);
     const body = await c.req.json();
-    const settings = { ...body, updatedAt: new Date().toISOString() };
-    await kv.set("auto-clock-settings", settings);
+    
+    // CRITICAL FIX: Update company-scoped auto-clock settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ error: "Company not found" }, 404);
+    
+    const settings = { ...body, companyId, updatedAt: new Date().toISOString() };
+    await kv.set(`auto-clock-settings:${companyId}`, settings);
     return c.json(settings);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3317,8 +3427,13 @@ app.put(`${PREFIX}/auto-clock-settings`, async (c) => {
 // ============ MANUAL CLOCK VISIBILITY SETTINGS ============
 app.get(`${PREFIX}/manual-clock-settings`, async (c) => {
   try {
-    await requireAuth(c);
-    const settings = await kv.get("manual-clock-settings");
+    const { user, role } = await requireAuth(c);
+    // CRITICAL FIX: Get company-scoped manual-clock settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ enabled: true, mode: "all", specificUsers: [] });
+    
+    const settings = await kv.get(`manual-clock-settings:${companyId}`);
     return c.json(settings || { enabled: true, mode: "all", specificUsers: [] });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3328,10 +3443,16 @@ app.get(`${PREFIX}/manual-clock-settings`, async (c) => {
 
 app.put(`${PREFIX}/manual-clock-settings`, async (c) => {
   try {
-    await requireAdminOrAbove(c);
+    const { user, role } = await requireAdminOrAbove(c);
     const body = await c.req.json();
-    const settings = { ...body, updatedAt: new Date().toISOString() };
-    await kv.set("manual-clock-settings", settings);
+    
+    // CRITICAL FIX: Update company-scoped manual-clock settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ error: "Company not found" }, 404);
+    
+    const settings = { ...body, companyId, updatedAt: new Date().toISOString() };
+    await kv.set(`manual-clock-settings:${companyId}`, settings);
     return c.json(settings);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3343,8 +3464,11 @@ app.put(`${PREFIX}/manual-clock-settings`, async (c) => {
 // Batch auto clock-out: checks all open attendance records and auto-clocks out if past configured time
 app.post(`${PREFIX}/attendance/batch-auto-clockout`, async (c) => {
   try {
-    await requireAuth(c);
-    const autoSettings = await kv.get("auto-clock-settings");
+    const { user, role } = await requireAuth(c);
+    // CRITICAL FIX: Get company-scoped auto-clock settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    const autoSettings = companyId ? await kv.get(`auto-clock-settings:${companyId}`) : null;
     if (!autoSettings?.enabled) return c.json({ processed: 0, message: "Auto-clock disabled" });
     const clockOutTime = autoSettings.clockOutTime || "17:00";
     const now = new Date();
@@ -3496,7 +3620,10 @@ app.get(`${PREFIX}/attendance/my-today`, async (c) => {
     }
     // Auto clock-out check
     if (record?.clockIn && !record?.clockOut) {
-      const autoSettings = await kv.get("auto-clock-settings");
+      // CRITICAL FIX: Get company-scoped auto-clock settings
+      const scope = await resolveCompanyScope(user.id);
+      const companyId = scope?.[0];
+      const autoSettings = companyId ? await kv.get(`auto-clock-settings:${companyId}`) : null;
       if (autoSettings?.enabled) {
         const clockOutTime = autoSettings.clockOutTime || "17:00";
         const [h, m] = clockOutTime.split(":").map(Number);
@@ -4205,15 +4332,26 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
 // ============ BACKUP & RESTORE (Superadmin only) ============
 app.get(`${PREFIX}/backup`, async (c) => {
   try {
-    await requireSuperAdmin(c);
+    const { user, role } = await requireSuperAdmin(c);
     const prefixes = ["employee:", "company:", "branch:", "department:", "asset:", "asset-category:", "paygrade:", "financial-year:", "leave-type:", "leave:", "attendance:", "announcement:", "message:", "notification:", "job-posting:", "job-application:", "perf-review:", "goal:", "feedback:", "meeting:", "workflow:", "disciplinary:", "compliance:", "training:", "task:", "onboard-checklist:", "payroll-run:", "tax-bracket:", "benefit-plan:", "admin-dept:", "deletion-request:", "profile-change:"];
     const backup: Record<string, any[]> = {};
     for (const p of prefixes) {
       const items = await kv.getByPrefix(p);
       if (items.length > 0) backup[p] = items;
     }
-    const settings = await kv.get("company-settings");
-    if (settings) backup["_singleton:company-settings"] = [settings];
+    
+    // CRITICAL FIX: Backup company-scoped settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (companyId) {
+      const settings = await kv.get(`company-settings:${companyId}`);
+      if (settings) backup["_singleton:company-settings"] = [settings];
+      const autoClockSettings = await kv.get(`auto-clock-settings:${companyId}`);
+      if (autoClockSettings) backup["_singleton:auto-clock-settings"] = [autoClockSettings];
+      const manualClockSettings = await kv.get(`manual-clock-settings:${companyId}`);
+      if (manualClockSettings) backup["_singleton:manual-clock-settings"] = [manualClockSettings];
+    }
+    
     return c.json({ version: "1.0", timestamp: new Date().toISOString(), data: backup });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -4224,14 +4362,38 @@ app.get(`${PREFIX}/backup`, async (c) => {
 
 app.post(`${PREFIX}/backup/restore`, async (c) => {
   try {
-    await requireSuperAdmin(c);
+    const { user, role } = await requireSuperAdmin(c);
     const { data } = await c.req.json();
     if (!data || typeof data !== "object") return c.json({ error: "Invalid backup data" }, 400);
+    
+    // CRITICAL FIX: Restore company-scoped settings
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    
     let restored = 0;
     for (const [prefix, items] of Object.entries(data)) {
       if (prefix === "_singleton:company-settings") {
         const arr = items as any[];
-        if (arr[0]) { await kv.set("company-settings", arr[0]); restored++; }
+        if (arr[0] && companyId) { 
+          await kv.set(`company-settings:${companyId}`, { ...arr[0], companyId }); 
+          restored++; 
+        }
+        continue;
+      }
+      if (prefix === "_singleton:auto-clock-settings") {
+        const arr = items as any[];
+        if (arr[0] && companyId) { 
+          await kv.set(`auto-clock-settings:${companyId}`, { ...arr[0], companyId }); 
+          restored++; 
+        }
+        continue;
+      }
+      if (prefix === "_singleton:manual-clock-settings") {
+        const arr = items as any[];
+        if (arr[0] && companyId) { 
+          await kv.set(`manual-clock-settings:${companyId}`, { ...arr[0], companyId }); 
+          restored++; 
+        }
         continue;
       }
       for (const item of items as any[]) {
@@ -4267,11 +4429,8 @@ app.get(`${PREFIX}/audit-logs`, async (c) => {
     const { user, role } = await requireAdminOrAbove(c);
     const logs = await kv.getByPrefix("audit:");
     
-    // Superadmin sees all logs, others see only their company's logs
-    let filteredLogs = logs;
-    if (role !== "superadmin") {
-      filteredLogs = await applyCompanyFilter(logs, user.id, role);
-    }
+    // CRITICAL FIX: Filter audit logs by company for ALL roles including SuperAdmin
+    let filteredLogs = await applyCompanyFilter(logs, user.id, role);
     
     // Sort by timestamp descending (newest first)
     filteredLogs.sort((a: any, b: any) => {
@@ -4813,10 +4972,8 @@ app.get(`${PREFIX}/employees`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     let employees = await kv.getByPrefix('employee:');
-    // Filter by company scope for admins and managers
-    if (role !== 'superadmin') {
-      employees = await filterEmployeesByCompany(employees, user.id, role);
-    }
+    // CRITICAL FIX: Filter by company scope for ALL roles including SuperAdmin
+    employees = await filterEmployeesByCompany(employees, user.id, role);
     return c.json(employees || []);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -4829,12 +4986,11 @@ app.get(`${PREFIX}/companies`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     let companies = await kv.getByPrefix('company:');
-    // SuperAdmin sees all, others see only their assigned companies
-    if (role !== 'superadmin') {
-      const scope = await resolveCompanyScope(user.id);
-      if (scope?.length) {
-        companies = companies.filter((c: any) => scope.includes(c.id) || scope.includes(c.name));
-      }
+    // CRITICAL FIX: SuperAdmin should only see their own company for multi-tenant isolation
+    // All users (including SuperAdmin) see only their assigned companies
+    const scope = await resolveCompanyScope(user.id);
+    if (scope?.length) {
+      companies = companies.filter((c: any) => scope.includes(c.id) || scope.includes(c.name));
     }
     return c.json(companies || []);
   } catch (e: any) {
@@ -4848,12 +5004,10 @@ app.get(`${PREFIX}/departments`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     let departments = await kv.getByPrefix('department:');
-    // Filter by company scope if needed
-    if (role !== 'superadmin') {
-      const scope = await resolveCompanyScope(user.id);
-      if (scope?.length) {
-        departments = departments.filter((d: any) => !d.companyId || scope.includes(d.companyId));
-      }
+    // CRITICAL FIX: Filter by company scope for ALL roles including SuperAdmin
+    const scope = await resolveCompanyScope(user.id);
+    if (scope?.length) {
+      departments = departments.filter((d: any) => !d.companyId || scope.includes(d.companyId));
     }
     return c.json(departments || []);
   } catch (e: any) {
@@ -4868,13 +5022,11 @@ app.get(`${PREFIX}/attendance-records`, async (c) => {
     const { user, role } = await requireAuth(c);
     let attendance = await kv.getByPrefix('attendance:');
     
-    // Filter by employee company scope
-    if (role !== 'superadmin') {
-      const employees = await kv.getByPrefix('employee:');
-      const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
-      const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.id || e.userId));
-      attendance = attendance.filter((a: any) => allowedUserIds.has(a.userId));
-    }
+    // CRITICAL FIX: Filter by employee company scope for ALL roles including SuperAdmin
+    const employees = await kv.getByPrefix('employee:');
+    const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
+    const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.id || e.userId));
+    attendance = attendance.filter((a: any) => allowedUserIds.has(a.userId));
     
     return c.json(attendance || []);
   } catch (e: any) {
@@ -4889,12 +5041,10 @@ app.get(`${PREFIX}/payroll-runs`, async (c) => {
     const { user, role } = await requireManagerOrAbove(c);
     let payrollRuns = await kv.getByPrefix('payroll-run:');
     
-    // Filter by company scope if needed
-    if (role !== 'superadmin') {
-      const scope = await resolveCompanyScope(user.id);
-      if (scope?.length) {
-        payrollRuns = payrollRuns.filter((p: any) => !p.companyId || scope.includes(p.companyId));
-      }
+    // CRITICAL FIX: Filter by company scope for ALL roles including SuperAdmin
+    const scope = await resolveCompanyScope(user.id);
+    if (scope?.length) {
+      payrollRuns = payrollRuns.filter((p: any) => !p.companyId || scope.includes(p.companyId));
     }
     
     return c.json(payrollRuns || []);
@@ -4911,13 +5061,11 @@ app.get(`${PREFIX}/performance-reviews`, async (c) => {
     const { user, role } = await requireManagerOrAbove(c);
     let reviews = await kv.getByPrefix('perf-review:');
     
-    // Filter by employee company scope
-    if (role !== 'superadmin') {
-      const employees = await kv.getByPrefix('employee:');
-      const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
-      const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.id || e.userId));
-      reviews = reviews.filter((r: any) => allowedUserIds.has(r.employeeId));
-    }
+    // CRITICAL FIX: Filter by employee company scope for ALL roles including SuperAdmin
+    const employees = await kv.getByPrefix('employee:');
+    const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
+    const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.id || e.userId));
+    reviews = reviews.filter((r: any) => allowedUserIds.has(r.employeeId));
     
     return c.json(reviews || []);
   } catch (e: any) {
@@ -4933,10 +5081,10 @@ app.get(`${PREFIX}/training-enrollments`, async (c) => {
     const { user, role } = await requireAuth(c);
     let enrollments = await kv.getByPrefix('training-enrollment:');
     
-    // Filter by employee company scope
+    // CRITICAL FIX: Filter by employee company scope for ALL roles including SuperAdmin
     if (role === 'employee') {
       enrollments = enrollments.filter((e: any) => e.userId === user.id);
-    } else if (role !== 'superadmin') {
+    } else {
       const employees = await kv.getByPrefix('employee:');
       const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
       const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.id || e.userId));
@@ -4956,10 +5104,10 @@ app.get(`${PREFIX}/assets`, async (c) => {
     const { user, role } = await requireAuth(c);
     let assets = await kv.getByPrefix('asset:');
     
-    // Filter by company scope and assignment
+    // CRITICAL FIX: Filter by company scope and assignment for ALL roles including SuperAdmin
     if (role === 'employee') {
       assets = assets.filter((a: any) => a.assignedTo === user.id);
-    } else if (role !== 'superadmin') {
+    } else {
       const scope = await resolveCompanyScope(user.id);
       if (scope?.length) {
         assets = assets.filter((a: any) => !a.companyId || scope.includes(a.companyId));
@@ -6203,7 +6351,10 @@ app.get(`${PREFIX}/attendance/today`, async (c) => {
       await kv.set(key, record);
     }
     if (record?.clockIn && !record?.clockOut) {
-      const autoSettings = await kv.get("auto-clock-settings");
+      // CRITICAL FIX: Get company-scoped auto-clock settings
+      const scope = await resolveCompanyScope(user.id);
+      const companyId = scope?.[0];
+      const autoSettings = companyId ? await kv.get(`auto-clock-settings:${companyId}`) : null;
       if (autoSettings?.enabled) {
         const clockOutTime = autoSettings.clockOutTime || "17:00";
         const [h, m] = clockOutTime.split(":").map(Number);
