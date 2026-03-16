@@ -1,0 +1,12 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Blumebyte Logo - Stylized B -->
+  <!-- Left rounded section -->
+  <path d="M8 12C8 8.68629 10.6863 6 14 6H28C28 6 28 32 14 32C10.6863 32 8 29.3137 8 26V12Z" fill="#000000"/>
+  
+  <!-- Right B section -->
+  <path d="M32 6H46C51.5228 6 56 10.4772 56 16V16C56 21.5228 51.5228 26 46 26H32V6Z" fill="#000000"/>
+  <path d="M32 32H50C55.5228 32 60 36.4772 60 42V46C60 51.5228 55.5228 56 50 56H32V32Z" fill="#000000"/>
+  
+  <!-- Decorative leaf accent -->
+  <path d="M18 16C18 16 20 12 24 12C22 14 22 18 18 20V16Z" fill="#FFFFFF"/>
+</svg>

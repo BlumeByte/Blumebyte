@@ -5,6 +5,12 @@ import { AuthProvider } from './lib/auth-context';
 import { BrandingProvider } from './lib/branding-context';
 import { EmployeeChat } from './components/EmployeeChat';
 import { Toaster } from './components/ui/sonner';
+import { ProtectedRoute } from './components/ProtectedRoute';
+
+// Import static pages directly (not lazy loaded)
+import SecurityPolicy from './pages/SecurityPolicy';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsConditions from './pages/TermsConditions';
 
 // Lazy load heavy components for better initial load performance
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -19,10 +25,6 @@ const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
 const EmployeeDashboard = lazy(() => import('./components/EmployeeDashboard'));
 const PaymentVerification = lazy(() => import('./components/PaymentVerification'));
 const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification'));
-const SecurityPolicy = lazy(() => import('./pages/SecurityPolicy'));
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
-const TermsConditions = lazy(() => import('./pages/TermsConditions'));
-import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -134,23 +136,11 @@ const EmployeePage = () => (
   </ProtectedRoute>
 );
 
-const SecurityPolicyPage = () => (
-  <Suspense fallback={<LoadingFallback />}>
-    <SecurityPolicy />
-  </Suspense>
-);
+const SecurityPolicyPage = () => <SecurityPolicy />;
 
-const PrivacyPolicyPage = () => (
-  <Suspense fallback={<LoadingFallback />}>
-    <PrivacyPolicy />
-  </Suspense>
-);
+const PrivacyPolicyPage = () => <PrivacyPolicy />;
 
-const TermsConditionsPage = () => (
-  <Suspense fallback={<LoadingFallback />}>
-    <TermsConditions />
-  </Suspense>
-);
+const TermsConditionsPage = () => <TermsConditions />;
 
 const NotFoundPage = () => <Navigate to="/login" replace />;
 
