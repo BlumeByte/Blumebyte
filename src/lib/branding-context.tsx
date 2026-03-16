@@ -11,9 +11,9 @@ export interface CompanyBranding {
 }
 
 const DEFAULT_BRANDING: CompanyBranding = {
-  companyName: 'SAS Finance Group',
+  companyName: 'Blumebyte',
   description: 'Human Resource Information System',
-  primaryColor: '#1d4ed8',
+  primaryColor: '#10b981',
   logoUrl: '',
 };
 
@@ -32,8 +32,16 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 
   const fetchBranding = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE}/public/company-branding`, {
-        headers: { Authorization: `Bearer ${publicAnonKey}` },
+      // CRITICAL FIX: Use authenticated endpoint to get company-scoped settings
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        // If not logged in, use default branding
+        setBranding(DEFAULT_BRANDING);
+        return;
+      }
+
+      const res = await fetch(`${BASE}/company-settings`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -43,10 +51,14 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
           primaryColor: data.primaryColor || DEFAULT_BRANDING.primaryColor,
           logoUrl: data.logoUrl || '',
         });
+      } else {
+        // On error, use default branding
+        setBranding(DEFAULT_BRANDING);
       }
     } catch (e) {
       console.log('Branding fetch error:', e);
       // On error, keep using default branding - don't block the app
+      setBranding(DEFAULT_BRANDING);
     }
   }, []);
 

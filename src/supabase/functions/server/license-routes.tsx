@@ -142,10 +142,11 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         return c.json({ error: 'Only superadmin can view license information' }, 403);
       }
       
-      // Get subscription
-      const subscription = await kv.get(`subscription:${user.id}`);
+      // CRITICAL FIX: Get company ID from user's employee record
+      const employeeRecord = await kv.get(`employee:${user.id}`);
+      const companyId = employeeRecord?.companyId || employeeRecord?.company;
       
-      if (!subscription) {
+      if (!companyId) {
         return c.json({
           purchasedLicenses: 0,
           usedLicenses: 0,
@@ -155,25 +156,34 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         });
       }
       
-      // Count used licenses
+      // Get subscription AND company record (licenses can be in either)
+      const subscription = await kv.get(`subscription:${user.id}`);
+      const company = await kv.get(`company:${companyId}`);
+      
+      // Count used licenses (filtered by company)
       const allUsers = await kv.getByPrefix('employee:');
-      const usedLicenses = allUsers.length;
-      const purchasedLicenses = subscription.purchasedLicenses || 0;
+      const companyUsers = allUsers.filter((u: any) => u.companyId === companyId || u.company === companyId);
+      const usedLicenses = companyUsers.length;
+      
+      // Get purchased licenses from subscription OR company record
+      const purchasedLicenses = subscription?.purchasedLicenses || company?.licenses || 0;
       const availableLicenses = Math.max(0, purchasedLicenses - usedLicenses);
+      const status = subscription?.status || company?.subscriptionStatus || 'none';
+      const plan = subscription?.plan || company?.subscriptionPlan || 'none';
       
       return c.json({
         purchasedLicenses,
         usedLicenses,
         availableLicenses,
-        plan: subscription.plan,
-        endDate: subscription.endDate,
-        status: subscription.status,
-        cardSaved: !!subscription.cardAuthorization,
-        cardLast4: subscription.cardAuthorization?.last4,
-        cardExpiry: subscription.cardAuthorization 
+        plan,
+        endDate: subscription?.endDate || null,
+        status,
+        cardSaved: !!subscription?.cardAuthorization,
+        cardLast4: subscription?.cardAuthorization?.last4,
+        cardExpiry: subscription?.cardAuthorization 
           ? `${subscription.cardAuthorization.expMonth}/${subscription.cardAuthorization.expYear}`
           : null,
-        cardBrand: subscription.cardAuthorization?.brand,
+        cardBrand: subscription?.cardAuthorization?.brand,
       });
     } catch (e: any) {
       console.error('Error fetching license info:', e);

@@ -1542,20 +1542,13 @@ app.get(`${PREFIX}/debug/my-scope`, async (c) => {
 // Public endpoint for branding (no auth required - login page needs this)
 app.get(`${PREFIX}/public/company-branding`, async (c) => {
   try {
-    const settings = await kv.get("company-settings");
-    if (!settings) return c.json({});
-    if (settings.logoPath) {
-      try {
-        const sb = supabaseAdmin();
-        const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(settings.logoPath, 60 * 60 * 24 * 7);
-        if (urlData?.signedUrl) settings.logoUrl = urlData.signedUrl;
-      } catch (e) { console.log("Public logo URL refresh error:", e); }
-    }
+    // CRITICAL FIX: Return default Blumebyte branding for public (login page)
+    // Cannot determine which company for unauthenticated users in multi-tenant system
     return c.json({
-      companyName: settings.companyName || '',
-      description: settings.description || '',
-      primaryColor: settings.primaryColor || '',
-      logoUrl: settings.logoUrl || '',
+      companyName: 'Blumebyte',
+      description: 'Human Resource Information System',
+      primaryColor: '#10b981',
+      logoUrl: '',
     });
   } catch (e: any) {
     console.log("Public branding fetch error:", e.message);
@@ -1622,8 +1615,13 @@ app.put(`${PREFIX}/admin/company-settings`, async (c) => {
 // ============ REFERENCE DATA (aggregated for dashboards) ============
 app.get(`${PREFIX}/reference-data`, async (c) => {
   try {
-    await requireAuth(c);
-    const [companies, departments, branches, assets, assetCategories, paygrades, leaveTypes, financialYears] = await Promise.all([
+    const { user, role } = await requireAuth(c);
+    
+    // CRITICAL FIX: Filter all reference data by company scope
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    
+    const [allCompanies, allDepartments, allBranches, allAssets, allAssetCategories, allPaygrades, allLeaveTypes, allFinancialYears] = await Promise.all([
       kv.getByPrefix("company:"),
       kv.getByPrefix("department:"),
       kv.getByPrefix("branch:"),
@@ -1633,6 +1631,17 @@ app.get(`${PREFIX}/reference-data`, async (c) => {
       kv.getByPrefix("leave-type:"),
       kv.getByPrefix("financial-year:"),
     ]);
+    
+    // Filter by company scope
+    const companies = scope?.length ? allCompanies.filter((c: any) => scope.includes(c.id)) : allCompanies;
+    const departments = companyId ? allDepartments.filter((d: any) => d.companyId === companyId || d.company === companyId) : allDepartments;
+    const branches = companyId ? allBranches.filter((b: any) => b.companyId === companyId || b.company === companyId) : allBranches;
+    const assets = companyId ? allAssets.filter((a: any) => a.companyId === companyId || a.company === companyId) : allAssets;
+    const assetCategories = companyId ? allAssetCategories.filter((ac: any) => ac.companyId === companyId || ac.company === companyId) : allAssetCategories;
+    const paygrades = companyId ? allPaygrades.filter((pg: any) => pg.companyId === companyId || pg.company === companyId) : allPaygrades;
+    const leaveTypes = companyId ? allLeaveTypes.filter((lt: any) => lt.companyId === companyId || lt.company === companyId) : allLeaveTypes;
+    const financialYears = companyId ? allFinancialYears.filter((fy: any) => fy.companyId === companyId || fy.company === companyId) : allFinancialYears;
+    
     return c.json({
       companies: companies || [],
       departments: departments || [],
