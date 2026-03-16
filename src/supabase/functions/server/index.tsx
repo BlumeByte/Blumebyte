@@ -508,22 +508,44 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       }
 
       try {
-        const verifyResponse = await fetch(
-          `https://api.paystack.co/transaction/verify/${paymentReference}`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${paystackSecretKey}`,
-              'Content-Type': 'application/json',
-            },
+        // Retry payment verification up to 3 times with delays
+        let verifyData = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts && !verifyData) {
+          attempts++;
+          console.log(`Payment verification attempt ${attempts}/${maxAttempts}...`);
+          
+          const verifyResponse = await fetch(
+            `https://api.paystack.co/transaction/verify/${paymentReference}`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${paystackSecretKey}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          const data = await verifyResponse.json();
+          console.log(`Attempt ${attempts} - Payment verification response:`, JSON.stringify(data));
+
+          if (data.status && data.data?.status === 'success') {
+            verifyData = data;
+            break;
+          } else if (data.data?.status === 'failed') {
+            return c.json({ error: 'Payment verification failed. Transaction was not successful.' }, 400);
           }
-        );
+          
+          // Wait before retry (1 second, then 2 seconds)
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+          }
+        }
 
-        const verifyData = await verifyResponse.json();
-        console.log('Payment verification response:', verifyData);
-
-        if (!verifyData.status || verifyData.data.status !== 'success') {
-          return c.json({ error: 'Payment verification failed. Please complete payment first.' }, 400);
+        if (!verifyData || verifyData.data.status !== 'success') {
+          return c.json({ error: 'Payment verification failed. Please wait a moment and try again, or contact support with reference: ' + paymentReference }, 400);
         }
 
         // Extract metadata from payment
@@ -540,10 +562,10 @@ app.post(`${PREFIX}/company/register`, async (c) => {
           paidAt: new Date().toISOString(),
         };
 
-        console.log(`Payment verified: ${paidLicenses} licenses, $${paidAmount}`);
+        console.log(`Payment verified successfully: ${paidLicenses} licenses, ${paidAmount} GHS`);
       } catch (paymentError: any) {
         console.error('Payment verification error:', paymentError);
-        return c.json({ error: 'Failed to verify payment. Please contact support.' }, 500);
+        return c.json({ error: 'Failed to verify payment. Please contact support with reference: ' + paymentReference }, 500);
       }
     }
 
@@ -557,14 +579,18 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       createdAt: new Date().toISOString(),
       status: 'active',
       licenses: licensesToSet,
-      usedLicenses: 0,
+      usedLicenses: 1, // SuperAdmin counts as 1
       subscriptionStatus,
       subscriptionPlan,
+      subscriptionStartDate: subscriptionStatus === 'active' ? new Date().toISOString() : null,
       ...(paymentData && { lastPayment: paymentData }),
     };
+    
+    console.log('Creating company record:', companyId);
     await kv.set(`company:${companyId}`, company);
 
     // Create SuperAdmin user in Supabase Auth
+    console.log('Creating SuperAdmin auth user for:', adminEmail);
     const { data: authData, error: authError } = await sb.auth.admin.createUser({
       email: adminEmail.toLowerCase(),
       password,
@@ -585,6 +611,7 @@ app.post(`${PREFIX}/company/register`, async (c) => {
     }
 
     const userId = authData.user.id;
+    console.log('SuperAdmin user created with ID:', userId);
 
     // Create SuperAdmin employee record
     await kv.set(`employee:${userId}`, {
@@ -601,6 +628,18 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       createdAt: new Date().toISOString(),
     });
 
+    console.log('SuperAdmin employee record created');
+
+    // Mark registration as verified if payment was provided
+    if (paymentReference) {
+      await kv.set(`verified_registration:${paymentReference}`, {
+        companyId,
+        userId,
+        licenses: licensesToSet,
+        verifiedAt: new Date().toISOString(),
+      });
+    }
+
     // Log audit event
     await logAudit({
       userId,
@@ -615,6 +654,8 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       },
     });
 
+    console.log('Company registration completed successfully for:', companyName);
+    
     return c.json({ 
       success: true, 
       userId,

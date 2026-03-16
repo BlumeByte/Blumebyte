@@ -323,8 +323,11 @@ export default function CompanySignup() {
   // Complete registration after successful payment
   const completeRegistration = async (paymentReference: string) => {
     setLoading(true);
+    setPollingStatus('Payment received! Creating your account...');
+    
     try {
       console.log('Creating company account with payment reference:', paymentReference);
+      toast.info('Verifying payment and setting up your account...');
       
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/company/register`,
@@ -354,23 +357,32 @@ export default function CompanySignup() {
         data = JSON.parse(text);
       } catch (parseErr) {
         console.error('Server response (not JSON):', text);
-        throw new Error(`Server error (status ${response.status}). Please try again or contact support.`);
+        throw new Error(`Server error (status ${response.status}). Please contact support with payment reference: ${paymentReference}`);
       }
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create company account');
+        const errorMessage = data.error || 'Failed to create company account';
+        console.error('Registration failed:', errorMessage);
+        throw new Error(errorMessage + ` (Payment reference: ${paymentReference})`);
       }
 
       console.log('Company created successfully:', data);
-      toast.success(`Company created successfully with ${formData.licenses} licenses!`);
+      toast.success(`🎉 Success! Your company "${formData.companyName}" has been created with ${data.licenses || formData.licenses} licenses!`, {
+        duration: 6000,
+      });
       
-      // Redirect to login
+      setPollingStatus('Account created successfully! Redirecting to login...');
+      
+      // Redirect to login after showing success message
       setTimeout(() => {
         navigate('/login');
-      }, 1500);
+      }, 2000);
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast.error(error.message || 'Failed to create company account');
+      setPollingStatus(null);
+      toast.error(error.message || 'Failed to create company account. Please contact support.', {
+        duration: 10000,
+      });
     } finally {
       setLoading(false);
     }
@@ -734,8 +746,15 @@ export default function CompanySignup() {
               </div>
 
               <p className="text-center text-xs text-gray-600">
-                Secure payment powered by Paystack. Your account will be created after successful payment.
+                Secure payment powered by Paystack. Your account will be created immediately after successful payment.
               </p>
+              
+              <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
+                <p className="text-xs text-gray-700 text-center">
+                  <strong>Need help?</strong> If you encounter any issues during payment or account creation, 
+                  please contact us at <a href="https://blumebyte.com/contact/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">blumebyte.com/contact</a> with your payment reference.
+                </p>
+              </div>
             </div>
           )}
         </CardContent>

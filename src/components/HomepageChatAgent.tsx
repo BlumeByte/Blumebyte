@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router';
 
 interface ChatMessage {
   id: string;
@@ -18,56 +19,57 @@ const FAQ_RESPONSES: Record<string, { answer: string; links?: { text: string; ur
   pricing: {
     answer: "Blumebyte offers flexible pricing: $6/month per employee for monthly billing or $5/month per employee for yearly billing. All plans include full access to our comprehensive HR management features.",
     links: [
-      { text: "View Pricing Details", url: "/pricing" },
-      { text: "Start Free Trial", url: "/signup" }
+      { text: "View Pricing Details", url: "/#pricing" },
+      { text: "Get Started", url: "/company-signup" }
     ]
   },
   features: {
     answer: "Blumebyte includes: Employee Management, Leave Tracking, Attendance & Clock In/Out, Payroll & Compensation, Performance Reviews, Training Programs, Compliance Tracking, Disciplinary Actions, 360° Feedback, Meetings & Announcements, Reports & Analytics, and more!",
     links: [
-      { text: "View All Features", url: "/features" },
-      { text: "Watch Demo", url: "/demo" }
+      { text: "View All Features", url: "/#features" },
+      { text: "Get Started", url: "/company-signup" }
     ]
   },
   signup: {
     answer: "Getting started is easy! Click 'Sign Up' to create your company account. You can add team members and start managing your HR in minutes.",
     links: [
-      { text: "Create Account", url: "/signup" },
+      { text: "Create Account", url: "/company-signup" },
       { text: "Contact Sales", url: "https://blumebyte.com/contact/" }
     ]
   },
   support: {
-    answer: "We're here to help! Our support team is available via email, live chat, and phone. You can also access our comprehensive documentation and video tutorials.",
+    answer: "We're here to help! Our support team is available via email and our contact form. Get in touch and we'll respond promptly to assist you.",
     links: [
-      { text: "Help Center", url: "/help" },
-      { text: "Contact Support", url: "https://blumebyte.com/contact/" }
+      { text: "Contact Support", url: "https://blumebyte.com/contact/" },
+      { text: "Sign In", url: "/login" }
     ]
   },
   trial: {
-    answer: "Yes! We offer a 14-day free trial with full access to all features. No credit card required to start.",
+    answer: "Get started with Blumebyte today! Create your company account and start managing your HR operations with our comprehensive platform.",
     links: [
-      { text: "Start Free Trial", url: "/signup" }
+      { text: "Create Account", url: "/company-signup" },
+      { text: "View Pricing", url: "/#pricing" }
     ]
   },
   security: {
     answer: "Security is our top priority. We use enterprise-grade encryption, role-based access control, and comply with industry standards. All data is backed up daily and stored securely.",
     links: [
-      { text: "Security Details", url: "/security" },
-      { text: "Privacy Policy", url: "/privacy" }
+      { text: "Security Details", url: "/security-policy" },
+      { text: "Privacy Policy", url: "/privacy-policy" }
     ]
   },
   integrations: {
-    answer: "Blumebyte integrates with popular tools including Slack, Google Workspace, Microsoft 365, and more. We also offer a REST API for custom integrations.",
+    answer: "Blumebyte is designed to work seamlessly with your existing workflows. Contact our team to learn about integration options and custom solutions for your business.",
     links: [
-      { text: "View Integrations", url: "/integrations" },
-      { text: "API Documentation", url: "/api-docs" }
+      { text: "Contact Us", url: "https://blumebyte.com/contact/" },
+      { text: "Get Started", url: "/company-signup" }
     ]
   },
   demo: {
-    answer: "Schedule a personalized demo with our team to see Blumebyte in action and learn how it can transform your HR processes.",
+    answer: "Interested in seeing Blumebyte in action? Create your account to explore all features, or contact our team for a personalized walkthrough.",
     links: [
-      { text: "Schedule Demo", url: "/demo" },
-      { text: "Watch Video Tour", url: "/tour" }
+      { text: "Get Started", url: "/company-signup" },
+      { text: "Contact Sales", url: "https://blumebyte.com/contact/" }
     ]
   }
 };
@@ -89,6 +91,7 @@ export function HomepageChatAgent() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -277,18 +280,51 @@ export function HomepageChatAgent() {
                             </p>
                             {msg.links && msg.links.length > 0 && (
                               <div className="mt-2 space-y-1">
-                                {msg.links.map((link, idx) => (
-                                  <a
-                                    key={idx}
-                                    href={link.url}
-                                    target={link.url.startsWith('http') ? '_blank' : undefined}
-                                    rel={link.url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
-                                  >
-                                    <ExternalLink className="h-3 w-3" />
-                                    {link.text}
-                                  </a>
-                                ))}
+                                {msg.links.map((link, idx) => {
+                                  const isExternal = link.url.startsWith('http');
+                                  
+                                  if (isExternal) {
+                                    return (
+                                      <a
+                                        key={idx}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                                      >
+                                        <ExternalLink className="h-3 w-3" />
+                                        {link.text}
+                                      </a>
+                                    );
+                                  }
+                                  
+                                  return (
+                                    <button
+                                      key={idx}
+                                      onClick={() => {
+                                        // Check if it's a hash link
+                                        if (link.url.includes('#')) {
+                                          const [path, hash] = link.url.split('#');
+                                          navigate(path || '/');
+                                          // Wait for navigation then scroll to element
+                                          setTimeout(() => {
+                                            const element = document.getElementById(hash);
+                                            if (element) {
+                                              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }
+                                          }, 100);
+                                        } else {
+                                          navigate(link.url);
+                                        }
+                                        setIsOpen(false);
+                                      }}
+                                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      {link.text}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>

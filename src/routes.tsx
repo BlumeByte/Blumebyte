@@ -8,17 +8,17 @@ import { Toaster } from './components/ui/sonner';
 
 // Lazy load heavy components for better initial load performance
 const LandingPage = lazy(() => import('./pages/LandingPage'));
-const LoginPage = lazy(() => import('./components/LoginPage').then(m => ({ default: m.LoginPage })));
+const LoginPage = lazy(() => import('./components/LoginPage'));
 const CompanySignup = lazy(() => import('./pages/CompanySignup'));
 const DevSettings = lazy(() => import('./pages/DevSettings'));
 const EmployeePortal = lazy(() => import('./pages/EmployeePortal'));
 const PaystackSubscription = lazy(() => import('./pages/PaystackSubscription'));
-const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-const ManagerDashboard = lazy(() => import('./components/ManagerDashboard').then(m => ({ default: m.ManagerDashboard })));
-const EmployeeDashboard = lazy(() => import('./components/EmployeeDashboard').then(m => ({ default: m.EmployeeDashboard })));
-const PaymentVerification = lazy(() => import('./components/PaymentVerification').then(m => ({ default: m.PaymentVerification })));
-const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification').then(m => ({ default: m.LicensePaymentVerification })));
+const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
+const EmployeeDashboard = lazy(() => import('./components/EmployeeDashboard'));
+const PaymentVerification = lazy(() => import('./components/PaymentVerification'));
+const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification'));
 const SecurityPolicy = lazy(() => import('./pages/SecurityPolicy'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsConditions = lazy(() => import('./pages/TermsConditions'));
