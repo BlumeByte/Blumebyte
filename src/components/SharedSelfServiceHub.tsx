@@ -289,34 +289,34 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                     {filteredJobs.length === 0 ? (
                       <div className="text-center py-12 text-gray-400"><Briefcase className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No open positions at this time</p></div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {filteredJobs.map(job => (
-                          <Card key={job.id} className="border-2 hover:border-blue-200 transition-colors">
-                            <CardContent className="pt-5">
-                              <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-semibold text-sm">{job.title || job.name}</h3>
-                                <Badge className="bg-green-100 text-green-700 text-[10px]">Open</Badge>
+                          <Card key={job.id} className="border-2 hover:border-blue-200 transition-colors flex flex-col">
+                            <CardContent className="pt-5 flex flex-col flex-1">
+                              <div className="flex justify-between items-start mb-2 gap-2">
+                                <h3 className="font-semibold text-sm flex-1 min-w-0">{job.title || job.name}</h3>
+                                <Badge className="bg-green-100 text-green-700 text-[10px] flex-shrink-0">Open</Badge>
                               </div>
-                              <p className="text-xs text-gray-500 flex items-center gap-1"><Building2 className="w-3 h-3" />{job.department || job.company || 'General'}</p>
-                              <div className="flex flex-wrap gap-2 mt-2 text-[11px] text-gray-500">
-                                {job.location && <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3" />{job.location}</span>}
-                                {(job.type || job.employmentType) && <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{job.type || job.employmentType}</span>}
-                                {job.deadline && <span className="flex items-center gap-0.5"><CalendarDays className="w-3 h-3" />Deadline: {job.deadline}</span>}
+                              <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><Building2 className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.department || job.company || 'General'}</span></p>
+                              <div className="flex flex-wrap gap-2 mt-1 text-[11px] text-gray-500">
+                                {job.location && <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.location}</span></span>}
+                                {(job.type || job.employmentType) && <span className="flex items-center gap-0.5 whitespace-nowrap"><Clock className="w-3 h-3 flex-shrink-0" />{job.type || job.employmentType}</span>}
                               </div>
+                              {job.deadline && <p className="text-[11px] text-gray-500 mt-1 flex items-center gap-0.5"><CalendarDays className="w-3 h-3 flex-shrink-0" />Deadline: {job.deadline}</p>}
                               {(job.salary || job.salaryRange) && (
-                                <p className="text-xs text-green-600 font-medium mt-2 flex items-center gap-1"><DollarSign className="w-3 h-3" />{job.salary || job.salaryRange}</p>
+                                <p className="text-xs text-green-600 font-medium mt-2 flex items-center gap-1"><DollarSign className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.salary || job.salaryRange}</span></p>
                               )}
                               {job.description && <p className="text-xs text-gray-500 mt-2 line-clamp-2">{job.description}</p>}
-                              <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                              <div className="flex flex-col gap-2 mt-auto pt-3 border-t">
                                 <span className="text-[10px] text-gray-400">Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : 'Recently'}</span>
-                                <div className="flex gap-1.5">
-                                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setSelectedJob(job); setDetailDialogOpen(true); }}>
+                                <div className="flex gap-1.5 flex-wrap">
+                                  <Button variant="outline" size="sm" className="h-7 text-xs flex-1 min-w-[80px]" onClick={() => { setSelectedJob(job); setDetailDialogOpen(true); }}>
                                     <Eye className="w-3 h-3 mr-1" />Details
                                   </Button>
                                   {alreadyApplied(job.id) ? (
-                                    <Badge className="bg-blue-100 text-blue-700 text-[10px]">Applied</Badge>
+                                    <Badge className="bg-blue-100 text-blue-700 text-[10px] h-7 px-3 flex items-center">Applied</Badge>
                                   ) : (
-                                    <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700" onClick={() => { setSelectedJob(job); setCoverLetter(''); setApplyDialogOpen(true); }}>
+                                    <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 flex-1 min-w-[100px]" onClick={() => { setSelectedJob(job); setCoverLetter(''); setApplyDialogOpen(true); }}>
                                       <Send className="w-3 h-3 mr-1" />Apply Now
                                     </Button>
                                   )}

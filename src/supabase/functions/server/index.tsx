@@ -2984,6 +2984,39 @@ makeCrud("admin/paygrades", "paygrade:", requireAdminOrAbove);
 makeCrud("admin/financial-years", "financial-year:", requireAdminOrAbove);
 makeCrud("admin/leave-types", "leave-type:", requireAdminOrAbove);
 makeCrud("admin/departments", "department:", requireAdminOrAbove);
+
+// Public read-only endpoints for employees to access reference data
+app.get(`${PREFIX}/leave-types`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json([]);
+    
+    const all = await kv.getByPrefix("leave-type:");
+    const filtered = all.filter((item: any) => item.companyId === companyId);
+    return c.json(filtered);
+  } catch (e: any) {
+    console.log('Leave types fetch error:', e.message);
+    return c.json([]);
+  }
+});
+
+app.get(`${PREFIX}/holidays`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json([]);
+    
+    const all = await kv.getByPrefix("holiday:");
+    const filtered = all.filter((item: any) => item.companyId === companyId);
+    return c.json(filtered);
+  } catch (e: any) {
+    console.log('Holidays fetch error:', e.message);
+    return c.json([]);
+  }
+});
 makeCrud("admin/job-postings", "job-posting:", requireAdminOrAbove);
 makeCrud("admin/workflows", "workflow:", requireAdminOrAbove);
 makeCrud("admin/performance-reviews", "perf-review:", requireAdminOrAbove);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -164,8 +164,9 @@ function EmpOverview({ onNavigate }: { onNavigate: (tab: string) => void }) {
     }).catch(console.log).finally(() => setLoading(false));
   }, [accessToken, user]);
 
-  useEffect(() => { loadOverview(); }, [loadOverview]);
-  useEffect(() => { const iv = setInterval(loadOverview, 15000); return () => clearInterval(iv); }, [loadOverview]);
+  useEffect(() => { loadOverview(); }, []);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(loadOverview, 60000); return () => clearInterval(iv); }, [loadOverview]);
 
   if (loading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
@@ -474,8 +475,13 @@ function EmpProfile() {
   const [saving, setSaving] = useState(false);
   const [otherGender, setOtherGender] = useState('');
   const [pendingChanges, setPendingChanges] = useState<any[]>([]);
+  const lastInteractionRef = useRef(Date.now());
 
   const loadProfile = useCallback(async () => {
+    // Don't refresh if user has interacted recently (within last 10 seconds)
+    const timeSinceInteraction = Date.now() - lastInteractionRef.current;
+    if (timeSinceInteraction < 10000 && !loading) return;
+    
     try {
       const [p, changes] = await Promise.all([
         api('/profile', { token: accessToken }),
@@ -488,10 +494,11 @@ function EmpProfile() {
       setPendingChanges(Array.isArray(changes) ? changes.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
     } catch (e) { console.log(e); }
     setLoading(false);
-  }, [accessToken]);
+  }, [accessToken, loading]);
 
-  useEffect(() => { loadProfile(); }, [loadProfile]);
-  useEffect(() => { const iv = setInterval(loadProfile, 15000); return () => clearInterval(iv); }, [loadProfile]);
+  useEffect(() => { loadProfile(); }, []);
+  // Increase refresh interval to 60 seconds and respect user interaction
+  useEffect(() => { const iv = setInterval(loadProfile, 60000); return () => clearInterval(iv); }, [loadProfile]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -558,23 +565,24 @@ function EmpProfile() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><Label className="text-xs">Phone</Label><Input value={profile.phone || ''} onChange={e => setProfile({ ...profile, phone: e.target.value })} /></div>
-            <div><Label className="text-xs">Personal Email</Label><Input value={profile.personalEmail || ''} onChange={e => setProfile({ ...profile, personalEmail: e.target.value })} /></div>
+            <div><Label className="text-xs">Phone</Label><Input value={profile.phone || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, phone: e.target.value }); }} /></div>
+            <div><Label className="text-xs">Personal Email</Label><Input value={profile.personalEmail || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, personalEmail: e.target.value }); }} /></div>
           </div>
-          <div><Label className="text-xs">Address</Label><Input value={profile.address || ''} onChange={e => setProfile({ ...profile, address: e.target.value })} /></div>
+          <div><Label className="text-xs">Address</Label><Input value={profile.address || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, address: e.target.value }); }} /></div>
           <div className="grid grid-cols-3 gap-3">
-            <div><Label className="text-xs">City</Label><Input value={profile.city || ''} onChange={e => setProfile({ ...profile, city: e.target.value })} /></div>
-            <div><Label className="text-xs">State</Label><Input value={profile.state || ''} onChange={e => setProfile({ ...profile, state: e.target.value })} /></div>
-            <div><Label className="text-xs">Country</Label><Input value={profile.country || ''} onChange={e => setProfile({ ...profile, country: e.target.value })} /></div>
+            <div><Label className="text-xs">City</Label><Input value={profile.city || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, city: e.target.value }); }} /></div>
+            <div><Label className="text-xs">State</Label><Input value={profile.state || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, state: e.target.value }); }} /></div>
+            <div><Label className="text-xs">Country</Label><Input value={profile.country || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, country: e.target.value }); }} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><Label className="text-xs">Emergency Contact</Label><Input value={profile.emergencyContact || ''} onChange={e => setProfile({ ...profile, emergencyContact: e.target.value })} /></div>
-            <div><Label className="text-xs">Emergency Phone</Label><Input value={profile.emergencyPhone || ''} onChange={e => setProfile({ ...profile, emergencyPhone: e.target.value })} /></div>
+            <div><Label className="text-xs">Emergency Contact</Label><Input value={profile.emergencyContact || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, emergencyContact: e.target.value }); }} /></div>
+            <div><Label className="text-xs">Emergency Phone</Label><Input value={profile.emergencyPhone || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, emergencyPhone: e.target.value }); }} /></div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div><Label className="text-xs">Date of Birth</Label><Input type="date" value={profile.dateOfBirth || ''} onChange={e => setProfile({ ...profile, dateOfBirth: e.target.value })} /></div>
+            <div><Label className="text-xs">Date of Birth</Label><Input type="date" value={profile.dateOfBirth || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, dateOfBirth: e.target.value }); }} /></div>
             <div><Label className="text-xs">Gender</Label>
               <Select value={['male','female','other'].includes(profile.gender) ? profile.gender : (profile.gender ? 'other' : '')} onValueChange={v => {
+                lastInteractionRef.current = Date.now();
                 if (v === 'other') {
                   setProfile({ ...profile, gender: otherGender || 'other' });
                 } else {
@@ -586,9 +594,9 @@ function EmpProfile() {
                 <SelectContent><SelectItem value="male">Male</SelectItem><SelectItem value="female">Female</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent>
               </Select>
               {(profile.gender === 'other' || (profile.gender && !['male','female'].includes(profile.gender))) && (
-                <Input className="mt-2" placeholder="Specify gender..." value={otherGender || (profile.gender !== 'other' ? profile.gender : '')} onChange={e => { setOtherGender(e.target.value); setProfile({ ...profile, gender: e.target.value || 'other' }); }} autoFocus />
+                <Input className="mt-2" placeholder="Specify gender..." value={otherGender || (profile.gender !== 'other' ? profile.gender : '')} onChange={e => { lastInteractionRef.current = Date.now(); setOtherGender(e.target.value); setProfile({ ...profile, gender: e.target.value || 'other' }); }} autoFocus />
               )}</div>
-            <div><Label className="text-xs">Nationality</Label><Input value={profile.nationality || ''} onChange={e => setProfile({ ...profile, nationality: e.target.value })} /></div>
+            <div><Label className="text-xs">Nationality</Label><Input value={profile.nationality || ''} onChange={e => { lastInteractionRef.current = Date.now(); setProfile({ ...profile, nationality: e.target.value }); }} /></div>
           </div>
           <Button onClick={handleSave} disabled={saving}>{saving && <Loader2 className="w-4 h-4 animate-spin mr-1" />}Submit Changes for Approval</Button>
         </CardContent>
@@ -648,8 +656,9 @@ function EmpAttendance() {
     setLoading(false);
   }, [accessToken]);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { load(); }, []);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleClockIn = async () => {
     setClocking(true);
@@ -754,15 +763,16 @@ function EmpLeave() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [l, lt] = await Promise.all([api('/leave-requests', { token: accessToken }), api('/admin/leave-types', { token: accessToken }).catch(() => [])]);
+      const [l, lt] = await Promise.all([api('/leave-requests', { token: accessToken }), api('/leave-types', { token: accessToken }).catch(() => [])]);
       setLeaves(Array.isArray(l) ? l : []);
       setLeaveTypes(Array.isArray(lt) ? lt : []);
     } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken]);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { load(); }, []);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -851,7 +861,8 @@ function EmpAnnouncements() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 10000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   if (loading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
@@ -885,8 +896,9 @@ function EmpTasks() {
     try { const d = await api('/my-tasks', { token: accessToken }); setTasks(Array.isArray(d) ? d.sort((a: any, b: any) => new Date(b.createdAt||0).getTime() - new Date(a.createdAt||0).getTime()) : []); } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken]);
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { load(); }, []);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const updateStatus = async (id: string, status: string) => {
     setUpdating(id);
@@ -978,7 +990,8 @@ function EmpOnboarding() {
     setLoading(false);
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const updateStatus = async (id: string, status: string) => {
     setUpdating(id);
@@ -1051,7 +1064,8 @@ function EmpReviews() {
     setLoading(false);
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const ratingColor = (r: number) => r >= 4 ? 'text-green-600 bg-green-50' : r >= 3 ? 'text-amber-600 bg-amber-50' : 'text-red-500 bg-red-50';
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + (r.rating || r.score || 0), 0) / reviews.length : 0;
@@ -1139,7 +1153,8 @@ function EmpTraining() {
     setLoading(false);
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const stColor = (s: string) => {
     switch (s) { case 'completed': return 'bg-green-100 text-green-800'; case 'active': return 'bg-blue-100 text-blue-800'; case 'planned': return 'bg-amber-100 text-amber-800'; default: return 'bg-gray-100 text-gray-800'; }
@@ -1238,7 +1253,8 @@ function EmpQuestionnaires() {
     setLoading(false);
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const stColor = (s: string) => {
     switch (s) { case 'submitted': case 'reviewed': return 'bg-green-100 text-green-800'; case 'pending': return 'bg-amber-100 text-amber-800'; default: return 'bg-gray-100 text-gray-800'; }
@@ -1354,7 +1370,8 @@ function EmpDisciplinary() {
     setLoading(false);
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const severityColor = (s: string) => {
     switch (s?.toLowerCase()) {
@@ -1467,7 +1484,8 @@ function EmpCompliance() {
     setLoading(false);
   }, [accessToken]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const compStatusColor = (s: string) => {
     switch (s?.toLowerCase()) {

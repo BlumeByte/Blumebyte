@@ -76,8 +76,9 @@ export function SharedMyProfile() {
     setLoading(false);
   }, [accessToken]);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 30000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { load(); }, []);
+  // Increase refresh interval to 60 seconds to reduce unnecessary reloads
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleEditSave = async () => {
     setSaving(true);
