@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Settings, Save, ArrowLeft } from 'lucide-react';
+import { Settings, Save, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 
 export default function DevSettings() {
@@ -97,6 +97,29 @@ export default function DevSettings() {
               <br />
               3. Copy your Public Key (for testing, use the Test Public Key)
             </p>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-800">Production Cleanup Utility</p>
+                  <p className="text-xs text-red-700 mt-1">
+                    Clear ALL test data and reset the system to production-ready state. This action is IRREVERSIBLE!
+                  </p>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => navigate('/production-cleanup')}
+                    className="mt-3 w-full"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Access Production Cleanup
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

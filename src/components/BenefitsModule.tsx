@@ -41,7 +41,7 @@ export function BenefitsModule() {
     setLoading(true);
     try {
       const [data, refData, usersData] = await Promise.all([
-        api('/benefits', { token: accessToken }),
+        api('/admin/benefits', { token: accessToken }),
         api('/reference-data', { token: accessToken }).catch(() => ({})),
         api('/users', { token: accessToken }).catch(() => [])
       ]);
@@ -109,19 +109,18 @@ export function BenefitsModule() {
       };
 
       if (editItem) {
-        await api(`/benefits/${editItem.id}`, {
+        await api(`/admin/benefits/${editItem.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
           token: accessToken,
         });
         toast.success('Benefit updated successfully');
       } else {
-        await api('/benefits', {
+        await api('/admin/benefits', {
           method: 'POST',
           body: JSON.stringify(payload),
           token: accessToken,
         });
-        toast.success('Benefit created successfully');
       }
       setDialogOpen(false);
       load();
@@ -134,7 +133,7 @@ export function BenefitsModule() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this benefit?')) return;
     try {
-      await api(`/benefits/${id}`, { method: 'DELETE', token: accessToken });
+      await api(`/admin/benefits/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Benefit deleted successfully');
       load();
     } catch (e: any) {

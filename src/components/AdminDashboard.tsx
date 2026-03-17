@@ -38,6 +38,9 @@ import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { ComprehensiveReports } from './ComprehensiveReports';
 import { AutomationModule } from './AutomationModule';
+import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
+import { SurveyBuilder } from './SurveyBuilder';
+import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -55,6 +58,9 @@ const TABS = [
   { id: 'tasks', label: 'Task Assignments', icon: ClipboardList },
   { id: 'feedback-360', label: '360° Feedback', icon: MessageSquare },
   { id: 'training', label: 'Training', icon: GraduationCap },
+  { id: 'overtime-expenses', label: 'OT & Expenses', icon: Clock },
+  { id: 'surveys', label: 'Surveys', icon: ClipboardList },
+  { id: 'engagement-analytics', label: 'Engagement Analytics', icon: BarChart3 },
   { id: 'messages', label: 'Messages', icon: MessageCircle },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'meetings', label: 'Meetings', icon: Users },
@@ -182,6 +188,9 @@ export function AdminDashboard() {
           {activeTab === 'tasks' && <AdminCrudPanel entityKey="tasks" />}
           {activeTab === 'feedback-360' && <AdminCrudPanel entityKey="feedback-360" />}
           {activeTab === 'training' && <TrainingManagement mode="admin" />}
+          {activeTab === 'overtime-expenses' && <OvertimeExpenseApproval />}
+          {activeTab === 'surveys' && <SurveyBuilder />}
+          {activeTab === 'engagement-analytics' && <EmployeeEngagementAnalytics />}
           {activeTab === 'messages' && <MessagesPanel />}
           {activeTab === 'announcements' && <AdminAnnouncements />}
           {activeTab === 'meetings' && <MeetingsPanel mode="admin" />}

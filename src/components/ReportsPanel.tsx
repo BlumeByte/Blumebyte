@@ -260,10 +260,10 @@ export function ReportsPanel() {
                       <ClientOnlyChart fallback={<div className="h-[220px] flex items-center justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>}>
                         <ResponsiveContainer width="100%" height={220}>
                           <RechartPie>
-                            <Pie key="pie-role" data={roleDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                              {roleDistribution.map((entry, i) => <Cell key={`role-${entry.name}-${i}`} fill={COLORS[i % COLORS.length]} />)}
+                            <Pie data={roleDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                              {roleDistribution.map((entry, i) => <Cell key={`role-cell-${entry.name}-${i}`} fill={COLORS[i % COLORS.length]} />)}
                             </Pie>
-                            <Tooltip key="tooltip-role" />
+                            <Tooltip />
                           </RechartPie>
                         </ResponsiveContainer>
                       </ClientOnlyChart>

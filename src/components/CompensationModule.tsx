@@ -41,7 +41,7 @@ export function CompensationModule() {
     setLoading(true);
     try {
       const [data, refData, usersData] = await Promise.all([
-        api('/compensations', { token: accessToken }),
+        api('/admin/compensations', { token: accessToken }),
         api('/reference-data', { token: accessToken }).catch(() => ({})),
         api('/users', { token: accessToken }).catch(() => [])
       ]);
@@ -109,14 +109,14 @@ export function CompensationModule() {
       };
 
       if (editItem) {
-        await api(`/compensations/${editItem.id}`, {
+        await api(`/admin/compensations/${editItem.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
           token: accessToken,
         });
         toast.success('Compensation updated successfully');
       } else {
-        await api('/compensations', {
+        await api('/admin/compensations', {
           method: 'POST',
           body: JSON.stringify(payload),
           token: accessToken,
@@ -134,7 +134,7 @@ export function CompensationModule() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this compensation?')) return;
     try {
-      await api(`/compensations/${id}`, { method: 'DELETE', token: accessToken });
+      await api(`/admin/compensations/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Compensation deleted successfully');
       load();
     } catch (e: any) {

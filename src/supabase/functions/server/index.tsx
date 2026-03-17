@@ -5,6 +5,7 @@ import { logger } from "npm:hono/logger";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
+import { performProductionCleanup } from "./production-cleanup.tsx";
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
@@ -48,6 +49,45 @@ app.post(`${PREFIX}/company/test-payment`, async (c) => {
   }
 });
 
+// PRODUCTION CLEANUP ENDPOINT
+// WARNING: This endpoint deletes ALL data and users. Use with extreme caution!
+app.post(`${PREFIX}/production/cleanup`, async (c) => {
+  try {
+    // Optional: Add a secret key for extra security
+    const cleanupKey = c.req.header('X-Cleanup-Key');
+    const expectedKey = Deno.env.get('CLEANUP_SECRET_KEY');
+    
+    // If cleanup key is configured, validate it
+    if (expectedKey && cleanupKey !== expectedKey) {
+      return c.json({ error: 'Unauthorized - Invalid cleanup key' }, 401);
+    }
+
+    console.log('⚠️  PRODUCTION CLEANUP INITIATED ⚠️');
+    console.log('This will delete ALL data, users, and reset the system!');
+    
+    const results = await performProductionCleanup();
+    
+    return c.json({
+      success: results.overall.success,
+      message: results.overall.message,
+      details: {
+        authUsersDeleted: results.authUsers.count,
+        kvKeysDeleted: results.kvData.count,
+        storageBucketsCleared: results.storage.count,
+        timestamp: results.timestamp,
+      },
+      errors: {
+        authUsers: results.authUsers.error,
+        kvData: results.kvData.error,
+        storage: results.storage.error,
+      }
+    });
+  } catch (e: any) {
+    console.error('Production cleanup error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // --- Supabase Admin Client ---
 const supabaseAdmin = () =>
   createClient(
@@ -83,10 +123,24 @@ async function getAuthUser(c: any) {
   return data.user;
 }
 
-// Helper to get SuperAdmin user
-async function getSuperAdmin() {
+// Helper to get SuperAdmin user for a specific company
+async function getSuperAdmin(companyId?: string) {
   const allUsers = await kv.getByPrefix('employee:');
-  return allUsers.find((u: any) => u.role === 'superadmin');
+  if (companyId) {
+    // Find superadmin in the same company
+    return allUsers.find((u: any) => u.role === 'superadmin' && (u.companyId === companyId || u.company === companyId));
+  }
+  // CRITICAL FIX: Without companyId, return null - never return a random superadmin from any company
+  console.log('getSuperAdmin: No companyId provided - returning null for strict tenant isolation');
+  return null;
+}
+
+// Helper to get user profile (used by automation routes)
+async function getUserProfile(userId: string) {
+  const kvData = await kv.get(`employee:${userId}`);
+  if (kvData) return kvData;
+  const profile = await kv.get(`user_profile:${userId}`);
+  return profile || null;
 }
 
 // Helper to verify subscription and license availability
@@ -106,7 +160,11 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
   // If we need to verify license availability
   if (requiresActiveLicense) {
     const allUsers = await kv.getByPrefix('employee:');
-    const activeUsers = allUsers.filter((u: any) => u.status === 'active');
+    // CRITICAL: Only count users in the same company as the superadmin
+    const superAdminData = await kv.get(`employee:${superAdminId}`);
+    const saCompany = superAdminData?.companyId || superAdminData?.company;
+    const companyUsers = saCompany ? allUsers.filter((u: any) => u.companyId === saCompany || u.company === saCompany) : allUsers;
+    const activeUsers = companyUsers.filter((u: any) => u.status === 'active');
     const usedLicenses = activeUsers.length;
     const purchasedLicenses = subscription.purchasedLicenses || 0;
     
@@ -231,7 +289,7 @@ async function logAudit(params: {
 }
 
 // --- Company scope resolver ---
-async function resolveCompanyScope(userId: string) {
+async function resolveCompanyScope(userId: string): Promise<string[] | null> {
   const kvData = await kv.get(`employee:${userId}`);
   if (kvData?.assignedCompanies?.length) return kvData.assignedCompanies;
   const sb = supabaseAdmin();
@@ -239,6 +297,12 @@ async function resolveCompanyScope(userId: string) {
   if (data?.user?.user_metadata?.assignedCompanies?.length)
     return data.user.user_metadata.assignedCompanies;
   return null;
+}
+
+// Helper to get the first company ID from scope (reduces repeated const scope patterns)
+async function getCompanyId(userId: string): Promise<string | null> {
+  const companies = await resolveCompanyScope(userId);
+  return companies?.[0] || null;
 }
 
 async function resolveCompanyName(companyId: string): Promise<string> {
@@ -249,34 +313,33 @@ async function resolveCompanyName(companyId: string): Promise<string> {
 
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
-  // CRITICAL FIX: SuperAdmin should see items from their company only, not all companies!
-  // This ensures proper multi-tenant isolation
-  
-  // Get user's assigned companies
+  // CRITICAL: STRICT multi-tenant isolation - NEVER return all items as fallback
   const assignedCompanies = await resolveCompanyScope(userId);
   
-  // If no company restrictions, return all
-  if (!assignedCompanies || assignedCompanies.length === 0) return items;
+  // If no company scope, return EMPTY - strict isolation
+  if (!assignedCompanies || assignedCompanies.length === 0) {
+    console.log(`applyCompanyFilter: User ${userId} has no assignedCompanies - returning empty for strict tenant isolation`);
+    return [];
+  }
   
   // Filter items by company for ALL roles (including SuperAdmin)
   return items.filter((item: any) => {
-    // Check if item has a company assignment
     const itemCompany = item.company || item.companyId || item.companyName;
-    if (!itemCompany) return true; // Include items without company assignment
-    
-    // Check if item's company is in user's assigned companies
+    if (!itemCompany) return false; // STRICT: Exclude items without company assignment
     return assignedCompanies.includes(itemCompany);
   });
 }
 
 // --- Filter employees by company scope ---
 async function filterEmployeesByCompany(employees: any[], userId: string, role: string): Promise<any[]> {
-  // CRITICAL FIX: SuperAdmin should see employees from their company only, not all companies!
-  // This ensures proper multi-tenant isolation
+  // CRITICAL: STRICT multi-tenant isolation - NEVER return all employees as fallback
   const scope = await resolveCompanyScope(userId);
   
-  // If no scope, return all employees (legacy behavior for users without company assignments)
-  if (!scope || scope.length === 0) return employees;
+  // If no scope, return EMPTY - strict isolation
+  if (!scope || scope.length === 0) {
+    console.log(`filterEmployeesByCompany: User ${userId} has no company scope - returning empty for strict tenant isolation`);
+    return [];
+  }
   
   // Filter by company for ALL roles (including SuperAdmin)
   return employees.filter((e: any) => {
@@ -319,6 +382,14 @@ function handleError(e: any, c: any, context: string = '') {
   return c.json({ error: errorMsg }, 500);
 }
 
+// --- Check if an item belongs to a user's company ---
+async function isItemInUserCompany(userId: string, itemCompanyId: string | undefined): Promise<boolean> {
+  if (!itemCompanyId) return true; // No company constraint
+  const userScope = await resolveCompanyScope(userId);
+  if (!userScope?.length) return false;
+  return userScope.includes(itemCompanyId);
+}
+
 // --- Generic CRUD factory ---
 function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise<any>) {
   // List
@@ -326,7 +397,6 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
     try {
       const { user, role } = await guardFn(c);
       let items = await kv.getByPrefix(`${kvPrefix}`);
-      // Apply company filtering for non-superadmin users
       items = await applyCompanyFilter(items, user.id, role);
       return c.json(items || []);
     } catch (e: any) {
@@ -340,10 +410,14 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
   // Get one
   app.get(`${PREFIX}/${prefix}/:id`, async (c) => {
     try {
-      await guardFn(c);
+      const { user, role } = await guardFn(c);
       const id = c.req.param("id");
       const item = await kv.get(`${kvPrefix}${id}`);
       if (!item) return c.json({ error: "Not found" }, 404);
+      const itemCompany = item.companyId || item.company;
+      if (itemCompany && !(await isItemInUserCompany(user.id, itemCompany))) {
+        return c.json({ error: "Not found" }, 404);
+      }
       return c.json(item);
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -355,10 +429,17 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
   // Create
   app.post(`${PREFIX}/${prefix}`, async (c) => {
     try {
-      await guardFn(c);
+      const { user } = await guardFn(c);
       const body = await c.req.json();
       const id = body.id || crypto.randomUUID();
-      const item = { ...body, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      const companyId = body.companyId || (await getCompanyId(user.id));
+      const item = { 
+        ...body, 
+        id, 
+        companyId,
+        createdAt: new Date().toISOString(), 
+        updatedAt: new Date().toISOString() 
+      };
       await kv.set(`${kvPrefix}${id}`, item);
       return c.json(item, 201);
     } catch (e: any) {
@@ -372,10 +453,16 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
   // Update
   app.put(`${PREFIX}/${prefix}/:id`, async (c) => {
     try {
-      await guardFn(c);
+      const { user } = await guardFn(c);
       const id = c.req.param("id");
       const body = await c.req.json();
       const existing = await kv.get(`${kvPrefix}${id}`);
+      if (existing) {
+        const itemCompany = existing.companyId || existing.company;
+        if (itemCompany && !(await isItemInUserCompany(user.id, itemCompany))) {
+          return c.json({ error: "Not found" }, 404);
+        }
+      }
       const item = { ...existing, ...body, id, updatedAt: new Date().toISOString() };
       await kv.set(`${kvPrefix}${id}`, item);
       return c.json(item);
@@ -389,8 +476,15 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
   // Delete
   app.delete(`${PREFIX}/${prefix}/:id`, async (c) => {
     try {
-      await guardFn(c);
+      const { user } = await guardFn(c);
       const id = c.req.param("id");
+      const existing = await kv.get(`${kvPrefix}${id}`);
+      if (existing) {
+        const itemCompany = existing.companyId || existing.company;
+        if (itemCompany && !(await isItemInUserCompany(user.id, itemCompany))) {
+          return c.json({ error: "Not found" }, 404);
+        }
+      }
       await kv.del(`${kvPrefix}${id}`);
       return c.json({ success: true });
     } catch (e: any) {
@@ -433,7 +527,12 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
     const { data, error } = await sb.auth.admin.createUser({
       email,
       password,
-      user_metadata: { name, role: "superadmin" },
+      user_metadata: { 
+        name, 
+        role: "superadmin",
+        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        twoFactorEnabled: false, // Will be enabled after first verification
+      },
       email_confirm: true,
     });
     if (error) {
@@ -598,6 +697,8 @@ app.post(`${PREFIX}/company/register`, async (c) => {
         role: "superadmin",
         companyId,
         companyName,
+        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true, // Auto-confirm since we don't have email configured
     });
@@ -887,6 +988,8 @@ async function createCompanyAccount(registrationData: any) {
         role: "superadmin",
         companyId,
         companyName,
+        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true,
     });
@@ -942,13 +1045,21 @@ app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
   try {
     const { user: authUser } = await requireSuperAdmin(c);
     
+    // CRITICAL FIX: Only sync users from the SuperAdmin's company
+    const scope = await resolveCompanyScope(authUser.id);
+    if (!scope?.length) {
+      return c.json({ error: 'No company scope found' }, 400);
+    }
+    
     const subscription = await kv.get(`subscription:${authUser.id}`);
     const allUsers = await kv.getByPrefix('employee:');
+    // CRITICAL: Filter to only this company's users
+    const companyUsers = allUsers.filter((u: any) => scope.includes(u.companyId) || scope.includes(u.company));
     
-    // If no subscription or inactive, deactivate all non-superadmin users
+    // If no subscription or inactive, deactivate all non-superadmin users IN THIS COMPANY
     if (!subscription || subscription.status !== 'active') {
       let deactivatedCount = 0;
-      for (const user of allUsers) {
+      for (const user of companyUsers) {
         if (user.role !== 'superadmin' && user.status === 'active') {
           await kv.set(`employee:${user.id || user.userId}`, {
             ...user,
@@ -962,18 +1073,18 @@ app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
       
       return c.json({
         success: true,
-        message: 'All users deactivated due to inactive subscription',
+        message: 'All company users deactivated due to inactive subscription',
         deactivatedCount,
         subscription: null
       });
     }
     
     const purchasedLicenses = subscription.purchasedLicenses || 0;
-    const superAdminCount = allUsers.filter((u: any) => u.role === 'superadmin').length;
+    const superAdminCount = companyUsers.filter((u: any) => u.role === 'superadmin').length;
     const availableLicenses = purchasedLicenses - superAdminCount;
     
-    // Get all non-superadmin users sorted by creation date (older first)
-    const nonSuperAdmins = allUsers
+    // Get all non-superadmin users IN THIS COMPANY sorted by creation date (older first)
+    const nonSuperAdmins = companyUsers
       .filter((u: any) => u.role !== 'superadmin')
       .sort((a: any, b: any) => {
         const dateA = new Date(a.createdAt || 0).getTime();
@@ -1148,8 +1259,10 @@ app.put(`${PREFIX}/employee/profile`, async (c) => {
         createdAt: new Date().toISOString(),
       };
       await kv.set(`profile-change:${id}`, changeRequest);
+      // CRITICAL: Only notify HR staff from the same company
       const allEmployees = await kv.getByPrefix("employee:");
-      const hrStaff = allEmployees.filter((e: any) => ["superadmin", "admin"].includes(e.role));
+      const empCompany = kvData?.companyId || kvData?.company;
+      const hrStaff = allEmployees.filter((e: any) => ["superadmin", "admin"].includes(e.role) && empCompany && (e.companyId === empCompany || e.company === empCompany));
       for (const hr of hrStaff) {
         const nid = crypto.randomUUID();
         await kv.set(`notification:${nid}`, {
@@ -1177,17 +1290,23 @@ app.get(`${PREFIX}/profile-change-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     const all = await kv.getByPrefix("profile-change:");
-    if (["superadmin", "admin"].includes(role)) return c.json(all);
-    if (role === "manager") {
-      const scope = await resolveCompanyScope(user.id);
-      if (scope?.length) {
-        const employees = await kv.getByPrefix("employee:");
-        const managedIds = employees.filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company)).map((e: any) => e.userId);
-        return c.json(all.filter((r: any) => managedIds.includes(r.userId)));
-      }
-      return c.json(all);
+    
+    // Employee only sees their own requests
+    if (role === "employee") {
+      return c.json(all.filter((r: any) => r.userId === user.id));
     }
-    return c.json(all.filter((r: any) => r.userId === user.id));
+    
+    // CRITICAL: For superadmin/admin/manager, filter by company scope
+    const scope = await resolveCompanyScope(user.id);
+    if (!scope?.length) return c.json([]);
+    
+    const employees = await kv.getByPrefix("employee:");
+    const companyEmployeeIds = new Set(
+      employees
+        .filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company))
+        .map((e: any) => e.userId || e.id)
+    );
+    return c.json(all.filter((r: any) => companyEmployeeIds.has(r.userId)));
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     return c.json({ error: e.message }, 500);
@@ -1236,9 +1355,11 @@ app.put(`${PREFIX}/profile-change-requests/:id`, async (c) => {
 // --- All users for messaging (any authenticated user) ---
 app.get(`${PREFIX}/users/for-messages`, async (c) => {
   try {
-    const { user } = await requireAuth(c);
+    const { user, role } = await requireAuth(c);
     const allEmployees = await kv.getByPrefix("employee:");
-    const result = allEmployees
+    // CRITICAL: Apply company filtering for multi-tenant isolation
+    const filtered = await filterEmployeesByCompany(allEmployees, user.id, role);
+    const result = filtered
       .filter((e: any) => e.userId !== user.id)
       .map((e: any) => ({
         userId: e.userId, id: e.userId, name: e.name,
@@ -1632,15 +1753,19 @@ app.get(`${PREFIX}/reference-data`, async (c) => {
       kv.getByPrefix("financial-year:"),
     ]);
     
-    // Filter by company scope
-    const companies = scope?.length ? allCompanies.filter((c: any) => scope.includes(c.id)) : allCompanies;
-    const departments = companyId ? allDepartments.filter((d: any) => d.companyId === companyId || d.company === companyId) : allDepartments;
-    const branches = companyId ? allBranches.filter((b: any) => b.companyId === companyId || b.company === companyId) : allBranches;
-    const assets = companyId ? allAssets.filter((a: any) => a.companyId === companyId || a.company === companyId) : allAssets;
-    const assetCategories = companyId ? allAssetCategories.filter((ac: any) => ac.companyId === companyId || ac.company === companyId) : allAssetCategories;
-    const paygrades = companyId ? allPaygrades.filter((pg: any) => pg.companyId === companyId || pg.company === companyId) : allPaygrades;
-    const leaveTypes = companyId ? allLeaveTypes.filter((lt: any) => lt.companyId === companyId || lt.company === companyId) : allLeaveTypes;
-    const financialYears = companyId ? allFinancialYears.filter((fy: any) => fy.companyId === companyId || fy.company === companyId) : allFinancialYears;
+    // CRITICAL: STRICT filter by company scope - return empty if no scope
+    if (!companyId) {
+      console.log(`reference-data: User ${user.id} has no companyId scope - returning empty for strict isolation`);
+      return c.json({ companies: [], departments: [], branches: [], assets: [], assetCategories: [], paygrades: [], leaveTypes: [], financialYears: [] });
+    }
+    const companies = allCompanies.filter((c: any) => scope!.includes(c.id));
+    const departments = allDepartments.filter((d: any) => d.companyId === companyId || d.company === companyId);
+    const branches = allBranches.filter((b: any) => b.companyId === companyId || b.company === companyId);
+    const assets = allAssets.filter((a: any) => a.companyId === companyId || a.company === companyId);
+    const assetCategories = allAssetCategories.filter((ac: any) => ac.companyId === companyId || ac.company === companyId);
+    const paygrades = allPaygrades.filter((pg: any) => pg.companyId === companyId || pg.company === companyId);
+    const leaveTypes = allLeaveTypes.filter((lt: any) => lt.companyId === companyId || lt.company === companyId);
+    const financialYears = allFinancialYears.filter((fy: any) => fy.companyId === companyId || fy.company === companyId);
     
     return c.json({
       companies: companies || [],
@@ -1755,9 +1880,10 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       usedLicenses: usedLicenses + 1,
       availableLicenses: purchasedLicenses - (usedLicenses + 1),
     });
-    // Broadcast: new user joined
+    // Broadcast: new user joined (ONLY to same company employees)
     const allEmps = await kv.getByPrefix("employee:");
-    for (const emp of allEmps) {
+    const companyEmps = allEmps.filter((emp: any) => (emp.companyId === userCompanyId || emp.company === userCompanyId));
+    for (const emp of companyEmps) {
       if ((emp.userId || emp.id) === userId) continue;
       const nid = crypto.randomUUID();
       await kv.set(`notification:${nid}`, {
@@ -1817,36 +1943,32 @@ app.get(`${PREFIX}/users`, async (c) => {
     const { user, role } = await requireAuth(c);
     const allEmployees = await kv.getByPrefix("employee:");
     
-    let filtered = allEmployees;
+    // CRITICAL: STRICT multi-tenant isolation for ALL roles
+    const scope = await resolveCompanyScope(user.id);
     
-    // CRITICAL FIX: SuperAdmin should only see employees from their company
-    if (role === "superadmin") {
-      const scope = await resolveCompanyScope(user.id);
-      if (scope && scope.length > 0) {
-        filtered = allEmployees.filter((e: any) => {
-          return scope.includes(e.companyId) || scope.includes(e.company);
-        });
-      }
-    } else if (role === "admin") {
-      const scope = await resolveCompanyScope(user.id);
-      filtered = allEmployees.filter((e: any) => {
-        if (e.role === "superadmin") return false;
-        if (scope && scope.length > 0) {
-          return scope.includes(e.companyId) || scope.includes(e.company);
-        }
-        return true;
-      });
-    } else if (role === "manager") {
-      const scope = await resolveCompanyScope(user.id);
-      filtered = allEmployees.filter((e: any) => {
-        if (!["employee", "manager"].includes(e.role)) return false;
-        if (scope && scope.length > 0) {
-          return scope.includes(e.companyId) || scope.includes(e.company);
-        }
-        return true;
-      });
-    } else if (role === "employee") {
+    if (role === "employee") {
       return c.json([allEmployees.find((e: any) => e.userId === user.id)].filter(Boolean));
+    }
+    
+    // If no scope, return EMPTY - strict isolation (no company = no data)
+    if (!scope || scope.length === 0) {
+      console.log(`/users: User ${user.id} (${role}) has no company scope - returning empty`);
+      return c.json([]);
+    }
+    
+    let filtered = allEmployees.filter((e: any) => {
+      const empCompany = e.companyId || e.company;
+      if (!empCompany) return false; // Exclude unscoped employees
+      return scope.includes(empCompany);
+    });
+    
+    // Admin cannot see superadmins
+    if (role === "admin") {
+      filtered = filtered.filter((e: any) => e.role !== "superadmin");
+    }
+    // Manager can only see employees and other managers
+    if (role === "manager") {
+      filtered = filtered.filter((e: any) => ["employee", "manager"].includes(e.role));
     }
     
     return c.json(filtered);
@@ -2340,9 +2462,11 @@ app.post(`${PREFIX}/superadmin/approval/:requestId/:action`, async (c) => {
           read: false, createdAt: new Date().toISOString() 
         });
         
-        // Notify all employees
+        // Notify same-company employees only
         const allEmployees = await kv.getByPrefix("employee:");
-        for (const emp of allEmployees) {
+        const hireCompany = application.jobCompany || empData?.companyId || empData?.company;
+        const companyEmps = hireCompany ? allEmployees.filter((e: any) => e.companyId === hireCompany || e.company === hireCompany) : [];
+        for (const emp of companyEmps) {
           if (emp.userId === application.applicantId) continue;
           const nid = crypto.randomUUID();
           await kv.set(`notification:${nid}`, { 
@@ -2444,13 +2568,21 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
     const target = await kv.get(`employee:${userId}`);
     const targetName = target?.name || "Unknown User";
     const targetRole = target?.role || "employee";
+    const targetCompany = target?.companyId || target?.company;
     // Only a superadmin can delete their own superadmin account; no one can delete another superadmin
     if (targetRole === "superadmin" && userId !== caller.id) return c.json({ error: "Cannot delete another superadmin account" }, 403);
+    // CRITICAL: Verify target belongs to caller's company
+    const callerScope = await resolveCompanyScope(caller.id);
+    if (callerScope?.length && targetCompany && !callerScope.includes(targetCompany)) {
+      return c.json({ error: "Cannot delete user from another company" }, 403);
+    }
     await kv.del(`employee:${userId}`);
     const sb = supabaseAdmin();
     await sb.auth.admin.deleteUser(userId);
+    // CRITICAL: Only notify same-company employees
     const allEmployees = await kv.getByPrefix("employee:");
-    for (const emp of allEmployees) {
+    const companyEmps = targetCompany ? allEmployees.filter((e: any) => e.companyId === targetCompany || e.company === targetCompany) : [];
+    for (const emp of companyEmps) {
       const nid = crypto.randomUUID();
       await kv.set(`notification:${nid}`, {
         id: nid, userId: emp.userId || emp.id, type: "user-removed",
@@ -2475,12 +2607,20 @@ app.delete(`${PREFIX}/superadmin/users/:userId`, async (c) => {
     const target = await kv.get(`employee:${userId}`);
     const targetName = target?.name || "Unknown User";
     const targetRole = target?.role || "employee";
+    const targetCompany = target?.companyId || target?.company;
     if (targetRole === "superadmin" && userId !== caller.id) return c.json({ error: "Cannot delete another superadmin account" }, 403);
+    // CRITICAL: Verify target belongs to caller's company
+    const callerScope = await resolveCompanyScope(caller.id);
+    if (callerScope?.length && targetCompany && !callerScope.includes(targetCompany)) {
+      return c.json({ error: "Cannot delete user from another company" }, 403);
+    }
     await kv.del(`employee:${userId}`);
     const sb = supabaseAdmin();
     await sb.auth.admin.deleteUser(userId);
+    // CRITICAL: Only notify same-company employees
     const allEmployees = await kv.getByPrefix("employee:");
-    for (const emp of allEmployees) {
+    const companyEmps = targetCompany ? allEmployees.filter((e: any) => e.companyId === targetCompany || e.company === targetCompany) : [];
+    for (const emp of companyEmps) {
       const nid = crypto.randomUUID();
       await kv.set(`notification:${nid}`, {
         id: nid, userId: emp.userId || emp.id, type: "user-removed",
@@ -2522,8 +2662,10 @@ app.post(`${PREFIX}/deletion-requests`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`deletion-request:${id}`, request);
+    // CRITICAL: Only notify superadmins from the same company
     const allEmployees = await kv.getByPrefix("employee:");
-    const superAdmins = allEmployees.filter((e: any) => e.role === "superadmin");
+    const callerCompany = kvData?.companyId || kvData?.company;
+    const superAdmins = allEmployees.filter((e: any) => e.role === "superadmin" && callerCompany && (e.companyId === callerCompany || e.company === callerCompany));
     for (const sa of superAdmins) {
       const nid = crypto.randomUUID();
       await kv.set(`notification:${nid}`, {
@@ -2585,11 +2727,14 @@ app.put(`${PREFIX}/deletion-requests/:id`, async (c) => {
       const targetName = target?.name || request.targetUserName;
       const targetRole = target?.role || request.targetUserRole;
       if (targetRole === "superadmin") return c.json({ error: "Cannot delete a superadmin account via deletion request" }, 403);
+      const targetCompany = target?.companyId || target?.company;
       await kv.del(`employee:${request.targetUserId}`);
       const sb = supabaseAdmin();
       try { await sb.auth.admin.deleteUser(request.targetUserId); } catch (e) { console.log("Auth delete err:", e); }
+      // CRITICAL: Only notify same-company employees
       const allEmployees = await kv.getByPrefix("employee:");
-      for (const emp of allEmployees) {
+      const companyEmps = targetCompany ? allEmployees.filter((e: any) => e.companyId === targetCompany || e.company === targetCompany) : [];
+      for (const emp of companyEmps) {
         const nid = crypto.randomUUID();
         await kv.set(`notification:${nid}`, {
           id: nid, userId: emp.userId || emp.id, type: "user-removed",
@@ -2623,10 +2768,16 @@ app.put(`${PREFIX}/deletion-requests/:id`, async (c) => {
 // ============ SUPERADMIN DATA RESET ============
 app.post(`${PREFIX}/superadmin/reset-user-data/:userId`, async (c) => {
   try {
-    await requireSuperAdmin(c);
+    const { user: caller } = await requireSuperAdmin(c);
     const userId = c.req.param("userId");
     const target = await kv.get(`employee:${userId}`);
     if (!target) return c.json({ error: "User not found" }, 404);
+    // CRITICAL FIX: Verify target belongs to caller's company
+    const callerScope = await resolveCompanyScope(caller.id);
+    const targetCompany = target?.companyId || target?.company;
+    if (callerScope?.length && targetCompany && !callerScope.includes(targetCompany)) {
+      return c.json({ error: "Cannot reset data for user from another company" }, 403);
+    }
     let deleted = 0;
     const attendance = await kv.getByPrefix("attendance:");
     for (const r of attendance) { if (r.userId === userId) { await kv.del(`attendance:${r.userId}:${r.date}`); deleted++; } }
@@ -2648,23 +2799,50 @@ app.post(`${PREFIX}/superadmin/reset-user-data/:userId`, async (c) => {
 
 app.post(`${PREFIX}/superadmin/reset-all-data`, async (c) => {
   try {
-    await requireSuperAdmin(c);
+    const { user: caller } = await requireSuperAdmin(c);
     const { confirmPhrase } = await c.req.json();
     if (confirmPhrase !== "RESET ALL DATA") return c.json({ error: "Type 'RESET ALL DATA' to confirm" }, 400);
-    const prefixes = ["company:", "branch:", "department:", "asset:", "asset-category:", "paygrade:", "financial-year:", "leave-type:", "leave:", "attendance:", "announcement:", "message:", "notification:", "job-posting:", "job-application:", "perf-review:", "goal:", "feedback:", "meeting:", "workflow:", "disciplinary:", "compliance:", "training:", "task:", "onboard-checklist:", "payroll-run:", "tax-bracket:", "benefit-plan:", "admin-dept:", "deletion-request:", "profile-change:"];
+    
+    // CRITICAL FIX: Only reset data belonging to the caller's company
+    const callerScope = await resolveCompanyScope(caller.id);
+    if (!callerScope?.length) {
+      return c.json({ error: "No company scope found - cannot reset data" }, 400);
+    }
+    const companyId = callerScope[0];
+    
+    const prefixes = ["branch:", "department:", "asset:", "asset-category:", "paygrade:", "financial-year:", "leave-type:", "leave:", "attendance:", "announcement:", "message:", "notification:", "job-posting:", "job-application:", "perf-review:", "goal:", "feedback:", "meeting:", "workflow:", "disciplinary:", "compliance:", "training:", "task:", "onboard-checklist:", "payroll-run:", "tax-bracket:", "benefit-plan:", "admin-dept:", "deletion-request:", "profile-change:"];
     let deleted = 0;
     for (const prefix of prefixes) {
       const items = await kv.getByPrefix(prefix);
       for (const item of items) {
+        // CRITICAL: Only delete items belonging to this company
+        const itemCompany = item.companyId || item.company;
+        if (itemCompany && !callerScope.includes(itemCompany)) continue; // Skip other company's data
+        // For items without company (attendance, messages, notifications), check userId
+        if (!itemCompany) {
+          if (item.userId) {
+            const emp = await kv.get(`employee:${item.userId}`);
+            const empCompany = emp?.companyId || emp?.company;
+            if (empCompany && !callerScope.includes(empCompany)) continue;
+          } else {
+            continue; // Skip items with no way to determine company
+          }
+        }
         const key = item.userId && item.date ? `${prefix}${item.userId}:${item.date}` : `${prefix}${item.id}`;
         await kv.del(key);
         deleted++;
       }
     }
-    try { await kv.del("company-settings"); deleted++; } catch (e) {}
+    // Reset company-scoped settings
+    try { await kv.del(`company-settings:${companyId}`); deleted++; } catch (e) {}
+    try { await kv.del(`auto-clock-settings:${companyId}`); deleted++; } catch (e) {}
+    try { await kv.del(`manual-clock-settings:${companyId}`); deleted++; } catch (e) {}
+    
+    // Only delete employees from THIS company (never other companies)
     const allEmployees = await kv.getByPrefix("employee:");
+    const companyEmployees = allEmployees.filter((e: any) => callerScope.includes(e.companyId) || callerScope.includes(e.company));
     const sb = supabaseAdmin();
-    for (const emp of allEmployees) {
+    for (const emp of companyEmployees) {
       if (emp.role === "superadmin") continue;
       const uid = emp.userId || emp.id;
       await kv.del(`employee:${uid}`);
@@ -2768,8 +2946,10 @@ app.put(`${PREFIX}/superadmin/asset/:id`, async (c) => {
 // SuperAdmin assets GET (list) and DELETE routes
 app.get(`${PREFIX}/superadmin/asset`, async (c) => {
   try {
-    await requireSuperAdmin(c);
-    const items = await kv.getByPrefix('asset:');
+    const { user, role } = await requireSuperAdmin(c);
+    let items = await kv.getByPrefix('asset:');
+    // CRITICAL FIX: Apply company filtering for multi-tenant isolation
+    items = await applyCompanyFilter(items, user.id, role);
     return c.json(items || []);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -2984,6 +3164,8 @@ makeCrud("admin/paygrades", "paygrade:", requireAdminOrAbove);
 makeCrud("admin/financial-years", "financial-year:", requireAdminOrAbove);
 makeCrud("admin/leave-types", "leave-type:", requireAdminOrAbove);
 makeCrud("admin/departments", "department:", requireAdminOrAbove);
+makeCrud("admin/compensations", "compensation:", requireAdminOrAbove);
+makeCrud("admin/benefits", "benefit:", requireAdminOrAbove);
 
 // Public read-only endpoints for employees to access reference data
 app.get(`${PREFIX}/leave-types`, async (c) => {
@@ -3209,17 +3391,19 @@ app.put(`${PREFIX}/onboard-approve/:id`, async (c) => {
 
 app.put(`${PREFIX}/training-approve/:id`, async (c) => {
   try {
-    const { kvData } = await requireAdminOrAbove(c);
+    const { user, kvData } = await requireAdminOrAbove(c);
     const id = c.req.param("id");
     const body = await c.req.json();
     const existing = await kv.get(`training:${id}`);
     if (!existing) return c.json({ error: "Not found" }, 404);
     const updated = { ...existing, ...body, updatedAt: new Date().toISOString() };
     await kv.set(`training:${id}`, updated);
-    // Broadcast notification for training completion
+    // CRITICAL FIX: Only broadcast to employees in the SAME company
     if (body.status && ["completed", "active"].includes(body.status)) {
+      const callerCompany = kvData?.companyId || kvData?.company;
       const allEmps = await kv.getByPrefix("employee:");
-      for (const emp of allEmps) {
+      const companyEmps = callerCompany ? allEmps.filter((e: any) => e.companyId === callerCompany || e.company === callerCompany) : [];
+      for (const emp of companyEmps) {
         const nid = crypto.randomUUID();
         await kv.set(`notification:${nid}`, { id: nid, userId: emp.userId || emp.id, type: "training-update", title: "Training Update", message: `Training "${existing.name || existing.title}" is now ${body.status}.`, read: false, createdAt: new Date().toISOString() });
       }
@@ -3231,9 +3415,12 @@ app.put(`${PREFIX}/training-approve/:id`, async (c) => {
 // ============ REPORTS ============
 app.get(`${PREFIX}/reports/users`, async (c) => {
   try {
-    await requireAdminOrAbove(c);
-    const employees = await kv.getByPrefix("employee:");
+    const { user, role } = await requireAdminOrAbove(c);
+    const allEmployees = await kv.getByPrefix("employee:");
+    // CRITICAL: Filter by company for multi-tenant isolation
+    const employees = await filterEmployeesByCompany(allEmployees, user.id, role);
     const attendance = await kv.getByPrefix("attendance:");
+    const allowedUserIds = new Set(employees.map((e: any) => e.userId || e.id));
     const report = employees.map((e: any) => {
       const empAtt = attendance.filter((a: any) => a.userId === (e.userId || e.id));
       return { userId: e.userId || e.id, name: e.name, email: e.email, role: e.role, department: e.department, company: e.company, position: e.position, status: e.status, phone: e.phone, attendanceDays: empAtt.length, totalHoursWorked: empAtt.reduce((s: number, a: any) => s + (parseFloat(a.totalHours) || 0), 0).toFixed(1), joinDate: e.createdAt };
@@ -3244,12 +3431,16 @@ app.get(`${PREFIX}/reports/users`, async (c) => {
 
 app.get(`${PREFIX}/reports/attendance`, async (c) => {
   try {
-    await requireAdminOrAbove(c);
-    const attendance = await kv.getByPrefix("attendance:");
-    const employees = await kv.getByPrefix("employee:");
+    const { user, role } = await requireAdminOrAbove(c);
+    const allEmployees = await kv.getByPrefix("employee:");
+    // CRITICAL: Filter by company for multi-tenant isolation
+    const filteredEmployees = await filterEmployeesByCompany(allEmployees, user.id, role);
+    const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.userId || e.id));
     const empMap: Record<string, string> = {};
-    for (const e of employees) empMap[e.userId || e.id] = e.name;
-    const report = attendance.map((a: any) => ({ ...a, employeeName: empMap[a.userId] || a.userId })).sort((a: any, b: any) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+    for (const e of filteredEmployees) empMap[e.userId || e.id] = e.name;
+    const attendance = await kv.getByPrefix("attendance:");
+    const filteredAttendance = attendance.filter((a: any) => allowedUserIds.has(a.userId));
+    const report = filteredAttendance.map((a: any) => ({ ...a, employeeName: empMap[a.userId] || a.userId })).sort((a: any, b: any) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
     return c.json(report);
   } catch (e: any) { if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401); if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403); return c.json({ error: e.message }, 500); }
 });
@@ -3261,11 +3452,15 @@ app.post(`${PREFIX}/leave-requests`, async (c) => {
     const body = await c.req.json();
     const id = crypto.randomUUID();
     const kvData = await kv.get(`employee:${user.id}`);
+    // CRITICAL FIX: Include companyId for multi-tenant isolation
+    const companyId = kvData?.companyId || kvData?.company;
     const leave = {
       id,
       userId: user.id,
       employeeName: kvData?.name || user.user_metadata?.name || "",
       department: kvData?.department || "",
+      companyId,
+      company: companyId,
       ...body,
       status: "pending",
       createdAt: new Date().toISOString(),
@@ -3908,9 +4103,13 @@ app.post(`${PREFIX}/announcements`, async (c) => {
     const body = await c.req.json();
     const id = crypto.randomUUID();
     const kvData = await kv.get(`employee:${user.id}`);
+    // CRITICAL FIX: Auto-assign companyId for multi-tenant isolation
+    const companyId = body.companyId || kvData?.companyId || kvData?.company;
     const item = {
       id,
       ...body,
+      companyId,
+      company: companyId,
       authorName: kvData?.name || "",
       createdAt: new Date().toISOString(),
     };
@@ -4038,9 +4237,13 @@ app.post(`${PREFIX}/admin/announcements`, async (c) => {
     const body = await c.req.json();
     const id = crypto.randomUUID();
     const kvData = await kv.get(`employee:${user.id}`);
+    // CRITICAL FIX: Auto-assign companyId for multi-tenant isolation
+    const companyId = body.companyId || kvData?.companyId || kvData?.company;
     const item = {
       id,
       ...body,
+      companyId,
+      company: companyId,
       authorName: kvData?.name || "",
       createdAt: new Date().toISOString(),
     };
@@ -4111,9 +4314,11 @@ app.post(`${PREFIX}/superadmin/approve-hiring`, async (c) => {
         read: false, createdAt: new Date().toISOString() 
       });
       
-      // Notify all employees
-      const allEmployees = await kv.getByPrefix("employee:");
-      for (const emp of allEmployees) {
+      // Notify same-company employees only
+      const allEmployees2 = await kv.getByPrefix("employee:");
+      const hireCompany2 = application.jobCompany || empData?.companyId || empData?.company;
+      const companyEmps2 = hireCompany2 ? allEmployees2.filter((e: any) => e.companyId === hireCompany2 || e.company === hireCompany2) : [];
+      for (const emp of companyEmps2) {
         if (emp.userId === application.applicantId) continue;
         const nid = crypto.randomUUID();
         await kv.set(`notification:${nid}`, { 
@@ -4190,11 +4395,13 @@ app.post(`${PREFIX}/notifications`, async (c) => {
 
 app.post(`${PREFIX}/notifications/broadcast`, async (c) => {
   try {
-    await requireAuth(c);
+    const { user, role } = await requireAuth(c);
     const body = await c.req.json();
     const allEmployees = await kv.getByPrefix("employee:");
+    // CRITICAL: Only broadcast to employees in same company
+    const companyEmployees = await filterEmployeesByCompany(allEmployees, user.id, role);
     const notifs: any[] = [];
-    for (const emp of allEmployees) {
+    for (const emp of companyEmployees) {
       const id = crypto.randomUUID();
       const notif = { id, userId: emp.userId, type: body.type, title: body.title, message: body.message, read: false, createdAt: new Date().toISOString() };
       await kv.set(`notification:${id}`, notif);
@@ -4257,8 +4464,10 @@ app.post(`${PREFIX}/job-applications`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`job-application:${id}`, application);
+    // CRITICAL: Only notify HR staff from the same company
     const allEmployees = await kv.getByPrefix("employee:");
-    const hrStaff = allEmployees.filter((e: any) => ["superadmin", "admin"].includes(e.role));
+    const applicantCompany = kvData?.companyId || kvData?.company;
+    const hrStaff = allEmployees.filter((e: any) => ["superadmin", "admin"].includes(e.role) && applicantCompany && (e.companyId === applicantCompany || e.company === applicantCompany));
     for (const hr of hrStaff) {
       const nid = crypto.randomUUID();
       await kv.set(`notification:${nid}`, {
@@ -4316,10 +4525,14 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
           createdAt: new Date().toISOString(),
         });
         
-        // Notify all SuperAdmins
+        // CRITICAL FIX: Only notify SuperAdmins from the SAME company
         const allEmployees = await kv.getByPrefix("employee:");
-        const superadmins = allEmployees.filter((e: any) => e.role === "superadmin");
-        for (const sa of superadmins) {
+        const callerKvData = await kv.get(`employee:${user.id}`);
+        const callerCompany = callerKvData?.companyId || callerKvData?.company;
+        const companySuperadmins = callerCompany 
+          ? allEmployees.filter((e: any) => e.role === "superadmin" && (e.companyId === callerCompany || e.company === callerCompany))
+          : [];
+        for (const sa of companySuperadmins) {
           const nid = crypto.randomUUID();
           await kv.set(`notification:${nid}`, {
             id: nid, userId: sa.userId, type: "approval-required",
@@ -4352,8 +4565,11 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
       }
       const nid1 = crypto.randomUUID();
       await kv.set(`notification:${nid1}`, { id: nid1, userId: existing.applicantId, type: "hire-approved", title: "Congratulations! You've Been Hired!", message: `Your application for ${existing.jobTitle} has been approved. Your profile has been updated.`, read: false, createdAt: new Date().toISOString() });
-      const allEmployees = await kv.getByPrefix("employee:");
-      for (const emp of allEmployees) {
+      // CRITICAL: Only notify same-company employees
+      const allEmp3 = await kv.getByPrefix("employee:");
+      const hireComp3 = existing.jobCompany || newCompany;
+      const compEmp3 = hireComp3 ? allEmp3.filter((e: any) => e.companyId === hireComp3 || e.company === hireComp3) : [];
+      for (const emp of compEmp3) {
         if (emp.userId === existing.applicantId) continue;
         const nid = crypto.randomUUID();
         await kv.set(`notification:${nid}`, { id: nid, userId: emp.userId, type: "new-hire", title: "New Hire Announcement", message: `Welcome ${existing.applicantName} to the team as ${existing.jobTitle}!`, read: false, createdAt: new Date().toISOString() });
@@ -4375,15 +4591,42 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
 app.get(`${PREFIX}/backup`, async (c) => {
   try {
     const { user, role } = await requireSuperAdmin(c);
-    const prefixes = ["employee:", "company:", "branch:", "department:", "asset:", "asset-category:", "paygrade:", "financial-year:", "leave-type:", "leave:", "attendance:", "announcement:", "message:", "notification:", "job-posting:", "job-application:", "perf-review:", "goal:", "feedback:", "meeting:", "workflow:", "disciplinary:", "compliance:", "training:", "task:", "onboard-checklist:", "payroll-run:", "tax-bracket:", "benefit-plan:", "admin-dept:", "deletion-request:", "profile-change:"];
-    const backup: Record<string, any[]> = {};
-    for (const p of prefixes) {
-      const items = await kv.getByPrefix(p);
-      if (items.length > 0) backup[p] = items;
+    
+    // CRITICAL FIX: Only backup data belonging to the caller's company
+    const scope = await resolveCompanyScope(user.id);
+    if (!scope?.length) {
+      return c.json({ error: "No company scope found" }, 400);
     }
     
-    // CRITICAL FIX: Backup company-scoped settings
-    const scope = await resolveCompanyScope(user.id);
+    const prefixes = ["employee:", "company:", "branch:", "department:", "asset:", "asset-category:", "paygrade:", "financial-year:", "leave-type:", "leave:", "attendance:", "announcement:", "message:", "notification:", "job-posting:", "job-application:", "perf-review:", "goal:", "feedback:", "meeting:", "workflow:", "disciplinary:", "compliance:", "training:", "task:", "onboard-checklist:", "payroll-run:", "tax-bracket:", "benefit-plan:", "admin-dept:", "deletion-request:", "profile-change:"];
+    const backup: Record<string, any[]> = {};
+    
+    // Build a set of company employee IDs for filtering user-specific data
+    const allEmps = await kv.getByPrefix("employee:");
+    const companyEmpIds = new Set(
+      allEmps
+        .filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company))
+        .map((e: any) => e.userId || e.id)
+    );
+    
+    for (const p of prefixes) {
+      const items = await kv.getByPrefix(p);
+      // Filter items by company scope
+      const filtered = items.filter((item: any) => {
+        const itemCompany = item.companyId || item.company;
+        if (itemCompany) return scope.includes(itemCompany);
+        // For user-specific items, check if userId belongs to company
+        if (item.userId) return companyEmpIds.has(item.userId);
+        // For company: prefix, filter by id
+        if (p === "company:" && item.id) return scope.includes(item.id);
+        // For employee: prefix, already handled by companyId
+        if (p === "employee:") return companyEmpIds.has(item.userId || item.id);
+        return false;
+      });
+      if (filtered.length > 0) backup[p] = filtered;
+    }
+    
+    // CRITICAL FIX: Backup company-scoped settings (reuse scope from above)
     const companyId = scope?.[0];
     if (companyId) {
       const settings = await kv.get(`company-settings:${companyId}`);
@@ -4589,11 +4832,15 @@ app.get(`${PREFIX}/subscription/user-count`, async (c) => {
       return c.json({ error: 'Only superadmin can view user count for subscription' }, 403);
     }
     
-    // Get all employees from KV store
+    // CRITICAL FIX: Only count users from the SuperAdmin's company
+    const scope = await resolveCompanyScope(user.id);
     const allUsers = await kv.getByPrefix('employee:');
+    const companyUsers = scope?.length 
+      ? allUsers.filter((u: any) => scope.includes(u.companyId) || scope.includes(u.company))
+      : allUsers;
     
-    // Count all users (including superadmin, admin, manager, employee)
-    const count = allUsers.length || 1; // Minimum 1 user (the superadmin)
+    // Count company users only (including superadmin, admin, manager, employee)
+    const count = companyUsers.length || 1; // Minimum 1 user (the superadmin)
     
     await logAudit({
       userId: user.id,
@@ -4620,9 +4867,13 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     
     // For non-superadmins, they're covered under the superadmin's subscription
     if (role !== 'superadmin') {
-      // Find the superadmin's subscription
+      // CRITICAL: Find the superadmin from the SAME company only
+      const scope = await resolveCompanyScope(user.id);
+      const companyId = scope?.[0];
       const allEmployees = await kv.getByPrefix('employee:');
-      const superadmin = allEmployees.find((emp: any) => emp.role === 'superadmin');
+      const superadmin = companyId 
+        ? allEmployees.find((emp: any) => emp.role === 'superadmin' && (emp.companyId === companyId || emp.company === companyId))
+        : null;
       
       if (!superadmin) {
         return c.json({ status: 'expired', message: 'No superadmin found' }, 200);
@@ -5048,9 +5299,14 @@ app.get(`${PREFIX}/departments`, async (c) => {
     let departments = await kv.getByPrefix('department:');
     // CRITICAL FIX: Filter by company scope for ALL roles including SuperAdmin
     const scope = await resolveCompanyScope(user.id);
-    if (scope?.length) {
-      departments = departments.filter((d: any) => !d.companyId || scope.includes(d.companyId));
+    if (!scope?.length) {
+      return c.json([]);
     }
+    departments = departments.filter((d: any) => {
+      const dCompany = d.companyId || d.company;
+      if (!dCompany) return false; // STRICT: Exclude items without company
+      return scope.includes(dCompany);
+    });
     return c.json(departments || []);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -5085,9 +5341,14 @@ app.get(`${PREFIX}/payroll-runs`, async (c) => {
     
     // CRITICAL FIX: Filter by company scope for ALL roles including SuperAdmin
     const scope = await resolveCompanyScope(user.id);
-    if (scope?.length) {
-      payrollRuns = payrollRuns.filter((p: any) => !p.companyId || scope.includes(p.companyId));
+    if (!scope?.length) {
+      return c.json([]);
     }
+    payrollRuns = payrollRuns.filter((p: any) => {
+      const pCompany = p.companyId || p.company;
+      if (!pCompany) return false; // STRICT: Exclude items without company
+      return scope.includes(pCompany);
+    });
     
     return c.json(payrollRuns || []);
   } catch (e: any) {
@@ -5151,9 +5412,14 @@ app.get(`${PREFIX}/assets`, async (c) => {
       assets = assets.filter((a: any) => a.assignedTo === user.id);
     } else {
       const scope = await resolveCompanyScope(user.id);
-      if (scope?.length) {
-        assets = assets.filter((a: any) => !a.companyId || scope.includes(a.companyId));
+      if (!scope?.length) {
+        return c.json([]);
       }
+      assets = assets.filter((a: any) => {
+        const aCompany = a.companyId || a.company;
+        if (!aCompany) return false; // STRICT: Exclude items without company
+        return scope.includes(aCompany);
+      });
     }
     
     return c.json(assets || []);
@@ -5261,17 +5527,22 @@ app.get(`${PREFIX}/chat/messages`, async (c) => {
 // EMPLOYEE SELF-SERVICE PORTAL ENDPOINTS
 // ========================================
 
-// Get employee profile
+// Get employee profile (reads from employee: key - the main profile store)
 app.get(`${PREFIX}/employee/profile`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const profile = await kv.get(`user_profile:${authUser.user.id}`);
-    
-    if (!profile) {
+    const kvData = authUser.kvData;
+    if (!kvData) {
       return c.json({ error: 'Profile not found' }, 404);
     }
-
-    return c.json(profile);
+    return c.json({
+      id: authUser.user.id,
+      userId: authUser.user.id,
+      email: authUser.user.email,
+      name: kvData.name || authUser.user.user_metadata?.name || '',
+      role: authUser.role,
+      ...kvData,
+    });
   } catch (e: any) {
     console.error('Get profile error:', e);
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
@@ -5462,16 +5733,914 @@ app.get(`${PREFIX}/employee/attendance`, async (c) => {
 app.get(`${PREFIX}/employee/payslips`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
 
-    const payslips = await kv.get(`payslips:${companyId}:${authUser.user.id}`) || [];
+    const userPayslips = await kv.get(`payslips:${companyId}:${authUser.user.id}`) || [];
+    
+    // Also check payroll runs for generated payslips
+    if (userPayslips.length === 0 && companyId) {
+      const payrollRuns = await kv.getByPrefix(`payroll-run:`);
+      const companyRuns = payrollRuns.filter((r: any) => 
+        (r.companyId === companyId || r.company === companyId) && r.status === 'completed'
+      );
+      const generatedSlips: any[] = [];
+      for (const run of companyRuns) {
+        if (run.payslips) {
+          const mySlip = run.payslips.find((s: any) => s.employeeId === authUser.user.id || s.userId === authUser.user.id);
+          if (mySlip) {
+            generatedSlips.push({
+              ...mySlip,
+              month: run.month || new Date(run.createdAt || run.date).toLocaleString('default', { month: 'long' }),
+              year: run.year || new Date(run.createdAt || run.date).getFullYear(),
+              generatedAt: run.completedAt || run.createdAt,
+            });
+          }
+        }
+      }
+      if (generatedSlips.length > 0) {
+        return c.json({ payslips: generatedSlips.sort((a: any, b: any) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()) });
+      }
+    }
 
-    return c.json({ payslips });
+    return c.json({ payslips: userPayslips });
   } catch (e: any) {
     console.error('Get payslips error:', e);
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ error: 'Failed to get payslips' }, 500);
+  }
+});
+
+// Get employee announcements (company-scoped)
+app.get(`${PREFIX}/employee/announcements`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
+    if (!companyId) return c.json({ announcements: [] });
+    
+    const allAnnouncements = await kv.getByPrefix('announcement:');
+    const companyAnnouncements = allAnnouncements.filter((a: any) => {
+      const aCompany = a.companyId || a.company;
+      if (aCompany !== companyId) return false;
+      if (a.status && a.status !== 'published' && a.status !== 'active') return false;
+      if (a.targetDepartments && a.targetDepartments.length > 0 && a.targetAudience !== 'all') {
+        const empDept = authUser.kvData?.department;
+        if (empDept && !a.targetDepartments.includes(empDept)) return false;
+      }
+      return true;
+    });
+    companyAnnouncements.sort((a: any, b: any) => 
+      new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime()
+    );
+    return c.json({ announcements: companyAnnouncements.slice(0, 20) });
+  } catch (e: any) {
+    console.error('Get employee announcements error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get announcements' }, 500);
+  }
+});
+
+// Submit profile update request (employee self-service)
+app.post(`${PREFIX}/employee/profile-update-request`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const body = await c.req.json();
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
+    const request = {
+      id: crypto.randomUUID(),
+      userId: authUser.user.id,
+      userName: authUser.kvData?.name || authUser.user.email,
+      companyId,
+      changes: body.changes || {},
+      reason: body.reason || '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    const existing = await kv.get(`profile-change-requests:${companyId}`) || [];
+    await kv.set(`profile-change-requests:${companyId}`, [...existing, request]);
+    // Notify admins
+    const allUsers = await kv.getByPrefix('employee:');
+    const admins = allUsers.filter((u: any) => 
+      (u.role === 'admin' || u.role === 'superadmin') && 
+      (u.companyId === companyId || u.company === companyId)
+    );
+    for (const admin of admins) {
+      const adminId = admin.id || admin.userId;
+      if (adminId) {
+        const notifs = await kv.get(`notifications:${adminId}`) || [];
+        notifs.push({ id: crypto.randomUUID(), type: 'profile_update_request', title: 'Profile Update Request', message: `${request.userName} has requested a profile update`, read: false, createdAt: new Date().toISOString() });
+        await kv.set(`notifications:${adminId}`, notifs);
+      }
+    }
+    return c.json({ success: true, request });
+  } catch (e: any) {
+    console.error('Profile update request error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to submit profile update request' }, 500);
+  }
+});
+
+// Cancel a pending leave request
+app.post(`${PREFIX}/employee/leave-cancel/:id`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const leaveId = c.req.param('id');
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
+    if (!companyId) return c.json({ error: 'No company' }, 400);
+
+    const existingRequests = await kv.get(`leave_requests:${companyId}`) || [];
+    const idx = existingRequests.findIndex((r: any) => r.id === leaveId && r.userId === authUser.user.id);
+    if (idx === -1) return c.json({ error: 'Leave request not found' }, 404);
+    if (existingRequests[idx].status !== 'pending') {
+      return c.json({ error: 'Only pending requests can be cancelled' }, 400);
+    }
+    existingRequests[idx].status = 'cancelled';
+    existingRequests[idx].cancelledAt = new Date().toISOString();
+    await kv.set(`leave_requests:${companyId}`, existingRequests);
+    return c.json({ success: true });
+  } catch (e: any) {
+    console.error('Leave cancel error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to cancel leave request' }, 500);
+  }
+});
+
+// Get team directory (colleagues in same company)
+app.get(`${PREFIX}/employee/team`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
+    if (!companyId) return c.json({ team: [] });
+
+    const allEmployees = await kv.getByPrefix('employee:');
+    const team = allEmployees
+      .filter((e: any) => {
+        const eCompany = e.companyId || e.company;
+        return eCompany === companyId && e.status === 'active' && (e.userId || e.id) !== authUser.user.id;
+      })
+      .map((e: any) => ({
+        id: e.userId || e.id,
+        name: e.name || 'Unknown',
+        email: e.email || '',
+        department: e.department || '',
+        position: e.position || e.jobTitle || '',
+        role: e.role || 'employee',
+        profileImageUrl: e.profileImageUrl || null,
+      }));
+
+    return c.json({ team });
+  } catch (e: any) {
+    console.error('Get team error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get team directory' }, 500);
+  }
+});
+
+// Get company holidays
+app.get(`${PREFIX}/employee/holidays`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
+    if (!companyId) return c.json({ holidays: [] });
+
+    const holidays = await kv.get(`holidays:${companyId}`) || [];
+    const vacations = await kv.getByPrefix('vacation:');
+    const companyVacations = vacations.filter((v: any) => {
+      const vCompany = v.companyId || v.company;
+      return vCompany === companyId && v.type === 'holiday';
+    });
+
+    const allHolidays = [...holidays, ...companyVacations].sort((a: any, b: any) =>
+      new Date(a.date || a.startDate || 0).getTime() - new Date(b.date || b.startDate || 0).getTime()
+    );
+
+    return c.json({ holidays: allHolidays });
+  } catch (e: any) {
+    console.error('Get holidays error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get holidays' }, 500);
+  }
+});
+
+// Get employee's profile update request history
+app.get(`${PREFIX}/employee/profile-update-requests`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
+    if (!companyId) return c.json({ requests: [] });
+
+    const allRequests = await kv.get(`profile-change-requests:${companyId}`) || [];
+    const myRequests = allRequests.filter((r: any) => r.userId === authUser.user.id);
+    const profileChanges = await kv.getByPrefix('profile-change:');
+    const myChanges = profileChanges.filter((r: any) => r.userId === authUser.user.id);
+
+    const combined = [...myRequests, ...myChanges].sort((a: any, b: any) =>
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+
+    return c.json({ requests: combined });
+  } catch (e: any) {
+    console.error('Get profile update requests error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get profile update requests' }, 500);
+  }
+});
+
+// Get employee documents (shared with employee or their department)
+app.get(`${PREFIX}/employee/documents`, async (c) => {
+  try {
+    const authUser = await requireAuth(c);
+    const companyId = authUser.kvData?.companyId || authUser.kvData?.company;
+    if (!companyId) return c.json({ documents: [] });
+
+    const allDocs = await kv.getByPrefix('document:');
+    const empDept = authUser.kvData?.department;
+    const companyDocs = allDocs.filter((d: any) => {
+      const dCompany = d.companyId || d.company;
+      if (dCompany !== companyId) return false;
+      if (d.visibility === 'all' || d.visibility === 'company' || !d.visibility) return true;
+      if (d.visibility === 'department' && d.department === empDept) return true;
+      if (d.targetEmployees && d.targetEmployees.includes(authUser.user.id)) return true;
+      return false;
+    });
+
+    companyDocs.sort((a: any, b: any) =>
+      new Date(b.createdAt || b.uploadedAt || 0).getTime() - new Date(a.createdAt || a.uploadedAt || 0).getTime()
+    );
+
+    return c.json({ documents: companyDocs.slice(0, 50) });
+  } catch (e: any) {
+    console.error('Get employee documents error:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Failed to get documents' }, 500);
+  }
+});
+
+// ========================================
+// EMPLOYEE OVERTIME & EXPENSE ENDPOINTS
+// ========================================
+
+// Submit overtime request
+app.post(`${PREFIX}/employee/overtime-request`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const body = await c.req.json();
+    const { date, hours, reason } = body;
+    if (!date || !hours || !reason) return c.json({ error: 'Date, hours, and reason are required' }, 400);
+    
+    const companyId = kvData?.companyId || kvData?.company;
+    const id = crypto.randomUUID();
+    const request = {
+      id, userId: user.id, userName: kvData?.name || user.email,
+      department: kvData?.department || '', companyId, date,
+      hours: parseFloat(hours), reason, status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    await kv.set(`overtime:${id}`, request);
+    
+    const allEmps = await kv.getByPrefix('employee:');
+    const managers = allEmps.filter((e: any) => ['superadmin', 'admin', 'manager'].includes(e.role) && (e.companyId === companyId || e.company === companyId));
+    for (const mgr of managers) {
+      const nid = crypto.randomUUID();
+      await kv.set(`notification:${nid}`, {
+        id: nid, userId: mgr.userId || mgr.id, type: 'overtime-request',
+        title: 'Overtime Request', message: `${kvData?.name || 'An employee'} submitted an overtime request for ${hours}h on ${date}`,
+        read: false, createdAt: new Date().toISOString(),
+      });
+    }
+    return c.json({ success: true, request });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Overtime request error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/employee/overtime-requests`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const all = await kv.getByPrefix('overtime:');
+    const mine = all.filter((r: any) => r.userId === user.id).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json({ requests: mine });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/employee/expense-claim`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const body = await c.req.json();
+    const { title, category, amount, date, description, currency } = body;
+    if (!title || !category || !amount || !date) return c.json({ error: 'Title, category, amount, and date are required' }, 400);
+    
+    const companyId = kvData?.companyId || kvData?.company;
+    const id = crypto.randomUUID();
+    const claim = {
+      id, userId: user.id, userName: kvData?.name || user.email,
+      department: kvData?.department || '', companyId, title, category,
+      amount: parseFloat(amount), currency: currency || 'NGN', date,
+      description: description || '', status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    await kv.set(`expense:${id}`, claim);
+    
+    const allEmps = await kv.getByPrefix('employee:');
+    const hrStaff = allEmps.filter((e: any) => ['superadmin', 'admin'].includes(e.role) && (e.companyId === companyId || e.company === companyId));
+    for (const hr of hrStaff) {
+      const nid = crypto.randomUUID();
+      await kv.set(`notification:${nid}`, {
+        id: nid, userId: hr.userId || hr.id, type: 'expense-claim',
+        title: 'Expense Claim', message: `${kvData?.name || 'An employee'} submitted an expense claim: ${title} (${currency || 'NGN'} ${amount})`,
+        read: false, createdAt: new Date().toISOString(),
+      });
+    }
+    return c.json({ success: true, claim });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Expense claim error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/employee/expense-claims`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const all = await kv.getByPrefix('expense:');
+    const mine = all.filter((r: any) => r.userId === user.id).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json({ claims: mine });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ========================================
+// EMPLOYEE TRAINING ENROLLMENT ENDPOINTS
+// ========================================
+
+app.get(`${PREFIX}/employee/available-training`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    if (!companyId) return c.json({ programs: [] });
+    
+    const [progs1, progs2] = await Promise.all([kv.getByPrefix('training:'), kv.getByPrefix('training-program:')]);
+    const allPrograms = [...(Array.isArray(progs1) ? progs1 : []), ...(Array.isArray(progs2) ? progs2 : [])];
+    const available = allPrograms.filter((p: any) => {
+      const pCompany = p.companyId || p.company;
+      if (pCompany && pCompany !== companyId) return false;
+      if (p.status === 'cancelled' || p.status === 'draft') return false;
+      return true;
+    });
+    return c.json({ programs: available });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/employee/training-enroll`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const { trainingId, trainingTitle } = await c.req.json();
+    if (!trainingId) return c.json({ error: 'Training ID is required' }, 400);
+    
+    const existingEnrollments = await kv.getByPrefix('training-enrollment:');
+    const alreadyEnrolled = existingEnrollments.find((e: any) => e.userId === user.id && e.trainingId === trainingId);
+    if (alreadyEnrolled) return c.json({ error: 'You are already enrolled in this program' }, 400);
+    
+    const companyId = kvData?.companyId || kvData?.company;
+    const id = crypto.randomUUID();
+    const enrollment = {
+      id, userId: user.id, userName: kvData?.name || user.email,
+      department: kvData?.department || '', companyId, trainingId,
+      trainingTitle: trainingTitle || 'Training Program',
+      status: 'enrolled', progress: 0, enrolledAt: new Date().toISOString(),
+    };
+    await kv.set(`training-enrollment:${id}`, enrollment);
+    return c.json({ success: true, enrollment });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Training enrollment error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/employee/my-enrollments`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const all = await kv.getByPrefix('training-enrollment:');
+    const mine = all.filter((e: any) => e.userId === user.id).sort((a: any, b: any) => new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime());
+    return c.json({ enrollments: mine });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ========================================
+// EMPLOYEE FEEDBACK & SURVEY ENDPOINTS
+// ========================================
+
+app.post(`${PREFIX}/employee/feedback`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const { category, message, anonymous } = await c.req.json();
+    if (!category || !message) return c.json({ error: 'Category and message are required' }, 400);
+    
+    const companyId = kvData?.companyId || kvData?.company;
+    const id = crypto.randomUUID();
+    const feedback = {
+      id, userId: anonymous ? 'anonymous' : user.id,
+      _actualUserId: user.id,
+      userName: anonymous ? 'Anonymous' : (kvData?.name || user.email),
+      department: anonymous ? '' : (kvData?.department || ''),
+      companyId, category, message, anonymous: !!anonymous,
+      status: 'submitted', createdAt: new Date().toISOString(),
+    };
+    await kv.set(`emp-feedback:${id}`, feedback);
+    
+    const allEmps = await kv.getByPrefix('employee:');
+    const hrStaff = allEmps.filter((e: any) => ['superadmin', 'admin'].includes(e.role) && (e.companyId === companyId || e.company === companyId));
+    for (const hr of hrStaff) {
+      const nid = crypto.randomUUID();
+      await kv.set(`notification:${nid}`, {
+        id: nid, userId: hr.userId || hr.id, type: 'employee-feedback',
+        title: 'New Employee Feedback',
+        message: `${anonymous ? 'Anonymous employee' : (kvData?.name || 'An employee')} submitted ${category} feedback`,
+        read: false, createdAt: new Date().toISOString(),
+      });
+    }
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Feedback submit error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/employee/feedback-history`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const all = await kv.getByPrefix('emp-feedback:');
+    const mine = all.filter((f: any) => f._actualUserId === user.id || f.userId === user.id)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json({ feedback: mine });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/employee/surveys`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    if (!companyId) return c.json({ surveys: [], responses: [] });
+    
+    const allSurveys = await kv.getByPrefix('survey:');
+    const companySurveys = allSurveys.filter((s: any) => {
+      const sCompany = s.companyId || s.company;
+      return sCompany === companyId && s.status !== 'draft';
+    });
+    
+    const allResponses = await kv.getByPrefix('survey-response:');
+    const myResponses = allResponses.filter((r: any) => r._actualUserId === user.id || r.userId === user.id);
+    return c.json({ surveys: companySurveys, responses: myResponses });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/employee/survey-response`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const { surveyId, surveyTitle, answers, anonymous } = await c.req.json();
+    if (!surveyId || !answers) return c.json({ error: 'Survey ID and answers are required' }, 400);
+    
+    const existingResponses = await kv.getByPrefix('survey-response:');
+    const alreadyResponded = existingResponses.find((r: any) => (r._actualUserId === user.id || r.userId === user.id) && r.surveyId === surveyId);
+    if (alreadyResponded) return c.json({ error: 'You have already responded to this survey' }, 400);
+    
+    const companyId = kvData?.companyId || kvData?.company;
+    const id = crypto.randomUUID();
+    const response = {
+      id, userId: anonymous ? 'anonymous' : user.id,
+      _actualUserId: user.id,
+      userName: anonymous ? 'Anonymous' : (kvData?.name || user.email),
+      companyId, surveyId, surveyTitle: surveyTitle || 'Survey',
+      answers, anonymous: !!anonymous, submittedAt: new Date().toISOString(),
+    };
+    await kv.set(`survey-response:${id}`, response);
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Survey response error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ========================================
+// EMPLOYEE TEAM CALENDAR ENDPOINT
+// ========================================
+
+app.get(`${PREFIX}/employee/team-calendar`, async (c) => {
+  try {
+    const { user, kvData } = await requireAuth(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    if (!companyId) return c.json({ leaves: [] });
+    
+    const allEmps = await kv.getByPrefix('employee:');
+    const companyEmps = allEmps.filter((e: any) => (e.companyId === companyId || e.company === companyId));
+    const allLeaves = await kv.getByPrefix('leave:');
+    const companyEmpIds = new Set(companyEmps.map((e: any) => e.userId || e.id));
+    
+    const teamLeaves = allLeaves
+      .filter((l: any) => l.status === 'approved' && companyEmpIds.has(l.userId))
+      .map((l: any) => {
+        const emp = companyEmps.find((e: any) => (e.userId || e.id) === l.userId);
+        return {
+          userId: l.userId,
+          userName: emp?.name || l.userName || 'Unknown',
+          department: emp?.department || l.department || '',
+          startDate: l.startDate, endDate: l.endDate,
+          type: l.type || l.leaveType || 'Annual', status: l.status,
+        };
+      });
+    return c.json({ leaves: teamLeaves });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ========================================
+// ADMIN OVERTIME & EXPENSE APPROVAL ENDPOINTS
+// ========================================
+
+app.get(`${PREFIX}/admin/overtime-requests`, async (c) => {
+  try {
+    const { user, role, kvData } = await requireAdminOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const all = await kv.getByPrefix('overtime:');
+    const companyRequests = all.filter((r: any) => r.companyId === companyId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json(companyRequests);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/admin/overtime-requests/:id`, async (c) => {
+  try {
+    const { user, kvData } = await requireAdminOrAbove(c);
+    const id = c.req.param('id');
+    const { status, rejectionReason } = await c.req.json();
+    if (!['approved', 'rejected'].includes(status)) return c.json({ error: 'Invalid status' }, 400);
+    const existing = await kv.get(`overtime:${id}`);
+    if (!existing) return c.json({ error: 'Overtime request not found' }, 404);
+    const updated = { ...existing, status, respondedAt: new Date().toISOString(), respondedBy: kvData?.name || user.email, ...(rejectionReason ? { rejectionReason } : {}) };
+    await kv.set(`overtime:${id}`, updated);
+    const nid = crypto.randomUUID();
+    await kv.set(`notification:${nid}`, { id: nid, userId: existing.userId, type: 'overtime-update', title: `Overtime ${status === 'approved' ? 'Approved' : 'Rejected'}`, message: `Your overtime request for ${existing.hours}h on ${existing.date} has been ${status}${rejectionReason ? ': ' + rejectionReason : ''}`, read: false, createdAt: new Date().toISOString() });
+    return c.json({ success: true, request: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/admin/expense-claims`, async (c) => {
+  try {
+    const { user, role, kvData } = await requireAdminOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const all = await kv.getByPrefix('expense:');
+    const companyClaims = all.filter((r: any) => r.companyId === companyId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json(companyClaims);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/admin/expense-claims/:id`, async (c) => {
+  try {
+    const { user, kvData } = await requireAdminOrAbove(c);
+    const id = c.req.param('id');
+    const { status, rejectionReason } = await c.req.json();
+    if (!['approved', 'rejected', 'reimbursed'].includes(status)) return c.json({ error: 'Invalid status' }, 400);
+    const existing = await kv.get(`expense:${id}`);
+    if (!existing) return c.json({ error: 'Expense claim not found' }, 404);
+    const updated = { ...existing, status, respondedAt: new Date().toISOString(), respondedBy: kvData?.name || user.email, ...(rejectionReason ? { rejectionReason } : {}) };
+    await kv.set(`expense:${id}`, updated);
+    const nid = crypto.randomUUID();
+    await kv.set(`notification:${nid}`, { id: nid, userId: existing.userId, type: 'expense-update', title: `Expense ${status === 'approved' ? 'Approved' : status === 'reimbursed' ? 'Reimbursed' : 'Rejected'}`, message: `Your expense claim "${existing.title}" (${existing.currency} ${existing.amount}) has been ${status}${rejectionReason ? ': ' + rejectionReason : ''}`, read: false, createdAt: new Date().toISOString() });
+    return c.json({ success: true, claim: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ========================================
+// MANAGER OVERTIME & EXPENSE APPROVAL ENDPOINTS
+// ========================================
+
+app.get(`${PREFIX}/manager/overtime-requests`, async (c) => {
+  try {
+    const { user, role, kvData } = await requireManagerOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const managerDepts = kvData?.departments || (kvData?.department ? [kvData.department] : []);
+    
+    // Get all employees in manager's departments
+    const allEmployees = await kv.getByPrefix('employee:');
+    const deptEmployees = allEmployees.filter((emp: any) => {
+      const empDepts = emp.departments || (emp.department ? [emp.department] : []);
+      const empCompany = emp.companyId || emp.company;
+      return empCompany === companyId && managerDepts.some((dept: string) => empDepts.includes(dept));
+    });
+    const deptEmployeeIds = new Set(deptEmployees.map((e: any) => e.userId || e.id));
+    
+    // Filter overtime requests to only those from department employees
+    const all = await kv.getByPrefix('overtime:');
+    const departmentRequests = all.filter((r: any) => 
+      r.companyId === companyId && deptEmployeeIds.has(r.userId)
+    ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    return c.json(departmentRequests);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Manager overtime requests error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/manager/overtime-requests/:id`, async (c) => {
+  try {
+    const { user, kvData } = await requireManagerOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const managerDepts = kvData?.departments || (kvData?.department ? [kvData.department] : []);
+    const id = c.req.param('id');
+    const { status, rejectionReason } = await c.req.json();
+    
+    if (!['approved', 'rejected'].includes(status)) return c.json({ error: 'Invalid status' }, 400);
+    
+    const existing = await kv.get(`overtime:${id}`);
+    if (!existing) return c.json({ error: 'Overtime request not found' }, 404);
+    
+    // Verify the employee is in manager's department
+    const employee = await kv.get(`employee:${existing.userId}`);
+    if (!employee) return c.json({ error: 'Employee not found' }, 404);
+    
+    const empDepts = employee.departments || (employee.department ? [employee.department] : []);
+    const hasAccess = managerDepts.some((dept: string) => empDepts.includes(dept));
+    
+    if (!hasAccess) {
+      return c.json({ error: 'You can only approve overtime for employees in your departments' }, 403);
+    }
+    
+    const updated = { 
+      ...existing, 
+      status, 
+      respondedAt: new Date().toISOString(), 
+      respondedBy: kvData?.name || user.email, 
+      ...(rejectionReason ? { rejectionReason } : {}) 
+    };
+    await kv.set(`overtime:${id}`, updated);
+    
+    // Send notification to employee
+    const nid = crypto.randomUUID();
+    await kv.set(`notification:${nid}`, { 
+      id: nid, 
+      userId: existing.userId, 
+      type: 'overtime-update', 
+      title: `Overtime ${status === 'approved' ? 'Approved' : 'Rejected'}`, 
+      message: `Your overtime request for ${existing.hours}h on ${existing.date} has been ${status}${rejectionReason ? ': ' + rejectionReason : ''}`, 
+      read: false, 
+      createdAt: new Date().toISOString() 
+    });
+    
+    return c.json({ success: true, request: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Manager overtime approval error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/manager/expense-claims`, async (c) => {
+  try {
+    const { user, role, kvData } = await requireManagerOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const managerDepts = kvData?.departments || (kvData?.department ? [kvData.department] : []);
+    
+    // Get all employees in manager's departments
+    const allEmployees = await kv.getByPrefix('employee:');
+    const deptEmployees = allEmployees.filter((emp: any) => {
+      const empDepts = emp.departments || (emp.department ? [emp.department] : []);
+      const empCompany = emp.companyId || emp.company;
+      return empCompany === companyId && managerDepts.some((dept: string) => empDepts.includes(dept));
+    });
+    const deptEmployeeIds = new Set(deptEmployees.map((e: any) => e.userId || e.id));
+    
+    // Filter expense claims to only those from department employees
+    const all = await kv.getByPrefix('expense:');
+    const departmentClaims = all.filter((r: any) => 
+      r.companyId === companyId && deptEmployeeIds.has(r.userId)
+    ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    return c.json(departmentClaims);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Manager expense claims error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/manager/expense-claims/:id`, async (c) => {
+  try {
+    const { user, kvData } = await requireManagerOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const managerDepts = kvData?.departments || (kvData?.department ? [kvData.department] : []);
+    const id = c.req.param('id');
+    const { status, rejectionReason } = await c.req.json();
+    
+    if (!['approved', 'rejected'].includes(status)) return c.json({ error: 'Invalid status' }, 400);
+    
+    const existing = await kv.get(`expense:${id}`);
+    if (!existing) return c.json({ error: 'Expense claim not found' }, 404);
+    
+    // Verify the employee is in manager's department
+    const employee = await kv.get(`employee:${existing.userId}`);
+    if (!employee) return c.json({ error: 'Employee not found' }, 404);
+    
+    const empDepts = employee.departments || (employee.department ? [employee.department] : []);
+    const hasAccess = managerDepts.some((dept: string) => empDepts.includes(dept));
+    
+    if (!hasAccess) {
+      return c.json({ error: 'You can only approve expenses for employees in your departments' }, 403);
+    }
+    
+    const updated = { 
+      ...existing, 
+      status, 
+      respondedAt: new Date().toISOString(), 
+      respondedBy: kvData?.name || user.email, 
+      ...(rejectionReason ? { rejectionReason } : {}) 
+    };
+    await kv.set(`expense:${id}`, updated);
+    
+    // Send notification to employee
+    const nid = crypto.randomUUID();
+    await kv.set(`notification:${nid}`, { 
+      id: nid, 
+      userId: existing.userId, 
+      type: 'expense-update', 
+      title: `Expense Claim ${status === 'approved' ? 'Approved' : 'Rejected'}`, 
+      message: `Your expense claim for ₦${existing.amount} (${existing.category}) has been ${status}${rejectionReason ? ': ' + rejectionReason : ''}`, 
+      read: false, 
+      createdAt: new Date().toISOString() 
+    });
+    
+    return c.json({ success: true, claim: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Manager expense approval error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ========================================
+// ADMIN SURVEY BUILDER ENDPOINTS
+// ========================================
+
+app.get(`${PREFIX}/admin/surveys`, async (c) => {
+  try {
+    const { user, kvData } = await requireAdminOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const all = await kv.getByPrefix('survey:');
+    const companySurveys = all.filter((s: any) => (s.companyId || s.company) === companyId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json(companySurveys);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/admin/survey`, async (c) => {
+  try {
+    const { user, kvData } = await requireAdminOrAbove(c);
+    const body = await c.req.json();
+    const { title, description, questions, deadline, anonymous, category, status } = body;
+    if (!title || !questions || !Array.isArray(questions)) return c.json({ error: 'Title and questions array required' }, 400);
+    const companyId = kvData?.companyId || kvData?.company;
+    const id = crypto.randomUUID();
+    const survey = { id, companyId, title, description: description || '', questions: questions.map((q: any) => ({ ...q, id: q.id || crypto.randomUUID() })), deadline: deadline || null, anonymous: anonymous !== false, category: category || 'General', status: status || 'draft', createdBy: kvData?.name || user.email, createdAt: new Date().toISOString() };
+    await kv.set(`survey:${id}`, survey);
+    return c.json({ success: true, survey });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.error('Create survey error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/admin/survey/:id`, async (c) => {
+  try {
+    const { user, kvData } = await requireAdminOrAbove(c);
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const existing = await kv.get(`survey:${id}`);
+    if (!existing) return c.json({ error: 'Survey not found' }, 404);
+    if (body.questions) { body.questions = body.questions.map((q: any) => ({ ...q, id: q.id || crypto.randomUUID() })); }
+    const updated = { ...existing, ...body, updatedAt: new Date().toISOString(), updatedBy: kvData?.name || user.email };
+    await kv.set(`survey:${id}`, updated);
+    return c.json({ success: true, survey: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.delete(`${PREFIX}/admin/survey/:id`, async (c) => {
+  try {
+    await requireAdminOrAbove(c);
+    const id = c.req.param('id');
+    await kv.del(`survey:${id}`);
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/admin/survey-responses/:surveyId`, async (c) => {
+  try {
+    await requireAdminOrAbove(c);
+    const surveyId = c.req.param('surveyId');
+    const all = await kv.getByPrefix('survey-response:');
+    const responses = all.filter((r: any) => r.surveyId === surveyId)
+      .sort((a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    return c.json(responses);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ========================================
+// EMPLOYEE TRAINING PROGRESS UPDATE
+// ========================================
+
+app.put(`${PREFIX}/employee/training-progress/:id`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const id = c.req.param('id');
+    const { progress, status } = await c.req.json();
+    const enrollment = await kv.get(`training-enrollment:${id}`);
+    if (!enrollment) return c.json({ error: 'Enrollment not found' }, 404);
+    if (enrollment.userId !== user.id) return c.json({ error: 'Not your enrollment' }, 403);
+    const updated = { ...enrollment, progress: Math.min(100, Math.max(0, progress ?? enrollment.progress)), status: status || (progress >= 100 ? 'completed' : 'in-progress'), ...(progress >= 100 ? { completedAt: new Date().toISOString() } : {}), updatedAt: new Date().toISOString() };
+    await kv.set(`training-enrollment:${id}`, updated);
+    return c.json({ success: true, enrollment: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/admin/employee-feedback`, async (c) => {
+  try {
+    const { user, kvData } = await requireAdminOrAbove(c);
+    const companyId = kvData?.companyId || kvData?.company;
+    const all = await kv.getByPrefix('emp-feedback:');
+    const companyFeedback = all.filter((f: any) => f.companyId === companyId)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json(companyFeedback);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/admin/employee-feedback/:id`, async (c) => {
+  try {
+    await requireAdminOrAbove(c);
+    const id = c.req.param('id');
+    const { status } = await c.req.json();
+    const existing = await kv.get(`emp-feedback:${id}`);
+    if (!existing) return c.json({ error: 'Feedback not found' }, 404);
+    const updated = { ...existing, status, updatedAt: new Date().toISOString() };
+    await kv.set(`emp-feedback:${id}`, updated);
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
   }
 });
 
@@ -5634,7 +6803,7 @@ app.get(`${PREFIX}/subscription/verify-payment`, async (c) => {
     });
 
     // Delete pending payment
-    await kv.delete(`pending_payment:${reference}`);
+    await kv.del(`pending_payment:${reference}`);
 
     // Redirect to success page
     return c.redirect(`${Deno.env.get('APP_URL')}/superadmin?subscription=success`);
@@ -5766,7 +6935,7 @@ app.get(`${PREFIX}/subscription/verify-license-upgrade`, async (c) => {
       availableLicenses: (stats.availableLicenses || 0) + pendingLicense.additionalLicenses,
     });
 
-    await kv.delete(`pending_license:${reference}`);
+    await kv.del(`pending_license:${reference}`);
 
     return c.redirect(`${Deno.env.get('APP_URL')}/superadmin?licenses=upgraded`);
   } catch (e: any) {
@@ -5974,7 +7143,7 @@ app.get(`${PREFIX}/automation/workflows`, async (c) => {
     const companyId = profile?.companyId;
     
     const workflows = await kv.getByPrefix('automation_workflow:');
-    const filtered = workflows.filter((w: any) => w.companyId === companyId || !w.companyId);
+    const filtered = companyId ? workflows.filter((w: any) => w.companyId === companyId) : [];
     
     return c.json({ data: filtered });
   } catch (e: any) {
@@ -6416,6 +7585,151 @@ app.get(`${PREFIX}/attendance/today`, async (c) => {
     return c.json(record || null);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 2FA (Two-Factor Authentication) Endpoints
+// ═══════════════════════════════════════════════════════════════════
+
+// Generate and send 2FA code via email
+app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
+  try {
+    const { email } = await c.req.json();
+    if (!email) {
+      return c.json({ error: "Email is required" }, 400);
+    }
+
+    // Generate a 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store the code in KV store
+    await kv.set(`2fa:${email.toLowerCase()}`, {
+      code,
+      expiresAt: expiresAt.toISOString(),
+      attempts: 0,
+    });
+
+    console.log(`2FA code generated for ${email}: ${code}`);
+
+    // TODO: In production, send this via email service (e.g., SendGrid, AWS SES)
+    // For now, we'll just log it and return success
+    // await sendEmail(email, '2FA Verification Code', `Your code is: ${code}`);
+
+    return c.json({ 
+      success: true, 
+      message: "Verification code sent to your email",
+      // DEVELOPMENT ONLY: Remove this in production
+      devCode: code,
+    });
+  } catch (e: any) {
+    console.error("2FA send code error:", e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Verify 2FA code
+app.post(`${PREFIX}/auth/2fa/verify-code`, async (c) => {
+  try {
+    const { email, code } = await c.req.json();
+    if (!email || !code) {
+      return c.json({ error: "Email and code are required" }, 400);
+    }
+
+    const stored = await kv.get(`2fa:${email.toLowerCase()}`);
+    if (!stored) {
+      return c.json({ error: "No verification code found. Please request a new code." }, 400);
+    }
+
+    // Check if expired
+    if (new Date(stored.expiresAt) < new Date()) {
+      await kv.del(`2fa:${email.toLowerCase()}`);
+      return c.json({ error: "Verification code has expired. Please request a new code." }, 400);
+    }
+
+    // Check attempts
+    if (stored.attempts >= 5) {
+      await kv.del(`2fa:${email.toLowerCase()}`);
+      return c.json({ error: "Too many failed attempts. Please request a new code." }, 400);
+    }
+
+    // Verify code
+    if (stored.code !== code) {
+      stored.attempts += 1;
+      await kv.set(`2fa:${email.toLowerCase()}`, stored);
+      return c.json({ 
+        error: "Invalid verification code",
+        attemptsRemaining: 5 - stored.attempts,
+      }, 400);
+    }
+
+    // Code is valid - delete it and update user metadata
+    await kv.del(`2fa:${email.toLowerCase()}`);
+
+    const sb = supabaseAdmin();
+    
+    // Get user by email
+    const { data: { users }, error: listError } = await sb.auth.admin.listUsers();
+    if (listError) {
+      console.error("Error listing users:", listError);
+      return c.json({ error: "Failed to verify user" }, 500);
+    }
+
+    const user = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    // Update user metadata to mark 2FA as enabled
+    await sb.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...user.user_metadata,
+        twoFactorEnabled: true,
+        twoFactorVerifiedAt: new Date().toISOString(),
+      },
+    });
+
+    console.log(`2FA verified and enabled for ${email}`);
+
+    return c.json({ 
+      success: true, 
+      message: "Two-factor authentication enabled successfully",
+    });
+  } catch (e: any) {
+    console.error("2FA verify code error:", e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Check 2FA status for a user
+app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
+  try {
+    const email = c.req.query("email");
+    if (!email) {
+      return c.json({ error: "Email is required" }, 400);
+    }
+
+    const sb = supabaseAdmin();
+    const { data: { users }, error } = await sb.auth.admin.listUsers();
+    if (error) {
+      console.error("Error listing users:", error);
+      return c.json({ error: "Failed to check 2FA status" }, 500);
+    }
+
+    const user = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    return c.json({
+      requires2FA: user.user_metadata?.requires2FA || false,
+      twoFactorEnabled: user.user_metadata?.twoFactorEnabled || false,
+      twoFactorVerifiedAt: user.user_metadata?.twoFactorVerifiedAt || null,
+    });
+  } catch (e: any) {
+    console.error("2FA status check error:", e);
     return c.json({ error: e.message }, 500);
   }
 });

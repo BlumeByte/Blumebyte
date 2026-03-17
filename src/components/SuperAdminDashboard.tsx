@@ -53,6 +53,9 @@ import { TaxConfigurationModule } from './TaxConfigurationModule';
 import { BenefitsModule } from './BenefitsModule';
 import { MultiDepartmentSelect } from './MultiDepartmentSelect';
 import { AutomationModule } from './AutomationModule';
+import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
+import { SurveyBuilder } from './SurveyBuilder';
+import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -82,6 +85,9 @@ const SIDEBAR_ITEMS = [
   { id: 'advanced-reports', label: 'Advanced Reports', icon: TrendingUp, group: 'operations' },
   { id: 'labour-compliance', label: 'Labour Act Compliance', icon: FileCheck, group: 'operations' },
   { id: 'onboarding-training', label: 'Onboarding & Training', icon: BookOpen, group: 'development' },
+  { id: 'overtime-expenses', label: 'OT & Expenses', icon: Clock, group: 'time' },
+  { id: 'surveys', label: 'Surveys & Feedback', icon: ClipboardList, group: 'engagement' },
+  { id: 'engagement-analytics', label: 'Engagement Analytics', icon: TrendingUp, group: 'engagement' },
   { id: 'tasks', label: 'Task Assignments', icon: ClipboardList, group: 'operations' },
   { id: 'announcements', label: 'Announcements', icon: Megaphone, group: 'engagement' },
   { id: 'messages', label: 'Messages', icon: MessageCircle, group: 'engagement' },
@@ -438,6 +444,9 @@ export function SuperAdminDashboard() {
       case 'advanced-reports': return <div className="p-8"><AdvancedReportsModule /></div>;
       case 'audit-logs': return <div className="p-8"><AuditLogsModule /></div>;
       case 'onboarding-training': return <OnboardingView />;
+      case 'overtime-expenses': return <div className="p-8"><OvertimeExpenseApproval /></div>;
+      case 'surveys': return <div className="p-8"><SurveyBuilder /></div>;
+      case 'engagement-analytics': return <div className="p-8"><EmployeeEngagementAnalytics /></div>;
       case 'meetings-1on1': return <MeetingsPanel mode="admin" />;
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;

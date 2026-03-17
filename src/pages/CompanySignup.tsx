@@ -220,8 +220,9 @@ export default function CompanySignup() {
           setPollingStatus(null);
           setPaymentWindowOpened(false);
           setPendingReference(null);
-          toast.success('Payment successful! Your account has been created. Please sign in.', { duration: 5000 });
-          navigate('/login');
+          toast.success('Payment successful! Setting up 2FA security...', { duration: 5000 });
+          // Redirect to 2FA setup for SuperAdmin
+          navigate('/two-factor-verification', { state: { email: formData.adminEmail } });
         } else if (data.status === 'paid') {
           // Payment succeeded on Paystack but not yet verified server-side
           clearInterval(pollingRef.current!);
@@ -371,11 +372,11 @@ export default function CompanySignup() {
         duration: 6000,
       });
       
-      setPollingStatus('Account created successfully! Redirecting to login...');
+      setPollingStatus('Account created successfully! Setting up 2FA security...');
       
-      // Redirect to login after showing success message
+      // Redirect to 2FA verification for SuperAdmin
       setTimeout(() => {
-        navigate('/login');
+        navigate('/two-factor-verification', { state: { email: formData.adminEmail } });
       }, 2000);
     } catch (error: any) {
       console.error('Registration error:', error);

@@ -25,6 +25,8 @@ const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
 const EmployeeDashboard = lazy(() => import('./components/EmployeeDashboard'));
 const PaymentVerification = lazy(() => import('./components/PaymentVerification'));
 const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification'));
+const ProductionCleanup = lazy(() => import('./pages/ProductionCleanup'));
+const TwoFactorVerification = lazy(() => import('./pages/TwoFactorVerification'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -142,6 +144,18 @@ const PrivacyPolicyPage = () => <PrivacyPolicy />;
 
 const TermsConditionsPage = () => <TermsConditions />;
 
+const ProductionCleanupPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <ProductionCleanup />
+  </Suspense>
+);
+
+const TwoFactorVerificationPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <TwoFactorVerification />
+  </Suspense>
+);
+
 const NotFoundPage = () => <Navigate to="/login" replace />;
 
 export const router = createBrowserRouter([
@@ -195,6 +209,14 @@ export const router = createBrowserRouter([
       {
         path: '/dev-settings',
         Component: DevSettingsPage,
+      },
+      {
+        path: '/production-cleanup',
+        Component: ProductionCleanupPage,
+      },
+      {
+        path: '/two-factor-verification',
+        Component: TwoFactorVerificationPage,
       },
       {
         path: '/security-policy',

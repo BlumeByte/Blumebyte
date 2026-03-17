@@ -35,6 +35,7 @@ import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { AnnouncementsViewer } from './AnnouncementsViewer';
 import { ManagerCrudPanel } from './ManagerCrudPanel';
 import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
+import { ManagerOvertimeExpenseApproval } from './ManagerOvertimeExpenseApproval';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -560,6 +561,14 @@ export function ManagerDashboard() {
             Training
           </Button>
           <Button
+            variant={activeTab === 'overtime-expenses' ? 'default' : 'ghost'}
+            className="w-full justify-start text-sm h-9"
+            onClick={() => setActiveTab('overtime-expenses')}
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            OT & Expenses
+          </Button>
+          <Button
             variant={activeTab === 'reports' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
             onClick={() => setActiveTab('reports')}
@@ -645,6 +654,7 @@ export function ManagerDashboard() {
             {activeTab === 'tasks' && 'Task Assignments'}
             {activeTab === 'feedback' && '360° Feedback'}
             {activeTab === 'training' && 'Training'}
+            {activeTab === 'overtime-expenses' && 'OT & Expenses'}
             {activeTab === 'reports' && 'Reports'}
             {activeTab === 'advanced-reports' && 'Advanced Reports'}
             {activeTab === 'meetings' && 'Meetings'}
@@ -732,6 +742,7 @@ export function ManagerDashboard() {
           {activeTab === 'tasks' && <ManagerCrudPanel resourceType="tasks" title="Task Assignments" description="Create and assign tasks to employees in your department" icon={ClipboardList} />}
           {activeTab === 'feedback' && <ManagerCrudPanel resourceType="feedback" title="360° Feedback" description="Collect and manage 360-degree feedback for your department" icon={UserCheck} />}
           {activeTab === 'training' && <TrainingManagement mode="admin" />}
+          {activeTab === 'overtime-expenses' && <ManagerOvertimeExpenseApproval />}
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'advanced-reports' && <AdvancedReportsModule />}
           {activeTab === 'meetings' && <MeetingsPanel mode="employee" />}

@@ -32,7 +32,7 @@ export function PayGradesModule() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api('/pay-grades', { token: accessToken });
+      const data = await api('/admin/paygrades', { token: accessToken });
       setGrades(Array.isArray(data) ? data : []);
     } catch (e) {
       console.log('Failed to load pay grades:', e);
@@ -91,14 +91,14 @@ export function PayGradesModule() {
       }
 
       if (editItem) {
-        await api(`/pay-grades/${editItem.id}`, {
+        await api(`/admin/paygrades/${editItem.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
           token: accessToken,
         });
         toast.success('Pay grade updated successfully');
       } else {
-        await api('/pay-grades', {
+        await api('/admin/paygrades', {
           method: 'POST',
           body: JSON.stringify(payload),
           token: accessToken,
@@ -116,7 +116,7 @@ export function PayGradesModule() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this pay grade?')) return;
     try {
-      await api(`/pay-grades/${id}`, { method: 'DELETE', token: accessToken });
+      await api(`/admin/paygrades/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Pay grade deleted successfully');
       load();
     } catch (e: any) {

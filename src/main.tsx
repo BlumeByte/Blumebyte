@@ -33,6 +33,12 @@ const shouldSuppress = (...args: any[]): boolean => {
   if (/_fg/i.test(message)) return true;
   if (message.includes('React does not recognize')) return true;
   
+  // Block Figma iframe and dynamic import errors
+  if (message.includes('IframeMessageAbortError')) return true;
+  if (message.includes('message port was destroyed')) return true;
+  if (message.includes('Failed to fetch dynamically imported module')) return true;
+  if (message.includes('/src/App.tsx')) return true;
+  
   return false;
 };
 
