@@ -225,7 +225,8 @@ function AdminOverview({ setTab }: { setTab: (t: string) => void }) {
   }, [accessToken]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
-  useEffect(() => { const iv = setInterval(loadStats, 20000); return () => clearInterval(iv); }, [loadStats]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(loadStats, 60000); return () => clearInterval(iv); }, [loadStats]);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -317,7 +318,8 @@ function AdminEmployees() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -585,7 +587,8 @@ function AdminUsers() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -795,7 +798,8 @@ function AdminDepartments() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -868,7 +872,8 @@ function AdminLeave() {
   }, [accessToken]);
 
   useEffect(() => { loadLeaves(); }, [loadLeaves]);
-  useEffect(() => { const iv = setInterval(loadLeaves, 20000); return () => clearInterval(iv); }, [loadLeaves]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(loadLeaves, 60000); return () => clearInterval(iv); }, [loadLeaves]);
 
   const handleAction = async (id: string, status: string) => {
     try {
@@ -942,7 +947,8 @@ function AdminAssets() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1251,7 +1257,8 @@ function AdminAttendance() {
   };
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const getUserName = (userId: string) => {
     const found = users.find(u => (u.userId || u.id) === userId);
@@ -1478,7 +1485,8 @@ function AdminAnnouncements() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 10000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleCreate = async () => {
     setSaving(true);
@@ -1584,7 +1592,8 @@ function AdminProfileChangeRequests() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleApprove = async (id: string) => {
     try {
@@ -1761,7 +1770,8 @@ function PendingApprovalsPanel() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleApprove = async (requestId: string) => {
     setProcessing(requestId);
@@ -2367,7 +2377,8 @@ function AdminHiring() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 20000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -2717,7 +2728,8 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
   }, [accessToken, config.apiPrefix, entityKey]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);

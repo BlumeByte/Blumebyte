@@ -1036,7 +1036,8 @@ function AttendanceView() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 30000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSaveAutoSettings = async () => {
     setSavingAuto(true);
@@ -2108,7 +2109,8 @@ function OnboardingView() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 30000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSaveChecklist = async () => {
     setSaving(true);
@@ -2507,8 +2509,8 @@ function AnnouncementsView() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  // Real-time polling every 10 seconds
-  useEffect(() => { const iv = setInterval(load, 10000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     if (!formData.title || !formData.content) { toast.error('Title and content required'); return; }
@@ -3143,9 +3145,9 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh every 30 seconds
+  // Reduce polling to 60 seconds to minimize server load
   useEffect(() => {
-    const interval = setInterval(() => { load(); }, 30000);
+    const interval = setInterval(() => { load(); }, 60000);
     return () => clearInterval(interval);
   }, [load]);
 

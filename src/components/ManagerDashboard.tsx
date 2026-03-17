@@ -84,7 +84,8 @@ function TeamTab() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -270,7 +271,8 @@ function LeaveTab() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [load]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleAction = async (id: string, status: string) => {
     try { 
@@ -437,7 +439,8 @@ export function ManagerDashboard() {
   }, [accessToken]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
-  useEffect(() => { const iv = setInterval(loadStats, 20000); return () => clearInterval(iv); }, [loadStats]);
+  // Reduce polling to 60 seconds to minimize server load
+  useEffect(() => { const iv = setInterval(loadStats, 60000); return () => clearInterval(iv); }, [loadStats]);
 
   const handleNavigation = (section: string) => {
     setActiveTab(section);
