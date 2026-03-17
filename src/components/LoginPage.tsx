@@ -9,6 +9,7 @@ import { Eye, EyeOff, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { OAuthButtons } from './OAuthButtons';
 
 const BLUMEBYTE_COLOR = '#000000';
 
@@ -154,6 +155,18 @@ export function LoginPage() {
                 Sign In
               </Button>
             </form>
+            
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">Or continue with</span>
+              </div>
+            </div>
+
+            <OAuthButtons mode="login" disabled={loginLoading} />
+            
             <p className="text-center text-xs text-gray-400 mt-6">
               New to Blumebyte?{' '}
               <button

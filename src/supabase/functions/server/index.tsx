@@ -7734,6 +7734,111 @@ app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
   }
 });
 
+// --- OAuth Company Creation ---
+// Create company for new OAuth users
+app.post(`${PREFIX}/oauth/create-company`, async (c) => {
+  try {
+    const accessToken = extractUserToken(c);
+    if (!accessToken) {
+      return c.json({ error: "Unauthorized - No access token" }, 401);
+    }
+
+    const sb = supabaseAdmin();
+    
+    // Verify the user with the access token
+    const { data: { user }, error: userError } = await sb.auth.getUser(accessToken);
+    if (userError || !user) {
+      console.error("OAuth user verification error:", userError);
+      return c.json({ error: "Invalid access token" }, 401);
+    }
+
+    const { companyName, userName, email, userId } = await c.req.json();
+    
+    if (!companyName || !userName || !email || !userId) {
+      return c.json({ error: "Missing required fields" }, 400);
+    }
+
+    // Verify the userId matches the authenticated user
+    if (user.id !== userId) {
+      return c.json({ error: "User ID mismatch" }, 403);
+    }
+
+    // Check if user already has a company profile
+    const existingProfile = await kv.get(`user:${userId}`);
+    if (existingProfile) {
+      return c.json({ error: "User already has a company profile" }, 400);
+    }
+
+    // Generate company ID
+    const companyId = `company_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    console.log(`Creating company for OAuth user: ${email}, Company: ${companyName}`);
+
+    // Create company record
+    const company = {
+      id: companyId,
+      name: companyName,
+      size: "1-10", // Default for OAuth signup
+      industry: "Other",
+      createdAt: new Date().toISOString(),
+      createdBy: userId,
+      subscription: {
+        status: "trial", // Start with trial or require payment
+        licenses: 5,
+        billingCycle: "monthly",
+        startDate: new Date().toISOString(),
+        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 day trial
+      },
+    };
+
+    await kv.set(`company:${companyId}`, company);
+
+    // Create SuperAdmin user profile
+    const userProfile = {
+      id: userId,
+      email,
+      name: userName,
+      role: "superadmin",
+      companyId,
+      departments: [],
+      createdAt: new Date().toISOString(),
+      active: true,
+      authProvider: user.app_metadata?.provider || "oauth",
+    };
+
+    await kv.set(`user:${userId}`, userProfile);
+
+    // Add user to company's users list
+    await kv.set(`company:${companyId}:users`, [userId]);
+
+    // Update user metadata in Supabase Auth
+    await sb.auth.admin.updateUserById(userId, {
+      user_metadata: {
+        ...user.user_metadata,
+        companyId,
+        role: "superadmin",
+        name: userName,
+        setupComplete: true,
+      },
+    });
+
+    console.log(`✅ OAuth company created successfully: ${companyId} for user ${email}`);
+
+    return c.json({
+      success: true,
+      message: "Company created successfully",
+      data: {
+        companyId,
+        userId,
+        role: "superadmin",
+      },
+    });
+  } catch (e: any) {
+    console.error("OAuth company creation error:", e);
+    return c.json({ error: e.message || "Failed to create company" }, 500);
+  }
+});
+
 // --- Catch-all 404 handler (returns JSON for better debugging) ---
 app.notFound((c) => {
   console.log(`404 Not Found: ${c.req.method} ${c.req.url}`);

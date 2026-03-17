@@ -27,6 +27,8 @@ const PaymentVerification = lazy(() => import('./components/PaymentVerification'
 const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification'));
 const ProductionCleanup = lazy(() => import('./pages/ProductionCleanup'));
 const TwoFactorVerification = lazy(() => import('./pages/TwoFactorVerification'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+const OAuthConsent = lazy(() => import('./pages/OAuthConsent'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -156,6 +158,18 @@ const TwoFactorVerificationPage = () => (
   </Suspense>
 );
 
+const AuthCallbackPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <AuthCallback />
+  </Suspense>
+);
+
+const OAuthConsentPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <OAuthConsent />
+  </Suspense>
+);
+
 const NotFoundPage = () => <Navigate to="/login" replace />;
 
 export const router = createBrowserRouter([
@@ -217,6 +231,18 @@ export const router = createBrowserRouter([
       {
         path: '/two-factor-verification',
         Component: TwoFactorVerificationPage,
+      },
+      {
+        path: '/auth/callback',
+        Component: AuthCallbackPage,
+      },
+      {
+        path: '/auth-callback',
+        Component: AuthCallbackPage,
+      },
+      {
+        path: '/oauth-consent',
+        Component: OAuthConsentPage,
       },
       {
         path: '/security-policy',

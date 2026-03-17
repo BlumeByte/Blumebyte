@@ -76,6 +76,20 @@ Initial setup and configuration:
 | **[POLICIES_SETUP_SUMMARY.md](./POLICIES_SETUP_SUMMARY.md)** | Security policies | Security config |
 | **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** | Deployment steps | Before deploy |
 
+###📱 OAuth & Social Authentication
+
+**Overview:** Full OAuth2 authentication with Google, GitHub, and Microsoft providers.
+
+| Document | Purpose | When to Read |
+|----------|---------|-------------|
+| **[OAUTH_CONFIGURATION_COMPLETE.md](./OAUTH_CONFIGURATION_COMPLETE.md)** | ⭐ START HERE: Complete summary & next steps | OAuth setup |
+| **[OAUTH_QUICK_FIX.md](./OAUTH_QUICK_FIX.md)** | Quick 5-minute setup guide | Initial setup |
+| **[OAUTH_JAVASCRIPT_ORIGINS_WARNING.md](./OAUTH_JAVASCRIPT_ORIGINS_WARNING.md)** | ⚠️ Critical: Authorized JavaScript origins | Fixing errors |
+| **[OAUTH_CONFIGURATION_DIAGRAM.md](./OAUTH_CONFIGURATION_DIAGRAM.md)** | Visual diagrams and architecture | Learning phase |
+| **[SUPABASE_OAUTH_CONFIG.md](./SUPABASE_OAUTH_CONFIG.md)** | Detailed Supabase configuration | Advanced config |
+| **[OAUTH_SETUP_GUIDE.md](./OAUTH_SETUP_GUIDE.md)** | Complete OAuth implementation guide | Full reference |
+| **[OAUTH_IMPLEMENTATION_SUMMARY.md](./OAUTH_IMPLEMENTATION_SUMMARY.md)** | Technical implementation details | Development |
+
 ---
 
 ### 🧪 Testing & Quality
