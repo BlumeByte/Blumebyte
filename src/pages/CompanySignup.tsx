@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
+import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
@@ -623,27 +623,42 @@ export default function CompanySignup() {
                 </div>
               </div>
 
-              {/* License Selection */}
+              {/* License Selection with +/- Buttons */}
               <div className="space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Number of Employee Licenses
                 </h3>
 
-                <div className="space-y-2">
-                  <Label htmlFor="licenses">Licenses (minimum 1)</Label>
-                  <Input
-                    id="licenses"
-                    type="number"
-                    min="1"
-                    value={formData.licenses}
-                    onChange={(e) => setFormData({ ...formData, licenses: Math.max(1, parseInt(e.target.value) || 1) })}
+                <div className="flex items-center justify-center gap-6 py-6 bg-gray-50 rounded-lg">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setFormData({ ...formData, licenses: Math.max(1, formData.licenses - 1) })}
+                    disabled={loading || paymentWindowOpened || formData.licenses <= 1}
+                    className="w-14 h-14 rounded-full"
+                  >
+                    <Minus className="h-6 w-6" />
+                  </Button>
+                  <div className="flex flex-col items-center">
+                    <span className="text-5xl font-bold text-blue-600">{formData.licenses}</span>
+                    <span className="text-sm text-gray-600 mt-1">employee {formData.licenses === 1 ? 'license' : 'licenses'}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setFormData({ ...formData, licenses: formData.licenses + 1 })}
                     disabled={loading || paymentWindowOpened}
-                  />
-                  <p className="text-sm text-gray-600">
-                    Each license allows one employee to access the platform
-                  </p>
+                    className="w-14 h-14 rounded-full"
+                  >
+                    <Plus className="h-6 w-6" />
+                  </Button>
                 </div>
+                <p className="text-sm text-gray-600 text-center">
+                  Each license allows one employee to access the platform
+                </p>
               </div>
 
               {/* Price Summary */}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, startTransition } from 'react';
 import { useNavigate } from 'react-router';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api-client';
@@ -54,7 +54,9 @@ export default function AuthCallback() {
           // User exists, redirect to their dashboard
           setStatus('success');
           setTimeout(() => {
-            navigate(`/${profile.role}`, { replace: true });
+            startTransition(() => {
+              navigate(`/${profile.role}`, { replace: true });
+            });
           }, 1500);
         }
       } catch (err: any) {
@@ -130,7 +132,9 @@ export default function AuthCallback() {
       
       // Redirect to SuperAdmin dashboard
       setTimeout(() => {
-        navigate('/superadmin', { replace: true });
+        startTransition(() => {
+          navigate('/superadmin', { replace: true });
+        });
       }, 1500);
 
     } catch (err: any) {
@@ -255,7 +259,11 @@ export default function AuthCallback() {
               <AlertDescription>{error || 'Unknown error occurred'}</AlertDescription>
             </Alert>
             <Button 
-              onClick={() => navigate('/login')} 
+              onClick={() => {
+                startTransition(() => {
+                  navigate('/login');
+                });
+              }}
               className="w-full"
             >
               Back to Login

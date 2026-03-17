@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { startTransition } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { TwoFactorSetup } from '../components/TwoFactorSetup';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
@@ -10,22 +10,28 @@ export default function TwoFactorVerification() {
 
   const handleComplete = () => {
     // Redirect to login after successful 2FA setup
-    navigate('/login', { 
-      replace: true,
-      state: { message: '2FA enabled successfully! Please log in again.' }
+    startTransition(() => {
+      navigate('/login', { 
+        replace: true,
+        state: { message: '2FA enabled successfully! Please log in again.' }
+      });
     });
   };
 
   const handleSkip = () => {
     // Allow skip for now (can be removed in production)
-    navigate('/login', { 
-      replace: true,
-      state: { message: 'You can enable 2FA later from your profile settings.' }
+    startTransition(() => {
+      navigate('/login', { 
+        replace: true,
+        state: { message: 'You can enable 2FA later from your profile settings.' }
+      });
     });
   };
 
   if (!email) {
-    navigate('/login', { replace: true });
+    startTransition(() => {
+      navigate('/login', { replace: true });
+    });
     return null;
   }
 

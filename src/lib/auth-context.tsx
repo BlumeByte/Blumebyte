@@ -172,7 +172,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       if (data?.session) {
         setAccessToken(data.session.access_token);
-        await fetchProfile(data.session.access_token);
+        const profile = await fetchProfile(data.session.access_token);
+        
+        // Auto clock-in: Only for non-admin users (employee, manager)
+        if (profile && (profile.role === 'employee' || profile.role === 'manager')) {
+          try {
+            // Check if user has already clocked in today
+            const today = new Date().toISOString().split('T')[0];
+            const attendanceCheck = await api('/attendance/today', { token: data.session.access_token }).catch(() => null);
+            
+            // Only clock in if user hasn't clocked in today
+            if (!attendanceCheck || !attendanceCheck.clockIn) {
+              await api('/attendance/clock-in', {
+                method: 'POST',
+                token: data.session.access_token,
+                body: JSON.stringify({
+                  date: today,
+                  clockIn: new Date().toISOString(),
+                  status: 'present',
+                }),
+              });
+              console.log('✅ Auto clock-in successful on login');
+            } else {
+              console.log('ℹ️ Already clocked in today, skipping auto clock-in');
+            }
+          } catch (clockError) {
+            // Don't fail login if clock-in fails
+            console.log('Auto clock-in failed (non-critical):', clockError);
+          }
+        }
       }
     } catch (e: any) {
       setLoginError(e.message);

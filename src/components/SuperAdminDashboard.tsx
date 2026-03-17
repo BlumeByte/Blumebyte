@@ -609,9 +609,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
     }
   }, [accessToken, scopeFixed]);
 
-  useEffect(() => {
-    if (!scopeFixed) return; // Wait for scope fix before loading data
-    
+  const loadDashboardData = useCallback(() => {
     const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.log(`Dashboard fetch ${path} failed:`, e); return null; });
     Promise.all([
       safeFetch('/users'),
@@ -644,7 +642,21 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       });
       setRecentLeaves(leavesArr.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5));
     }).catch(console.log).finally(() => setLoading(false));
-  }, [accessToken, scopeFixed]);
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!scopeFixed) return; // Wait for scope fix before loading data
+    loadDashboardData();
+  }, [scopeFixed, loadDashboardData]);
+
+  // Auto-refresh dashboard every 30 seconds for real-time updates
+  useEffect(() => {
+    if (!scopeFixed) return;
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [scopeFixed, loadDashboardData]);
 
   const statCards = [
     { label: 'Total Users', value: stats.users, icon: Users, color: 'blue', bg: 'bg-blue-100', text: 'text-blue-600' },
@@ -949,11 +961,47 @@ function MyProfileView() {
 function TimeOffCalendarView() {
   const { accessToken } = useAuth();
   const [leaves, setLeaves] = useState<any[]>([]);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    api('/leave-requests', { token: accessToken }).then(data => setLeaves(Array.isArray(data) ? data : [])).catch(console.log).finally(() => setLoading(false));
+    Promise.all([
+      api('/leave-requests', { token: accessToken }),
+      api('/users', { token: accessToken }),
+      api('/superadmin/meeting-1on1', { token: accessToken }).catch(() => []),
+    ]).then(([leavesData, usersData, meetingsData]) => {
+      const leavesArr = Array.isArray(leavesData) ? leavesData : [];
+      const usersArr = Array.isArray(usersData) ? usersData : [];
+      const meetingsArr = Array.isArray(meetingsData) ? meetingsData : [];
+      
+      // Enrich leaves with employee names
+      const enrichedLeaves = leavesArr.map(leave => {
+        const user = usersArr.find(u => (u.userId || u.id) === leave.userId);
+        return {
+          ...leave,
+          employeeName: user?.name || leave.employeeName || 'Unknown',
+        };
+      });
+      
+      // Enrich meetings with user names
+      const enrichedMeetings = meetingsArr
+        .filter(m => m.status === 'scheduled') // Only show scheduled meetings
+        .map(meeting => {
+          const organizer = usersArr.find(u => (u.userId || u.id) === meeting.organizerId);
+          const participant = usersArr.find(u => (u.userId || u.id) === meeting.participantId);
+          return {
+            ...meeting,
+            organizerName: organizer?.name || 'Unknown',
+            participantName: participant?.name || 'Unknown',
+          };
+        });
+      
+      setLeaves(enrichedLeaves);
+      setMeetings(enrichedMeetings);
+      setUsers(usersArr);
+    }).catch(console.log).finally(() => setLoading(false));
   }, [accessToken]);
 
   const year = currentMonth.getFullYear();
@@ -971,6 +1019,11 @@ function TimeOffCalendarView() {
     });
   };
 
+  const getMeetingsForDate = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return meetings.filter(m => m.date === dateStr);
+  };
+
   const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
 
@@ -979,10 +1032,11 @@ function TimeOffCalendarView() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Time Off Calendar</h1>
+        <h1 className="text-2xl font-bold">Time Off & Events Calendar</h1>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{leaves.length} total requests</Badge>
-          <Badge className="bg-amber-100 text-amber-800">{leaves.filter(l => l.status === 'pending').length} pending</Badge>
+          <Badge variant="outline">{leaves.length} leave requests</Badge>
+          <Badge variant="outline" className="bg-blue-50">{meetings.length} meetings</Badge>
+          <Badge className="bg-amber-100 text-amber-800">{leaves.filter(l => l.status === 'pending').length} pending leaves</Badge>
         </div>
       </div>
 
@@ -1006,17 +1060,28 @@ function TimeOffCalendarView() {
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
                 const dayLeaves = getLeaveForDate(day);
+                const dayMeetings = getMeetingsForDate(day);
                 const isToday = new Date().getDate() === day && new Date().getMonth() === month && new Date().getFullYear() === year;
+                const allEvents = [
+                  ...dayLeaves.map(l => ({ type: 'leave', ...l })),
+                  ...dayMeetings.map(m => ({ type: 'meeting', ...m })),
+                ];
                 return (
                   <div key={day} className={`bg-white p-2 min-h-[80px] ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''}`}>
                     <span className={`text-sm ${isToday ? 'font-bold text-blue-600' : 'text-gray-700'}`}>{day}</span>
                     <div className="mt-1 space-y-0.5">
-                      {dayLeaves.slice(0, 2).map((l, idx) => (
-                        <div key={idx} className={`text-[10px] px-1 py-0.5 rounded truncate ${statusColors[l.status] || 'bg-gray-200'}`}>
-                          {l.employeeName?.split(' ')[0] || 'Leave'}
-                        </div>
+                      {allEvents.slice(0, 3).map((event, idx) => (
+                        event.type === 'leave' ? (
+                          <div key={`leave-${idx}`} className={`text-[10px] px-1 py-0.5 rounded truncate ${statusColors[event.status] || 'bg-gray-200'}`} title={`${event.employeeName} - ${event.leaveType}`}>
+                            {event.employeeName?.split(' ')[0] || 'Leave'}
+                          </div>
+                        ) : (
+                          <div key={`meeting-${idx}`} className="text-[10px] px-1 py-0.5 rounded truncate bg-blue-200" title={`Meeting: ${event.title || ''} - ${event.organizerName} & ${event.participantName}`}>
+                            📅 {event.startTime || 'Meeting'}
+                          </div>
+                        )
                       ))}
-                      {dayLeaves.length > 2 && <div className="text-[10px] text-gray-400">+{dayLeaves.length - 2} more</div>}
+                      {allEvents.length > 3 && <div className="text-[10px] text-gray-400">+{allEvents.length - 3} more</div>}
                     </div>
                   </div>
                 );
@@ -1027,9 +1092,10 @@ function TimeOffCalendarView() {
       </Card>
 
       <div className="flex items-center gap-4 mt-4">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-green-200" /><span className="text-xs text-gray-500">Approved</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-200" /><span className="text-xs text-gray-500">Pending</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-200" /><span className="text-xs text-gray-500">Rejected</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-green-200" /><span className="text-xs text-gray-500">Approved Leave</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-200" /><span className="text-xs text-gray-500">Pending Leave</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-200" /><span className="text-xs text-gray-500">Rejected Leave</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-200" /><span className="text-xs text-gray-500">Scheduled Meeting</span></div>
       </div>
     </div>
   );
@@ -3179,9 +3245,9 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
 
   useEffect(() => { load(); }, [load]);
 
-  // Reduce polling to 60 seconds to minimize server load
+  // Auto-refresh every 30 seconds for real-time updates
   useEffect(() => {
-    const interval = setInterval(() => { load(); }, 60000);
+    const interval = setInterval(() => { load(); }, 30000);
     return () => clearInterval(interval);
   }, [load]);
 

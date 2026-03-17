@@ -826,10 +826,23 @@ function EmpLeave() {
           <div className="space-y-3 py-2">
             <div><Label className="text-xs">Leave Type</Label>
               {leaveTypes.length > 0 ? (
-                <Select value={formData.leaveType || ''} onValueChange={v => setFormData({ ...formData, leaveType: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>{leaveTypes.map(lt => <SelectItem key={lt.id} value={lt.name}>{lt.name}</SelectItem>)}</SelectContent>
-                </Select>
+                <>
+                  <Select value={formData.leaveType === '__other__' || !leaveTypes.find(lt => lt.name === formData.leaveType) ? '__other__' : formData.leaveType || ''} onValueChange={v => setFormData({ ...formData, leaveType: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      {leaveTypes.map(lt => <SelectItem key={lt.id} value={lt.name}>{lt.name}</SelectItem>)}
+                      <SelectItem value="__other__">Other (Specify)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(formData.leaveType === '__other__' || (formData.leaveType && !leaveTypes.find(lt => lt.name === formData.leaveType))) && (
+                    <Input 
+                      className="mt-2" 
+                      value={formData.leaveType === '__other__' ? '' : formData.leaveType || ''} 
+                      onChange={e => setFormData({ ...formData, leaveType: e.target.value })} 
+                      placeholder="Please specify leave type" 
+                    />
+                  )}
+                </>
               ) : (
                 <Input value={formData.leaveType || ''} onChange={e => setFormData({ ...formData, leaveType: e.target.value })} placeholder="e.g., Vacation, Sick, Personal" />
               )}

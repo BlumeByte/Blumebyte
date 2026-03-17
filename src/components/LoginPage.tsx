@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 import { Card, CardContent, CardHeader } from './ui/card';
@@ -40,7 +40,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (!sessionLoading && user) {
-      navigate(`/${user.role}`, { replace: true });
+      startTransition(() => {
+        navigate(`/${user.role}`, { replace: true });
+      });
     }
   }, [user, sessionLoading, navigate]);
 
@@ -212,7 +214,11 @@ export function LoginPage() {
               New to Blumebyte?{' '}
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={() => {
+                  startTransition(() => {
+                    navigate('/');
+                  });
+                }}
                 className="text-black hover:underline font-medium"
               >
                 Create a company account

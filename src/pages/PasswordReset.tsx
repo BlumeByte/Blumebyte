@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -91,7 +91,9 @@ export function PasswordReset() {
       
       // Redirect to login after 3 seconds
       setTimeout(() => {
-        navigate('/login');
+        startTransition(() => {
+          navigate('/login');
+        });
       }, 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to reset password. Please try again.');
@@ -129,7 +131,11 @@ export function PasswordReset() {
                   <div className="mt-4">
                     <Button
                       type="button"
-                      onClick={() => navigate('/login')}
+                      onClick={() => {
+                        startTransition(() => {
+                          navigate('/login');
+                        });
+                      }}
                       className="w-full text-white"
                       style={{ backgroundColor: BLUMEBYTE_COLOR }}
                     >
@@ -215,7 +221,11 @@ export function PasswordReset() {
                 <div className="text-center">
                   <button
                     type="button"
-                    onClick={() => navigate('/login')}
+                    onClick={() => {
+                      startTransition(() => {
+                        navigate('/login');
+                      });
+                    }}
                     className="text-xs text-gray-500 hover:text-black transition-colors"
                   >
                     Back to Login
