@@ -291,11 +291,17 @@ async function logAudit(params: {
 // --- Company scope resolver ---
 async function resolveCompanyScope(userId: string): Promise<string[] | null> {
   const kvData = await kv.get(`employee:${userId}`);
-  if (kvData?.assignedCompanies?.length) return kvData.assignedCompanies;
+  if (kvData?.assignedCompanies?.length) {
+    console.log(`✅ resolveCompanyScope: Found assignedCompanies in KV for user ${userId}:`, kvData.assignedCompanies);
+    return kvData.assignedCompanies;
+  }
   const sb = supabaseAdmin();
   const { data } = await sb.auth.admin.getUserById(userId);
-  if (data?.user?.user_metadata?.assignedCompanies?.length)
+  if (data?.user?.user_metadata?.assignedCompanies?.length) {
+    console.log(`✅ resolveCompanyScope: Found assignedCompanies in auth metadata for user ${userId}:`, data.user.user_metadata.assignedCompanies);
     return data.user.user_metadata.assignedCompanies;
+  }
+  console.log(`❌ resolveCompanyScope: No assignedCompanies found for user ${userId}. KV data:`, kvData, 'Auth metadata:', data?.user?.user_metadata);
   return null;
 }
 
@@ -988,6 +994,7 @@ async function createCompanyAccount(registrationData: any) {
         role: "superadmin",
         companyId,
         companyName,
+        assignedCompanies: [companyId], // CRITICAL: Include assignedCompanies in auth metadata
         requires2FA: true, // Enable 2FA requirement for SuperAdmin
         twoFactorEnabled: false, // Will be enabled after first verification
       },
@@ -1016,6 +1023,8 @@ async function createCompanyAccount(registrationData: any) {
       assignedCompanies: [companyId],
       createdAt: new Date().toISOString(),
     });
+    
+    console.log(`✅ Created SuperAdmin account for ${adminEmail} with companyId: ${companyId}, assignedCompanies: [${companyId}]`);
 
     // Log audit event
     await logAudit({
@@ -7919,6 +7928,67 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
   } catch (e: any) {
     console.error("OAuth company creation error:", e);
     return c.json({ error: e.message || "Failed to create company" }, 500);
+  }
+});
+
+// ============ MIGRATION: FIX MISSING ASSIGNEDCOMPANIES ============
+// This endpoint fixes SuperAdmin accounts that don't have assignedCompanies set
+app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
+  try {
+    const { user: caller } = await requireSuperAdmin(c);
+    console.log(`🔧 Running company scope fix for SuperAdmin ${caller.email}`);
+    
+    // Get the caller's employee record
+    const empRecord = await kv.get(`employee:${caller.id}`);
+    if (!empRecord) {
+      return c.json({ error: 'Employee record not found' }, 404);
+    }
+    
+    // Check if assignedCompanies is already set
+    if (empRecord.assignedCompanies?.length) {
+      console.log(`✅ assignedCompanies already set: ${empRecord.assignedCompanies}`);
+      return c.json({ 
+        success: true, 
+        message: 'Company scope already configured',
+        assignedCompanies: empRecord.assignedCompanies 
+      });
+    }
+    
+    // Get companyId from the employee record
+    const companyId = empRecord.companyId || empRecord.company;
+    if (!companyId) {
+      return c.json({ error: 'No company found for this SuperAdmin' }, 400);
+    }
+    
+    console.log(`🔧 Setting assignedCompanies to [${companyId}]`);
+    
+    // Update KV store
+    empRecord.assignedCompanies = [companyId];
+    empRecord.updatedAt = new Date().toISOString();
+    await kv.set(`employee:${caller.id}`, empRecord);
+    
+    // Update Supabase auth metadata
+    const sb = supabaseAdmin();
+    await sb.auth.admin.updateUserById(caller.id, {
+      user_metadata: {
+        ...empRecord,
+        assignedCompanies: [companyId]
+      }
+    });
+    
+    console.log(`✅ Company scope fixed for ${caller.email}: assignedCompanies = [${companyId}]`);
+    
+    return c.json({ 
+      success: true, 
+      message: 'Company scope fixed successfully',
+      assignedCompanies: [companyId],
+      companyId 
+    });
+  } catch (e: any) {
+    console.error('Fix company scope error:', e);
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
   }
 });
 

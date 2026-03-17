@@ -585,8 +585,33 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [allLeaves, setAllLeaves] = useState<any[]>([]);
   const [allAttendance, setAllAttendance] = useState<any[]>([]);
+  const [scopeFixed, setScopeFixed] = useState(false);
+
+  // Auto-fix missing assignedCompanies on component mount
+  useEffect(() => {
+    const fixCompanyScope = async () => {
+      try {
+        console.log('🔧 Attempting to fix company scope...');
+        const result = await api('/superadmin/fix-company-scope', { 
+          method: 'POST', 
+          token: accessToken 
+        });
+        console.log('✅ Company scope check result:', result);
+        setScopeFixed(true);
+      } catch (e) {
+        console.error('Company scope fix failed:', e);
+        setScopeFixed(true); // Continue anyway
+      }
+    };
+    
+    if (!scopeFixed) {
+      fixCompanyScope();
+    }
+  }, [accessToken, scopeFixed]);
 
   useEffect(() => {
+    if (!scopeFixed) return; // Wait for scope fix before loading data
+    
     const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.log(`Dashboard fetch ${path} failed:`, e); return null; });
     Promise.all([
       safeFetch('/users'),
@@ -619,7 +644,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       });
       setRecentLeaves(leavesArr.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5));
     }).catch(console.log).finally(() => setLoading(false));
-  }, [accessToken]);
+  }, [accessToken, scopeFixed]);
 
   const statCards = [
     { label: 'Total Users', value: stats.users, icon: Users, color: 'blue', bg: 'bg-blue-100', text: 'text-blue-600' },
