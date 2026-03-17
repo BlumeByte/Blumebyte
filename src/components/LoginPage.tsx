@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Eye, EyeOff, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { OAuthButtons } from './OAuthButtons';
+import { toast } from 'sonner';
 
 const BLUMEBYTE_COLOR = '#000000';
 
@@ -23,6 +25,10 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
   // License checking temporarily deactivated
   /*
   const [licenseStatus, setLicenseStatus] = useState<{ hasLicenses: boolean; loading: boolean }>({
@@ -69,6 +75,22 @@ export function LoginPage() {
     try {
       await login(email, password);
     } catch (_) {}
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    try {
+      await api('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: resetEmail }),
+      });
+      setResetSuccess(true);
+    } catch (error) {
+      toast.error('Failed to send reset email. Please try again.');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   if (sessionLoading) {
@@ -149,6 +171,19 @@ export function LoginPage() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotPasswordOpen(true);
+                      setResetEmail(email);
+                      setResetSuccess(false);
+                    }}
+                    className="text-xs text-gray-500 hover:text-black transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full text-white" style={{ backgroundColor: BLUMEBYTE_COLOR }} disabled={loginLoading}>
                 {loginLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -200,6 +235,56 @@ export function LoginPage() {
         </div>
         */}
       </div>
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Forgot Password</DialogTitle>
+            <DialogDescription>
+              Enter your email to receive a password reset link.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {resetSuccess ? (
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <AlertTitle className="text-green-800">Password Reset Link Sent</AlertTitle>
+              <AlertDescription className="text-green-700">
+                We have sent a password reset link to your email. Please check your inbox.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="resetEmail">Email</Label>
+                <Input
+                  id="resetEmail"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setForgotPasswordOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="text-white" style={{ backgroundColor: BLUMEBYTE_COLOR }} disabled={resetLoading}>
+                  {resetLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Send Reset Link
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

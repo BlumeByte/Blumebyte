@@ -7992,6 +7992,165 @@ app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
   }
 });
 
+// ============ PASSWORD RESET ENDPOINTS ============
+// Request password reset (forgot password)
+app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
+  try {
+    const { email } = await c.req.json();
+    
+    if (!email) {
+      return c.json({ error: 'Email is required' }, 400);
+    }
+    
+    console.log(`📧 Password reset requested for: ${email}`);
+    
+    // Find user by email
+    const allEmployees = await kv.getByPrefix('employee:');
+    const employee = allEmployees.find((e: any) => e.email?.toLowerCase() === email.toLowerCase());
+    
+    if (!employee) {
+      // Don't reveal if email exists or not for security
+      console.log(`⚠️  Email not found: ${email}, but returning success for security`);
+      return c.json({ success: true, message: 'If the email exists, a reset link has been sent' });
+    }
+    
+    // Generate reset token
+    const resetToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiry
+    
+    // Store reset token
+    await kv.set(`password-reset:${resetToken}`, {
+      userId: employee.userId || employee.id,
+      email: employee.email,
+      expiresAt: expiresAt.toISOString(),
+      createdAt: new Date().toISOString(),
+    });
+    
+    // Create reset link
+    const resetLink = `${c.req.url.split('/make-server-')[0]}/password-reset?token=${resetToken}`;
+    
+    console.log(`✅ Password reset token created for ${email}`);
+    console.log(`🔗 Reset link: ${resetLink}`);
+    
+    // TODO: In production, send email here
+    // For now, log the reset link (in production, this would be sent via email)
+    console.log(`📨 PASSWORD RESET LINK (would be emailed): ${resetLink}`);
+    
+    // Log audit event
+    await logAudit({
+      userId: employee.userId || employee.id,
+      userName: employee.name || email,
+      action: 'REQUEST',
+      resourceType: 'password-reset',
+      resourceId: resetToken,
+      details: { email, expiresAt: expiresAt.toISOString() },
+    });
+    
+    return c.json({ 
+      success: true, 
+      message: 'If the email exists, a reset link has been sent',
+      // For development only - remove in production
+      resetLink: Deno.env.get('ENVIRONMENT') === 'development' ? resetLink : undefined,
+    });
+  } catch (e: any) {
+    console.error('Forgot password error:', e);
+    return c.json({ error: 'Failed to process password reset request' }, 500);
+  }
+});
+
+// Validate reset token
+app.post(`${PREFIX}/auth/validate-reset-token`, async (c) => {
+  try {
+    const { token } = await c.req.json();
+    
+    if (!token) {
+      return c.json({ valid: false, error: 'Token is required' }, 400);
+    }
+    
+    const resetData = await kv.get(`password-reset:${token}`);
+    
+    if (!resetData) {
+      return c.json({ valid: false, error: 'Invalid or expired reset token' });
+    }
+    
+    // Check if token has expired
+    const expiresAt = new Date(resetData.expiresAt);
+    const now = new Date();
+    
+    if (now > expiresAt) {
+      await kv.del(`password-reset:${token}`);
+      return c.json({ valid: false, error: 'Reset token has expired' });
+    }
+    
+    return c.json({ valid: true });
+  } catch (e: any) {
+    console.error('Validate token error:', e);
+    return c.json({ valid: false, error: 'Failed to validate token' }, 500);
+  }
+});
+
+// Reset password with token
+app.post(`${PREFIX}/auth/reset-password`, async (c) => {
+  try {
+    const { token, newPassword } = await c.req.json();
+    
+    if (!token || !newPassword) {
+      return c.json({ error: 'Token and new password are required' }, 400);
+    }
+    
+    if (newPassword.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters' }, 400);
+    }
+    
+    // Get reset data
+    const resetData = await kv.get(`password-reset:${token}`);
+    
+    if (!resetData) {
+      return c.json({ error: 'Invalid or expired reset token' }, 400);
+    }
+    
+    // Check if token has expired
+    const expiresAt = new Date(resetData.expiresAt);
+    const now = new Date();
+    
+    if (now > expiresAt) {
+      await kv.del(`password-reset:${token}`);
+      return c.json({ error: 'Reset token has expired' }, 400);
+    }
+    
+    // Update password in Supabase Auth
+    const sb = supabaseAdmin();
+    const { error: updateError } = await sb.auth.admin.updateUserById(resetData.userId, {
+      password: newPassword,
+    });
+    
+    if (updateError) {
+      console.error('Password update error:', updateError);
+      return c.json({ error: 'Failed to update password' }, 500);
+    }
+    
+    // Delete the used reset token
+    await kv.del(`password-reset:${token}`);
+    
+    console.log(`✅ Password reset successful for user ${resetData.email}`);
+    
+    // Log audit event
+    await logAudit({
+      userId: resetData.userId,
+      userName: resetData.email,
+      action: 'UPDATE',
+      resourceType: 'password',
+      resourceId: resetData.userId,
+      details: { method: 'password-reset', email: resetData.email },
+    });
+    
+    return c.json({ success: true, message: 'Password reset successfully' });
+  } catch (e: any) {
+    console.error('Reset password error:', e);
+    return c.json({ error: 'Failed to reset password' }, 500);
+  }
+});
+
 // --- Catch-all 404 handler (returns JSON for better debugging) ---
 app.notFound((c) => {
   console.log(`404 Not Found: ${c.req.method} ${c.req.url}`);

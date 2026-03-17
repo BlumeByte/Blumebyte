@@ -29,6 +29,7 @@ const ProductionCleanup = lazy(() => import('./pages/ProductionCleanup'));
 const TwoFactorVerification = lazy(() => import('./pages/TwoFactorVerification'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const OAuthConsent = lazy(() => import('./pages/OAuthConsent'));
+const PasswordReset = lazy(() => import('./pages/PasswordReset'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -170,6 +171,12 @@ const OAuthConsentPage = () => (
   </Suspense>
 );
 
+const PasswordResetPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <PasswordReset />
+  </Suspense>
+);
+
 const NotFoundPage = () => <Navigate to="/login" replace />;
 
 export const router = createBrowserRouter([
@@ -243,6 +250,10 @@ export const router = createBrowserRouter([
       {
         path: '/oauth-consent',
         Component: OAuthConsentPage,
+      },
+      {
+        path: '/password-reset',
+        Component: PasswordResetPage,
       },
       {
         path: '/security-policy',
