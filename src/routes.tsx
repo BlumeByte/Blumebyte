@@ -29,7 +29,7 @@ const ProductionCleanup = lazy(() => import('./pages/ProductionCleanup'));
 const TwoFactorVerification = lazy(() => import('./pages/TwoFactorVerification'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const OAuthConsent = lazy(() => import('./pages/OAuthConsent'));
-const PasswordReset = lazy(() => import('./pages/PasswordReset'));
+const PasswordReset = lazy(() => import('./pages/PasswordReset').then(module => ({ default: module.default })));
 
 // Loading fallback component
 const LoadingFallback = () => (

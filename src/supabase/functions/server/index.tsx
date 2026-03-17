@@ -8060,11 +8060,15 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
       createdAt: new Date().toISOString(),
     });
     
-    // Create reset link
-    const baseUrl = c.req.url.split('/make-server-')[0];
-    const resetLink = `${baseUrl}/password-reset?token=${resetToken}`;
+    // Create reset link - IMPORTANT: Use frontend URL, not backend URL
+    // In production, use your actual frontend domain (e.g., https://yourapp.vercel.app)
+    // For development in Figma Make, we need to construct the proper frontend URL
+    const requestOrigin = c.req.header('Origin') || c.req.header('Referer')?.split('/make-server-')[0];
+    const frontendUrl = requestOrigin || Deno.env.get('FRONTEND_URL') || 'http://localhost:3000';
+    const resetLink = `${frontendUrl}/password-reset?token=${resetToken}`;
     
     console.log(`✅ Password reset token created for ${email}`);
+    console.log(`🌐 Frontend URL detected: ${frontendUrl}`);
     console.log(`🔗 Reset link: ${resetLink}`);
     console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
     

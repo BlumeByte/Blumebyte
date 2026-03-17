@@ -32,6 +32,9 @@ export function PasswordReset() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Set page title
+    document.title = 'Reset Password - Blumebyte';
+    
     if (!token) {
       setError('Invalid or missing reset token');
       setValidating(false);
@@ -228,3 +231,4 @@ export function PasswordReset() {
 }
 
 export default PasswordReset;
+export { PasswordReset };
