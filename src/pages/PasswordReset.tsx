@@ -231,4 +231,3 @@ export function PasswordReset() {
 }
 
 export default PasswordReset;
-export { PasswordReset };
