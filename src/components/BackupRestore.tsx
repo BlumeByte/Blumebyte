@@ -20,7 +20,7 @@ import {
 
 export function BackupRestore() {
   const { accessToken } = useAuth();
-  const [activeTab, setActiveTab] = useState<'backup' | 'deletion-requests' | 'reset-user' | 'reset-all'>('backup');
+  const [activeTab, setActiveTab] = useState<'backup' | 'deletion-requests' | 'reset-user' | 'reset-all' | 'delete-account'>('backup');
   const [backingUp, setBackingUp] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [lastBackup, setLastBackup] = useState<any>(null);
@@ -46,6 +46,11 @@ export function BackupRestore() {
   const [confirmPhrase, setConfirmPhrase] = useState('');
   const [resettingAll, setResettingAll] = useState(false);
   const [resetAllResult, setResetAllResult] = useState<any>(null);
+
+  // Delete account
+  const [deleteAccountPhrase, setDeleteAccountPhrase] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountResult, setDeleteAccountResult] = useState<any>(null);
 
   const loadRequests = useCallback(async () => {
     setLoadingReqs(true);
@@ -183,6 +188,25 @@ export function BackupRestore() {
     setResettingAll(false);
   };
 
+  // Delete account
+  const handleDeleteAccount = async () => {
+    if (deleteAccountPhrase !== 'DELETE MY ACCOUNT') { toast.error("Type 'DELETE MY ACCOUNT' exactly to confirm"); return; }
+    if (!confirm('FINAL WARNING: This will permanently delete YOUR account and all associated data. Download a backup first! Continue?')) return;
+    setDeletingAccount(true); setDeleteAccountResult(null);
+    try {
+      const result = await api('/superadmin/delete-account', { method: 'POST', body: JSON.stringify({ deleteAccountPhrase }), token: accessToken });
+      setDeleteAccountResult({ success: true, ...result });
+      toast.success(`Account deleted. ${result.deletedRecords} records removed.`);
+      setDeleteAccountPhrase('');
+      // Redirect to login or home page
+      // window.location.href = '/login';
+    } catch (e: any) {
+      setDeleteAccountResult({ success: false, error: e.message });
+      toast.error(e.message);
+    }
+    setDeletingAccount(false);
+  };
+
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
   return (
@@ -202,6 +226,7 @@ export function BackupRestore() {
           { id: 'deletion-requests' as const, label: 'Deletion Requests', icon: ShieldAlert, badge: pendingCount },
           { id: 'reset-user' as const, label: 'Reset / Delete User', icon: UserMinus },
           { id: 'reset-all' as const, label: 'Factory Reset', icon: AlertTriangle },
+          { id: 'delete-account' as const, label: 'Delete Account', icon: Trash2 },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
@@ -488,6 +513,72 @@ export function BackupRestore() {
                     <><CheckCircle className="w-4 h-4 text-green-600" /><p className="text-xs text-green-700">Factory reset complete. {resetAllResult.deletedRecords} records deleted. Only SuperAdmin accounts remain.</p></>
                   ) : (
                     <><AlertCircle className="w-4 h-4 text-red-600" /><p className="text-xs text-red-700">{resetAllResult.error}</p></>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* DELETE ACCOUNT TAB */}
+      {activeTab === 'delete-account' && (
+        <div className="max-w-xl">
+          <Card className="border-red-300">
+            <CardHeader className="bg-red-50">
+              <div className="flex items-center gap-2"><Trash2 className="w-5 h-5 text-red-600" /><CardTitle className="text-base text-red-800">Delete Account - Danger Zone</CardTitle></div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                <h4 className="text-sm font-bold text-red-800 mb-2">⚠️ CRITICAL WARNING - This action will permanently:</h4>
+                <ul className="text-xs text-red-700 space-y-1 list-disc pl-4">
+                  <li><strong>Delete YOUR SuperAdmin account and profile</strong></li>
+                  <li><strong>Delete ALL company data associated with your account</strong></li>
+                  <li><strong>Cancel ALL active licenses and subscriptions</strong></li>
+                  <li><strong>Remove all employees, departments, and organizational structure</strong></li>
+                  <li><strong>Delete all attendance, payroll, leave, and HR records</strong></li>
+                  <li><strong>Remove all documents, messages, and announcements</strong></li>
+                </ul>
+                <div className="bg-red-100 rounded-md p-3 mt-3 border border-red-300">
+                  <p className="text-xs font-bold text-red-900">🔴 YOUR LICENSE WILL BE PERMANENTLY CANCELLED</p>
+                  <p className="text-xs text-red-800 mt-1">All active subscriptions will be terminated immediately. You will lose access to all paid features and employee slots.</p>
+                </div>
+                <p className="text-xs font-bold text-red-900 mt-3">⚠️ This action is IRREVERSIBLE and CANNOT be undone!</p>
+              </div>
+
+              <div className="bg-amber-50 rounded-lg p-3 flex items-start gap-2">
+                <Shield className="w-4 h-4 text-amber-600 mt-0.5" />
+                <p className="text-xs text-amber-800"><strong>⚡ CRITICAL RECOMMENDATION:</strong> Download a full backup before proceeding. This is your LAST CHANCE to save your data!</p>
+              </div>
+
+              <Button variant="outline" onClick={handleBackup} disabled={backingUp} className="w-full">
+                {backingUp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                Download Safety Backup First
+              </Button>
+
+              <Separator />
+
+              <div>
+                <Label className="text-xs font-semibold text-red-800">Type "DELETE MY ACCOUNT" to confirm:</Label>
+                <Input
+                  value={deleteAccountPhrase}
+                  onChange={e => setDeleteAccountPhrase(e.target.value)}
+                  placeholder="DELETE MY ACCOUNT"
+                  className="mt-1 border-red-200 focus:border-red-400"
+                />
+              </div>
+
+              <Button variant="destructive" className="w-full" onClick={handleDeleteAccount} disabled={deletingAccount || deleteAccountPhrase !== 'DELETE MY ACCOUNT'}>
+                {deletingAccount ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                {deletingAccount ? 'Deleting Account & Cancelling License...' : 'Delete Account & Cancel License'}
+              </Button>
+
+              {deleteAccountResult && (
+                <div className={`p-3 rounded-lg flex items-center gap-2 ${deleteAccountResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
+                  {deleteAccountResult.success ? (
+                    <><CheckCircle className="w-4 h-4 text-green-600" /><p className="text-xs text-green-700">Account deleted. {deleteAccountResult.deletedRecords} records removed. License cancelled.</p></>
+                  ) : (
+                    <><AlertCircle className="w-4 h-4 text-red-600" /><p className="text-xs text-red-700">{deleteAccountResult.error}</p></>
                   )}
                 </div>
               )}

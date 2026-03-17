@@ -2857,6 +2857,89 @@ app.post(`${PREFIX}/superadmin/reset-all-data`, async (c) => {
   }
 });
 
+// Delete SuperAdmin Account and All Data
+app.post(`${PREFIX}/superadmin/delete-account`, async (c) => {
+  try {
+    const { user: caller } = await requireSuperAdmin(c);
+    const { deleteAccountPhrase } = await c.req.json();
+    if (deleteAccountPhrase !== "DELETE MY ACCOUNT") return c.json({ error: "Type 'DELETE MY ACCOUNT' to confirm" }, 400);
+    
+    console.log(`⚠️  SuperAdmin ${caller.email} is deleting their account and all company data`);
+    
+    // CRITICAL: Delete ALL data belonging to the caller's company
+    const callerScope = await resolveCompanyScope(caller.id);
+    if (!callerScope?.length) {
+      return c.json({ error: "No company scope found - cannot delete account" }, 400);
+    }
+    const companyId = callerScope[0];
+    
+    // 1. Delete all data from all modules (same as reset-all-data but includes SuperAdmin)
+    const prefixes = ["company:", "branch:", "department:", "asset:", "asset-category:", "paygrade:", "financial-year:", "leave-type:", "leave:", "attendance:", "announcement:", "message:", "notification:", "job-posting:", "job-application:", "perf-review:", "goal:", "feedback:", "meeting:", "workflow:", "disciplinary:", "compliance:", "training:", "task:", "onboard-checklist:", "payroll-run:", "tax-bracket:", "benefit-plan:", "admin-dept:", "deletion-request:", "profile-change:"];
+    let deleted = 0;
+    for (const prefix of prefixes) {
+      const items = await kv.getByPrefix(prefix);
+      for (const item of items) {
+        // CRITICAL: Only delete items belonging to this company
+        const itemCompany = item.companyId || item.company || item.id;
+        if (prefix === "company:" && itemCompany === companyId) {
+          await kv.del(`${prefix}${itemCompany}`);
+          deleted++;
+        } else if (itemCompany && callerScope.includes(itemCompany)) {
+          const key = item.userId && item.date ? `${prefix}${item.userId}:${item.date}` : `${prefix}${item.id}`;
+          await kv.del(key);
+          deleted++;
+        } else if (!itemCompany) {
+          // For items without company (attendance, messages, notifications), check userId
+          if (item.userId) {
+            const emp = await kv.get(`employee:${item.userId}`);
+            const empCompany = emp?.companyId || emp?.company;
+            if (empCompany && callerScope.includes(empCompany)) {
+              const key = item.userId && item.date ? `${prefix}${item.userId}:${item.date}` : `${prefix}${item.id}`;
+              await kv.del(key);
+              deleted++;
+            }
+          }
+        }
+      }
+    }
+    
+    // 2. Delete company-scoped settings
+    try { await kv.del(`company-settings:${companyId}`); deleted++; } catch (e) {}
+    try { await kv.del(`auto-clock-settings:${companyId}`); deleted++; } catch (e) {}
+    try { await kv.del(`manual-clock-settings:${companyId}`); deleted++; } catch (e) {}
+    try { await kv.del(`license:${companyId}`); deleted++; } catch (e) {}
+    
+    // 3. Delete ALL employees from THIS company (including SuperAdmin this time)
+    const allEmployees = await kv.getByPrefix("employee:");
+    const companyEmployees = allEmployees.filter((e: any) => callerScope.includes(e.companyId) || callerScope.includes(e.company));
+    const sb = supabaseAdmin();
+    for (const emp of companyEmployees) {
+      const uid = emp.userId || emp.id;
+      await kv.del(`employee:${uid}`);
+      try { 
+        await sb.auth.admin.deleteUser(uid);
+        console.log(`Deleted user: ${emp.email}`);
+      } catch (e) {
+        console.error(`Failed to delete auth user ${emp.email}:`, e);
+      }
+      deleted++;
+    }
+    
+    console.log(`✅ Account deletion complete. ${deleted} records deleted. License cancelled.`);
+    
+    return c.json({ 
+      success: true, 
+      deletedRecords: deleted,
+      message: 'Account and all data permanently deleted. License cancelled.' 
+    });
+  } catch (e: any) {
+    console.error('Delete account error:', e);
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Reset password
 app.post(`${PREFIX}/users/:userId/reset-password`, async (c) => {
   try {
