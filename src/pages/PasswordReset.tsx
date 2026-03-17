@@ -49,7 +49,7 @@ export function PasswordReset() {
         if (result.valid) {
           setTokenValid(true);
         } else {
-          setError('This password reset link has expired or is invalid');
+          setError(result.error || 'This password reset link has expired or is invalid');
         }
       } catch (err) {
         setError('Failed to validate reset link. Please request a new one.');

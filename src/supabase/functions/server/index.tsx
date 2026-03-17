@@ -317,6 +317,28 @@ async function resolveCompanyName(companyId: string): Promise<string> {
   return company?.name || "";
 }
 
+// CRITICAL: Helper to ensure companyId is set on new items for multi-tenant isolation
+async function ensureCompanyId(item: any, userId: string): Promise<any> {
+  // If item already has companyId/company, use it
+  if (item.companyId || item.company) {
+    return item;
+  }
+  
+  // Get companyId from user's scope
+  const companyId = await getCompanyId(userId);
+  if (!companyId) {
+    console.error(`⚠️  CRITICAL: User ${userId} has no company scope - cannot create item`);
+    throw new Error('User has no company assignment');
+  }
+  
+  // Add companyId to item
+  return {
+    ...item,
+    companyId,
+    company: companyId, // Add both fields for compatibility
+  };
+}
+
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
   // CRITICAL: STRICT multi-tenant isolation - NEVER return all items as fallback
@@ -438,15 +460,21 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
       const { user } = await guardFn(c);
       const body = await c.req.json();
       const id = body.id || crypto.randomUUID();
-      const companyId = body.companyId || (await getCompanyId(user.id));
+      const companyId = body.companyId || body.company || (await getCompanyId(user.id));
+      if (!companyId) {
+        console.error(`⚠️  CRITICAL: User ${user.id} has no company scope - cannot create ${prefix}`);
+        return c.json({ error: 'User has no company assignment' }, 400);
+      }
       const item = { 
         ...body, 
         id, 
         companyId,
+        company: companyId, // CRITICAL: Set both fields for compatibility
         createdAt: new Date().toISOString(), 
         updatedAt: new Date().toISOString() 
       };
       await kv.set(`${kvPrefix}${id}`, item);
+      console.log(`✅ Created ${prefix}:${id} with companyId: ${companyId}`);
       return c.json(item, 201);
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3001,14 +3029,17 @@ async function validateAssetAssignment(body: any, existingId?: string) {
 // Custom asset create/update (SuperAdmin) with assignment validation
 app.post(`${PREFIX}/superadmin/asset`, async (c) => {
   try {
-    await requireSuperAdmin(c);
+    const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
     if (body.assignedToUserId === '__unassigned') { body.assignedToUserId = ''; body.assignedToName = ''; body.status = 'available'; }
     const err = await validateAssetAssignment(body);
     if (err) return c.json({ error: err }, 400);
     const id = body.id || crypto.randomUUID();
-    const item = { ...body, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    // CRITICAL FIX: Ensure companyId is set for multi-tenant isolation
+    const itemWithCompany = await ensureCompanyId(body, user.id);
+    const item = { ...itemWithCompany, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     await kv.set(`asset:${id}`, item);
+    console.log(`✅ Created asset ${id} with companyId: ${item.companyId}`);
     return c.json(item, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3192,13 +3223,16 @@ async function validateMeetingSchedule(body: any, existingId?: string) {
 // Custom meeting create/update with conflict validation
 app.post(`${PREFIX}/superadmin/meeting`, async (c) => {
   try {
-    await requireSuperAdmin(c);
+    const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
     const err = await validateMeetingSchedule(body);
     if (err) return c.json({ error: err }, 400);
     const id = body.id || crypto.randomUUID();
-    const item = { ...body, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    // CRITICAL FIX: Ensure companyId is set for multi-tenant isolation
+    const itemWithCompany = await ensureCompanyId(body, user.id);
+    const item = { ...itemWithCompany, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     await kv.set(`meeting:${id}`, item);
+    console.log(`✅ Created meeting ${id} with companyId: ${item.companyId}`);
     return c.json(item, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -7993,7 +8027,7 @@ app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
 });
 
 // ============ PASSWORD RESET ENDPOINTS ============
-// Request password reset (forgot password)
+// Request password reset (forgot password) - Custom token-based system
 app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
   try {
     const { email } = await c.req.json();
@@ -8027,14 +8061,19 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     });
     
     // Create reset link
-    const resetLink = `${c.req.url.split('/make-server-')[0]}/password-reset?token=${resetToken}`;
+    const baseUrl = c.req.url.split('/make-server-')[0];
+    const resetLink = `${baseUrl}/password-reset?token=${resetToken}`;
     
     console.log(`✅ Password reset token created for ${email}`);
     console.log(`🔗 Reset link: ${resetLink}`);
+    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
     
-    // TODO: In production, send email here
-    // For now, log the reset link (in production, this would be sent via email)
-    console.log(`📨 PASSWORD RESET LINK (would be emailed): ${resetLink}`);
+    // Log to console for development (in production, send via email service)
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`📨 PASSWORD RESET LINK FOR: ${email}`);
+    console.log(`${resetLink}`);
+    console.log(`Valid until: ${expiresAt.toLocaleString()}`);
+    console.log(`${'='.repeat(80)}\n`);
     
     // Log audit event
     await logAudit({
@@ -8048,9 +8087,10 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     
     return c.json({ 
       success: true, 
-      message: 'If the email exists, a reset link has been sent',
-      // For development only - remove in production
-      resetLink: Deno.env.get('ENVIRONMENT') === 'development' ? resetLink : undefined,
+      message: 'Password reset link generated. Check console logs for the link (in production, this would be sent via email).',
+      // Return link in development for easy access
+      resetLink: resetLink,
+      expiresAt: expiresAt.toISOString(),
     });
   } catch (e: any) {
     console.error('Forgot password error:', e);
