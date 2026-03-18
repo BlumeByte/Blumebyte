@@ -258,7 +258,14 @@ async function logAudit(params: {
   details?: any;
   ipAddress?: string;
   userAgent?: string;
+  companyId?: string;
 }) {
+  // Get companyId from params or resolve from userId
+  let companyId = params.companyId;
+  if (!companyId) {
+    companyId = await getCompanyId(params.userId);
+  }
+
   const auditLog = {
     id: crypto.randomUUID(),
     userId: params.userId,
@@ -270,6 +277,8 @@ async function logAudit(params: {
     ipAddress: params.ipAddress || 'unknown',
     userAgent: params.userAgent || 'unknown',
     timestamp: new Date().toISOString(),
+    companyId: companyId || 'unknown', // Add companyId for multi-tenant filtering
+    company: companyId || 'unknown', // Add company field for compatibility
   };
 
   try {
