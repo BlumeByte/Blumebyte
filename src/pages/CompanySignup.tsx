@@ -24,9 +24,10 @@ export default function CompanySignup() {
     adminEmail: '',
     password: '',
     confirmPassword: '',
-    licenses: 5,
+    licenses: 2,
     billingCycle: 'monthly' as 'monthly' | 'yearly',
   });
+  const [customIndustry, setCustomIndustry] = useState('');
 
   // Payment tracking
   const [paymentWindowOpened, setPaymentWindowOpened] = useState(false);
@@ -181,6 +182,12 @@ export default function CompanySignup() {
     // Validation for step 1
     if (!formData.companyName || !formData.adminEmail || !formData.password || !formData.adminName) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    // Validate custom industry if "other" is selected
+    if (formData.industry === 'other' && !customIndustry.trim()) {
+      toast.error('Please specify your industry');
       return;
     }
 
@@ -341,7 +348,7 @@ export default function CompanySignup() {
           body: JSON.stringify({
             companyName: formData.companyName,
             companySize: formData.companySize,
-            industry: formData.industry,
+            industry: formData.industry === 'other' ? customIndustry : formData.industry,
             adminName: formData.adminName,
             adminEmail: formData.adminEmail.toLowerCase(),
             password: formData.password,
@@ -474,7 +481,12 @@ export default function CompanySignup() {
                     <Label htmlFor="industry">Industry</Label>
                     <Select
                       value={formData.industry}
-                      onValueChange={(value) => setFormData({ ...formData, industry: value })}
+                      onValueChange={(value) => {
+                        setFormData({ ...formData, industry: value });
+                        if (value !== 'other') {
+                          setCustomIndustry('');
+                        }
+                      }}
                       disabled={loading}
                     >
                       <SelectTrigger id="industry">
@@ -491,6 +503,21 @@ export default function CompanySignup() {
                     </Select>
                   </div>
                 </div>
+
+                {/* Custom Industry Input - shown when "Other" is selected */}
+                {formData.industry === 'other' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="customIndustry">Please specify your industry *</Label>
+                    <Input
+                      id="customIndustry"
+                      placeholder="e.g., Education, Hospitality, Construction"
+                      value={customIndustry}
+                      onChange={(e) => setCustomIndustry(e.target.value)}
+                      disabled={loading || paymentWindowOpened}
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Admin Information */}
@@ -635,8 +662,8 @@ export default function CompanySignup() {
                     type="button"
                     variant="outline"
                     size="lg"
-                    onClick={() => setFormData({ ...formData, licenses: Math.max(1, formData.licenses - 1) })}
-                    disabled={loading || paymentWindowOpened || formData.licenses <= 1}
+                    onClick={() => setFormData({ ...formData, licenses: Math.max(2, formData.licenses - 1) })}
+                    disabled={loading || paymentWindowOpened || formData.licenses <= 2}
                     className="w-14 h-14 rounded-full"
                   >
                     <Minus className="h-6 w-6" />
@@ -657,7 +684,7 @@ export default function CompanySignup() {
                   </Button>
                 </div>
                 <p className="text-sm text-gray-600 text-center">
-                  Each license allows one employee to access the platform
+                  Each license allows one employee to access the platform. Minimum purchase: 2 licenses.
                 </p>
               </div>
 

@@ -373,7 +373,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     try {
       setLoading(true);
       
-      const pricePerUser = selectedPlan === 'monthly' ? 5 : 48;
+      const pricePerUser = selectedPlan === 'monthly' ? 6 : 60;
       const totalAmount = additionalLicenses * pricePerUser;
 
       console.log('Frontend: Initiating license purchase');
@@ -489,7 +489,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     }
   };
 
-  const pricePerUser = selectedPlan === 'monthly' ? 5 : 48;
+  const pricePerUser = selectedPlan === 'monthly' ? 6 : 60;
   const totalCost = additionalLicenses * pricePerUser;
   const monthlyEquivalent = selectedPlan === 'yearly' ? (totalCost / 12).toFixed(2) : totalCost;
 
@@ -672,7 +672,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                       <CheckCircle className="w-5 h-5 text-blue-500" />
                     )}
                   </div>
-                  <p className="text-2xl font-bold">$5</p>
+                  <p className="text-2xl font-bold">$6</p>
                   <p className="text-xs text-muted-foreground">per license/month</p>
                 </CardContent>
               </Card>
@@ -702,8 +702,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                       <CheckCircle className="w-5 h-5 text-blue-500" />
                     )}
                   </div>
-                  <p className="text-2xl font-bold">$4<span className="text-base text-muted-foreground">/month</span></p>
-                  <p className="text-xs text-muted-foreground">billed annually at $48/year</p>
+                  <p className="text-2xl font-bold">$5<span className="text-base text-muted-foreground">/month</span></p>
+                  <p className="text-xs text-muted-foreground">billed annually at $60/year</p>
                   <p className="text-xs text-green-600 font-medium mt-1">Save $12/year per license</p>
                 </CardContent>
               </Card>
