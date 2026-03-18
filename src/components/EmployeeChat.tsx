@@ -84,8 +84,8 @@ export function EmployeeChat() {
       inputRef.current?.focus();
       fetchMessages();
       
-      // Poll for new messages every 3 seconds
-      pollInterval.current = window.setInterval(fetchMessages, 3000);
+      // PERFORMANCE: Poll for new messages every 10 seconds instead of 3
+      pollInterval.current = window.setInterval(fetchMessages, 10000);
     } else {
       if (pollInterval.current) {
         clearInterval(pollInterval.current);

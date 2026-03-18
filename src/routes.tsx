@@ -3,7 +3,6 @@ import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider } from './lib/auth-context';
 import { BrandingProvider } from './lib/branding-context';
-import { EmployeeChat } from './components/EmployeeChat';
 import { Toaster } from './components/ui/sonner';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -12,7 +11,7 @@ import SecurityPolicy from './pages/SecurityPolicy';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
 
-// Lazy load heavy components for better initial load performance
+// PERFORMANCE: Lazy load ALL heavy components
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./components/LoginPage'));
 const CompanySignup = lazy(() => import('./pages/CompanySignup'));
@@ -31,6 +30,9 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const OAuthConsent = lazy(() => import('./pages/OAuthConsent'));
 const PasswordReset = lazy(() => import('./pages/PasswordReset'));
 
+// PERFORMANCE: Lazy load EmployeeChat to reduce initial bundle
+const EmployeeChat = lazy(() => import('./components/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
+
 // Loading fallback component
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -47,7 +49,10 @@ function RootLayout() {
     <BrandingProvider>
       <AuthProvider>
         <Toaster richColors position="top-right" />
-        <EmployeeChat />
+        {/* PERFORMANCE: Lazy load EmployeeChat in Suspense to reduce initial load */}
+        <Suspense fallback={null}>
+          <EmployeeChat />
+        </Suspense>
         <Outlet />
       </AuthProvider>
     </BrandingProvider>

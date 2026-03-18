@@ -76,7 +76,8 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
   }, [accessToken, user]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 30000); return () => clearInterval(iv); }, [load]);
+  // PERFORMANCE: Reduced polling from 30s to 60s
+  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
 
   const handleApply = async () => {
     if (!selectedJob) return;

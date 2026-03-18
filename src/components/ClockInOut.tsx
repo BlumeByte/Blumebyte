@@ -221,7 +221,8 @@ export function ClockInOut() {
       setElapsed(Math.max(0, Math.round(activeMs / 60000)));
     };
     update();
-    const interval = setInterval(update, 30000);
+    // PERFORMANCE: Update elapsed time every 60s instead of 30s (time is in minutes anyway)
+    const interval = setInterval(update, 60000);
     return () => clearInterval(interval);
   }, [record?.clockIn, record?.clockOut, record?.isPaused, record?.totalPausedMinutes, record?.pauses]);
 

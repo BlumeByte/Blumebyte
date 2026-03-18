@@ -3245,9 +3245,9 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh every 30 seconds for real-time updates
+  // PERFORMANCE: Auto-refresh every 60 seconds for real-time updates (reduced from 30s)
   useEffect(() => {
-    const interval = setInterval(() => { load(); }, 30000);
+    const interval = setInterval(() => { load(); }, 60000);
     return () => clearInterval(interval);
   }, [load]);
 

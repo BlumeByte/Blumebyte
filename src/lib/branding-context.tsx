@@ -65,7 +65,11 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Fetch branding in background without blocking initial render
     fetchBranding();
-    const iv = setInterval(fetchBranding, 15000); // Poll every 15 seconds for real-time updates
+    // PERFORMANCE: Only poll if user is logged in, and reduce frequency to 60 seconds
+    const token = localStorage.getItem('auth-token');
+    if (!token) return; // Don't poll if not logged in
+    
+    const iv = setInterval(fetchBranding, 60000); // Reduced from 15s to 60s
     return () => clearInterval(iv);
   }, [fetchBranding]);
 
