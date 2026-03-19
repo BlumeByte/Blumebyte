@@ -143,6 +143,20 @@ async function getUserProfile(userId: string) {
   return profile || null;
 }
 
+async function getCompanyContext(userId: string) {
+  const profile = await getUserProfile(userId);
+  const companyId = profile?.companyId || profile?.company || null;
+  const company = companyId
+    ? (await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`))
+    : null;
+
+  return {
+    profile,
+    companyId,
+    company,
+  };
+}
+
 // Helper to verify subscription and license availability
 async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiveLicense = true) {
   const subscription = await kv.get(`subscription:${superAdminId}`);
@@ -1901,6 +1915,8 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     
     const userId = data.user.id;
     
+    const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
+
     // Create user profile with company scoping
     const userProfile = {
       id: userId,
@@ -3709,9 +3725,10 @@ app.post(`${PREFIX}/training-programs`, async (c) => {
     const { user, role } = await requireAdminOrAbove(c);
     const body = await c.req.json();
     
-    // Get company ID from user profile
-    const userProfile = await kv.get(`user_profile:${user.id}`);
-    const companyId = userProfile?.companyId;
+    const { profile: userProfile, companyId } = await getCompanyContext(user.id);
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
     
     const id = `training_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const training = {
@@ -5704,8 +5721,10 @@ app.post(`${PREFIX}/employee/leave-request`, async (c) => {
       return c.json({ error: 'Missing required fields' }, 400);
     }
 
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const { profile: userProfile, companyId } = await getCompanyContext(authUser.user.id);
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -5740,8 +5759,10 @@ app.post(`${PREFIX}/employee/leave-request`, async (c) => {
 app.get(`${PREFIX}/employee/leave-requests`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const { profile: userProfile, companyId } = await getCompanyContext(authUser.user.id);
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
 
     const allRequests = await kv.get(`leave_requests:${companyId}`) || [];
     const userRequests = allRequests.filter((r: any) => r.userId === authUser.user.id);
@@ -5758,8 +5779,10 @@ app.get(`${PREFIX}/employee/leave-requests`, async (c) => {
 app.post(`${PREFIX}/employee/clock-in`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const { profile: userProfile, companyId } = await getCompanyContext(authUser.user.id);
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const attendanceKey = `attendance:${companyId}:${today}`;
@@ -5801,8 +5824,10 @@ app.post(`${PREFIX}/employee/clock-in`, async (c) => {
 app.post(`${PREFIX}/employee/clock-out`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const { profile: userProfile, companyId } = await getCompanyContext(authUser.user.id);
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const attendanceKey = `attendance:${companyId}:${today}`;
@@ -5842,8 +5867,10 @@ app.post(`${PREFIX}/employee/clock-out`, async (c) => {
 app.get(`${PREFIX}/employee/attendance`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const { profile: userProfile, companyId } = await getCompanyContext(authUser.user.id);
+    if (!companyId) {
+      return c.json({ error: 'User not associated with a company' }, 400);
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const records: any[] = [];
@@ -6796,14 +6823,10 @@ app.put(`${PREFIX}/admin/employee-feedback/:id`, async (c) => {
 app.get(`${PREFIX}/company/info`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
-
+    const { companyId, company } = await getCompanyContext(authUser.user.id);
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
     }
-
-    const company = await kv.get(`company_by_id:${companyId}`);
     
     return c.json(company);
   } catch (e: any) {
@@ -6819,9 +6842,7 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
     const authUser = await requireAuth(c);
     const { plan, amount, licenses } = await c.req.json();
 
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
-
+    const { profile: userProfile, companyId } = await getCompanyContext(authUser.user.id);
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
     }
@@ -6963,9 +6984,7 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
     const authUser = await requireAuth(c);
     const { additionalLicenses, amount } = await c.req.json();
 
-    const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
-
+    const { profile: userProfile, companyId } = await getCompanyContext(authUser.user.id);
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
     }
