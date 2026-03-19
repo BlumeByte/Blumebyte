@@ -1851,21 +1851,30 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       return c.json({ error: "User not associated with a company. Please contact support." }, 400);
     }
     
-    // Check license availability for this company
+    // Check license availability for this company using the freshest subscription data.
     const company = await kv.get(`company_by_id:${userCompanyId}`);
-    const subscription = company?.subscription;
-    
-    if (!subscription || subscription.status !== 'active') {
+    const companySubscription = company?.subscription;
+    const superAdminSubscription = await kv.get(`subscription:${authUser.id}`);
+    const subscriptionStatus = superAdminSubscription?.status || companySubscription?.status || company?.subscriptionStatus;
+    const purchasedLicenses =
+      superAdminSubscription?.purchasedLicenses ||
+      companySubscription?.licenses ||
+      company?.licenses ||
+      0;
+
+    if (subscriptionStatus !== 'active' || purchasedLicenses <= 0) {
       return c.json({ 
         error: "No active subscription. Please purchase licenses first.",
-        needsSubscription: true 
+        needsSubscription: true,
       }, 403);
     }
     
-    // Count existing active users in this company
-    const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
-    const usedLicenses = companyStats.usedLicenses || 1; // At least the super admin
-    const purchasedLicenses = subscription.licenses || 0;
+    // Count existing active users in this company directly instead of relying on cached stats.
+    const allUsers = await kv.getByPrefix('employee:');
+    const usedLicenses = allUsers.filter((existingUser: any) => {
+      const existingCompanyId = existingUser.companyId || existingUser.company;
+      return existingCompanyId === userCompanyId && existingUser.status !== 'inactive';
+    }).length;
     
     if (usedLicenses >= purchasedLicenses) {
       return c.json({ 
