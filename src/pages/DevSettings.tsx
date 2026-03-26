@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Settings, Save, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
+import { Settings, Save, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 
 export default function DevSettings() {
@@ -35,19 +35,18 @@ export default function DevSettings() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Settings className="h-6 w-6 text-blue-600" />
-            <CardTitle>Developer Settings</CardTitle>
+            <CardTitle>Payment Configuration</CardTitle>
           </div>
           <CardDescription>
-            Configure Paystack public key temporarily (for testing only)
+            Configure your Paystack public key for subscription checkout
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
             <p className="text-sm text-yellow-800">
-              <strong>⚠️ Temporary Configuration</strong>
+              <strong>Payment setup required</strong>
               <br />
-              This page allows you to set the Paystack public key in localStorage while the server endpoint is being deployed.
-              Once the server is ready, this won't be necessary.
+              Add your Paystack public key so the signup and subscription payment flow can initialize successfully.
             </p>
           </div>
 
@@ -61,7 +60,7 @@ export default function DevSettings() {
                 onChange={(e) => setPublicKey(e.target.value)}
               />
               <p className="text-xs text-gray-600">
-                Your Paystack public key (starts with pk_test_ for test mode or pk_live_ for live mode)
+                Enter a valid Paystack public key. Test keys start with <code>pk_test_</code> and live keys start with <code>pk_live_</code>.
               </p>
             </div>
 
@@ -79,7 +78,7 @@ export default function DevSettings() {
           <div className="border-t pt-4">
             <Button
               variant="ghost"
-              onClick={() => navigate('/company/signup')}
+              onClick={() => navigate('/company-signup')}
               className="w-full"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -89,37 +88,14 @@ export default function DevSettings() {
 
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>How to get your Paystack key:</strong>
+              <strong>How to find your Paystack key:</strong>
               <br />
               1. Log in to your Paystack Dashboard
               <br />
               2. Go to Settings → API Keys & Webhooks
               <br />
-              3. Copy your Public Key (for testing, use the Test Public Key)
+              3. Copy your Public Key and paste it above
             </p>
-          </div>
-
-          <div className="border-t pt-4">
-            <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-red-800">Production Cleanup Utility</p>
-                  <p className="text-xs text-red-700 mt-1">
-                    Clear ALL test data and reset the system to production-ready state. This action is IRREVERSIBLE!
-                  </p>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => navigate('/production-cleanup')}
-                    className="mt-3 w-full"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Access Production Cleanup
-                  </Button>
-                </div>
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>

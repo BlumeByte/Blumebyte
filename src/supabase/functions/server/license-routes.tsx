@@ -218,7 +218,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const purchasedLicenses = subscription?.purchasedLicenses || company?.subscription?.licenses || company?.licenses || 0;
       const subscriptionStatus = subscription?.status || company?.subscription?.status || company?.subscriptionStatus;
 
-      if (subscriptionStatus !== 'active' || purchasedLicenses <= 0) {
+      if (!['active', 'trial'].includes(subscriptionStatus || '') || purchasedLicenses <= 0) {
         return c.json({ 
           canCreate: false, 
           reason: 'No active subscription. Please purchase licenses first.',
