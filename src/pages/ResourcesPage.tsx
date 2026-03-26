@@ -167,69 +167,6 @@ export default function ResourcesPage() {
         </div>
       </section>
 
-      {/* Blog Section */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4 text-black">Latest from Our Blog</h2>
-            <p className="text-lg text-gray-600">
-              Insights, tips, and best practices from HR experts
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-8">
-            {blogPosts.map((post, index) => (
-              <Card key={index} className="border-2 border-gray-200 hover:border-black transition-all bg-white">
-                <CardHeader>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-600">{post.category}</span>
-                    <span className="text-sm text-gray-500">{post.readTime}</span>
-                  </div>
-                  <CardTitle className="text-xl">{post.title}</CardTitle>
-                  <CardDescription>{post.excerpt}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="ghost" className="px-0">
-                    Read Article <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <div className="text-center mt-8">
-            <Button variant="outline" size="lg">
-              View All Blog Posts
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Downloadable Guides */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-4 text-black">Free Downloadable Guides</h2>
-          <p className="text-lg text-gray-600">
-            Comprehensive guides to help you master HR management
-          </p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          {guides.map((guide, index) => (
-            <Card key={index} className="border-2 border-gray-200 hover:border-black transition-all">
-              <CardHeader>
-                <Download className="h-10 w-10 text-black mb-4" />
-                <CardTitle className="text-lg">{guide.title}</CardTitle>
-                <p className="text-sm text-gray-500">{guide.pages}</p>
-                <CardDescription>{guide.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full bg-black text-white hover:bg-gray-800">
-                  Download Free
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
       {/* Newsletter Section */}
       <section className="bg-black text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

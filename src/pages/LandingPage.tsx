@@ -229,6 +229,12 @@ export default function LandingPage() {
                             navigate('/platform-overview');
                           } else if (menu === 'Solutions' && section.title === 'By Industry') {
                             navigate(`/industry/${item.name.toLowerCase()}`);
+                          } else if (menu === 'Solutions' && (section.title === 'By Company Size' || section.title === 'By Stakeholder')) {
+                            // Navigate to platform overview for company size and stakeholder
+                            navigate('/platform-overview');
+                          } else if (menu === 'Why Blumebyte') {
+                            // Navigate to about page for Why Blumebyte items
+                            navigate('/about');
                           } else if (menu === 'Resources') {
                             navigate('/resources');
                           }
@@ -581,20 +587,19 @@ export default function LandingPage() {
             <div>
               <h3 className="font-semibold text-black mb-3">Platform</h3>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li><button className="hover:text-black">Overview</button></li>
-                <li><button className="hover:text-black">Features</button></li>
-                <li><button className="hover:text-black">Integrations</button></li>
-                <li><button className="hover:text-black">Pricing</button></li>
+                <li><button onClick={() => navigate('/platform-overview')} className="hover:text-black">Overview</button></li>
+                <li><button onClick={() => navigate('/features')} className="hover:text-black">Features</button></li>
+                <li><button onClick={() => navigate('/integrations')} className="hover:text-black">Integrations</button></li>
+                <li><button onClick={() => navigate('/pricing')} className="hover:text-black">Pricing</button></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold text-black mb-3">Company</h3>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li><button className="hover:text-black">About Us</button></li>
-                <li><button className="hover:text-black">Careers</button></li>
-                <li><button className="hover:text-black">Contact</button></li>
-                <li><button className="hover:text-black">Blog</button></li>
+                <li><button onClick={() => navigate('/about')} className="hover:text-black">About Us</button></li>
+                <li><button onClick={() => navigate('/careers')} className="hover:text-black">Careers</button></li>
+                <li><button onClick={() => navigate('/contact')} className="hover:text-black">Contact</button></li>
               </ul>
             </div>
             

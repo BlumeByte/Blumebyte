@@ -33,6 +33,11 @@ const PlatformOverview = lazy(() => import('./pages/PlatformOverview'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 const IndustryPage = lazy(() => import('./pages/IndustryPage'));
 const ResourcesPage = lazy(() => import('./pages/ResourcesPage'));
+const FeaturesPage = lazy(() => import('./pages/FeaturesPage'));
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const CareersPage = lazy(() => import('./pages/CareersPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 // PERFORMANCE: Lazy load EmployeeChat to reduce initial bundle
 const EmployeeChat = lazy(() => import('./components/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
@@ -277,20 +282,76 @@ export const router = createBrowserRouter([
         Component: TermsConditionsPage,
       },
       {
-        path: '/platform-overview',
-        Component: PlatformOverview,
+        path: '/pricing',
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <PricingPage />
+          </Suspense>
+        ),
       },
       {
-        path: '/pricing',
-        Component: PricingPage,
+        path: '/platform-overview',
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <PlatformOverview />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/features',
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <FeaturesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/integrations',
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <IntegrationsPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/about',
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <AboutPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/careers',
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <CareersPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/contact',
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <ContactPage />
+          </Suspense>
+        ),
       },
       {
         path: '/industry/:industry',
-        Component: IndustryPage,
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <IndustryPage />
+          </Suspense>
+        ),
       },
       {
         path: '/resources',
-        Component: ResourcesPage,
+        Component: () => (
+          <Suspense fallback={<LoadingFallback />}>
+            <ResourcesPage />
+          </Suspense>
+        ),
       },
       {
         path: '*',
