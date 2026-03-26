@@ -217,7 +217,7 @@ export function SubscriptionExpiryAlert({ daysRemaining }: { daysRemaining: numb
             {daysRemaining <= 3 && ' All users will lose access when it expires!'}
           </p>
           <Button 
-            onClick={() => navigate('/superadmin/settings')}
+            onClick={() => navigate('/subscription')}
             className="bg-orange-600 hover:bg-orange-700 text-white"
           >
             <CreditCard className="w-4 h-4 mr-2" />

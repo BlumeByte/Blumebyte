@@ -157,6 +157,10 @@ async function getCompanyContext(userId: string) {
   };
 }
 
+function hasUsableSubscriptionStatus(status?: string | null) {
+  return status === 'active' || status === 'trial';
+}
+
 // Helper to verify subscription and license availability
 async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiveLicense = true) {
   const subscription = await kv.get(`subscription:${superAdminId}`);
@@ -211,7 +215,7 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
 async function requireAuth(c: any) {
   const user = await getAuthUser(c);
   if (!user) throw new Error("Unauthorized");
-  const kvData = await kv.get(`employee:${user.id}`);
+  const kvData = await getUserProfile(user.id);
   const role = kvData?.role || user.user_metadata?.role || "employee";
   
   // SUBSCRIPTION LOGIC TEMPORARILY DEACTIVATED
@@ -313,16 +317,25 @@ async function logAudit(params: {
 
 // --- Company scope resolver ---
 async function resolveCompanyScope(userId: string): Promise<string[] | null> {
-  const kvData = await kv.get(`employee:${userId}`);
+  const kvData = await getUserProfile(userId);
   if (kvData?.assignedCompanies?.length) {
     console.log(`✅ resolveCompanyScope: Found assignedCompanies in KV for user ${userId}:`, kvData.assignedCompanies);
     return kvData.assignedCompanies;
+  }
+  if (kvData?.companyId || kvData?.company) {
+    const fallbackCompanyId = kvData.companyId || kvData.company;
+    console.log(`🔧 resolveCompanyScope: Falling back to direct companyId for user ${userId}:`, fallbackCompanyId);
+    return [fallbackCompanyId];
   }
   const sb = supabaseAdmin();
   const { data } = await sb.auth.admin.getUserById(userId);
   if (data?.user?.user_metadata?.assignedCompanies?.length) {
     console.log(`✅ resolveCompanyScope: Found assignedCompanies in auth metadata for user ${userId}:`, data.user.user_metadata.assignedCompanies);
     return data.user.user_metadata.assignedCompanies;
+  }
+  if (data?.user?.user_metadata?.companyId) {
+    console.log(`🔧 resolveCompanyScope: Falling back to auth metadata companyId for user ${userId}:`, data.user.user_metadata.companyId);
+    return [data.user.user_metadata.companyId];
   }
   console.log(`❌ resolveCompanyScope: No assignedCompanies found for user ${userId}. KV data:`, kvData, 'Auth metadata:', data?.user?.user_metadata);
   return null;
@@ -336,7 +349,7 @@ async function getCompanyId(userId: string): Promise<string | null> {
 
 async function resolveCompanyName(companyId: string): Promise<string> {
   if (!companyId) return "";
-  const company = await kv.get(`company:${companyId}`);
+  const company = await kv.get(`company_by_id:${companyId}`) || await kv.get(`company:${companyId}`);
   return company?.name || "";
 }
 
@@ -1876,7 +1889,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       company?.licenses ||
       0;
 
-    if (subscriptionStatus !== 'active' || purchasedLicenses <= 0) {
+    if (!hasUsableSubscriptionStatus(subscriptionStatus) || purchasedLicenses <= 0) {
       return c.json({ 
         error: "No active subscription. Please purchase licenses first.",
         needsSubscription: true,
@@ -7963,7 +7976,7 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
     }
 
     // Check if user already has a company profile
-    const existingProfile = await kv.get(`user:${userId}`);
+    const existingProfile = await getUserProfile(userId) || await kv.get(`user:${userId}`);
     if (existingProfile) {
       return c.json({ error: "User already has a company profile" }, 400);
     }
@@ -7991,21 +8004,36 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
     };
 
     await kv.set(`company:${companyId}`, company);
+    await kv.set(`company_by_id:${companyId}`, company);
+    await kv.set(`company_stats:${companyId}`, {
+      totalEmployees: 1,
+      activeEmployees: 1,
+      usedLicenses: 1,
+      availableLicenses: (company.subscription?.licenses || 0) - 1,
+    });
 
     // Create SuperAdmin user profile
     const userProfile = {
       id: userId,
+      userId,
       email,
       name: userName,
       role: "superadmin",
       companyId,
+      company: companyId,
+      assignedCompanies: [companyId],
       departments: [],
+      department: "",
       createdAt: new Date().toISOString(),
+      status: "active",
       active: true,
       authProvider: user.app_metadata?.provider || "oauth",
     };
 
     await kv.set(`user:${userId}`, userProfile);
+    await kv.set(`employee:${userId}`, userProfile);
+    await kv.set(`user_profile:${userId}`, userProfile);
+    await kv.set(`company_users:${companyId}:${userId}`, userProfile);
 
     // Add user to company's users list
     await kv.set(`company:${companyId}:users`, [userId]);
@@ -8015,6 +8043,7 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
       user_metadata: {
         ...user.user_metadata,
         companyId,
+        assignedCompanies: [companyId],
         role: "superadmin",
         name: userName,
         setupComplete: true,
