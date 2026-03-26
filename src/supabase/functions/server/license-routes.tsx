@@ -158,7 +158,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       // Get subscription AND company record (licenses can be in either)
       const subscription = await kv.get(`subscription:${user.id}`);
-      const company = await kv.get(`company_by_id:${companyId}`) || await kv.get(`company:${companyId}`);
+      const company = await kv.get(`company:${companyId}`);
       
       // Count used licenses (filtered by company)
       const allUsers = await kv.getByPrefix('employee:');
@@ -166,10 +166,10 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const usedLicenses = companyUsers.length;
       
       // Get purchased licenses from subscription OR company record
-      const purchasedLicenses = subscription?.purchasedLicenses || company?.subscription?.licenses || company?.licenses || 0;
+      const purchasedLicenses = subscription?.purchasedLicenses || company?.licenses || 0;
       const availableLicenses = Math.max(0, purchasedLicenses - usedLicenses);
-      const status = subscription?.status || company?.subscription?.status || company?.subscriptionStatus || 'none';
-      const plan = subscription?.plan || company?.subscription?.plan || company?.subscriptionPlan || 'none';
+      const status = subscription?.status || company?.subscriptionStatus || 'none';
+      const plan = subscription?.plan || company?.subscriptionPlan || 'none';
       
       return c.json({
         purchasedLicenses,
@@ -206,19 +206,10 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         });
       }
       
-      const employeeRecord = await kv.get(`employee:${user.id}`);
-      const companyId = employeeRecord?.companyId || employeeRecord?.company;
-      const company = companyId
-        ? (await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`))
-        : null;
-
       // Get subscription
       const subscription = await kv.get(`subscription:${user.id}`);
       
-      const purchasedLicenses = subscription?.purchasedLicenses || company?.subscription?.licenses || company?.licenses || 0;
-      const subscriptionStatus = subscription?.status || company?.subscription?.status || company?.subscriptionStatus;
-
-      if (!['active', 'trial'].includes(subscriptionStatus || '') || purchasedLicenses <= 0) {
+      if (!subscription || subscription.status !== 'active') {
         return c.json({ 
           canCreate: false, 
           reason: 'No active subscription. Please purchase licenses first.',
@@ -226,12 +217,10 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         });
       }
       
-      // Count used licenses in the current tenant only
+      // Count used licenses
       const allUsers = await kv.getByPrefix('employee:');
-      const usedLicenses = allUsers.filter((existingUser: any) => {
-        const existingCompanyId = existingUser.companyId || existingUser.company;
-        return existingCompanyId === companyId && existingUser.status !== 'inactive';
-      }).length;
+      const usedLicenses = allUsers.length;
+      const purchasedLicenses = subscription.purchasedLicenses || 0;
       const availableLicenses = purchasedLicenses - usedLicenses;
       
       if (availableLicenses <= 0) {

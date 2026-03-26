@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
-import { supabase } from './supabase';
 
 const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
 
@@ -33,10 +32,8 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 
   const fetchBranding = useCallback(async () => {
     try {
-      // Get the live Supabase session token instead of reading a stale/nonexistent localStorage key.
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
+      // CRITICAL FIX: Use authenticated endpoint to get company-scoped settings
+      const token = localStorage.getItem('auth-token');
       if (!token) {
         // If not logged in, use default branding
         setBranding(DEFAULT_BRANDING);
@@ -44,10 +41,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       }
 
       const res = await fetch(`${BASE}/company-settings`, {
-        headers: {
-          Authorization: `Bearer ${publicAnonKey}`,
-          'X-User-Token': token,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -71,18 +65,12 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Fetch branding in background without blocking initial render
     fetchBranding();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      fetchBranding();
-    });
-
-    // PERFORMANCE: Poll slowly in the background to keep branding fresh for long-lived sessions.
+    // PERFORMANCE: Only poll if user is logged in, and reduce frequency to 60 seconds
+    const token = localStorage.getItem('auth-token');
+    if (!token) return; // Don't poll if not logged in
+    
     const iv = setInterval(fetchBranding, 60000); // Reduced from 15s to 60s
-
-    return () => {
-      subscription.unsubscribe();
-      clearInterval(iv);
-    };
+    return () => clearInterval(iv);
   }, [fetchBranding]);
 
   return (

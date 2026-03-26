@@ -3152,9 +3152,9 @@ function UserManagementView() {
                 <MultiDepartmentSelect
                   departments={departments}
                   selectedDepartments={formData.departments || []}
-                  onChange={(depts) => setFormData((prev: any) => ({ ...prev, departments: depts, department: depts.includes(prev.department) ? prev.department : (depts[0] || '') }))}
+                  onChange={(depts) => setFormData({ ...formData, departments: depts })}
                   primaryDepartment={formData.department}
-                  onPrimaryChange={(dept) => setFormData((prev: any) => ({ ...prev, department: dept, departments: prev.departments?.includes(dept) ? prev.departments : [...(prev.departments || []), dept] }))}
+                  onPrimaryChange={(dept) => setFormData({ ...formData, department: dept })}
                   showPrimary={true}
                   label="Assigned Departments"
                 />

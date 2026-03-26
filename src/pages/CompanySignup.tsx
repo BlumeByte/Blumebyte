@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react';
+import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
@@ -165,10 +165,10 @@ export default function CompanySignup() {
         return;
       }
 
-      // If no key is available, show a production-safe message
-      console.warn('No Paystack public key found.');
+      // If no key in localStorage, show message to configure it
+      console.warn('No Paystack public key found. Please configure it in Dev Settings.');
       toast.error(
-        'Payment checkout is not available right now. Please contact support or try again later.',
+        'Payment system needs configuration. Click the settings icon to configure.',
         { duration: 8000 }
       );
     };
@@ -398,6 +398,17 @@ export default function CompanySignup() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      {/* Floating Settings Button */}
+      {!paystackPublicKey && (
+        <button
+          onClick={() => navigate('/dev-settings')}
+          className="fixed bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-50"
+          title="Configure Paystack"
+        >
+          <Settings className="h-5 w-5" />
+        </button>
+      )}
+      
       <Card className="w-full max-w-2xl border-2">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -722,13 +733,25 @@ export default function CompanySignup() {
                 </div>
               )}
 
-              {/* Payment availability warning */}
+              {/* Paystack Configuration Warning */}
               {!paystackPublicKey && (
                 <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                  <p className="text-sm font-medium text-yellow-900">Payment checkout is temporarily unavailable.</p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    Please contact support or try again later once payment configuration is available.
-                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-900">Payment Configuration Required</p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        Paystack public key is not configured. Click below to set it up.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => navigate('/dev-settings')}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      <Settings className="h-3 w-3 mr-1" />
+                      Configure
+                    </Button>
+                  </div>
                 </div>
               )}
 

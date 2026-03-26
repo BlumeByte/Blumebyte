@@ -15,6 +15,7 @@ import TermsConditions from './pages/TermsConditions';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./components/LoginPage'));
 const CompanySignup = lazy(() => import('./pages/CompanySignup'));
+const DevSettings = lazy(() => import('./pages/DevSettings'));
 const EmployeePortal = lazy(() => import('./pages/EmployeePortal'));
 const PaystackSubscription = lazy(() => import('./pages/PaystackSubscription'));
 const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard'));
@@ -23,10 +24,15 @@ const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
 const EmployeeDashboard = lazy(() => import('./components/EmployeeDashboard'));
 const PaymentVerification = lazy(() => import('./components/PaymentVerification'));
 const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification'));
+const ProductionCleanup = lazy(() => import('./pages/ProductionCleanup'));
 const TwoFactorVerification = lazy(() => import('./pages/TwoFactorVerification'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const OAuthConsent = lazy(() => import('./pages/OAuthConsent'));
 const PasswordReset = lazy(() => import('./pages/PasswordReset'));
+const PlatformOverview = lazy(() => import('./pages/PlatformOverview'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
+const IndustryPage = lazy(() => import('./pages/IndustryPage'));
+const ResourcesPage = lazy(() => import('./pages/ResourcesPage'));
 
 // PERFORMANCE: Lazy load EmployeeChat to reduce initial bundle
 const EmployeeChat = lazy(() => import('./components/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
@@ -73,6 +79,12 @@ const LoginPageWrapper = () => (
 const CompanySignupPage = () => (
   <Suspense fallback={<LoadingFallback />}>
     <CompanySignup />
+  </Suspense>
+);
+
+const DevSettingsPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <DevSettings />
   </Suspense>
 );
 
@@ -143,6 +155,12 @@ const SecurityPolicyPage = () => <SecurityPolicy />;
 const PrivacyPolicyPage = () => <PrivacyPolicy />;
 
 const TermsConditionsPage = () => <TermsConditions />;
+
+const ProductionCleanupPage = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <ProductionCleanup />
+  </Suspense>
+);
 
 const TwoFactorVerificationPage = () => (
   <Suspense fallback={<LoadingFallback />}>
@@ -219,6 +237,14 @@ export const router = createBrowserRouter([
         Component: EmployeePortalPage,
       },
       {
+        path: '/dev-settings',
+        Component: DevSettingsPage,
+      },
+      {
+        path: '/production-cleanup',
+        Component: ProductionCleanupPage,
+      },
+      {
         path: '/two-factor-verification',
         Component: TwoFactorVerificationPage,
       },
@@ -249,6 +275,22 @@ export const router = createBrowserRouter([
       {
         path: '/terms-conditions',
         Component: TermsConditionsPage,
+      },
+      {
+        path: '/platform-overview',
+        Component: PlatformOverview,
+      },
+      {
+        path: '/pricing',
+        Component: PricingPage,
+      },
+      {
+        path: '/industry/:industry',
+        Component: IndustryPage,
+      },
+      {
+        path: '/resources',
+        Component: ResourcesPage,
       },
       {
         path: '*',
