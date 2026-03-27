@@ -1883,10 +1883,19 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       }, 403);
     }
     
-    // Count existing active users in this company
+    // Count existing active users in this company (strict multi-tenant scoping)
     const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
-    const usedLicenses = companyStats.usedLicenses || company.usedLicenses || 1; // Fallback to company.usedLicenses
-    const purchasedLicenses = subscription.licenses || 0;
+    const allUsers = await kv.getByPrefix('employee:');
+    const activeCompanyUsers = allUsers.filter((u: any) => {
+      const profileCompanyId = u.companyId || u.company;
+      const isActive = (u.status || 'active') === 'active';
+      return profileCompanyId === userCompanyId && isActive;
+    });
+
+    const usedLicenses = Number.isFinite(companyStats.usedLicenses)
+      ? companyStats.usedLicenses
+      : activeCompanyUsers.length;
+    const purchasedLicenses = subscription.purchasedLicenses || subscription.licenses || company.licenses || 0;
     
     if (usedLicenses >= purchasedLicenses) {
       return c.json({ 
@@ -7768,53 +7777,45 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
       attempts: 0,
     });
 
-    // Log the code prominently for development
-    console.log(`
-╔════════════════════════════════════════════╗
-║        2FA VERIFICATION CODE               ║
-║                                            ║
-║  Email: ${email.padEnd(37)}║
-║  Code:  ${code.padEnd(37)}║
-║  Valid for: 10 minutes                     ║
-╚════════════════════════════════════════════╝
-    `);
+    const emailApiKey = Deno.env.get('EMAIL_API_KEY');
+    if (!emailApiKey) {
+      return c.json({ error: "2FA email service is not configured. Please set EMAIL_API_KEY." }, 500);
+    }
 
-    // TODO: Production email sending
-    // In production, integrate with an email service (SendGrid, AWS SES, Resend, etc.)
-    // Example integration:
-    // const emailApiKey = Deno.env.get('EMAIL_API_KEY');
-    // if (emailApiKey) {
-    //   await fetch('https://api.resend.com/emails', {
-    //     method: 'POST',
-    //     headers: {
-    //       'Authorization': `Bearer ${emailApiKey}`,
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify({
-    //       from: 'Blumebyte <noreply@blumebyte.com>',
-    //       to: email,
-    //       subject: 'Your 2FA Verification Code',
-    //       html: `
-    //         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    //           <h2 style="color: #2563eb;">Blumebyte - 2FA Verification</h2>
-    //           <p>Your verification code is:</p>
-    //           <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
-    //             ${code}
-    //           </div>
-    //           <p>This code will expire in 10 minutes.</p>
-    //           <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
-    //         </div>
-    //       `
-    //     }),
-    //   });
-    // }
+    const fromEmail = Deno.env.get('EMAIL_FROM') || 'Blumebyte <noreply@blumebyte.com>';
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${emailApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: email.toLowerCase(),
+        subject: 'Your Blumebyte 2FA Verification Code',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">Blumebyte - Two-Factor Authentication</h2>
+            <p>Your verification code is:</p>
+            <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
+              ${code}
+            </div>
+            <p>This code will expire in 10 minutes.</p>
+            <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
+          </div>
+        `
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('2FA email sending failed:', errorText);
+      return c.json({ error: "Failed to send 2FA verification email. Please try again." }, 500);
+    }
 
     return c.json({ 
       success: true, 
-      message: "Verification code generated successfully",
-      // DEVELOPMENT ONLY: Return code in response for testing (remove in production)
-      devCode: code,
-      note: "Check server console for the 2FA code. In production, configure EMAIL_API_KEY to send emails.",
+      message: "Verification code sent successfully",
     });
   } catch (e: any) {
     console.error("2FA send code error:", e);

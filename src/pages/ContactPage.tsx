@@ -4,7 +4,6 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Mail, Phone, MapPin, MessageSquare, Send } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { SharedNavigation } from '../components/SharedNavigation';
 
 export default function ContactPage() {
@@ -51,8 +50,8 @@ export default function ContactPage() {
       icon: Phone,
       title: 'Call Us',
       description: 'Speak with our team Monday-Friday, 9am-6pm',
-      action: '+1 (555) 123-4567',
-      href: 'tel:+15551234567'
+      action: '+233256122555',
+      href: 'tel:+233256122555'
     },
     {
       icon: MessageSquare,
@@ -65,22 +64,10 @@ export default function ContactPage() {
 
   const offices = [
     {
-      city: 'San Francisco',
-      address: '123 Tech Street, Suite 400',
-      location: 'San Francisco, CA 94105',
-      country: 'United States'
-    },
-    {
-      city: 'London',
-      address: '456 Business Road',
-      location: 'London, EC2A 4BX',
-      country: 'United Kingdom'
-    },
-    {
-      city: 'Lagos',
-      address: '789 Innovation Avenue',
-      location: 'Lagos, Nigeria',
-      country: 'Nigeria'
+      city: 'Accra',
+      address: 'Blumebyte Office',
+      location: 'Accra',
+      country: 'Ghana'
     },
   ];
 
@@ -242,7 +229,7 @@ export default function ContactPage() {
           <div>
             <h2 className="text-3xl font-bold mb-4 text-black">Our Offices</h2>
             <p className="text-gray-600 mb-8">
-              Visit us at one of our global locations.
+              Visit us at our office location.
             </p>
             <div className="space-y-6">
               {offices.map((office, index) => (
