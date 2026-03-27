@@ -1,0 +1,20 @@
+The fix needed at line 1854-1856:
+
+OLD CODE:
+    // Check license availability for this company
+    const company = await kv.get(`company_by_id:${userCompanyId}`);
+    const subscription = company?.subscription;
+
+NEW CODE:
+    // Check license availability for this company
+    // Try both possible keys (new payment flow uses company_by_id, old flow uses company:)
+    let company = await kv.get(`company_by_id:${userCompanyId}`);
+    if (!company) {
+      company = await kv.get(`company:${userCompanyId}`);
+    }
+    
+    // Check subscription (new format: company.subscription object, old format: company.licenses directly)
+    const subscription = company?.subscription || (company?.licenses > 0 ? {
+      status: company.subscriptionStatus === 'active' ? 'active' : 'inactive',
+      licenses: company.licenses
+    } : null);

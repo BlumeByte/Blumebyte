@@ -6,6 +6,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
 import { performProductionCleanup } from "./production-cleanup.tsx";
+import { migrateCompanyKeys } from "./migration-company-keys.tsx";
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
@@ -1851,11 +1852,31 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       return c.json({ error: "User not associated with a company. Please contact support." }, 400);
     }
     
-    // Check license availability for this company
-    const company = await kv.get(`company_by_id:${userCompanyId}`);
-    const subscription = company?.subscription;
+    // FIXED: Check license availability - handle both storage keys
+    let company = await kv.get(`company_by_id:${userCompanyId}`);
+    if (!company) {
+      company = await kv.get(`company:${userCompanyId}`);
+    }
+    
+    if (!company) {
+      console.error('Company not found:', userCompanyId);
+      return c.json({ error: "Company not found. Please contact support." }, 400);
+    }
+    
+    // FIXED: Handle both subscription formats (old and new)
+    const subscription = company.subscription || (company.licenses > 0 ? {
+      status: company.subscriptionStatus === 'active' ? 'active' : 'inactive',
+      licenses: company.licenses
+    } : null);
     
     if (!subscription || subscription.status !== 'active') {
+      console.error('No active subscription for company:', userCompanyId, {
+        hasCompany: !!company,
+        hasSubscription: !!subscription,
+        status: subscription?.status,
+        licenses: company.licenses,
+        subscriptionStatus: company.subscriptionStatus
+      });
       return c.json({ 
         error: "No active subscription. Please purchase licenses first.",
         needsSubscription: true 
@@ -1864,7 +1885,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     
     // Count existing active users in this company
     const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
-    const usedLicenses = companyStats.usedLicenses || 1; // At least the super admin
+    const usedLicenses = companyStats.usedLicenses || company.usedLicenses || 1; // Fallback to company.usedLicenses
     const purchasedLicenses = subscription.licenses || 0;
     
     if (usedLicenses >= purchasedLicenses) {
@@ -8067,6 +8088,29 @@ app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
     console.error('Fix company scope error:', e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ============ MIGRATION: FIX COMPANY STORAGE KEYS ============
+// This endpoint ensures all companies have proper company_by_id: keys with normalized subscription format
+app.post(`${PREFIX}/admin/migrate-company-keys`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    console.log('🔧 Running company key migration requested by:', user.email);
+    
+    const result = await migrateCompanyKeys();
+    
+    console.log('✅ Company key migration complete:', result);
+    
+    return c.json({
+      success: true,
+      message: 'Company keys migrated successfully',
+      ...result
+    });
+  } catch (e: any) {
+    console.error('Migration error:', e);
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     return c.json({ error: e.message }, 500);
   }
 });
