@@ -1863,17 +1863,28 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       return c.json({ error: "Company not found. Please contact support." }, 400);
     }
     
-    // FIXED: Handle both subscription formats (old and new)
-    const subscription = company.subscription || (company.licenses > 0 ? {
+    // FIXED: Handle both subscription records and company-embedded subscription formats
+    const directSubscription = await kv.get(`subscription:${authUser.id}`);
+    const companySubscription = company.subscription || (company.licenses > 0 ? {
       status: company.subscriptionStatus === 'active' ? 'active' : 'inactive',
       licenses: company.licenses
     } : null);
+    const isSubscriptionActive = directSubscription?.status === 'active' || companySubscription?.status === 'active';
+    const purchasedLicenses =
+      directSubscription?.purchasedLicenses ||
+      directSubscription?.licenses ||
+      companySubscription?.purchasedLicenses ||
+      companySubscription?.licenses ||
+      company.licenses ||
+      0;
     
-    if (!subscription || subscription.status !== 'active') {
+    if (!isSubscriptionActive) {
       console.error('No active subscription for company:', userCompanyId, {
         hasCompany: !!company,
-        hasSubscription: !!subscription,
-        status: subscription?.status,
+        hasDirectSubscription: !!directSubscription,
+        directStatus: directSubscription?.status,
+        hasCompanySubscription: !!companySubscription,
+        companySubscriptionStatus: companySubscription?.status,
         licenses: company.licenses,
         subscriptionStatus: company.subscriptionStatus
       });
