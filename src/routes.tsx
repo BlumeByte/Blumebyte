@@ -10,6 +10,23 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import SecurityPolicy from './pages/SecurityPolicy';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
+import PlatformOverview from './pages/PlatformOverview';
+import PricingPage from './pages/PricingPage';
+import IndustryPage from './pages/IndustryPage';
+import ResourcesPage from './pages/ResourcesPage';
+import FeaturesPage from './pages/FeaturesPage';
+import IntegrationsPage from './pages/IntegrationsPage';
+import AboutPage from './pages/AboutPage';
+import CareersPage from './pages/CareersPage';
+import ContactPage from './pages/ContactPage';
+import HRDataReportingPage from './pages/HRDataReportingPage';
+import TimeAttendancePage from './pages/TimeAttendancePage';
+import PayrollPage from './pages/PayrollPage';
+import PerformanceManagementPage from './pages/PerformanceManagementPage';
+import CompensationPage from './pages/CompensationPage';
+import ApplicantTrackingPage from './pages/ApplicantTrackingPage';
+import OnboardingPage from './pages/OnboardingPage';
+import EmployeeExperiencePage from './pages/EmployeeExperiencePage';
 
 // PERFORMANCE: Lazy load ALL heavy components
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -29,15 +46,6 @@ const TwoFactorVerification = lazy(() => import('./pages/TwoFactorVerification')
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const OAuthConsent = lazy(() => import('./pages/OAuthConsent'));
 const PasswordReset = lazy(() => import('./pages/PasswordReset'));
-const PlatformOverview = lazy(() => import('./pages/PlatformOverview'));
-const PricingPage = lazy(() => import('./pages/PricingPage'));
-const IndustryPage = lazy(() => import('./pages/IndustryPage'));
-const ResourcesPage = lazy(() => import('./pages/ResourcesPage'));
-const FeaturesPage = lazy(() => import('./pages/FeaturesPage'));
-const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'));
-const AboutPage = lazy(() => import('./pages/AboutPage'));
-const CareersPage = lazy(() => import('./pages/CareersPage'));
-const ContactPage = lazy(() => import('./pages/ContactPage'));
 
 // PERFORMANCE: Lazy load EmployeeChat to reduce initial bundle
 const EmployeeChat = lazy(() => import('./components/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
@@ -191,6 +199,24 @@ const PasswordResetPage = () => (
   </Suspense>
 );
 
+const HRDataReportingPageWrapper = () => <HRDataReportingPage />;
+const TimeAttendancePageWrapper = () => <TimeAttendancePage />;
+const PayrollPageWrapper = () => <PayrollPage />;
+const PerformanceManagementPageWrapper = () => <PerformanceManagementPage />;
+const CompensationPageWrapper = () => <CompensationPage />;
+const ApplicantTrackingPageWrapper = () => <ApplicantTrackingPage />;
+const OnboardingPageWrapper = () => <OnboardingPage />;
+const EmployeeExperiencePageWrapper = () => <EmployeeExperiencePage />;
+const PlatformOverviewWrapper = () => <PlatformOverview />;
+const PricingPageWrapper = () => <PricingPage />;
+const FeaturesPageWrapper = () => <FeaturesPage />;
+const IntegrationsPageWrapper = () => <IntegrationsPage />;
+const AboutPageWrapper = () => <AboutPage />;
+const CareersPageWrapper = () => <CareersPage />;
+const ContactPageWrapper = () => <ContactPage />;
+const IndustryPageWrapper = () => <IndustryPage />;
+const ResourcesPageWrapper = () => <ResourcesPage />;
+
 const NotFoundPage = () => <Navigate to="/login" replace />;
 
 export const router = createBrowserRouter([
@@ -283,75 +309,71 @@ export const router = createBrowserRouter([
       },
       {
         path: '/pricing',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <PricingPage />
-          </Suspense>
-        ),
+        Component: PricingPageWrapper,
       },
       {
         path: '/platform-overview',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <PlatformOverview />
-          </Suspense>
-        ),
+        Component: PlatformOverviewWrapper,
       },
       {
         path: '/features',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <FeaturesPage />
-          </Suspense>
-        ),
+        Component: FeaturesPageWrapper,
       },
       {
         path: '/integrations',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <IntegrationsPage />
-          </Suspense>
-        ),
+        Component: IntegrationsPageWrapper,
       },
       {
         path: '/about',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <AboutPage />
-          </Suspense>
-        ),
+        Component: AboutPageWrapper,
       },
       {
         path: '/careers',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <CareersPage />
-          </Suspense>
-        ),
+        Component: CareersPageWrapper,
       },
       {
         path: '/contact',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <ContactPage />
-          </Suspense>
-        ),
+        Component: ContactPageWrapper,
       },
       {
         path: '/industry/:industry',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <IndustryPage />
-          </Suspense>
-        ),
+        Component: IndustryPageWrapper,
       },
       {
         path: '/resources',
-        Component: () => (
-          <Suspense fallback={<LoadingFallback />}>
-            <ResourcesPage />
-          </Suspense>
-        ),
+        Component: ResourcesPageWrapper,
+      },
+      {
+        path: '/hr-data-reporting',
+        Component: HRDataReportingPageWrapper,
+      },
+      {
+        path: '/time-attendance',
+        Component: TimeAttendancePageWrapper,
+      },
+      {
+        path: '/payroll',
+        Component: PayrollPageWrapper,
+      },
+      {
+        path: '/performance-management',
+        Component: PerformanceManagementPageWrapper,
+      },
+      {
+        path: '/compensation',
+        Component: CompensationPageWrapper,
+      },
+      {
+        path: '/applicant-tracking',
+        Component: ApplicantTrackingPageWrapper,
+      },
+      {
+        path: '/onboarding',
+        Component: OnboardingPageWrapper,
+      },
+      {
+        path: '/employee-experience',
+        Component: EmployeeExperiencePageWrapper,
       },
       {
         path: '*',

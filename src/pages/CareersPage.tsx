@@ -2,8 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Briefcase, Heart, Zap, Users, Trophy, Globe, Coffee, BookOpen, ArrowRight } from 'lucide-react';
+import { Briefcase, MapPin, Clock, DollarSign, Users, Heart, Zap, Globe, TrendingUp, Award, ArrowRight } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { SharedNavigation } from '../components/SharedNavigation';
 
 export default function CareersPage() {
   const navigate = useNavigate();
@@ -20,17 +21,17 @@ export default function CareersPage() {
       description: 'Work from anywhere with flexible hours and work-life balance'
     },
     {
-      icon: BookOpen,
-      title: 'Learning & Growth',
+      icon: TrendingUp,
+      title: 'Career Growth',
       description: 'Continuous learning budget, conferences, and professional development'
     },
     {
-      icon: Trophy,
+      icon: Award,
       title: 'Competitive Pay',
       description: 'Market-leading salaries, equity, and performance bonuses'
     },
     {
-      icon: Coffee,
+      icon: Clock,
       title: 'Unlimited PTO',
       description: 'Take the time you need to recharge and stay productive'
     },
@@ -108,19 +109,7 @@ export default function CareersPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <img src={logoImage} alt="Blumebyte" className="h-8 cursor-pointer" onClick={() => navigate('/')} />
-            <div className="flex gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>Sign In</Button>
-              <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
-                Get Started
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SharedNavigation />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20">

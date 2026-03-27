@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 
@@ -165,18 +165,12 @@ export default function LandingPage() {
     {
       title: 'Learn',
       items: [
-        { name: 'HR Toolkit', icon: Briefcase, description: 'Essential HR resources' },
-        { name: 'Content Library', icon: Book, description: 'Articles and guides' },
+        { name: 'HR Toolkit', icon: Briefcase, description: 'Templates and tools' },
+        { name: 'Content Library', icon: Book, description: 'Guides and resources' },
         { name: 'HR Glossary', icon: FileText, description: 'Industry terminology' },
-        { name: 'Blog', icon: FileCheck, description: 'Latest insights' },
-      ]
-    },
-    {
-      title: 'Events',
-      items: [
-        { name: 'Webinar Library', icon: Calendar, description: 'On-demand webinars' },
-        { name: 'Events Hub', icon: Users, description: 'Upcoming events' },
-        { name: 'HR Virtual Summit', icon: Award, description: 'Annual conference' },
+        { name: 'Webinar Library', icon: Video, description: 'On-demand videos' },
+        { name: 'Events Hub', icon: Calendar, description: 'Upcoming events' },
+        { name: 'HR Virtual Summit', icon: Trophy, description: 'Annual conference' },
       ]
     }
   ];

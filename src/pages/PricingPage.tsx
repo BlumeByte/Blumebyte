@@ -2,8 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { SharedNavigation } from '../components/SharedNavigation';
 
 export default function PricingPage() {
   const navigate = useNavigate();
@@ -113,19 +114,7 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <img src={logoImage} alt="Blumebyte" className="h-8 cursor-pointer" onClick={() => navigate('/')} />
-            <div className="flex gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>Sign In</Button>
-              <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
-                Get Started
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SharedNavigation />
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">

@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Users, BarChart3, Clock, DollarSign, Trophy, UserCheck, Shield, Zap, FileText, Calendar, Award, CheckCircle2 } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { SharedNavigation } from '../components/SharedNavigation';
 
 export default function PlatformOverview() {
   const navigate = useNavigate();
@@ -68,19 +69,7 @@ export default function PlatformOverview() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <img src={logoImage} alt="Blumebyte" className="h-8 cursor-pointer" onClick={() => navigate('/')} />
-            <div className="flex gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>Sign In</Button>
-              <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
-                Get Started
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SharedNavigation />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20">
@@ -95,7 +84,7 @@ export default function PlatformOverview() {
             </p>
             <div className="flex gap-4 justify-center">
               <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
-                Start Free Trial
+                Get Started Now
               </Button>
               <Button size="lg" variant="outline" onClick={() => navigate('/pricing')}>
                 View Pricing
@@ -191,7 +180,7 @@ export default function PlatformOverview() {
               Join hundreds of companies using Blumebyte to transform their HR operations
             </p>
             <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
-              Start Free Trial
+              Get Started Now
             </Button>
           </CardContent>
         </Card>
