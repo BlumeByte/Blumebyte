@@ -36,6 +36,7 @@ import { AnnouncementsViewer } from './AnnouncementsViewer';
 import { ManagerCrudPanel } from './ManagerCrudPanel';
 import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
 import { ManagerOvertimeExpenseApproval } from './ManagerOvertimeExpenseApproval';
+import { Monochrome3DBackground } from './Monochrome3DBackground';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -448,7 +449,8 @@ export function ManagerDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 relative">
+      <Monochrome3DBackground variant="manager" />
       {/* Sidebar */}
       <aside className="w-56 bg-white border-r flex flex-col fixed h-screen">
         <div className="p-4 border-b">
