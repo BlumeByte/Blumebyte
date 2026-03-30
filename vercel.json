@@ -1,5 +1,5 @@
 {
-  "buildCommand": "bash -c 'if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ] || [ \"$VERCEL_GIT_COMMIT_REF\" = \"release\" ]; then npm run build; else echo \"Blocked build for branch: $VERCEL_GIT_COMMIT_REF\"; exit 1; fi'",
+  "buildCommand": "bash -c 'if [ \"$VERCEL_ENV\" = \"production\" ] && [ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ] && [ \"$VERCEL_GIT_COMMIT_REF\" != \"release\" ]; then echo \"Blocked production build for branch: $VERCEL_GIT_COMMIT_REF\"; exit 1; fi; npm run build'",
   "outputDirectory": "dist",
   "framework": "vite",
   "installCommand": "npm install --legacy-peer-deps",
