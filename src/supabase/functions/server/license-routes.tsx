@@ -206,10 +206,22 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         });
       }
       
-      // Get subscription
+      const userProfile = await kv.get(`employee:${user.id}`);
+      const companyId = userProfile?.companyId || userProfile?.company;
+      if (!companyId) {
+        return c.json({
+          canCreate: false,
+          reason: 'User is not associated with a company.',
+        }, 400);
+      }
+
+      // Get subscription and company (supports both data models)
       const subscription = await kv.get(`subscription:${user.id}`);
-      
-      if (!subscription || subscription.status !== 'active') {
+      let company = await kv.get(`company_by_id:${companyId}`);
+      if (!company) company = await kv.get(`company:${companyId}`);
+      const isSubscriptionActive = subscription?.status === 'active' || company?.subscription?.status === 'active' || company?.subscriptionStatus === 'active';
+
+      if (!isSubscriptionActive) {
         return c.json({ 
           canCreate: false, 
           reason: 'No active subscription. Please purchase licenses first.',
@@ -217,10 +229,15 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         });
       }
       
-      // Count used licenses
+      // Count used licenses for this company only
       const allUsers = await kv.getByPrefix('employee:');
-      const usedLicenses = allUsers.length;
-      const purchasedLicenses = subscription.purchasedLicenses || 0;
+      const activeCompanyUsers = allUsers.filter((u: any) => {
+        const userCompanyId = u.companyId || u.company;
+        const isActive = (u.status || 'active') === 'active';
+        return userCompanyId === companyId && isActive;
+      });
+      const usedLicenses = activeCompanyUsers.length;
+      const purchasedLicenses = subscription?.purchasedLicenses || company?.subscription?.purchasedLicenses || company?.subscription?.licenses || company?.licenses || 0;
       const availableLicenses = purchasedLicenses - usedLicenses;
       
       if (availableLicenses <= 0) {
