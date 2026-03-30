@@ -3,43 +3,33 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- Favicons -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <link rel="shortcut icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <!-- Favicon with multiple formats for better browser compatibility -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3" />
+    <link rel="shortcut icon" href="/favicon.ico?v=3" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <meta
       name="description"
       content="Blumebyte - Comprehensive multi-tenant HR management SaaS platform with advanced employee management, payroll, and automation"
     />
-
     <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-title" content="Blumebyte" />
     <meta name="application-name" content="Blumebyte" />
 
     <link rel="manifest" href="/manifest.json" />
 
-    <title>Blumebyte - HR Management Platform</title>
-
-    <!-- PERFORMANCE -->
-    <link
-      rel="preconnect"
-      href="https://ivohczdtuxasyfoiphqu.supabase.co"
-      crossorigin
-    />
-    <link
-      rel="dns-prefetch"
-      href="https://ivohczdtuxasyfoiphqu.supabase.co"
-    />
-
+    <!-- PERFORMANCE: Preconnect to critical domains -->
+    <link rel="preconnect" href="https://ivohczdtuxasyfoiphqu.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://ivohczdtuxasyfoiphqu.supabase.co" />
     <link rel="preconnect" href="https://js.paystack.co" />
 
-    <!-- Paystack -->
+    <!-- Paystack Inline Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
+
+    <title>Blumebyte - HR Management Platform</title>
   </head>
 
   <body>
@@ -49,17 +39,3 @@
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-
-  <!-- <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Blumebyte</title>
-    </head>
-
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html> --> -->
