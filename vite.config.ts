@@ -51,8 +51,26 @@
       },
     },
     build: {
-      target: 'esnext',
+      target: 'es2019',
       outDir: 'dist',
+      sourcemap: false,
+      minify: 'esbuild',
+      cssCodeSplit: true,
+      reportCompressedSize: false,
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]',
+        },
+      },
+    },
+    esbuild: {
+      drop: ['console', 'debugger'],
+      legalComments: 'none',
+      minifyIdentifiers: true,
+      minifySyntax: true,
+      minifyWhitespace: true,
     },
     server: {
       port: 3000,
