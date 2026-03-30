@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { publicAnonKey, supabaseProjectId, supabaseUrl } from '../config/env';
 
-const supabaseUrl = `https://${projectId}.supabase.co`;
+export const supabaseStorageKey = `sb-${supabaseProjectId || 'project'}-auth-token`;
 
 export const supabase = createClient(supabaseUrl, publicAnonKey, {
   auth: {
-    storageKey: `sb-${projectId}-auth-token`,
+    storageKey: supabaseStorageKey,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
