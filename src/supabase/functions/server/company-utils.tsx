@@ -65,14 +65,17 @@ export async function validateCompanyLicenses(companyId: string) {
     };
   }
   
-  // Get usage from active tenant users (authoritative source)
+  // Get usage stats (multi-tenant scoped)
+  const companyStats = await kv.get(`company_stats:${companyId}`) || {};
   const allUsers = await kv.getByPrefix('employee:');
   const activeCompanyUsers = allUsers.filter((u: any) => {
     const userCompanyId = u.companyId || u.company;
     const isActive = (u.status || 'active') === 'active';
     return userCompanyId === companyId && isActive;
   });
-  const usedLicenses = activeCompanyUsers.length;
+  const usedLicenses = Number.isFinite(companyStats.usedLicenses)
+    ? companyStats.usedLicenses
+    : activeCompanyUsers.length;
   const purchasedLicenses = subscription.purchasedLicenses || subscription.licenses || company.licenses || 0;
   
   if (usedLicenses >= purchasedLicenses) {
