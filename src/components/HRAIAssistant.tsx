@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
 import { useNavigate } from 'react-router';
