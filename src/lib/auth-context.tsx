@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, supabaseStorageKey } from './supabase';
+import { isSupabaseConfigured } from '../config/env';
 import { api } from './api-client';
 import { authLock } from './auth-lock';
 
@@ -112,6 +113,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setSessionLoading(false);
+      return;
+    }
+
     // Use onAuthStateChange as the single source of truth for session state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'TOKEN_REFRESHED' && !session) {
@@ -161,6 +167,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setLoginLoading(true);
     setLoginError(null);
+
+    if (!isSupabaseConfigured) {
+      const configError = 'Login is temporarily unavailable because production Supabase environment variables are not configured.';
+      setLoginError(configError);
+      setLoginLoading(false);
+      throw new Error(configError);
+    }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
