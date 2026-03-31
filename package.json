@@ -63,9 +63,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "figma:sync": "node scripts/figma-sync.mjs",
-    "figma:push": "node scripts/figma-push.mjs",
-    "figma:auto-sync": "npm run figma:sync && npm run figma:push"
+    "preview": "vite preview"
   }
 }
