@@ -112,6 +112,11 @@ export default function CompanySignup() {
   // Fetch Paystack public key
   useEffect(() => {
     const fetchPublicKey = async () => {
+      if (!isSupabaseConfigured || !supabaseFunctionsBaseUrl) {
+        toast.error('Signup service is not configured in production yet. Please contact support or use Sign In if your account already exists.');
+        return;
+      }
+
       try {
         const url = `${supabaseFunctionsBaseUrl}/paystack/public-key`;
         console.log('Fetching Paystack public key from:', url);
@@ -257,6 +262,11 @@ export default function CompanySignup() {
   };
 
   const handlePayment = async () => {
+    if (!isSupabaseConfigured || !supabaseFunctionsBaseUrl) {
+      toast.error('Signup is unavailable right now due to missing production configuration. Existing tenants should use Sign In.');
+      return;
+    }
+
     if (formData.licenses < 1) {
       toast.error('Please select at least 1 license');
       return;
@@ -371,6 +381,11 @@ export default function CompanySignup() {
       if (!response.ok) {
         const errorMessage = data.error || 'Failed to create company account';
         console.error('Registration failed:', errorMessage);
+
+        if (/already exists|existing|duplicate/i.test(errorMessage)) {
+          throw new Error('This email/company already has an account or license. Please sign in instead of signing up.');
+        }
+
         throw new Error(errorMessage + ` (Payment reference: ${paymentReference})`);
       }
 
