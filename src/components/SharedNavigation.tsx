@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
 import { ChevronDown, BarChart3, FileText, Clock, DollarSign, Trophy, Award, UserCheck, Users, Heart, Building2, GraduationCap, Briefcase, Zap, Sparkles, Globe, Target, Shield, Briefcase as BriefcaseIcon, Book, Calendar, Video, FileCheck } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '@/assets/logo';
 
 export function SharedNavigation() {
   const navigate = useNavigate();

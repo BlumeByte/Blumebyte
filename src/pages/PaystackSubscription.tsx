@@ -7,7 +7,7 @@ import { CheckCircle2, Users, TrendingUp, Zap, Shield, Loader2 } from 'lucide-re
 import { toast } from 'sonner';
 import { api } from '../lib/api-client';
 import { useAuth } from '../lib/auth-context';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '@/assets/logo';
 
 interface Plan {
   id: string;
