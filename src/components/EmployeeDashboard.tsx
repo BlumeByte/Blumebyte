@@ -30,6 +30,7 @@ import { MeetingsPanel } from './MeetingsPanel';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
+import { Monochrome3DBackground } from './Monochrome3DBackground';
 
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
@@ -47,7 +48,8 @@ export function EmployeeDashboard() {
   }, [accessToken]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-transparent relative isolate">
+      <Monochrome3DBackground variant="employee" />
       <header className="sticky top-0 z-20 bg-white border-b px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>

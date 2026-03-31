@@ -26,7 +26,7 @@ import {
 import { useAuth } from '../lib/auth-context';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { api } from '../lib/api-client';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { NotificationsBell } from '../components/NotificationsBell';
 import { OvertimeExpenseTab } from '../components/portal/OvertimeExpenseTab';
 import { TrainingTab } from '../components/portal/TrainingTab';

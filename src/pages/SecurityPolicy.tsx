@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Shield, Mail, Lock, AlertTriangle, CheckCircle2, ArrowLeft } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '@/assets/logo';
 
 export default function SecurityPolicy() {
   const navigate = useNavigate();
