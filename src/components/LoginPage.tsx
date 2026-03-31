@@ -9,7 +9,7 @@ import { Eye, EyeOff, Loader2, AlertCircle, AlertTriangle, CheckCircle } from 'l
 import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '@/assets/logo';
 import { OAuthButtons } from './OAuthButtons';
 import { toast } from 'sonner';
 

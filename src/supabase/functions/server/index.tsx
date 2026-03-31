@@ -146,10 +146,15 @@ async function getUserProfile(userId: string) {
 
 // Helper to verify subscription and license availability
 async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiveLicense = true) {
-  const subscription = await kv.get(`subscription:${superAdminId}`);
-  
+  const superAdminData = await kv.get(`employee:${superAdminId}`);
+  const companyId = superAdminData?.companyId || superAdminData?.company;
+  const subscription = (await kv.get(`subscription:${superAdminId}`)) || (companyId ? await kv.get(`subscription:${companyId}`) : null);
+  const company = companyId ? ((await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`))) : null;
+
+  const evaluated = evaluateSubscriptionState(subscription, company);
+
   // Check if subscription exists and is active
-  if (!subscription || subscription.status !== 'active') {
+  if ((!subscription && !company) || evaluated.status !== 'active') {
     return {
       valid: false,
       reason: 'no_subscription',
@@ -157,18 +162,15 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
       subscription: null
     };
   }
-  
+
   // If we need to verify license availability
   if (requiresActiveLicense) {
     const allUsers = await kv.getByPrefix('employee:');
-    // CRITICAL: Only count users in the same company as the superadmin
-    const superAdminData = await kv.get(`employee:${superAdminId}`);
-    const saCompany = superAdminData?.companyId || superAdminData?.company;
-    const companyUsers = saCompany ? allUsers.filter((u: any) => u.companyId === saCompany || u.company === saCompany) : allUsers;
+    const companyUsers = companyId ? allUsers.filter((u: any) => u.companyId === companyId || u.company === companyId) : allUsers;
     const activeUsers = companyUsers.filter((u: any) => u.status === 'active');
     const usedLicenses = activeUsers.length;
-    const purchasedLicenses = subscription.purchasedLicenses || 0;
-    
+    const purchasedLicenses = evaluated.purchasedLicenses || 0;
+
     if (usedLicenses >= purchasedLicenses) {
       return {
         valid: false,
@@ -179,7 +181,7 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
         purchasedLicenses
       };
     }
-    
+
     return {
       valid: true,
       subscription,
@@ -188,10 +190,45 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
       availableLicenses: purchasedLicenses - usedLicenses
     };
   }
-  
+
   return {
     valid: true,
     subscription
+  };
+}
+
+function evaluateSubscriptionState(subscription: any, company: any = null) {
+  const status = subscription?.status || company?.subscription?.status || company?.subscriptionStatus || 'none';
+  const purchasedLicenses =
+    subscription?.purchasedLicenses ||
+    subscription?.licenses ||
+    company?.subscription?.purchasedLicenses ||
+    company?.subscription?.licenses ||
+    company?.licenses ||
+    0;
+
+  const rawEndDate = subscription?.endDate || company?.subscription?.endDate || null;
+  const parsedEndDate = rawEndDate ? new Date(rawEndDate) : null;
+  const hasValidEndDate = !!parsedEndDate && !Number.isNaN(parsedEndDate.getTime());
+  const now = new Date();
+
+  const isActiveByDate = hasValidEndDate ? now < parsedEndDate : false;
+  const isActiveByStatus = status === 'active' && purchasedLicenses > 0;
+  const isActive = isActiveByDate || isActiveByStatus;
+
+  const daysRemaining = hasValidEndDate
+    ? Math.max(0, Math.ceil((parsedEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  return {
+    status: isActive ? 'active' : 'expired',
+    plan: subscription?.plan || company?.subscription?.plan || company?.subscriptionPlan || 'none',
+    startDate: subscription?.startDate || company?.subscription?.startDate || null,
+    endDate: rawEndDate,
+    daysRemaining,
+    userCount: subscription?.userCount,
+    amount: subscription?.amount,
+    purchasedLicenses,
   };
 }
 
@@ -1336,6 +1373,7 @@ app.put(`${PREFIX}/employee/profile`, async (c) => {
 app.get(`${PREFIX}/profile-change-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
+
     const all = await kv.getByPrefix("profile-change:");
     
     // Employee only sees their own requests
@@ -1906,7 +1944,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     const usedLicenses = Number.isFinite(companyStats.usedLicenses)
       ? companyStats.usedLicenses
       : activeCompanyUsers.length;
-    const purchasedLicenses = subscription.purchasedLicenses || subscription.licenses || company.licenses || 0;
     
     if (usedLicenses >= purchasedLicenses) {
       return c.json({ 
@@ -5055,57 +5092,38 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
         return c.json({ status: 'expired', message: 'No superadmin found' }, 200);
       }
       
-      const subscription = await kv.get(`subscription:${superadmin.id}`);
-      
-      if (!subscription) {
+      const subscription = (await kv.get(`subscription:${superadmin.id}`)) || (await kv.get(`subscription:${companyId}`));
+      const company = (await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`));
+
+      if (!subscription && !company) {
         return c.json({ status: 'expired', message: 'No subscription found' }, 200);
       }
-      
-      const now = new Date();
-      const endDate = new Date(subscription.endDate);
-      const isActive = now < endDate;
-      const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
-      return c.json({
-        status: isActive ? 'active' : 'expired',
-        plan: subscription.plan,
-        startDate: subscription.startDate,
-        endDate: subscription.endDate,
-        daysRemaining: Math.max(0, daysRemaining),
-        userCount: subscription.userCount,
-      });
+
+      return c.json(evaluateSubscriptionState(subscription, company));
     }
     
-    // For superadmins, check their own subscription
-    const subscription = await kv.get(`subscription:${user.id}`);
-    
-    if (!subscription) {
+    // For superadmins, check their own subscription (or company-level fallback)
+    const employeeRecord = await kv.get(`employee:${user.id}`);
+    const companyId = employeeRecord?.companyId || employeeRecord?.company;
+    const subscription = (await kv.get(`subscription:${user.id}`)) || (companyId ? await kv.get(`subscription:${companyId}`) : null);
+    const company = companyId ? ((await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`))) : null;
+
+    if (!subscription && !company) {
       return c.json({ status: 'none', message: 'No subscription found' }, 200);
     }
-    
-    const now = new Date();
-    const endDate = new Date(subscription.endDate);
-    const isActive = now < endDate;
-    const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
+
+    const evaluated = evaluateSubscriptionState(subscription, company);
+
     await logAudit({
       userId: user.id,
       userName: user.email || 'Unknown',
       action: 'READ',
       resourceType: 'subscription',
       resourceId: user.id,
-      details: { status: isActive ? 'active' : 'expired' },
+      details: { status: evaluated.status },
     });
-    
-    return c.json({
-      status: isActive ? 'active' : 'expired',
-      plan: subscription.plan,
-      startDate: subscription.startDate,
-      endDate: subscription.endDate,
-      daysRemaining: Math.max(0, daysRemaining),
-      userCount: subscription.userCount,
-      amount: subscription.amount,
-    });
+
+    return c.json(evaluated);
   } catch (e: any) {
     console.error('Error checking subscription status:', e);
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Building2, Heart, DollarSign, GraduationCap, Briefcase, Zap, CheckCircle2, Users, Shield, BarChart3 } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '@/assets/logo';
 import { SharedNavigation } from '../components/SharedNavigation';
 
 export default function IndustryPage() {

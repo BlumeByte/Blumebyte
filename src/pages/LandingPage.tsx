@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '@/assets/logo';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
+import { Monochrome3DBackground } from '../components/Monochrome3DBackground';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -196,7 +197,7 @@ export default function LandingPage() {
 
   const DropdownMenu = ({ menu, content }: { menu: string; content: any[] }) => (
     <div
-      className="relative"
+      className="relative isolate"
       onMouseEnter={() => handleMouseEnter(menu)}
       onMouseLeave={handleMouseLeave}
     >
@@ -259,7 +260,8 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-transparent relative isolate">
+      <Monochrome3DBackground variant="landing" />
       {/* Navigation */}
       <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -8,7 +8,8 @@ import { Loader2, CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { supabaseFunctionsBaseUrl } from '../config/env';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -101,7 +102,7 @@ export default function AuthCallback() {
 
       // Create company and SuperAdmin profile via backend
       const response = await fetch(
-        `https://${await import('../utils/supabase/info').then(m => m.projectId)}.supabase.co/functions/v1/make-server-668731fc/oauth/create-company`,
+        `${supabaseFunctionsBaseUrl}/oauth/create-company`,
         {
           method: 'POST',
           headers: {
