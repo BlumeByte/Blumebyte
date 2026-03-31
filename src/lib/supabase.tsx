@@ -3,41 +3,25 @@ import { isSupabaseConfigured, publicAnonKey, supabaseProjectId, supabaseUrl } f
 
 export const supabaseStorageKey = `sb-${supabaseProjectId || 'project'}-auth-token`;
 
-type AuthResult<T = any> = Promise<{ data: T; error: Error | null }>;
+const FALLBACK_SUPABASE_URL = 'https://placeholder.supabase.co';
+const FALLBACK_SUPABASE_ANON_KEY = 'placeholder-anon-key';
 
-const unconfiguredError = () =>
-  new Error('Supabase is not configured in this deployment. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
-
-const createUnconfiguredClient = () => ({
-  auth: {
-    signInWithPassword: async (): AuthResult => ({ data: { session: null, user: null }, error: unconfiguredError() }),
-    getSession: async (): AuthResult => ({ data: { session: null }, error: null }),
-    refreshSession: async (): AuthResult => ({ data: { session: null }, error: unconfiguredError() }),
-    signOut: async (): AuthResult => ({ data: {}, error: null }),
-    onAuthStateChange: () => ({
-      data: {
-        subscription: {
-          unsubscribe: () => {},
-        },
-      },
-    }),
-  },
-});
-
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, publicAnonKey, {
-      auth: {
-        storageKey: supabaseStorageKey,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        flowType: 'pkce',
-      },
-    })
-  : (createUnconfiguredClient() as any);
+export const supabase = createClient(
+  isSupabaseConfigured ? supabaseUrl : FALLBACK_SUPABASE_URL,
+  isSupabaseConfigured ? publicAnonKey : FALLBACK_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      storageKey: supabaseStorageKey,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+    },
+  }
+);
 
 if (!isSupabaseConfigured) {
   console.warn(
-    'Supabase client disabled because env vars are missing. Auth/database actions are blocked until Vercel production env vars are configured.'
+    'Supabase client is running in fallback mode; authentication and database operations are disabled until env vars are configured.'
   );
 }

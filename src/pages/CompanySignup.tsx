@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner';
-import { isSupabaseConfigured, publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
+import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
 import logoImage from '../assets/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export default function CompanySignup() {
