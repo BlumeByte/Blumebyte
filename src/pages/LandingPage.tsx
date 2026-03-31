@@ -197,7 +197,7 @@ export default function LandingPage() {
 
   const DropdownMenu = ({ menu, content }: { menu: string; content: any[] }) => (
     <div
-      className="relative"
+      className="relative isolate"
       onMouseEnter={() => handleMouseEnter(menu)}
       onMouseLeave={handleMouseLeave}
     >
