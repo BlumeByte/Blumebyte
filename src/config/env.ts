@@ -1,5 +1,10 @@
 const env = import.meta.env;
 
+const DEFAULT_SUPABASE_URL = 'https://ivohczdtuxasyfoiphqu.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2b2hjemR0dXhhc3lmb2lwaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzgyNDcsImV4cCI6MjA4ODM1NDI0N30.loRm7iik0lgBW7yRK-ANIjpyKVZGLCdSuqVZ5VDnQNQ';
+const DEFAULT_SUPABASE_FUNCTIONS_SLUG = 'make-server-a35148f0';
+
 function getEnv(name: keyof ImportMetaEnv, fallback = ''): string {
   const value = env[name];
   return typeof value === 'string' ? value.trim() : fallback;
