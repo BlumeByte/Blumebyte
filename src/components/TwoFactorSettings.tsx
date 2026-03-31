@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
 import { Shield, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { TwoFactorSetup } from './TwoFactorSetup';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function TwoFactorSettings() {
   const { user } = useAuth();

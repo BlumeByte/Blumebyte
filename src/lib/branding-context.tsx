@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { supabaseFunctionsBaseUrl } from '../config/env';
 
-const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
+const BASE = supabaseFunctionsBaseUrl;
 
 export interface CompanyBranding {
   companyName: string;

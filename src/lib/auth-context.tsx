@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from './supabase';
+import { supabase, supabaseStorageKey } from './supabase';
 import { api } from './api-client';
 import { authLock } from './auth-lock';
 
@@ -229,6 +229,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetchProfile(token);
     }
   };
+
+
+  useEffect(() => {
+    const clearSessionOnLeave = () => {
+      try {
+        localStorage.removeItem(supabaseStorageKey);
+        sessionStorage.removeItem('auth-token');
+      } catch {}
+      setUser(null);
+      setAccessToken(null);
+    };
+
+    window.addEventListener('beforeunload', clearSessionOnLeave);
+    window.addEventListener('pagehide', clearSessionOnLeave);
+
+    return () => {
+      window.removeEventListener('beforeunload', clearSessionOnLeave);
+      window.removeEventListener('pagehide', clearSessionOnLeave);
+    };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, accessToken, sessionLoading, loginLoading, loginError, login, logout, clearError, getToken, refreshProfile }}>

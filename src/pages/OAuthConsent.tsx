@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Building2, Shield, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '@/assets/logo';
 
 export default function OAuthConsent() {
   const [searchParams] = useSearchParams();

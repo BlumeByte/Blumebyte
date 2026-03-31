@@ -9,7 +9,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Alert, AlertDescription } from './ui/alert';
 import { Separator } from './ui/separator';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import {
   Users, CreditCard, AlertTriangle, CheckCircle, 
   Loader2, ShoppingCart, Zap, TrendingUp
