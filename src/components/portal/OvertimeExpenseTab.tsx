@@ -13,7 +13,7 @@ import {
   AlertCircle, X, Receipt, Timer, Plus, CalendarDays, FileText
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 
 interface OvertimeRequest {
   id: string;

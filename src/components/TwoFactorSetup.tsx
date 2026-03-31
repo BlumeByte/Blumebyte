@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Alert, AlertDescription } from './ui/alert';
 import { Shield, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 
 interface TwoFactorSetupProps {
   email: string;
@@ -20,19 +21,32 @@ export function TwoFactorSetup({ email, onComplete, onSkip }: TwoFactorSetupProp
   const [sendingCode, setSendingCode] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+  const [codeSent, setCodeSent] = useState(false);
 
   const handleSendCode = async () => {
     setSendingCode(true);
     setError('');
+    setDevCode(null);
 
     try {
-      await api('/auth/2fa/send-code', {
+      const response = await api('/auth/2fa/send-code', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
 
-      toast.success('Verification code sent to your email');
+      setCodeSent(true);
+      
+      // DEVELOPMENT ONLY: Show the code in the UI
+      if (response.devCode) {
+        setDevCode(response.devCode);
+        toast.success(`Verification code: ${response.devCode}`, {
+          duration: 10000,
+        });
+      } else {
+        toast.success('Verification code sent to your email');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to send verification code');
       toast.error('Failed to send code');
@@ -110,6 +124,18 @@ export function TwoFactorSetup({ email, onComplete, onSkip }: TwoFactorSetupProp
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Development Code Display */}
+        {devCode && (
+          <Alert className="border-amber-500 bg-amber-50">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800">
+              <p className="font-bold mb-1">Development Mode</p>
+              <p className="text-sm">Your verification code: <span className="font-mono font-bold text-lg">{devCode}</span></p>
+              <p className="text-xs mt-1">In production, this will be sent to your email.</p>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Instructions */}
         <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <Mail className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />

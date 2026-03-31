@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Textarea } from './ui/textarea';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import {
   LayoutDashboard, Users, UserPlus, CalendarDays, Clock, Megaphone,
   Loader2, Plus, X, CheckCircle, Copy, AlertCircle, MessageCircle, Pencil, Search,
@@ -36,7 +36,6 @@ import { AnnouncementsViewer } from './AnnouncementsViewer';
 import { ManagerCrudPanel } from './ManagerCrudPanel';
 import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
 import { ManagerOvertimeExpenseApproval } from './ManagerOvertimeExpenseApproval';
-import { Monochrome3DBackground } from './Monochrome3DBackground';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -449,8 +448,7 @@ export function ManagerDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 relative">
-      <Monochrome3DBackground variant="manager" />
+    <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
       <aside className="w-56 bg-white border-r flex flex-col fixed h-screen">
         <div className="p-4 border-b">

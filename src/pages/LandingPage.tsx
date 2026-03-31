@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video } from 'lucide-react';
-import logoImage from '@/assets/logo';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
-import { Monochrome3DBackground } from '../components/Monochrome3DBackground';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -197,7 +196,7 @@ export default function LandingPage() {
 
   const DropdownMenu = ({ menu, content }: { menu: string; content: any[] }) => (
     <div
-      className="relative isolate"
+      className="relative"
       onMouseEnter={() => handleMouseEnter(menu)}
       onMouseLeave={handleMouseLeave}
     >
@@ -260,8 +259,7 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-white relative">
-      <Monochrome3DBackground variant="landing" />
+    <div className="min-h-screen bg-white">
       {/* Navigation */}
       <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -296,9 +294,35 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center max-w-4xl mx-auto">
+      {/* Hero Section with Animated Tech Background */}
+      <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 overflow-hidden">
+        {/* Animated Tech Background */}
+        <div className="absolute inset-0 -z-10 opacity-30">
+          {/* Animated grid pattern */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] animate-[scrollGrid_20s_linear_infinite]" />
+          
+          {/* Floating tech elements */}
+          <div className="absolute top-10 left-10 w-32 h-32 border border-gray-300 rounded-lg animate-[float_6s_ease-in-out_infinite]" />
+          <div className="absolute top-20 right-20 w-24 h-24 border border-gray-400 rounded-full animate-[float_8s_ease-in-out_infinite_reverse]" />
+          <div className="absolute bottom-20 left-20 w-40 h-40 border border-gray-300 rounded-lg animate-[float_10s_ease-in-out_infinite]" />
+          <div className="absolute bottom-10 right-10 w-28 h-28 border border-gray-400 rounded-full animate-[float_7s_ease-in-out_infinite_reverse]" />
+          
+          {/* Animated lines */}
+          <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <line x1="0" y1="0" x2="100%" y2="100%" stroke="#d0d0d0" strokeWidth="1" className="animate-[dash_4s_linear_infinite]" strokeDasharray="10,10" />
+            <line x1="100%" y1="0" x2="0" y2="100%" stroke="#d0d0d0" strokeWidth="1" className="animate-[dash_4s_linear_infinite_reverse]" strokeDasharray="10,10" />
+          </svg>
+          
+          {/* Binary code animation */}
+          <div className="absolute top-0 left-1/4 text-gray-400 text-xs font-mono opacity-20 animate-[scrollDown_15s_linear_infinite]">
+            01001000 01010010<br/>10001101 11010011<br/>01101110 00111001
+          </div>
+          <div className="absolute top-0 right-1/4 text-gray-400 text-xs font-mono opacity-20 animate-[scrollDown_12s_linear_infinite]">
+            11010110 00101111<br/>01110011 10011001<br/>10010101 01001110
+          </div>
+        </div>
+
+        <div className="text-center max-w-4xl mx-auto relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 text-gray-900 text-sm font-medium mb-6 border border-gray-200">
             <Sparkles className="h-4 w-4" />
             AI-Powered HR Management

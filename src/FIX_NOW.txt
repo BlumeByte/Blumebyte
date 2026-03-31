@@ -1,0 +1,70 @@
+==================================================================
+                   FIX 403 ERROR IN 2 MINUTES
+==================================================================
+
+ERROR YOU'RE SEEING:
+"Error while deploying: XHR for .../edge_functions/make-server/deploy failed with status 403"
+
+THE FIX:
+The Supabase integration needs "Deploy Edge Functions" permission.
+
+------------------------------------------------------------------
+                        DO THIS NOW:
+------------------------------------------------------------------
+
+1. In Figma Make, click "Integrations" or "Settings"
+
+2. Find "Supabase" and click "Disconnect"
+
+3. Click "Connect to Supabase" again
+
+4. Login and select project: ivohczdtuxasyfoiphqu
+
+5. When it asks for permissions:
+   [✓] CHECK "Deploy Edge Functions"  <-- CRITICAL!
+   [✓] CHECK "Manage Database"
+   [✓] CHECK "Access Storage"
+   [✓] CHECK ALL permissions
+
+6. Click "Authorize"
+
+7. Retry deployment
+
+DONE! The deployment should now work.
+
+------------------------------------------------------------------
+                         VERIFY SUCCESS:
+------------------------------------------------------------------
+
+Visit this URL:
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+
+You should see:
+{"status":"ok","version":"2.1-payment-flow-UPDATED",...}
+
+------------------------------------------------------------------
+                        IF IT DOESN'T WORK:
+------------------------------------------------------------------
+
+Open the file: QUICK_FIX_GUIDE.md
+Follow "Option 2" (CLI deployment)
+Takes 5 minutes, 95% success rate
+
+------------------------------------------------------------------
+                         MORE HELP:
+------------------------------------------------------------------
+
+Simple guide:     DO_THIS_NOW.md
+Visual guide:     VISUAL_FIX_GUIDE.md
+Complete docs:    README_FIX_403.md
+All options:      START_HERE.md
+
+------------------------------------------------------------------
+
+Time to fix: 2 minutes
+Success rate: 90%
+Difficulty: Easy
+
+GO DO IT NOW!
+
+==================================================================

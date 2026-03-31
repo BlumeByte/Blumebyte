@@ -1,7 +1,7 @@
 import React, { startTransition } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { TwoFactorSetup } from '../components/TwoFactorSetup';
-import logoImage from '@/assets/logo';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export default function TwoFactorVerification() {
   const navigate = useNavigate();

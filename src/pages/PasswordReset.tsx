@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import logoImage from '@/assets/logo';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { toast } from 'sonner';
 
 const BLUMEBYTE_COLOR = '#000000';

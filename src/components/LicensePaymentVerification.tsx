@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Loader2, CheckCircle, XCircle, Users, Zap, CreditCard, X } from 'lucide-react';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 
 export function LicensePaymentVerification() {
   const [searchParams] = useSearchParams();

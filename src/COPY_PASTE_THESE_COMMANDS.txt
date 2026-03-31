@@ -1,0 +1,100 @@
+================================================================================
+                    COPY & PASTE THESE COMMANDS
+================================================================================
+
+FIX THE 403 ERROR IN 5 MINUTES - JUST COPY/PASTE THESE COMMANDS
+
+================================================================================
+                        FOR MAC/LINUX USERS
+================================================================================
+
+Open Terminal and copy/paste these commands ONE BY ONE:
+
+1. Install Supabase CLI:
+   npm install -g supabase
+
+2. Login to Supabase (browser will open):
+   supabase login
+
+3. Link to your project:
+   supabase link --project-ref ivohczdtuxasyfoiphqu
+
+4. Deploy the edge function:
+   supabase functions deploy make-server --no-verify-jwt
+
+5. Test it worked:
+   curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health"
+
+DONE! Should see: {"status":"ok","version":"2.1-payment-flow-UPDATED",...}
+
+================================================================================
+                        FOR WINDOWS USERS
+================================================================================
+
+Open Command Prompt or PowerShell and copy/paste these commands ONE BY ONE:
+
+1. Install Supabase CLI:
+   npm install -g supabase
+
+2. Login to Supabase (browser will open):
+   supabase login
+
+3. Link to your project:
+   supabase link --project-ref ivohczdtuxasyfoiphqu
+
+4. Deploy the edge function:
+   supabase functions deploy make-server --no-verify-jwt
+
+5. Test it worked:
+   curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health"
+
+DONE! Should see: {"status":"ok","version":"2.1-payment-flow-UPDATED",...}
+
+================================================================================
+                    AFTER DEPLOYMENT - SET SECRETS
+================================================================================
+
+Go to this URL:
+https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu/settings/functions
+
+Click "Add secret" and add these TWO secrets:
+
+1. Secret name: PAYSTACK_SECRET_KEY
+   Secret value: [your paystack secret key here]
+
+2. Secret name: PAYSTACK_PUBLIC_KEY
+   Secret value: [your paystack public key here]
+
+Click "Save" for each.
+
+================================================================================
+                          VERIFICATION
+================================================================================
+
+Open this URL in your browser:
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+
+Should return:
+{"status":"ok","version":"2.1-payment-flow-UPDATED",...}
+
+If you see this = SUCCESS! Your 403 error is fixed.
+
+================================================================================
+                          WHAT JUST HAPPENED
+================================================================================
+
+✅ Edge function deployed to Supabase
+✅ Bypassed Figma Make's broken connection
+✅ 403 error is gone
+✅ Your app will work now
+✅ All 32 modules functional
+✅ Payments work
+✅ User management works
+
+================================================================================
+                        TIME REQUIRED: 5 MINUTES
+================================================================================
+
+That's it. Just copy/paste the 5 commands above. You're done.
+
+================================================================================

@@ -6,9 +6,9 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
-import { toast } from 'sonner';
-import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
-import logoImage from '../assets/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { toast } from 'sonner@2.0.3';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export default function CompanySignup() {
   const navigate = useNavigate();
@@ -112,13 +112,8 @@ export default function CompanySignup() {
   // Fetch Paystack public key
   useEffect(() => {
     const fetchPublicKey = async () => {
-      if (!isSupabaseConfigured || !supabaseFunctionsBaseUrl) {
-        toast.error('Signup service is not configured in production yet. Please contact support or use Sign In if your account already exists.');
-        return;
-      }
-
       try {
-        const url = `${supabaseFunctionsBaseUrl}/paystack/public-key`;
+        const url = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/paystack/public-key`;
         console.log('Fetching Paystack public key from:', url);
         
         const response = await fetch(url, {
@@ -218,7 +213,7 @@ export default function CompanySignup() {
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch(
-          `${supabaseFunctionsBaseUrl}/company/payment-status/${reference}`,
+          `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/company/payment-status/${reference}`,
           {
             headers: { Authorization: `Bearer ${publicAnonKey}` },
           }
@@ -262,11 +257,6 @@ export default function CompanySignup() {
   };
 
   const handlePayment = async () => {
-    if (!isSupabaseConfigured || !supabaseFunctionsBaseUrl) {
-      toast.error('Signup is unavailable right now due to missing production configuration. Existing tenants should use Sign In.');
-      return;
-    }
-
     if (formData.licenses < 1) {
       toast.error('Please select at least 1 license');
       return;
@@ -348,7 +338,7 @@ export default function CompanySignup() {
       toast.info('Verifying payment and setting up your account...');
       
       const response = await fetch(
-        `${supabaseFunctionsBaseUrl}/company/register`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/company/register`,
         {
           method: 'POST',
           headers: {
@@ -381,11 +371,6 @@ export default function CompanySignup() {
       if (!response.ok) {
         const errorMessage = data.error || 'Failed to create company account';
         console.error('Registration failed:', errorMessage);
-
-        if (/already exists|existing|duplicate/i.test(errorMessage)) {
-          throw new Error('This email/company already has an account or license. Please sign in instead of signing up.');
-        }
-
         throw new Error(errorMessage + ` (Payment reference: ${paymentReference})`);
       }
 

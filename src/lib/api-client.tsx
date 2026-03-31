@@ -1,6 +1,6 @@
-import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
 
-const BASE = supabaseFunctionsBaseUrl;
+const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
 
 // PERFORMANCE: Simple in-memory cache for GET requests
 const requestCache = new Map<string, { data: any; timestamp: number }>();

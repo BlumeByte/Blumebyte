@@ -40,7 +40,7 @@ import {
   LineChart as LineChartIcon,
   AlertCircle,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { Alert, AlertDescription } from './ui/alert';
 import { exportToCSV, exportToPDF } from './ListControls';
 import { format } from 'date-fns';

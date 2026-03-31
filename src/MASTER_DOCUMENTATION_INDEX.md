@@ -2,7 +2,7 @@
 
 **Complete documentation for your production-ready multi-tenant HR platform**
 
-Last Updated: March 17, 2026  
+Last Updated: March 31, 2026  
 Version: 2.1 Production Ready
 
 ---
@@ -17,9 +17,34 @@ Version: 2.1 Production Ready
 **Ready to Launch?** Go directly to:
 - **[PRODUCTION_CLEANUP_GUIDE.md](./PRODUCTION_CLEANUP_GUIDE.md)** - Clear test data
 
+**Deployment Error (403)?** Quick fix:
+- **[QUICK_FIX_403_ERROR.md](./QUICK_FIX_403_ERROR.md)** - 2-minute solution ⚡
+- **[403_ERROR_RESOLUTION_GUIDE.md](./403_ERROR_RESOLUTION_GUIDE.md)** - Complete guide
+
 ---
 
 ## 📖 Documentation Categories
+
+### 🚨 NEW: Deployment Troubleshooting (March 31, 2026)
+
+**Issue:** Supabase Edge Function 403 Forbidden error
+
+| Document | Purpose | When to Use |
+|----------|---------|-------------|
+| **[QUICK_FIX_403_ERROR.md](./QUICK_FIX_403_ERROR.md)** | ⚡ 2-minute quick fix | **START HERE** |
+| **[403_ERROR_RESOLUTION_GUIDE.md](./403_ERROR_RESOLUTION_GUIDE.md)** | Complete resolution guide | Full reference |
+| **[SUPABASE_EDGE_FUNCTION_DEPLOYMENT_FIX.md](./SUPABASE_EDGE_FUNCTION_DEPLOYMENT_FIX.md)** | Detailed troubleshooting | Advanced issues |
+| **[DEPLOYMENT_403_FIX_SUMMARY.md](./DEPLOYMENT_403_FIX_SUMMARY.md)** | Technical summary | Documentation |
+
+**What's Included:**
+- ✅ Re-authentication guide
+- ✅ CLI deployment script (`deploy-edge-function.sh`)
+- ✅ Supabase configuration file (`/supabase/config.toml`)
+- ✅ NPM deployment scripts
+- ✅ Verification procedures
+- ✅ Complete troubleshooting steps
+
+---
 
 ### 🎯 Production Launch (START HERE!)
 
@@ -433,7 +458,7 @@ With this comprehensive documentation:
 
 ---
 
-**Last Updated:** March 17, 2026  
+**Last Updated:** March 31, 2026  
 **Documentation Version:** 2.1  
 **Platform Status:** ✅ Production Ready
 
@@ -441,9 +466,19 @@ With this comprehensive documentation:
 
 ## 📖 Document Changelog
 
-### Latest Updates (March 17, 2026)
+### Latest Updates (March 31, 2026)
 
-**New Documents:**
+**NEW: Supabase Edge Function 403 Deployment Error Fix**
+- ✨ QUICK_FIX_403_ERROR.md - 2-minute quick fix
+- ✨ 403_ERROR_RESOLUTION_GUIDE.md - Complete resolution guide
+- ✨ SUPABASE_EDGE_FUNCTION_DEPLOYMENT_FIX.md - Detailed troubleshooting
+- ✨ DEPLOYMENT_403_FIX_SUMMARY.md - Technical summary
+- ✨ README_403_FIX.md - Quick start guide
+- ✨ deploy-edge-function.sh - Automated deployment script
+- ✨ supabase/config.toml - Supabase configuration
+- ✅ Added NPM scripts: deploy:edge-function, test:edge-function
+
+**Previous Updates:**
 - ✨ README_PRODUCTION_LAUNCH.md
 - ✨ PRODUCTION_CLEANUP_GUIDE.md
 - ✨ CLEANUP_QUICK_REFERENCE.md

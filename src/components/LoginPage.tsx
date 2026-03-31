@@ -9,7 +9,7 @@ import { Eye, EyeOff, Loader2, AlertCircle, AlertTriangle, CheckCircle } from 'l
 import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
-import logoImage from '@/assets/logo';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { OAuthButtons } from './OAuthButtons';
 import { toast } from 'sonner';
 
@@ -30,6 +30,7 @@ export function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetLink, setResetLink] = useState<string | null>(null);
+  const [logoutReason, setLogoutReason] = useState<string | null>(null);
   // License checking temporarily deactivated
   /*
   const [licenseStatus, setLicenseStatus] = useState<{ hasLicenses: boolean; loading: boolean }>({
@@ -37,6 +38,21 @@ export function LoginPage() {
     loading: true,
   });
   */
+
+  useEffect(() => {
+    // Check for logout reason in URL
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get('reason');
+    if (reason) {
+      if (reason === 'inactivity') {
+        setLogoutReason('You were logged out due to inactivity. Please log in again.');
+      } else if (reason === 'session_expired') {
+        setLogoutReason('Your session expired. Please log in again.');
+      }
+      // Clear the URL parameter
+      window.history.replaceState({}, '', '/login');
+    }
+  }, []);
 
   useEffect(() => {
     if (!sessionLoading && user) {
@@ -141,6 +157,14 @@ export function LoginPage() {
           </CardHeader>
           <CardContent className="pt-4 pb-8 px-8">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {logoutReason && (
+                <Alert className="bg-amber-50 border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    {logoutReason}
+                  </AlertDescription>
+                </Alert>
+              )}
               {loginError && (
                 <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />

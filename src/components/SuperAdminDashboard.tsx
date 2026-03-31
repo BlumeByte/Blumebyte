@@ -56,7 +56,6 @@ import { AutomationModule } from './AutomationModule';
 import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
-import { Monochrome3DBackground } from './Monochrome3DBackground';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -464,8 +463,7 @@ export function SuperAdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex relative">
-      <Monochrome3DBackground variant="superadmin" />
+    <div className="min-h-screen bg-gray-50 flex">
       <aside className={`${collapsed ? 'w-[72px]' : 'w-60'} bg-white border-r border-gray-200 flex flex-col fixed h-screen z-30 transition-all duration-200 overflow-hidden`}>
         <div className={`p-3 flex items-center ${collapsed ? 'justify-center' : 'justify-between'} flex-shrink-0`}>
           {collapsed ? (

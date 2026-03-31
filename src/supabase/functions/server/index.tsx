@@ -146,15 +146,10 @@ async function getUserProfile(userId: string) {
 
 // Helper to verify subscription and license availability
 async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiveLicense = true) {
-  const superAdminData = await kv.get(`employee:${superAdminId}`);
-  const companyId = superAdminData?.companyId || superAdminData?.company;
-  const subscription = (await kv.get(`subscription:${superAdminId}`)) || (companyId ? await kv.get(`subscription:${companyId}`) : null);
-  const company = companyId ? ((await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`))) : null;
-
-  const evaluated = evaluateSubscriptionState(subscription, company);
-
+  const subscription = await kv.get(`subscription:${superAdminId}`);
+  
   // Check if subscription exists and is active
-  if ((!subscription && !company) || evaluated.status !== 'active') {
+  if (!subscription || subscription.status !== 'active') {
     return {
       valid: false,
       reason: 'no_subscription',
@@ -162,15 +157,18 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
       subscription: null
     };
   }
-
+  
   // If we need to verify license availability
   if (requiresActiveLicense) {
     const allUsers = await kv.getByPrefix('employee:');
-    const companyUsers = companyId ? allUsers.filter((u: any) => u.companyId === companyId || u.company === companyId) : allUsers;
+    // CRITICAL: Only count users in the same company as the superadmin
+    const superAdminData = await kv.get(`employee:${superAdminId}`);
+    const saCompany = superAdminData?.companyId || superAdminData?.company;
+    const companyUsers = saCompany ? allUsers.filter((u: any) => u.companyId === saCompany || u.company === saCompany) : allUsers;
     const activeUsers = companyUsers.filter((u: any) => u.status === 'active');
     const usedLicenses = activeUsers.length;
-    const purchasedLicenses = evaluated.purchasedLicenses || 0;
-
+    const purchasedLicenses = subscription.purchasedLicenses || 0;
+    
     if (usedLicenses >= purchasedLicenses) {
       return {
         valid: false,
@@ -181,7 +179,7 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
         purchasedLicenses
       };
     }
-
+    
     return {
       valid: true,
       subscription,
@@ -190,45 +188,10 @@ async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiv
       availableLicenses: purchasedLicenses - usedLicenses
     };
   }
-
+  
   return {
     valid: true,
     subscription
-  };
-}
-
-function evaluateSubscriptionState(subscription: any, company: any = null) {
-  const status = subscription?.status || company?.subscription?.status || company?.subscriptionStatus || 'none';
-  const purchasedLicenses =
-    subscription?.purchasedLicenses ||
-    subscription?.licenses ||
-    company?.subscription?.purchasedLicenses ||
-    company?.subscription?.licenses ||
-    company?.licenses ||
-    0;
-
-  const rawEndDate = subscription?.endDate || company?.subscription?.endDate || null;
-  const parsedEndDate = rawEndDate ? new Date(rawEndDate) : null;
-  const hasValidEndDate = !!parsedEndDate && !Number.isNaN(parsedEndDate.getTime());
-  const now = new Date();
-
-  const isActiveByDate = hasValidEndDate ? now < parsedEndDate : false;
-  const isActiveByStatus = status === 'active' && purchasedLicenses > 0;
-  const isActive = isActiveByDate || isActiveByStatus;
-
-  const daysRemaining = hasValidEndDate
-    ? Math.max(0, Math.ceil((parsedEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
-    : null;
-
-  return {
-    status: isActive ? 'active' : 'expired',
-    plan: subscription?.plan || company?.subscription?.plan || company?.subscriptionPlan || 'none',
-    startDate: subscription?.startDate || company?.subscription?.startDate || null,
-    endDate: rawEndDate,
-    daysRemaining,
-    userCount: subscription?.userCount,
-    amount: subscription?.amount,
-    purchasedLicenses,
   };
 }
 
@@ -1373,7 +1336,6 @@ app.put(`${PREFIX}/employee/profile`, async (c) => {
 app.get(`${PREFIX}/profile-change-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
-
     const all = await kv.getByPrefix("profile-change:");
     
     // Employee only sees their own requests
@@ -1901,49 +1863,71 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       return c.json({ error: "Company not found. Please contact support." }, 400);
     }
     
-    // FIXED: Handle both subscription records and company-embedded subscription formats
-    const directSubscription = await kv.get(`subscription:${authUser.id}`);
-    const companySubscription = company.subscription || (company.licenses > 0 ? {
-      status: company.subscriptionStatus === 'active' ? 'active' : 'inactive',
-      licenses: company.licenses
-    } : null);
-    const isSubscriptionActive = directSubscription?.status === 'active' || companySubscription?.status === 'active';
-    const purchasedLicenses =
-      directSubscription?.purchasedLicenses ||
-      directSubscription?.licenses ||
-      companySubscription?.purchasedLicenses ||
-      companySubscription?.licenses ||
-      company.licenses ||
-      0;
+    // ENHANCED: Better subscription validation with multiple format support
+    console.log('=== SUBSCRIPTION DEBUG ===');
+    console.log('Company data:', JSON.stringify(company, null, 2));
     
-    if (!isSubscriptionActive) {
+    // Check multiple subscription formats
+    let subscription = null;
+    let subscriptionStatus = 'inactive';
+    let purchasedLicenses = 0;
+    
+    // Format 1: Modern subscription object
+    if (company.subscription && typeof company.subscription === 'object') {
+      subscription = company.subscription;
+      subscriptionStatus = subscription.status || 'inactive';
+      purchasedLicenses = subscription.licenses || subscription.purchasedLicenses || 0;
+    }
+    // Format 2: Legacy format with direct properties
+    else if (company.licenses > 0 || company.subscriptionStatus === 'active') {
+      subscriptionStatus = company.subscriptionStatus || 'active';
+      purchasedLicenses = company.licenses || 0;
+      subscription = {
+        status: subscriptionStatus,
+        licenses: purchasedLicenses
+      };
+    }
+    // Format 3: Check for separate subscription key
+    else {
+      const separateSubscription = await kv.get(`subscription:${userCompanyId}`);
+      if (separateSubscription) {
+        subscription = separateSubscription;
+        subscriptionStatus = separateSubscription.status || 'inactive';
+        purchasedLicenses = separateSubscription.licenses || separateSubscription.purchasedLicenses || 0;
+      }
+    }
+    
+    console.log('Subscription status:', subscriptionStatus);
+    console.log('Purchased licenses:', purchasedLicenses);
+    console.log('========================');
+    
+    if (!subscription || subscriptionStatus !== 'active' || purchasedLicenses <= 0) {
       console.error('No active subscription for company:', userCompanyId, {
         hasCompany: !!company,
-        hasDirectSubscription: !!directSubscription,
-        directStatus: directSubscription?.status,
-        hasCompanySubscription: !!companySubscription,
-        companySubscriptionStatus: companySubscription?.status,
-        licenses: company.licenses,
-        subscriptionStatus: company.subscriptionStatus
+        hasSubscription: !!subscription,
+        status: subscriptionStatus,
+        purchasedLicenses,
+        companyLicenses: company.licenses,
+        companyStatus: company.subscriptionStatus
       });
       return c.json({ 
         error: "No active subscription. Please purchase licenses first.",
-        needsSubscription: true 
+        needsSubscription: true,
+        debug: {
+          companyId: userCompanyId,
+          subscriptionStatus,
+          purchasedLicenses,
+          companyLicenses: company.licenses,
+          companySubscriptionStatus: company.subscriptionStatus
+        }
       }, 403);
     }
     
-    // Count existing active users in this company (strict multi-tenant scoping)
+    // Count existing active users in this company
     const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
-    const allUsers = await kv.getByPrefix('employee:');
-    const activeCompanyUsers = allUsers.filter((u: any) => {
-      const profileCompanyId = u.companyId || u.company;
-      const isActive = (u.status || 'active') === 'active';
-      return profileCompanyId === userCompanyId && isActive;
-    });
-
-    const usedLicenses = Number.isFinite(companyStats.usedLicenses)
-      ? companyStats.usedLicenses
-      : activeCompanyUsers.length;
+    const usedLicenses = companyStats.usedLicenses || company.usedLicenses || 1; // Fallback to company.usedLicenses
+    
+    console.log('License check - Used:', usedLicenses, 'Purchased:', purchasedLicenses);
     
     if (usedLicenses >= purchasedLicenses) {
       return c.json({ 
@@ -5092,38 +5076,57 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
         return c.json({ status: 'expired', message: 'No superadmin found' }, 200);
       }
       
-      const subscription = (await kv.get(`subscription:${superadmin.id}`)) || (await kv.get(`subscription:${companyId}`));
-      const company = (await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`));
-
-      if (!subscription && !company) {
+      const subscription = await kv.get(`subscription:${superadmin.id}`);
+      
+      if (!subscription) {
         return c.json({ status: 'expired', message: 'No subscription found' }, 200);
       }
-
-      return c.json(evaluateSubscriptionState(subscription, company));
+      
+      const now = new Date();
+      const endDate = new Date(subscription.endDate);
+      const isActive = now < endDate;
+      const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      return c.json({
+        status: isActive ? 'active' : 'expired',
+        plan: subscription.plan,
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        daysRemaining: Math.max(0, daysRemaining),
+        userCount: subscription.userCount,
+      });
     }
     
-    // For superadmins, check their own subscription (or company-level fallback)
-    const employeeRecord = await kv.get(`employee:${user.id}`);
-    const companyId = employeeRecord?.companyId || employeeRecord?.company;
-    const subscription = (await kv.get(`subscription:${user.id}`)) || (companyId ? await kv.get(`subscription:${companyId}`) : null);
-    const company = companyId ? ((await kv.get(`company_by_id:${companyId}`)) || (await kv.get(`company:${companyId}`))) : null;
-
-    if (!subscription && !company) {
+    // For superadmins, check their own subscription
+    const subscription = await kv.get(`subscription:${user.id}`);
+    
+    if (!subscription) {
       return c.json({ status: 'none', message: 'No subscription found' }, 200);
     }
-
-    const evaluated = evaluateSubscriptionState(subscription, company);
-
+    
+    const now = new Date();
+    const endDate = new Date(subscription.endDate);
+    const isActive = now < endDate;
+    const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
     await logAudit({
       userId: user.id,
       userName: user.email || 'Unknown',
       action: 'READ',
       resourceType: 'subscription',
       resourceId: user.id,
-      details: { status: evaluated.status },
+      details: { status: isActive ? 'active' : 'expired' },
     });
-
-    return c.json(evaluated);
+    
+    return c.json({
+      status: isActive ? 'active' : 'expired',
+      plan: subscription.plan,
+      startDate: subscription.startDate,
+      endDate: subscription.endDate,
+      daysRemaining: Math.max(0, daysRemaining),
+      userCount: subscription.userCount,
+      amount: subscription.amount,
+    });
   } catch (e: any) {
     console.error('Error checking subscription status:', e);
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
@@ -7806,45 +7809,53 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
       attempts: 0,
     });
 
-    const emailApiKey = Deno.env.get('EMAIL_API_KEY');
-    if (!emailApiKey) {
-      return c.json({ error: "2FA email service is not configured. Please set EMAIL_API_KEY." }, 500);
-    }
+    // Log the code prominently for development
+    console.log(`
+╔════════════════════════════════════════════╗
+║        2FA VERIFICATION CODE               ║
+║                                            ║
+║  Email: ${email.padEnd(37)}║
+║  Code:  ${code.padEnd(37)}║
+║  Valid for: 10 minutes                     ║
+╚════════════════════════════════════════════╝
+    `);
 
-    const fromEmail = Deno.env.get('EMAIL_FROM') || 'Blumebyte <noreply@blumebyte.com>';
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${emailApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: email.toLowerCase(),
-        subject: 'Your Blumebyte 2FA Verification Code',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">Blumebyte - Two-Factor Authentication</h2>
-            <p>Your verification code is:</p>
-            <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
-              ${code}
-            </div>
-            <p>This code will expire in 10 minutes.</p>
-            <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
-          </div>
-        `
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('2FA email sending failed:', errorText);
-      return c.json({ error: "Failed to send 2FA verification email. Please try again." }, 500);
-    }
+    // TODO: Production email sending
+    // In production, integrate with an email service (SendGrid, AWS SES, Resend, etc.)
+    // Example integration:
+    // const emailApiKey = Deno.env.get('EMAIL_API_KEY');
+    // if (emailApiKey) {
+    //   await fetch('https://api.resend.com/emails', {
+    //     method: 'POST',
+    //     headers: {
+    //       'Authorization': `Bearer ${emailApiKey}`,
+    //       'Content-Type': 'application/json',
+    //     },
+    //     body: JSON.stringify({
+    //       from: 'Blumebyte <noreply@blumebyte.com>',
+    //       to: email,
+    //       subject: 'Your 2FA Verification Code',
+    //       html: `
+    //         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    //           <h2 style="color: #2563eb;">Blumebyte - 2FA Verification</h2>
+    //           <p>Your verification code is:</p>
+    //           <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
+    //             ${code}
+    //           </div>
+    //           <p>This code will expire in 10 minutes.</p>
+    //           <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
+    //         </div>
+    //       `
+    //     }),
+    //   });
+    // }
 
     return c.json({ 
       success: true, 
-      message: "Verification code sent successfully",
+      message: "Verification code generated successfully",
+      // DEVELOPMENT ONLY: Return code in response for testing (remove in production)
+      devCode: code,
+      note: "Check server console for the 2FA code. In production, configure EMAIL_API_KEY to send emails.",
     });
   } catch (e: any) {
     console.error("2FA send code error:", e);

@@ -5,8 +5,8 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Alert, AlertDescription } from './ui/alert';
-import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
-import { toast } from "sonner";
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
 
@@ -51,7 +51,7 @@ export function EmployeeChat() {
       if (!token) return;
 
       const response = await fetch(
-        `${supabaseFunctionsBaseUrl}/chat/messages`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/chat/messages`,
         {
           method: 'GET',
           headers: {
@@ -119,7 +119,7 @@ export function EmployeeChat() {
       }
 
       const response = await fetch(
-        `${supabaseFunctionsBaseUrl}/chat/send`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/chat/send`,
         {
           method: 'POST',
           headers: {

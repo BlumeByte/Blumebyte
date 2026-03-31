@@ -9,7 +9,7 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { Loader2, Plus, Megaphone, Eye, Pencil, Trash2, Users } from 'lucide-react';
 import { useBranding } from '../lib/branding-context';
 import { MultiEmployeeSelect } from './MultiEmployeeSelect';

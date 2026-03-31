@@ -4,8 +4,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
-import { toast } from 'sonner';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
 import { useNavigate } from 'react-router';
@@ -105,6 +105,8 @@ export function HRAIAssistant() {
 
     try {
       const token = await getToken();
+      console.log('AI Assistant: Token retrieved:', token ? `${token.substring(0, 20)}...` : 'null');
+      
       if (!token) {
         toast.error('Please sign in to use Blumebyte');
         setIsLoading(false);
@@ -112,7 +114,7 @@ export function HRAIAssistant() {
       }
 
       const response = await fetch(
-        `${supabaseFunctionsBaseUrl}/ai-assistant`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/ai-assistant`,
         {
           method: 'POST',
           headers: {

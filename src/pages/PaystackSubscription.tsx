@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { CheckCircle2, Users, TrendingUp, Zap, Shield, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { api } from '../lib/api-client';
 import { useAuth } from '../lib/auth-context';
-import logoImage from '@/assets/logo';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 interface Plan {
   id: string;

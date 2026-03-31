@@ -15,7 +15,7 @@ import {
   CheckCircle2, ClipboardList, BarChart3, Eye, Lock, Shield
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { brandGradientStyle } from '../../lib/branding-context';
 
 interface Survey {

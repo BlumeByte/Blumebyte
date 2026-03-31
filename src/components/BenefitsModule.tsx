@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Textarea } from './ui/textarea';
 import { Checkbox } from './ui/checkbox';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { Loader2, Plus, Heart, Pencil, Trash2, Eye, TrendingUp, User, Building2} from 'lucide-react';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { FileText, Scale, AlertCircle, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
-import logoImage from '@/assets/logo';
+import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export default function TermsConditions() {
   const navigate = useNavigate();

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { supabase, supabaseStorageKey } from './supabase';
-import { isSupabaseConfigured } from '../config/env';
+import { supabase } from './supabase';
 import { api } from './api-client';
 import { authLock } from './auth-lock';
 
@@ -36,6 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initializedRef = useRef(false);
   const tokenCacheRef = useRef<{ token: string; expiresAt: number } | null>(null);
   const tokenFetchingRef = useRef<Promise<string | null> | null>(null);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   const fetchProfile = useCallback(async (token: string) => {
     try {
@@ -112,12 +113,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return token;
   }, []);
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setSessionLoading(false);
-      return;
+  // Reset inactivity timer
+  const resetInactivityTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
     }
+    
+    // Only set timer if user is logged in
+    if (user) {
+      // 30 minutes of inactivity before auto-logout
+      const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
+      
+      inactivityTimerRef.current = setTimeout(async () => {
+        console.log('Auto-logout due to inactivity');
+        await logout();
+        window.location.href = '/login?reason=inactivity';
+      }, INACTIVITY_TIMEOUT);
+    }
+  }, [user]);
 
+  useEffect(() => {
     // Use onAuthStateChange as the single source of truth for session state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'TOKEN_REFRESHED' && !session) {
@@ -164,16 +181,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchProfile]);
 
+  // Track user activity and page visibility
+  useEffect(() => {
+    if (!user) return;
+
+    // Activity events to track
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
+
+    // Handle page visibility changes
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        // Page is hidden - store the time
+        lastActivityRef.current = Date.now();
+      } else {
+        // Page is visible again - check how long it was hidden
+        const hiddenDuration = Date.now() - lastActivityRef.current;
+        const MAX_HIDDEN_DURATION = 2 * 60 * 60 * 1000; // 2 hours
+        
+        if (hiddenDuration > MAX_HIDDEN_DURATION) {
+          console.log('Auto-logout: Page was hidden for too long');
+          await logout();
+          window.location.href = '/login?reason=session_expired';
+        } else {
+          // Reset the timer when page becomes visible again
+          resetInactivityTimer();
+        }
+      }
+    };
+
+    // Add event listeners
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity, { passive: true });
+    });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Initialize inactivity timer
+    resetInactivityTimer();
+
+    // Cleanup
+    return () => {
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleActivity);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [user, resetInactivityTimer]);
+
   const login = async (email: string, password: string) => {
     setLoginLoading(true);
     setLoginError(null);
-
-    if (!isSupabaseConfigured) {
-      const configError = 'Login is temporarily unavailable because production Supabase environment variables are not configured.';
-      setLoginError(configError);
-      setLoginLoading(false);
-      throw new Error(configError);
-    }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
@@ -232,6 +296,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     setAccessToken(null);
+    
+    // Clear inactivity timer on logout
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
   };
 
   const clearError = () => setLoginError(null);
@@ -242,26 +312,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetchProfile(token);
     }
   };
-
-
-  useEffect(() => {
-    const clearSessionOnLeave = () => {
-      try {
-        localStorage.removeItem(supabaseStorageKey);
-        sessionStorage.removeItem('auth-token');
-      } catch {}
-      setUser(null);
-      setAccessToken(null);
-    };
-
-    window.addEventListener('beforeunload', clearSessionOnLeave);
-    window.addEventListener('pagehide', clearSessionOnLeave);
-
-    return () => {
-      window.removeEventListener('beforeunload', clearSessionOnLeave);
-      window.removeEventListener('pagehide', clearSessionOnLeave);
-    };
-  }, []);
 
   return (
     <AuthContext.Provider value={{ user, accessToken, sessionLoading, loginLoading, loginError, login, logout, clearError, getToken, refreshProfile }}>
