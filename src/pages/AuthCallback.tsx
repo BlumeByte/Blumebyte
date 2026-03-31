@@ -8,7 +8,7 @@ import { Loader2, CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { supabaseFunctionsBaseUrl } from '../config/env';
 
 export default function AuthCallback() {

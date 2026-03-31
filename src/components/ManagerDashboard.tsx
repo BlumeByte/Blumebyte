@@ -449,7 +449,7 @@ export function ManagerDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 relative isolate">
+    <div className="flex min-h-screen bg-gray-50 relative">
       <Monochrome3DBackground variant="manager" />
       {/* Sidebar */}
       <aside className="w-56 bg-white border-r flex flex-col fixed h-screen">

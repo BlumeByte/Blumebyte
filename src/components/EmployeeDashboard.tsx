@@ -48,7 +48,7 @@ export function EmployeeDashboard() {
   }, [accessToken]);
 
   return (
-    <div className="min-h-screen bg-gray-50 relative isolate">
+    <div className="min-h-screen bg-gray-50 relative">
       <Monochrome3DBackground variant="employee" />
       <header className="sticky top-0 z-20 bg-white border-b px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
