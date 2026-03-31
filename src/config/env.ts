@@ -10,8 +10,8 @@ function getEnv(name: keyof ImportMetaEnv, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback;
 }
 
-export const supabaseUrl = getEnv('VITE_SUPABASE_URL', DEFAULT_SUPABASE_URL);
-export const publicAnonKey = getEnv('VITE_SUPABASE_ANON_KEY', DEFAULT_SUPABASE_ANON_KEY);
+export const supabaseUrl = getEnv('VITE_SUPABASE_URL');
+export const publicAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && publicAnonKey);
 
@@ -24,13 +24,13 @@ export const supabaseProjectId = getEnv('VITE_SUPABASE_PROJECT_ID') || (() => {
   }
 })();
 
-export const supabaseFunctionSlug = getEnv('VITE_SUPABASE_FUNCTIONS_SLUG', DEFAULT_SUPABASE_FUNCTIONS_SLUG);
+export const supabaseFunctionSlug = getEnv('VITE_SUPABASE_FUNCTIONS_SLUG', 'make-server-668731fc');
 export const supabaseFunctionsBaseUrl = isSupabaseConfigured
   ? `${supabaseUrl}/functions/v1/${supabaseFunctionSlug}`
   : '';
 
-if (!getEnv('VITE_SUPABASE_URL') || !getEnv('VITE_SUPABASE_ANON_KEY')) {
+if (!isSupabaseConfigured) {
   console.warn(
-    'Using built-in Supabase fallback values because VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY are missing in this environment.'
+    'Supabase environment variables are missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel Production Environment Variables.'
   );
 }
