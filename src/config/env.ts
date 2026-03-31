@@ -7,7 +7,11 @@ function getEnv(name: keyof ImportMetaEnv, fallback = ''): string {
 
 export const supabaseUrl = getEnv('VITE_SUPABASE_URL');
 export const publicAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
+
+export const isSupabaseConfigured = Boolean(supabaseUrl && publicAnonKey);
+
 export const supabaseProjectId = getEnv('VITE_SUPABASE_PROJECT_ID') || (() => {
+  if (!supabaseUrl) return '';
   try {
     return new URL(supabaseUrl).hostname.split('.')[0] || '';
   } catch {
@@ -16,8 +20,12 @@ export const supabaseProjectId = getEnv('VITE_SUPABASE_PROJECT_ID') || (() => {
 })();
 
 export const supabaseFunctionSlug = getEnv('VITE_SUPABASE_FUNCTIONS_SLUG', 'make-server-668731fc');
-export const supabaseFunctionsBaseUrl = `${supabaseUrl}/functions/v1/${supabaseFunctionSlug}`;
+export const supabaseFunctionsBaseUrl = isSupabaseConfigured
+  ? `${supabaseUrl}/functions/v1/${supabaseFunctionSlug}`
+  : '';
 
-if (!supabaseUrl || !publicAnonKey) {
-  console.warn('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Configure these in Vercel Environment Variables.');
+if (!isSupabaseConfigured) {
+  console.warn(
+    'Supabase environment variables are missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel Production Environment Variables.'
+  );
 }
