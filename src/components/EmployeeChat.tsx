@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Alert, AlertDescription } from './ui/alert';
 import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
 
