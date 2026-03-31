@@ -6,9 +6,9 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { publicAnonKey, supabaseFunctionsBaseUrl } from '../config/env';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import logoImage from '../assets/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export default function CompanySignup() {
   const navigate = useNavigate();
