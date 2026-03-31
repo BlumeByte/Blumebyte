@@ -260,7 +260,7 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-transparent relative isolate">
+    <div className="min-h-screen bg-white relative">
       <Monochrome3DBackground variant="landing" />
       {/* Navigation */}
       <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
