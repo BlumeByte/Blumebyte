@@ -181,6 +181,104 @@
   }
 }
 
+/* Monochrome recurring 3D-style animated backgrounds */
+.mono-3d-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.6;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.45), transparent 35%),
+    radial-gradient(circle at 80% 80%, rgba(0, 0, 0, 0.08), transparent 40%),
+    linear-gradient(145deg, #fafafa 0%, #f2f2f2 50%, #ededed 100%);
+}
+
+.mono-3d-grid {
+  position: absolute;
+  inset: -30%;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-size: 80px 80px;
+  transform: perspective(900px) rotateX(62deg) translateY(20%);
+  animation: monoGrid 16s linear infinite;
+  opacity: 0.45;
+}
+
+.mono-3d-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(1px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.45), 0 18px 42px rgba(0, 0, 0, 0.2);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.88), rgba(18, 18, 18, 0.7));
+}
+
+.mono-3d-orb-a {
+  width: 36rem;
+  height: 36rem;
+  top: -8rem;
+  left: -8rem;
+  animation: monoFloatA 12s ease-in-out infinite;
+}
+
+.mono-3d-orb-b {
+  width: 28rem;
+  height: 28rem;
+  right: -7rem;
+  top: 20%;
+  animation: monoFloatB 14s ease-in-out infinite;
+}
+
+.mono-3d-orb-c {
+  width: 18rem;
+  height: 18rem;
+  left: 40%;
+  bottom: -5rem;
+  animation: monoFloatC 10s ease-in-out infinite;
+}
+
+.mono-3d-sweep {
+  position: absolute;
+  inset: -35%;
+  background: conic-gradient(from 180deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: monoSweep 18s linear infinite;
+  mix-blend-mode: screen;
+}
+
+.mono-3d-theme-landing .mono-3d-grid { opacity: 0.38; }
+.mono-3d-theme-superadmin .mono-3d-orb-a { width: 42rem; height: 42rem; }
+.mono-3d-theme-admin .mono-3d-orb-b { top: 8%; right: -6rem; }
+.mono-3d-theme-manager .mono-3d-orb-c { left: 22%; width: 22rem; height: 22rem; }
+.mono-3d-theme-employee .mono-3d-orb-a { top: 2rem; left: -12rem; }
+
+@keyframes monoGrid {
+  from { transform: perspective(900px) rotateX(62deg) translate3d(0, 20%, 0); }
+  to { transform: perspective(900px) rotateX(62deg) translate3d(0, 28%, 0); }
+}
+
+@keyframes monoFloatA {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate3d(2rem, 1rem, 0) scale(1.06) rotate(6deg); }
+}
+
+@keyframes monoFloatB {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate3d(-1.8rem, -1.2rem, 0) scale(1.08) rotate(-9deg); }
+}
+
+@keyframes monoFloatC {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate3d(1rem, -1.6rem, 0) scale(1.12) rotate(10deg); }
+}
+
+@keyframes monoSweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /**
  * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
  */

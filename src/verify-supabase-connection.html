@@ -196,11 +196,11 @@
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">Project ID</div>
-          <div class="info-value" id="project-id">ivohczdtuxasyfoiphqu</div>
+          <div class="info-value" id="project-id">(from query/localStorage)</div>
         </div>
         <div class="info-item">
           <div class="info-label">Supabase URL</div>
-          <div class="info-value" id="supabase-url">https://ivohczdtuxasyfoiphqu.supabase.co</div>
+          <div class="info-value" id="supabase-url">(from query/localStorage)</div>
         </div>
         <div class="info-item">
           <div class="info-label">Server Endpoint</div>
@@ -253,9 +253,19 @@
   </div>
 
   <script>
-    const PROJECT_ID = 'ivohczdtuxasyfoiphqu';
-    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2b2hjemR0dXhhc3lmb2lwaHF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NzgyNDcsImV4cCI6MjA4ODM1NDI0N30.loRm7iik0lgBW7yRK-ANIjpyKVZGLCdSuqVZ5VDnQNQ';
-    const BASE_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/make-server-668731fc`;
+    const params = new URLSearchParams(window.location.search);
+    const PROJECT_ID = params.get('projectId') || localStorage.getItem('supabase_project_id') || '';
+    const ANON_KEY = params.get('anonKey') || localStorage.getItem('supabase_anon_key') || '';
+    const FUNCTION_SLUG = params.get('functionSlug') || 'make-server-668731fc';
+    const BASE_URL = PROJECT_ID ? `https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_SLUG}` : '';
+
+    if (PROJECT_ID) localStorage.setItem('supabase_project_id', PROJECT_ID);
+    if (ANON_KEY) localStorage.setItem('supabase_anon_key', ANON_KEY);
+
+    document.getElementById('project-id').textContent = PROJECT_ID || 'Missing: ?projectId=your-project-id';
+    document.getElementById('supabase-url').textContent = PROJECT_ID
+      ? `https://${PROJECT_ID}.supabase.co`
+      : 'Missing: ?projectId=your-project-id';
     
     function setStatus(elementId, status, text) {
       const el = document.getElementById(elementId);
@@ -279,6 +289,9 @@
       setResult('health-result', 'Connecting to server...');
       
       try {
+        if (!PROJECT_ID || !ANON_KEY) {
+          throw new Error('Missing projectId or anonKey. Add them as URL params (?projectId=...&anonKey=...).');
+        }
         const response = await fetch(`${BASE_URL}/health`, {
           headers: {
             'Authorization': `Bearer ${ANON_KEY}`
@@ -305,6 +318,9 @@
       setResult('setup-result', 'Checking setup status...');
       
       try {
+        if (!PROJECT_ID || !ANON_KEY) {
+          throw new Error('Missing projectId or anonKey. Add them as URL params (?projectId=...&anonKey=...).');
+        }
         const response = await fetch(`${BASE_URL}/check-setup`, {
           headers: {
             'Authorization': `Bearer ${ANON_KEY}`
@@ -336,6 +352,9 @@
       setResult('db-result', 'Verifying database connection...');
       
       try {
+        if (!PROJECT_ID || !ANON_KEY) {
+          throw new Error('Missing projectId or anonKey. Add them as URL params (?projectId=...&anonKey=...).');
+        }
         // Test if we can access the health endpoint (which internally uses the database)
         const response = await fetch(`${BASE_URL}/health`, {
           headers: {
@@ -374,7 +393,8 @@
     }
     
     function openDashboard() {
-      window.open('https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu', '_blank');
+      if (!PROJECT_ID) { alert('Missing projectId query parameter.'); return; }
+      window.open(`https://supabase.com/dashboard/project/${PROJECT_ID}`, '_blank');
     }
     
     // Auto-run tests on page load

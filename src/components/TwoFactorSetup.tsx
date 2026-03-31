@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Alert, AlertDescription } from './ui/alert';
 import { Shield, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface TwoFactorSetupProps {
   email: string;
