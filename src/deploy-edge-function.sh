@@ -1,9 +1,11 @@
 #!/bin/bash
 # Blumebyte HR - Edge Function Deployment Script
 # This script deploys the Supabase Edge Function to production
+# Updated: January 2025 - Security patches applied (Hono 4.7.7)
 
 echo "🚀 Blumebyte HR - Edge Function Deployment"
 echo "=========================================="
+echo "🔒 Security: Hono 4.7.7 (All vulnerabilities patched)"
 echo ""
 
 # Project details

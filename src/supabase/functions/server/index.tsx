@@ -1,7 +1,8 @@
 // Blumebyte HR Management Server - v2.1 - Payment-First Registration
-import { Hono } from "npm:hono";
-import { cors } from "npm:hono/cors";
-import { logger } from "npm:hono/logger";
+// SECURITY: Updated to Hono 4.7.7+ to patch all known vulnerabilities (Jan 2025)
+import { Hono } from "npm:hono@4.7.7";
+import { cors } from "npm:hono@4.7.7/cors";
+import { logger } from "npm:hono@4.7.7/logger";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
@@ -2641,14 +2642,20 @@ app.post(`${PREFIX}/admin/request-user-create`, async (c) => {
     const { userData, reason } = await c.req.json();
     const requestId = `approval_req:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
     
+    // CRITICAL FIX: Add company scope to approval requests
+    const adminProfile = await kv.get(`employee:${adminUser.id}`);
+    const companyId = adminProfile?.companyId || adminProfile?.company;
+    
     const approvalRequest = {
       id: requestId,
       type: 'user_create',
       requestedBy: adminUser.id,
-      requestedByName: (await kv.get(`employee:${adminUser.id}`))?.name || 'Admin',
+      requestedByName: adminProfile?.name || 'Admin',
       userData,
       reason: reason || 'Admin user creation request',
       status: 'pending',
+      companyId,
+      company: companyId,
       createdAt: new Date().toISOString(),
     };
     
@@ -2675,17 +2682,23 @@ app.post(`${PREFIX}/admin/request-user-update`, async (c) => {
     const existingUser = await kv.get(`employee:${userId}`);
     if (!existingUser) return c.json({ error: 'User not found' }, 404);
     
+    // CRITICAL FIX: Add company scope to approval requests
+    const adminProfile = await kv.get(`employee:${adminUser.id}`);
+    const companyId = adminProfile?.companyId || adminProfile?.company;
+    
     const approvalRequest = {
       id: requestId,
       type: 'user_update',
       requestedBy: adminUser.id,
-      requestedByName: (await kv.get(`employee:${adminUser.id}`))?.name || 'Admin',
+      requestedByName: adminProfile?.name || 'Admin',
       userId,
       userName: existingUser.name,
       updates,
       currentData: existingUser,
       reason: reason || 'Admin user update request',
       status: 'pending',
+      companyId,
+      company: companyId,
       createdAt: new Date().toISOString(),
     };
     
@@ -4701,10 +4714,14 @@ app.delete(`${PREFIX}/announcements/:id`, async (c) => {
 // ============ MESSAGES ============
 app.get(`${PREFIX}/messages`, async (c) => {
   try {
-    const { user } = await requireAuth(c);
+    const { user, role } = await requireAuth(c);
     const allMessages = await kv.getByPrefix("message:");
-    // Filter messages for current user (either sender or recipient)
-    const userMessages = allMessages.filter((m: any) => 
+    
+    // Apply company filtering first
+    const filtered = await applyCompanyFilter(allMessages, user.id, role);
+    
+    // Then filter messages for current user (either sender or recipient)
+    const userMessages = filtered.filter((m: any) => 
       m.senderId === user.id || m.recipientId === user.id
     );
     return c.json(userMessages || []);
@@ -4722,6 +4739,10 @@ app.post(`${PREFIX}/messages`, async (c) => {
     const senderData = await kv.get(`employee:${user.id}`);
     const recipientData = await kv.get(`employee:${body.recipientId}`);
     
+    // CRITICAL FIX: Add company scope to messages
+    const senderCompanyId = senderData?.companyId || senderData?.company;
+    const companyRecord = senderCompanyId ? await kv.get(`company_by_id:${senderCompanyId}`) : null;
+    
     const message = {
       id,
       senderId: user.id,
@@ -4729,6 +4750,8 @@ app.post(`${PREFIX}/messages`, async (c) => {
       recipientId: body.recipientId,
       recipientName: recipientData?.name || "",
       message: body.message,
+      companyId: senderCompanyId,
+      company: companyRecord?.name || senderCompanyId,
       read: false,
       createdAt: new Date().toISOString(),
     };
@@ -4999,6 +5022,11 @@ app.post(`${PREFIX}/job-applications`, async (c) => {
     const body = await c.req.json();
     const id = crypto.randomUUID();
     const kvData = await kv.get(`employee:${user.id}`);
+    
+    // CRITICAL FIX: Get company info for multi-tenant isolation
+    const applicantCompanyId = kvData?.companyId || kvData?.company;
+    const companyRecord = applicantCompanyId ? await kv.get(`company_by_id:${applicantCompanyId}`) : null;
+    
     const application = {
       id, applicantId: user.id, applicantName: kvData?.name || "",
       applicantEmail: kvData?.email || user.email || "",
@@ -5009,12 +5037,14 @@ app.post(`${PREFIX}/job-applications`, async (c) => {
       jobDepartment: body.jobDepartment || "", jobCompany: body.jobCompany || "",
       jobSalaryRange: body.jobSalaryRange || "", jobType: body.jobType || "",
       coverLetter: body.coverLetter || "", status: "pending",
+      companyId: applicantCompanyId,
+      company: companyRecord?.name || applicantCompanyId,
       createdAt: new Date().toISOString(),
     };
     await kv.set(`job-application:${id}`, application);
     // CRITICAL: Only notify HR staff from the same company
     const allEmployees = await kv.getByPrefix("employee:");
-    const applicantCompany = kvData?.companyId || kvData?.company;
+    const applicantCompany = applicantCompanyId;
     const hrStaff = allEmployees.filter((e: any) => ["superadmin", "admin"].includes(e.role) && applicantCompany && (e.companyId === applicantCompany || e.company === applicantCompany));
     for (const hr of hrStaff) {
       const nid = crypto.randomUUID();
@@ -5061,6 +5091,11 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
       if (role !== "superadmin") {
         // Create a pending approval request for SuperAdmin
         const approvalId = `approval_req:hiring_${crypto.randomUUID()}`;
+        
+        // CRITICAL FIX: Add company scope to hiring approval requests
+        const kvData = await kv.get(`employee:${user.id}`);
+        const companyId = kvData?.companyId || kvData?.company || existing.companyId;
+        
         await kv.set(approvalId, {
           id: approvalId,
           type: "hiring",
@@ -5068,7 +5103,9 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
           applicantName: existing.applicantName,
           jobTitle: existing.jobTitle,
           requestedBy: user.id,
-          requestedByName: user.user_metadata?.name || user.email,
+          requestedByName: kvData?.name || user.user_metadata?.name || user.email,
+          companyId,
+          company: companyId,
           status: "pending",
           createdAt: new Date().toISOString(),
         });

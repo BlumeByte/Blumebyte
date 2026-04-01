@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner@2.0.3';
 import { Loader2, Clock, Calendar, Save } from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
-import { api } from '../lib/api-client';
+import { api } from '../lib/api';
 
 interface DayConfig {
   day: string;
