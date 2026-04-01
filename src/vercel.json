@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run vercel-build",
-  "outputDirectory": "build",
+  "outputDirectory": "dist",
   "installCommand": "bash vercel-install.sh",
   "devCommand": "npm run dev",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
