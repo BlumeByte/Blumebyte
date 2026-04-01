@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "deploy:edge-function": "bash deploy-edge-function.sh",
     "test:edge-function": "curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health",
-    "postinstall": "echo 'Dependencies installed successfully'"
+    "postinstall": "echo 'Dependencies installed successfully'",
+    "vercel-build": "vite build"
   },
   "dependencies": {
     "react": "^18.3.1",
