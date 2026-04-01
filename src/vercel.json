@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
-  "installCommand": "npm ci --production=false --legacy-peer-deps || npm install --legacy-peer-deps",
+  "installCommand": "bash vercel-install.sh",
   "devCommand": "npm run dev",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
   "build": {
