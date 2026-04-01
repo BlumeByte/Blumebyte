@@ -20,17 +20,28 @@ export default function PerformanceManagementPage() {
   return (
     <div className="min-h-screen bg-white">
       <SharedNavigation />
-      <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1653566031486-dc4ead13a35d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbWFuYWdlciUyMHBlcmZvcm1hbmNlJTIwcmV2aWV3JTIwbWVldGluZ3xlbnwxfHx8fDE3NzUwNDc4NDl8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-black mb-6">
-              <Trophy className="h-8 w-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white mb-6">
+              <Trophy className="h-8 w-8 text-black" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-black">Performance Management</h1>
-            <p className="text-xl text-gray-600 mb-8">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">Performance Management</h1>
+            <p className="text-xl text-gray-200 mb-8">
               Drive employee growth and business success with comprehensive performance management tools.
             </p>
-            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
               Get Started Today
             </Button>
           </div>

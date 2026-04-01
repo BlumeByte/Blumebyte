@@ -20,17 +20,28 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-white">
       <SharedNavigation />
-      <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1653565685060-e15e492a7fda?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbmV3JTIwZW1wbG95ZWUlMjBvbmJvYXJkaW5nJTIwdHJhaW5pbmd8ZW58MXx8fHwxNzc1MDQ3ODUxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-black mb-6">
-              <Users className="h-8 w-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white mb-6">
+              <Users className="h-8 w-8 text-black" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-black">Employee Onboarding</h1>
-            <p className="text-xl text-gray-600 mb-8">
-              Create amazing first impressions with seamless onboarding experiences that set new hires up for success.
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">Employee Onboarding</h1>
+            <p className="text-xl text-gray-200 mb-8">
+              Create memorable first impressions with streamlined onboarding that sets new hires up for success.
             </p>
-            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
               Get Started Today
             </Button>
           </div>

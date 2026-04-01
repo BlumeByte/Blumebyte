@@ -16,6 +16,7 @@ export default function IndustryPage() {
       icon: Building2,
       tagline: 'Build stronger teams for stronger projects',
       description: 'Manage your construction workforce with tools designed for the field and office.',
+      heroImage: 'https://images.unsplash.com/photo-1725811641350-f63dc7442725?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwY29uc3RydWN0aW9uJTIwd29ya2VyJTIwc2l0ZSUyMG1hbmFnZXJ8ZW58MXx8fHwxNzc1MDQ3ODUxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       challenges: [
         'Managing remote and on-site workers',
         'Tracking certifications and safety training',
@@ -40,6 +41,7 @@ export default function IndustryPage() {
       icon: GraduationCap,
       tagline: 'Empowering educators with better HR tools',
       description: 'Simplify HR management for schools, colleges, and educational institutions.',
+      heroImage: 'https://images.unsplash.com/photo-1744809482817-9a9d4fc280af?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwdGVhY2hlciUyMGVkdWNhdGlvbiUyMGNsYXNzcm9vbSUyMHN0dWRlbnRzfGVufDF8fHx8MTc3NTA0Nzg1OHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       challenges: [
         'Managing faculty and staff across departments',
         'Handling seasonal hiring patterns',
@@ -64,6 +66,7 @@ export default function IndustryPage() {
       icon: DollarSign,
       tagline: 'Secure HR solutions for financial institutions',
       description: 'Meet compliance requirements while managing your finance team efficiently.',
+      heroImage: 'https://images.unsplash.com/photo-1758519290803-f2b25952a5d7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwYmFua2VyJTIwZmluYW5jZSUyMHByb2Zlc3Npb25hbCUyMG9mZmljZXxlbnwxfHx8fDE3NzUwNDc4NTJ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       challenges: [
         'Strict regulatory compliance',
         'Confidential employee data',
@@ -88,6 +91,7 @@ export default function IndustryPage() {
       icon: Heart,
       tagline: 'Healthcare HR for better patient care',
       description: 'Manage healthcare professionals with specialized HR tools.',
+      heroImage: 'https://images.unsplash.com/photo-1666886573583-9839aafe43cf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwaGVhbHRoY2FyZSUyMGRvY3RvciUyMG51cnNlJTIwaG9zcGl0YWx8ZW58MXx8fHwxNzc1MDQ3ODUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       challenges: [
         'Shift scheduling for 24/7 operations',
         'Tracking medical licenses and certifications',
@@ -112,6 +116,7 @@ export default function IndustryPage() {
       icon: Briefcase,
       tagline: 'Streamline operations on the factory floor',
       description: 'Optimize workforce management for manufacturing operations.',
+      heroImage: 'https://images.unsplash.com/photo-1637997840862-9aafaf835eed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbWFudWZhY3R1cmluZyUyMGZhY3RvcnklMjB3b3JrZXIlMjBwcm9kdWN0aW9ufGVufDF8fHx8MTc3NTA0Nzg1M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       challenges: [
         'Shift work and complex schedules',
         'Safety compliance and training',
@@ -136,6 +141,7 @@ export default function IndustryPage() {
       icon: Zap,
       tagline: 'Modern HR for modern tech companies',
       description: 'Scale your tech team with agile HR management.',
+      heroImage: 'https://images.unsplash.com/photo-1573497160825-0d94a2724d40?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwdGVjaCUyMGRldmVsb3BlciUyMHNvZnR3YXJlJTIwZW5naW5lZXJ8ZW58MXx8fHwxNzc1MDQ3ODUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
       challenges: [
         'Rapid hiring and scaling',
         'Remote and distributed teams',
@@ -166,19 +172,30 @@ export default function IndustryPage() {
       <SharedNavigation />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src={currentIndustry.heroImage}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-black mb-6">
-              <Icon className="h-8 w-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white mb-6">
+              <Icon className="h-8 w-8 text-black" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-black">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">
               {currentIndustry.tagline}
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-xl text-gray-200 mb-8">
               {currentIndustry.description}
             </p>
-            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
               Get Started Today
             </Button>
           </div>

@@ -55,19 +55,30 @@ export default function TimeAttendancePage() {
       <SharedNavigation />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1584789873809-3de5fb20bfe6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwb2ZmaWNlJTIwd29ya2VyJTIwdGltZSUyMGNsb2NrJTIwYXR0ZW5kYW5jZXxlbnwxfHx8fDE3NzUwNDc4NDh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-black mb-6">
-              <Clock className="h-8 w-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white mb-6">
+              <Clock className="h-8 w-8 text-black" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-black">
-              Time & Attendance
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">
+              Time & Attendance Management
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
-              Streamline time tracking and attendance management with automated tools that save time and reduce errors.
+            <p className="text-xl text-gray-200 mb-8">
+              Track work hours, manage shifts, and monitor attendance with precision and ease.
             </p>
-            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
               Get Started Today
             </Button>
           </div>
