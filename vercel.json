@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm install --no-optional --legacy-peer-deps",
+  "installCommand": "node -e \"const fs=require(\'fs\');const p=\'package.json\';const j=JSON.parse(fs.readFileSync(p,\'utf8\'));[\'node:crypto\',\'child_process\',\'path\'].forEach(k=>j.dependencies&&delete j.dependencies[k]);fs.writeFileSync(p,JSON.stringify(j,null,2)+\'\\n\');\" && npm install --no-optional --legacy-peer-deps",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
