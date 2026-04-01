@@ -287,6 +287,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const performClientSideLogoutCleanup = useCallback(() => {
+    setUser(null);
+    setAccessToken(null);
+
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  }, []);
+
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -294,15 +304,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // signOut may fail if session is already invalid – that's fine
       console.log('signOut error (session may already be invalid):', e);
     }
-    setUser(null);
-    setAccessToken(null);
-    
-    // Clear inactivity timer on logout
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = null;
-    }
+
+    performClientSideLogoutCleanup();
   };
+
+
+  useEffect(() => {
+    if (!user) return;
+
+    const logoutOnLeave = () => {
+      // Best effort logout when user/tenant leaves the app or closes the tab.
+      // local scope avoids network dependency during unload.
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      performClientSideLogoutCleanup();
+    };
+
+    window.addEventListener('beforeunload', logoutOnLeave);
+    window.addEventListener('pagehide', logoutOnLeave);
+
+    return () => {
+      window.removeEventListener('beforeunload', logoutOnLeave);
+      window.removeEventListener('pagehide', logoutOnLeave);
+    };
+  }, [user, performClientSideLogoutCleanup]);
 
   const clearError = () => setLoginError(null);
 
