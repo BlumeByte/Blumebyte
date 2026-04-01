@@ -1,17 +1,23 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background with subtle gradient -->
-  <rect width="64" height="64" rx="12" fill="white"/>
+  <!-- Background with gradient for better visibility -->
+  <rect width="64" height="64" rx="12" fill="url(#grad1)"/>
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#000000;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
+    </linearGradient>
+  </defs>
   
-  <!-- Blumebyte Logo - Modern B design -->
+  <!-- Blumebyte Logo - Modern B design in white -->
   <!-- Left curved section -->
-  <path d="M12 16C12 14.3431 13.3431 13 15 13H23C23 13 23 38.5 15 38.5C13.3431 38.5 12 37.1569 12 35.5V16Z" fill="black"/>
+  <path d="M12 16C12 14.3431 13.3431 13 15 13H23C23 13 23 38.5 15 38.5C13.3431 38.5 12 37.1569 12 35.5V16Z" fill="white"/>
   
   <!-- Top right curve of B -->
-  <path d="M25 13H35C39.4183 13 43 16.5817 43 21C43 25.4183 39.4183 29 35 29H25V13Z" fill="black"/>
+  <path d="M25 13H35C39.4183 13 43 16.5817 43 21C43 25.4183 39.4183 29 35 29H25V13Z" fill="white"/>
   
   <!-- Bottom right curve of B -->
-  <path d="M25 31H37C41.4183 31 45 34.5817 45 39C45 43.4183 41.4183 47 37 47H25V31Z" fill="black"/>
+  <path d="M25 31H37C41.4183 31 45 34.5817 45 39C45 43.4183 41.4183 47 37 47H25V31Z" fill="white"/>
   
   <!-- Small decorative arc on left section -->
-  <path d="M15.5 18C15.5 18 19 20 19 24C19 28 15.5 30 15.5 30" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M15.5 18C15.5 18 19 20 19 24C19 28 15.5 30 15.5 30" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
 </svg>

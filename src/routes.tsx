@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Import static pages directly (not lazy loaded)
 import LandingPage from './pages/LandingPage';
+import LoginPage from './components/LoginPage';
 import CompanySignup from './pages/CompanySignup';
 import DevSettings from './pages/DevSettings';
 import EmployeePortal from './pages/EmployeePortal';
@@ -36,7 +37,6 @@ import OnboardingPage from './pages/OnboardingPage';
 import EmployeeExperiencePage from './pages/EmployeeExperiencePage';
 
 // PERFORMANCE: Lazy load heavy dashboard components
-const LoginPage = lazy(() => import('./components/LoginPage'));
 const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
@@ -74,11 +74,7 @@ function RootLayout() {
 }
 
 // Create component wrappers instead of JSX elements
-const LoginPageWrapper = () => (
-  <Suspense fallback={<LoadingFallback />}>
-    <LoginPage />
-  </Suspense>
-);
+const LoginPageWrapper = () => <LoginPage />;
 
 const CompanySignupPage = () => <CompanySignup />;
 

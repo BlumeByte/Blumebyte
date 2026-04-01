@@ -348,6 +348,15 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
     console.log(`✅ resolveCompanyScope: Found assignedCompanies in auth metadata for user ${userId}:`, data.user.user_metadata.assignedCompanies);
     return data.user.user_metadata.assignedCompanies;
   }
+  
+  // FALLBACK: If assignedCompanies not set, use companyId/company from employee record
+  // This handles legacy users created before assignedCompanies was implemented
+  if (kvData?.companyId || kvData?.company) {
+    const companyId = kvData.companyId || kvData.company;
+    console.log(`⚠️ resolveCompanyScope: assignedCompanies not found, using fallback companyId for user ${userId}: ${companyId}`);
+    return [companyId];
+  }
+  
   console.log(`❌ resolveCompanyScope: No assignedCompanies found for user ${userId}. KV data:`, kvData, 'Auth metadata:', data?.user?.user_metadata);
   return null;
 }

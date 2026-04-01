@@ -2,6 +2,7 @@ import * as React from 'react';
 import { RouterProvider } from 'react-router';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { router } from './routes';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   // Suppress Figma iframe errors in console (development only)
@@ -65,6 +66,7 @@ function App() {
   return (
     <ErrorBoundary>
       <RouterProvider router={router} />
+      <Analytics />
     </ErrorBoundary>
   );
 }

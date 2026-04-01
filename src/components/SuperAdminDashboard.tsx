@@ -2993,6 +2993,25 @@ function UserManagementView() {
   const [tempPassword, setTempPassword] = useState('');
   const [showTempPw, setShowTempPw] = useState(false);
   const [search, setSearch] = useState('');
+  const [licenseInfo, setLicenseInfo] = useState<any>(null);
+
+  const fetchLicenseInfo = useCallback(async () => {
+    try {
+      const response = await fetch(`https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/subscription/license-info`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLicenseInfo(data);
+      }
+    } catch (error) {
+      console.error('Error fetching license info:', error);
+    }
+  }, [accessToken]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -3004,9 +3023,11 @@ function UserManagementView() {
       setUsers(Array.isArray(usrs) ? usrs : []);
       setCompanies(ref.companies || []);
       setDepartments(ref.departments || []);
+      // Fetch license info
+      await fetchLicenseInfo();
     } catch (e) { console.log(e); }
     setLoading(false);
-  }, [accessToken]);
+  }, [accessToken, fetchLicenseInfo]);
 
   useEffect(() => { load(); }, [load]);
 
