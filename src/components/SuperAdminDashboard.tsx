@@ -3004,6 +3004,13 @@ function UserManagementView() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Validate required fields
+      if (!formData.email || !formData.name || !formData.role) {
+        toast.error('Please fill in all required fields (Email, Name, Role)');
+        setSaving(false);
+        return;
+      }
+
       // Prepare data with departments array
       const payload = {
         ...formData,
@@ -3022,7 +3029,28 @@ function UserManagementView() {
         toast.success('User created');
       }
       load();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { 
+      console.error('Error saving user:', e);
+      
+      // Handle specific error cases with helpful messages
+      if (e.message && e.message.includes('already exists')) {
+        toast.error('⚠️ A user with this email already exists. Please use a different email address.');
+      } else if (e.needsSubscription) {
+        toast.error('⚠️ No active subscription. As SuperAdmin, you can create up to 5 test users before purchasing licenses.');
+      } else if (e.needsLicenses) {
+        if (e.isTestMode) {
+          toast.error('⚠️ Test user limit reached (5 users). Please purchase licenses to add more users.');
+        } else {
+          toast.error(`⚠️ No available licenses. You've used ${e.usedLicenses}/${e.purchasedLicenses} licenses. Please purchase more to add users.`);
+        }
+      } else if (e.message && e.message.includes('Invalid email')) {
+        toast.error('⚠️ Invalid email format. Please enter a valid email address.');
+      } else if (e.message && e.message.includes('required')) {
+        toast.error('⚠️ Please fill in all required fields (Email, Name, and Role).');
+      } else {
+        toast.error(e.message || 'Failed to save user. Please try again.');
+      }
+    }
     setSaving(false);
   };
 
@@ -3050,6 +3078,19 @@ function UserManagementView() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">User Management</h1>
         <Button onClick={() => { setEditUser(null); setFormData({ role: 'employee', departments: [], department: '' }); setShowTempPw(false); setDialogOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Create User</Button>
+      </div>
+
+      {/* Info banner for SuperAdmin about test users */}
+      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-blue-900">
+          <p className="font-medium mb-1">💡 Test Mode - Limited Users</p>
+          <p className="text-blue-700">
+            As SuperAdmin, you can create up to <strong>5 test users</strong> before purchasing licenses. 
+            Currently: <strong>{filtered.length}/5 users</strong>. 
+            <span className="ml-1">Need more users? Purchase licenses in Billings & Subscriptions.</span>
+          </p>
+        </div>
       </div>
 
       <div className="mb-4">

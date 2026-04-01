@@ -1843,6 +1843,19 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       return c.json({ error: "Email, name and role are required" }, 400);
     }
     
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return c.json({ error: "Invalid email format" }, 400);
+    }
+    
+    // Check if user with this email already exists
+    const allEmployees = await kv.getByPrefix("employee:");
+    const existingUser = allEmployees.find((e: any) => e.email?.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      return c.json({ error: "A user with this email already exists" }, 400);
+    }
+    
     // CRITICAL FIX: Get company ID from super admin's employee record
     const adminProfile = await kv.get(`employee:${authUser.id}`);
     const userCompanyId = adminProfile?.companyId || adminProfile?.company;
@@ -1901,7 +1914,12 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     console.log('Purchased licenses:', purchasedLicenses);
     console.log('========================');
     
-    if (!subscription || subscriptionStatus !== 'active' || purchasedLicenses <= 0) {
+    // IMPORTANT: Allow SuperAdmin to create initial users even without subscription
+    // This is necessary for setting up the company and testing before purchasing
+    const isSuperAdmin = adminProfile?.role === 'superadmin';
+    const hasSubscription = subscription && subscriptionStatus === 'active' && purchasedLicenses > 0;
+    
+    if (!isSuperAdmin && !hasSubscription) {
       console.error('No active subscription for company:', userCompanyId, {
         hasCompany: !!company,
         hasSubscription: !!subscription,
@@ -1927,30 +1945,48 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
     const usedLicenses = companyStats.usedLicenses || company.usedLicenses || 1; // Fallback to company.usedLicenses
     
-    console.log('License check - Used:', usedLicenses, 'Purchased:', purchasedLicenses);
+    // For SuperAdmin without subscription: allow limited user creation for testing
+    let effectiveLicenseLimit = purchasedLicenses;
+    if (isSuperAdmin && !hasSubscription) {
+      // Allow SuperAdmin to create up to 5 users for testing without subscription
+      effectiveLicenseLimit = 5;
+      console.log('⚠️ SuperAdmin creating user without subscription - allowing up to 5 test users');
+    }
     
-    if (usedLicenses >= purchasedLicenses) {
+    console.log('License check - Used:', usedLicenses, 'Effective Limit:', effectiveLicenseLimit);
+    
+    if (usedLicenses >= effectiveLicenseLimit) {
       return c.json({ 
-        error: "No available licenses. Please purchase more licenses to add users.",
+        error: isSuperAdmin && !hasSubscription 
+          ? "Test user limit reached (5 users). Please purchase licenses to add more users."
+          : "No available licenses. Please purchase more licenses to add users.",
         needsLicenses: true,
         usedLicenses,
-        purchasedLicenses 
+        purchasedLicenses: effectiveLicenseLimit,
+        isTestMode: isSuperAdmin && !hasSubscription
       }, 403);
     }
     
     const tempPassword = generateTempPassword();
     const sb = supabaseAdmin();
     
-    let companyName = "";
-    if (companyId) companyName = await resolveCompanyName(companyId);
+    console.log('Creating user with email:', email, 'companyId:', userCompanyId, 'company:', company.name);
 
     const { data, error } = await sb.auth.admin.createUser({
-      email,
+      email: email.toLowerCase(), // Normalize email to lowercase
       password: tempPassword,
-      user_metadata: { name, role, companyId, company: companyName },
+      user_metadata: { 
+        name, 
+        role, 
+        companyId: userCompanyId, // Use the admin's company, not the body companyId
+        company: company.name 
+      },
       email_confirm: true,
     });
-    if (error) return c.json({ error: error.message }, 400);
+    if (error) {
+      console.error('Supabase auth.admin.createUser error:', error);
+      return c.json({ error: error.message }, 400);
+    }
     
     const userId = data.user.id;
     
