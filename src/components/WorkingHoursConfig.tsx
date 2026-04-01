@@ -23,8 +23,8 @@ const DEFAULT_DAYS: DayConfig[] = [
   { day: 'wednesday', label: 'Wednesday', enabled: true, startTime: '09:00', endTime: '17:00' },
   { day: 'thursday', label: 'Thursday', enabled: true, startTime: '09:00', endTime: '17:00' },
   { day: 'friday', label: 'Friday', enabled: true, startTime: '09:00', endTime: '17:00' },
-  { day: 'saturday', label: 'Saturday', enabled: false, startTime: '09:00', endTime: '13:00' },
-  { day: 'sunday', label: 'Sunday', enabled: false, startTime: '09:00', endTime: '13:00' },
+  { day: 'saturday', label: 'Saturday', enabled: true, startTime: '09:00', endTime: '17:00' },
+  { day: 'sunday', label: 'Sunday', enabled: true, startTime: '09:00', endTime: '17:00' },
 ];
 
 export function WorkingHoursConfig() {
@@ -32,8 +32,8 @@ export function WorkingHoursConfig() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [workingDays, setWorkingDays] = useState<DayConfig[]>(DEFAULT_DAYS);
-  const [blockWeekendsForLeaves, setBlockWeekendsForLeaves] = useState(true);
-  const [blockWeekendsForMeetings, setBlockWeekendsForMeetings] = useState(true);
+  const [blockWeekendsForLeaves, setBlockWeekendsForLeaves] = useState(false);
+  const [blockWeekendsForMeetings, setBlockWeekendsForMeetings] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -129,7 +129,7 @@ export function WorkingHoursConfig() {
             Working Days & Hours
           </CardTitle>
           <CardDescription>
-            Configure your company's working schedule. This affects leave calculations and meeting availability.
+            Configure your company's working schedule. By default, all 7 days are enabled as working days. Disable weekends if your company doesn't work on Saturday/Sunday.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

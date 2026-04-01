@@ -1828,7 +1828,25 @@ app.get(`${PREFIX}/company/working-hours`, async (c) => {
     }
     
     const config = await kv.get(`working_hours:${companyId}`);
-    return c.json(config || null);
+    
+    // Return defaults if no config exists
+    if (!config) {
+      return c.json({
+        workingDays: [
+          { day: 'monday', label: 'Monday', enabled: true, startTime: '09:00', endTime: '17:00' },
+          { day: 'tuesday', label: 'Tuesday', enabled: true, startTime: '09:00', endTime: '17:00' },
+          { day: 'wednesday', label: 'Wednesday', enabled: true, startTime: '09:00', endTime: '17:00' },
+          { day: 'thursday', label: 'Thursday', enabled: true, startTime: '09:00', endTime: '17:00' },
+          { day: 'friday', label: 'Friday', enabled: true, startTime: '09:00', endTime: '17:00' },
+          { day: 'saturday', label: 'Saturday', enabled: true, startTime: '09:00', endTime: '17:00' },
+          { day: 'sunday', label: 'Sunday', enabled: true, startTime: '09:00', endTime: '17:00' },
+        ],
+        blockWeekendsForLeaves: false,
+        blockWeekendsForMeetings: false,
+      });
+    }
+    
+    return c.json(config);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ error: e.message }, 500);
@@ -1861,8 +1879,8 @@ app.post(`${PREFIX}/company/working-hours`, async (c) => {
     const config = {
       companyId,
       workingDays,
-      blockWeekendsForLeaves: hasWeekendWork ? false : (blockWeekendsForLeaves ?? true),
-      blockWeekendsForMeetings: hasWeekendWork ? false : (blockWeekendsForMeetings ?? true),
+      blockWeekendsForLeaves: hasWeekendWork ? false : (blockWeekendsForLeaves ?? false),
+      blockWeekendsForMeetings: hasWeekendWork ? false : (blockWeekendsForMeetings ?? false),
       updatedAt: new Date().toISOString(),
       updatedBy: user.id,
     };
@@ -3804,7 +3822,21 @@ app.post(`${PREFIX}/meetings`, async (c) => {
     else { body.status = body.status || "scheduled"; }
     if (body.status === "scheduled") { const err = await validateMeetingSchedule(body); if (err) return c.json({ error: err }, 400); }
     const id = body.id || crypto.randomUUID();
-    const item = { ...body, id, createdBy: user.id, createdByName: kvData?.name || "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    
+    // CRITICAL FIX: Add company scope to meetings
+    const userCompanyId = kvData?.companyId || kvData?.company;
+    const company = userCompanyId ? await kv.get(`company_by_id:${userCompanyId}`) : null;
+    
+    const item = { 
+      ...body, 
+      id, 
+      createdBy: user.id, 
+      createdByName: kvData?.name || "", 
+      companyId: userCompanyId,
+      company: company?.name || userCompanyId,
+      createdAt: new Date().toISOString(), 
+      updatedAt: new Date().toISOString() 
+    };
     await kv.set(`meeting:${id}`, item);
     // Notify all participants (support both single participantId and participantIds array)
     const allParticipantIds = [...(body.participantIds || []), body.participantId].filter(Boolean);
