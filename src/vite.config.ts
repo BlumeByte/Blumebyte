@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: 'build',
     rollupOptions: {
       // Exclude supabase functions from the build
       external: [
