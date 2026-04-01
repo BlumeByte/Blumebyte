@@ -27,13 +27,28 @@
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "utils/**/*.ts",
+    "utils/**/*.tsx",
+    "routes/**/*.ts",
+    "routes/**/*.tsx",
+    "App.tsx",
+    "main.tsx",
+    "vite.config.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
+    "build",
+    ".vercel",
     "supabase",
+    ".supabase",
+    "**/supabase/**",
     "tests",
     "**/*.test.ts",
     "**/*.test.tsx",

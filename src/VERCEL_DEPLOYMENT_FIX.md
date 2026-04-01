@@ -7,19 +7,19 @@ Vercel deployment was failing with error:
 npm error Invalid package name "node:crypto" of package "node:crypto@*"
 ```
 
-**Root Cause**: Vercel's build process was trying to analyze server-side Deno code (Supabase Edge Functions) which uses Node.js built-in module imports with the `node:` prefix. These should NOT be processed by Vercel since they're deployed separately to Supabase.
+**Root Cause**: The `.vercelignore` file was NOT actually created in the repository! Without it, Vercel was analyzing the `supabase/` directory which contains Deno code with `node:crypto` imports. These should NOT be processed by Vercel since they're deployed separately to Supabase.
 
 ---
 
 ## ✅ Solution Applied
 
-### 1. Created `.vercelignore`
-Explicitly excludes server-side code from Vercel builds:
+### 1. Created `.vercelignore` (THE CRITICAL FIX)
 ```
-supabase/
-.supabase/
-**/supabase/functions/**
+supabase
+.supabase
 ```
+
+**This simple file tells Vercel to completely ignore the server-side code!**
 
 ### 2. Updated `vercel.json`
 ```json
