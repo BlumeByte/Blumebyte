@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Alert, AlertDescription } from './ui/alert';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../lib/auth-context';
 
 interface ChatMessage {
