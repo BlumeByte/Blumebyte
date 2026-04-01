@@ -7,6 +7,7 @@ import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
 import { performProductionCleanup } from "./production-cleanup.tsx";
 import { migrateCompanyKeys } from "./migration-company-keys.tsx";
+import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-stats.tsx";
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
@@ -31,6 +32,41 @@ app.get(`${PREFIX}/health`, (c) => {
     version: '2.1-payment-flow-UPDATED',
     endpoints: ['company/init-payment', 'company/payment-status/:reference', 'company/test-payment']
   });
+});
+
+// Sync company stats endpoint (SuperAdmin only)
+app.post(`${PREFIX}/admin/sync-company-stats`, async (c) => {
+  try {
+    const authUser = await getAuthUser(c);
+    if (!authUser) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    const employeeRecord = await kv.get(`employee:${authUser.id}`);
+    const companyId = employeeRecord?.companyId || employeeRecord?.company;
+    
+    // Sync stats for the current company
+    if (companyId) {
+      const stats = await recalculateCompanyStats(companyId);
+      return c.json({ success: true, stats });
+    }
+    
+    return c.json({ error: 'Company not found' }, 404);
+  } catch (e: any) {
+    console.error('Error syncing company stats:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Sync all companies stats endpoint (debugging - can be called without auth for now)
+app.post(`${PREFIX}/admin/sync-all-stats`, async (c) => {
+  try {
+    const results = await syncAllCompaniesStats();
+    return c.json({ success: true, results });
+  } catch (e: any) {
+    console.error('Error syncing all stats:', e);
+    return c.json({ error: e.message }, 500);
+  }
 });
 
 // Simple test endpoint for payment flow
@@ -1780,6 +1816,81 @@ app.put(`${PREFIX}/admin/company-settings`, async (c) => {
   }
 });
 
+// ============ WORKING HOURS CONFIGURATION ============
+app.get(`${PREFIX}/company/working-hours`, async (c) => {
+  try {
+    const { user } = await requireAuth(c);
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    
+    if (!companyId) {
+      return c.json({ error: 'Company not found' }, 404);
+    }
+    
+    const config = await kv.get(`working_hours:${companyId}`);
+    return c.json(config || null);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/company/working-hours`, async (c) => {
+  try {
+    const { user, role } = await requireSuperAdmin(c);
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    
+    if (!companyId) {
+      return c.json({ error: 'Company not found' }, 404);
+    }
+    
+    const body = await c.req.json();
+    const { workingDays, blockWeekendsForLeaves, blockWeekendsForMeetings } = body;
+    
+    // Validate workingDays
+    if (!Array.isArray(workingDays) || workingDays.length !== 7) {
+      return c.json({ error: 'Invalid working days configuration' }, 400);
+    }
+    
+    // Check if weekends are working days
+    const hasWeekendWork = workingDays.some((d: any) => 
+      (d.day === 'saturday' || d.day === 'sunday') && d.enabled
+    );
+    
+    const config = {
+      companyId,
+      workingDays,
+      blockWeekendsForLeaves: hasWeekendWork ? false : (blockWeekendsForLeaves ?? true),
+      blockWeekendsForMeetings: hasWeekendWork ? false : (blockWeekendsForMeetings ?? true),
+      updatedAt: new Date().toISOString(),
+      updatedBy: user.id,
+    };
+    
+    await kv.set(`working_hours:${companyId}`, config);
+    
+    await logAudit({
+      userId: user.id,
+      userName: user.email || 'Unknown',
+      action: 'UPDATE',
+      resourceType: 'working-hours-config',
+      resourceId: companyId,
+      details: { 
+        enabledDays: workingDays.filter((d: any) => d.enabled).map((d: any) => d.day),
+        blockWeekendsForLeaves: config.blockWeekendsForLeaves,
+        blockWeekendsForMeetings: config.blockWeekendsForMeetings,
+      },
+    });
+    
+    return c.json({ success: true, config });
+  } catch (e: any) {
+    console.error('Error saving working hours:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // ============ REFERENCE DATA (aggregated for dashboards) ============
 app.get(`${PREFIX}/reference-data`, async (c) => {
   try {
@@ -2013,6 +2124,15 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     });
     if (error) {
       console.error('Supabase auth.admin.createUser error:', error);
+      
+      // Provide clear message for duplicate email
+      if (error.message.includes('already registered') || error.message.includes('already exists')) {
+        return c.json({ 
+          error: `Email ${email} is already in use. If this user was recently deleted, please wait a moment and try again.`,
+          alreadyExists: true
+        }, 400);
+      }
+      
       return c.json({ error: error.message }, 400);
     }
     
@@ -2044,14 +2164,23 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     await kv.set(`employee:${userId}`, userProfile);
     await kv.set(`company_users:${userCompanyId}:${userId}`, userProfile);
     
-    // Update company stats
+    // Update company stats - immediate update for quick response
     await kv.set(`company_stats:${userCompanyId}`, {
       ...companyStats,
       totalEmployees: (companyStats.totalEmployees || 0) + 1,
       activeEmployees: (companyStats.activeEmployees || 0) + 1,
       usedLicenses: usedLicenses + 1,
       availableLicenses: purchasedLicenses - (usedLicenses + 1),
+      lastUpdated: new Date().toISOString(),
     });
+    
+    // Recalculate stats from actual data to ensure accuracy
+    try {
+      await recalculateCompanyStats(userCompanyId);
+    } catch (syncError) {
+      console.error('Error syncing company stats after user creation:', syncError);
+      // Don't fail the user creation if stats sync fails
+    }
     // Broadcast: new user joined (ONLY to same company employees)
     const allEmps = await kv.getByPrefix("employee:");
     const companyEmps = allEmps.filter((emp: any) => (emp.companyId === userCompanyId || emp.company === userCompanyId));
@@ -2832,19 +2961,77 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
     const { user: caller } = await requireSuperAdmin(c);
     const userId = c.req.param("userId");
     const target = await kv.get(`employee:${userId}`);
+    
+    if (!target) {
+      return c.json({ error: "User not found" }, 404);
+    }
+    
     const targetName = target?.name || "Unknown User";
+    const targetEmail = target?.email || "";
     const targetRole = target?.role || "employee";
     const targetCompany = target?.companyId || target?.company;
+    
     // Only a superadmin can delete their own superadmin account; no one can delete another superadmin
-    if (targetRole === "superadmin" && userId !== caller.id) return c.json({ error: "Cannot delete another superadmin account" }, 403);
+    if (targetRole === "superadmin" && userId !== caller.id) {
+      return c.json({ error: "Cannot delete another superadmin account" }, 403);
+    }
+    
     // CRITICAL: Verify target belongs to caller's company
     const callerScope = await resolveCompanyScope(caller.id);
     if (callerScope?.length && targetCompany && !callerScope.includes(targetCompany)) {
       return c.json({ error: "Cannot delete user from another company" }, 403);
     }
-    await kv.del(`employee:${userId}`);
+    
+    console.log(`🗑️ Deleting user: ${targetEmail} (${userId})`);
+    
+    // Delete from Supabase Auth first (this allows email reuse)
     const sb = supabaseAdmin();
-    await sb.auth.admin.deleteUser(userId);
+    try {
+      await sb.auth.admin.deleteUser(userId);
+      console.log(`✅ Deleted from Supabase Auth: ${targetEmail}`);
+    } catch (authError: any) {
+      console.error(`Error deleting from Supabase Auth:`, authError);
+      // Continue with KV deletion even if auth deletion fails
+    }
+    
+    // Delete all related records
+    await kv.del(`employee:${userId}`);
+    await kv.del(`user_profile:${userId}`);
+    if (targetCompany) {
+      await kv.del(`company_users:${targetCompany}:${userId}`);
+    }
+    
+    // Delete user's notifications
+    const userNotifications = await kv.getByPrefix(`notification:`);
+    const userNots = userNotifications.filter((n: any) => n.userId === userId);
+    for (const not of userNots) {
+      await kv.del(`notification:${not.id}`);
+    }
+    
+    // Recalculate company stats
+    if (targetCompany) {
+      try {
+        await recalculateCompanyStats(targetCompany);
+        console.log(`✅ Company stats recalculated after deleting ${targetEmail}`);
+      } catch (statsError) {
+        console.error('Error recalculating stats after deletion:', statsError);
+      }
+    }
+    
+    // Log the deletion
+    await logAudit({
+      userId: caller.id,
+      userName: caller.email || 'Unknown',
+      action: 'DELETE',
+      resourceType: 'user',
+      resourceId: userId,
+      details: { 
+        deletedUserEmail: targetEmail,
+        deletedUserName: targetName,
+        deletedUserRole: targetRole,
+      },
+    });
+    
     // CRITICAL: Only notify same-company employees
     const allEmployees = await kv.getByPrefix("employee:");
     const companyEmps = targetCompany ? allEmployees.filter((e: any) => e.companyId === targetCompany || e.company === targetCompany) : [];
@@ -2856,7 +3043,9 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
         read: false, createdAt: new Date().toISOString(),
       });
     }
-    return c.json({ success: true });
+    
+    console.log(`✅ User deletion complete: ${targetEmail}`);
+    return c.json({ success: true, message: `User ${targetEmail} has been permanently deleted. Email can now be reused.` });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
@@ -2865,41 +3054,13 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
   }
 });
 
-// Superadmin delete user (alias)
+// Superadmin delete user (alias - forwards to main delete endpoint)
 app.delete(`${PREFIX}/superadmin/users/:userId`, async (c) => {
-  try {
-    const { user: caller } = await requireSuperAdmin(c);
-    const userId = c.req.param("userId");
-    const target = await kv.get(`employee:${userId}`);
-    const targetName = target?.name || "Unknown User";
-    const targetRole = target?.role || "employee";
-    const targetCompany = target?.companyId || target?.company;
-    if (targetRole === "superadmin" && userId !== caller.id) return c.json({ error: "Cannot delete another superadmin account" }, 403);
-    // CRITICAL: Verify target belongs to caller's company
-    const callerScope = await resolveCompanyScope(caller.id);
-    if (callerScope?.length && targetCompany && !callerScope.includes(targetCompany)) {
-      return c.json({ error: "Cannot delete user from another company" }, 403);
-    }
-    await kv.del(`employee:${userId}`);
-    const sb = supabaseAdmin();
-    await sb.auth.admin.deleteUser(userId);
-    // CRITICAL: Only notify same-company employees
-    const allEmployees = await kv.getByPrefix("employee:");
-    const companyEmps = targetCompany ? allEmployees.filter((e: any) => e.companyId === targetCompany || e.company === targetCompany) : [];
-    for (const emp of companyEmps) {
-      const nid = crypto.randomUUID();
-      await kv.set(`notification:${nid}`, {
-        id: nid, userId: emp.userId || emp.id, type: "user-removed",
-        title: "Team Update", message: `${targetName} (${targetRole}) has been removed from the organization.`,
-        read: false, createdAt: new Date().toISOString(),
-      });
-    }
-    return c.json({ success: true });
-  } catch (e: any) {
-    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    return c.json({ error: e.message }, 500);
-  }
+  // Reuse the main delete endpoint logic
+  return app.request(`${PREFIX}/users/${c.req.param("userId")}`, {
+    method: 'DELETE',
+    headers: c.req.raw.headers,
+  });
 });
 
 // ============ DELETION REQUESTS (Admin/Manager request, SuperAdmin approves) ============

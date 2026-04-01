@@ -45,6 +45,7 @@ import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { AuditLogsModule } from './AuditLogsModule';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { LicenseManagement } from './LicenseManagement';
+import { WorkingHoursConfig } from './WorkingHoursConfig';
 import { ClientOnlyChart } from './ClientOnlyChart';
 import { CompensationModule } from './CompensationModule';
 import { PayGradesModule } from './PayGradesModule';
@@ -453,7 +454,15 @@ export function SuperAdminDashboard() {
       case 'recruitment': return <RecruitmentView />;
       case 'automation': return <div className="p-8"><AutomationModule companyId={user?.companyId || ''} /></div>;
       case 'profile-requests': return <ProfileChangeRequests />;
-      case 'billings-subscriptions': return <div className="p-8"><LicenseManagement /></div>;
+      case 'billings-subscriptions': return (
+        <div className="p-8 space-y-8">
+          <LicenseManagement />
+          <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">Working Hours Configuration</h2>
+            <WorkingHoursConfig />
+          </div>
+        </div>
+      );
       default:
         if (ENTITY_CONFIGS[activeSection]) {
           return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} />;

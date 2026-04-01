@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono';
 import * as kv from './kv_store.tsx';
 import { usdToPaystackAmount, getPaystackCurrency } from './currency-utils.tsx';
+import { recalculateCompanyStats } from './sync-company-stats.tsx';
 
 const PREFIX = '/make-server-668731fc';
 
@@ -160,10 +161,21 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const subscription = await kv.get(`subscription:${user.id}`);
       const company = await kv.get(`company:${companyId}`);
       
-      // Count used licenses (filtered by company)
+      // Recalculate company stats to ensure accuracy
+      try {
+        await recalculateCompanyStats(companyId);
+      } catch (syncError) {
+        console.error('Error syncing stats in license-info:', syncError);
+        // Continue even if sync fails
+      }
+      
+      // Get updated stats
+      const stats = await kv.get(`company_stats:${companyId}`) || {};
+      
+      // Count used licenses (filtered by company) - fallback if stats not available
       const allUsers = await kv.getByPrefix('employee:');
       const companyUsers = allUsers.filter((u: any) => u.companyId === companyId || u.company === companyId);
-      const usedLicenses = companyUsers.length;
+      const usedLicenses = stats.usedLicenses || companyUsers.length;
       
       // Get purchased licenses from subscription OR company record
       const purchasedLicenses = subscription?.purchasedLicenses || company?.licenses || 0;
