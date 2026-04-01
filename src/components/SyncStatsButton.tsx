@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner@2.0.3';
 import { RefreshCw, CheckCircle } from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
-import { api } from '../lib/api';
+import { api } from '../lib/api-client';
 
 export function SyncStatsButton() {
   const { accessToken } = useAuth();
