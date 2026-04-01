@@ -3036,12 +3036,14 @@ function UserManagementView() {
       if (e.message && e.message.includes('already exists')) {
         toast.error('⚠️ A user with this email already exists. Please use a different email address.');
       } else if (e.needsSubscription) {
-        toast.error('⚠️ No active subscription. As SuperAdmin, you can create up to 5 test users before purchasing licenses.');
+        toast.error('⚠️ No active subscription. You can create up to 5 users before purchasing licenses.');
       } else if (e.needsLicenses) {
+        const usedCount = e.usedLicenses || 0;
+        const purchasedCount = e.purchasedLicenses || 0;
         if (e.isTestMode) {
-          toast.error('⚠️ Test user limit reached (5 users). Please purchase licenses to add more users.');
+          toast.error(`⚠️ User limit reached. You have used all ${purchasedCount} available users. Please purchase licenses to add more users.`);
         } else {
-          toast.error(`⚠️ No available licenses. You've used ${e.usedLicenses}/${e.purchasedLicenses} licenses. Please purchase more to add users.`);
+          toast.error(`⚠️ No available licenses. You have used ${usedCount} of ${purchasedCount} licenses. Please purchase more to add users.`);
         }
       } else if (e.message && e.message.includes('Invalid email')) {
         toast.error('⚠️ Invalid email format. Please enter a valid email address.');
@@ -3080,18 +3082,20 @@ function UserManagementView() {
         <Button onClick={() => { setEditUser(null); setFormData({ role: 'employee', departments: [], department: '' }); setShowTempPw(false); setDialogOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Create User</Button>
       </div>
 
-      {/* Info banner for SuperAdmin about test users */}
-      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div className="text-sm text-blue-900">
-          <p className="font-medium mb-1">💡 Test Mode - Limited Users</p>
-          <p className="text-blue-700">
-            As SuperAdmin, you can create up to <strong>5 test users</strong> before purchasing licenses. 
-            Currently: <strong>{filtered.length}/5 users</strong>. 
-            <span className="ml-1">Need more users? Purchase licenses in Billings & Subscriptions.</span>
-          </p>
+      {/* Info banner for license status */}
+      {licenseInfo && licenseInfo.purchasedLicenses === 0 && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-amber-900">
+            <p className="font-medium mb-1">⚠️ No Active Licenses</p>
+            <p className="text-amber-700">
+              You can create up to <strong>5 users</strong> before purchasing licenses. 
+              Currently: <strong>{filtered.length}/5 users</strong>. 
+              <span className="ml-1">Need more users? Purchase licenses in Billings & Subscriptions.</span>
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mb-4">
         <div className="relative max-w-sm">

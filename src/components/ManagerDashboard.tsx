@@ -92,17 +92,27 @@ function TeamTab() {
     setSaving(true);
     try {
       if (editUser) {
-        // Managers can only edit employees in their assigned departments
+        // Managers can only submit edit requests - they cannot make direct changes
         const userDepts = editUser.departments || (editUser.department ? [editUser.department] : []);
         const hasAccess = currentUserDepartments.some((dept: string) => userDepts.includes(dept));
         
         if (!hasAccess) {
-          toast.error('You can only edit employees in your assigned departments');
+          toast.error('You can only request edits for employees in your assigned departments');
           setSaving(false);
           return;
         }
-        await api(`/users/${editUser.userId || editUser.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
-        toast.success('Updated'); 
+        
+        // Submit a request for approval instead of direct edit
+        await api('/manager/request-user-update', { 
+          method: 'POST', 
+          body: JSON.stringify({ 
+            userId: editUser.userId || editUser.id,
+            updates: formData,
+            reason: 'Manager employee update request'
+          }), 
+          token: accessToken 
+        });
+        toast.success('Update request sent to Admin for approval'); 
         setDialogOpen(false);
         load();
       }
@@ -164,12 +174,12 @@ function TeamTab() {
 
   return (
     <div className="space-y-4">
-      {/* Managers cannot add employees - only Admin and SuperAdmin can */}
+      {/* Managers can only view and request changes - not add or delete */}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium">Department Team Members ({filteredAndSorted.length} employees)</p>
-            <p className="text-xs text-blue-600 mt-1">You can edit employees in your department. Contact an Admin to add new employees.</p>
+            <p className="text-xs text-blue-600 mt-1">As a Manager, you can view team members and submit edit requests. Only Admins can add or remove employees.</p>
           </div>
         </div>
       </div>

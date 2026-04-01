@@ -1919,6 +1919,18 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     const isSuperAdmin = adminProfile?.role === 'superadmin';
     const hasSubscription = subscription && subscriptionStatus === 'active' && purchasedLicenses > 0;
     
+    // Check role-based permissions
+    const isAdmin = adminProfile?.role === 'admin';
+    const isManager = adminProfile?.role === 'manager';
+    
+    // Managers cannot add users - only SuperAdmin and Admin
+    if (isManager) {
+      return c.json({ 
+        error: "Managers do not have permission to add employees. Please contact your Admin.",
+        forbidden: true
+      }, 403);
+    }
+    
     if (!isSuperAdmin && !hasSubscription) {
       console.error('No active subscription for company:', userCompanyId, {
         hasCompany: !!company,
@@ -1945,25 +1957,41 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     const companyStats = await kv.get(`company_stats:${userCompanyId}`) || {};
     const usedLicenses = companyStats.usedLicenses || company.usedLicenses || 1; // Fallback to company.usedLicenses
     
-    // For SuperAdmin without subscription: allow limited user creation for testing
+    // Determine license limit based on role and subscription
     let effectiveLicenseLimit = purchasedLicenses;
+    let isTestMode = false;
+    
     if (isSuperAdmin && !hasSubscription) {
-      // Allow SuperAdmin to create up to 5 users for testing without subscription
+      // SuperAdmin without subscription can create up to 5 users for testing
       effectiveLicenseLimit = 5;
-      console.log('⚠️ SuperAdmin creating user without subscription - allowing up to 5 test users');
+      isTestMode = true;
+      console.log('⚠️ SuperAdmin creating user without subscription - allowing up to 5 users');
+    } else if (isAdmin && !isSuperAdmin) {
+      // Admin must have available licenses - no test mode
+      if (usedLicenses >= purchasedLicenses) {
+        return c.json({ 
+          error: `No available licenses. You have used ${usedLicenses} of ${purchasedLicenses} licenses. Please contact your SuperAdmin to purchase more licenses.`,
+          needsLicenses: true,
+          usedLicenses,
+          purchasedLicenses,
+          isAdmin: true
+        }, 403);
+      }
     }
     
-    console.log('License check - Used:', usedLicenses, 'Effective Limit:', effectiveLicenseLimit);
+    console.log('License check - Used:', usedLicenses, 'Effective Limit:', effectiveLicenseLimit, 'Limited Mode:', isTestMode);
     
     if (usedLicenses >= effectiveLicenseLimit) {
+      const message = isTestMode 
+        ? `User limit reached. You have used all ${effectiveLicenseLimit} available test users. Please purchase licenses to add more users.`
+        : `No available licenses. You have used ${usedLicenses} of ${purchasedLicenses} licenses. Please purchase more licenses to add users.`;
+        
       return c.json({ 
-        error: isSuperAdmin && !hasSubscription 
-          ? "Test user limit reached (5 users). Please purchase licenses to add more users."
-          : "No available licenses. Please purchase more licenses to add users.",
+        error: message,
         needsLicenses: true,
         usedLicenses,
         purchasedLicenses: effectiveLicenseLimit,
-        isTestMode: isSuperAdmin && !hasSubscription
+        isTestMode
       }, 403);
     }
     
@@ -2052,6 +2080,57 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
         licensesAvailable: purchasedLicenses - usedLicenses - 1
       },
     });
+    
+    // Send welcome email with temporary password
+    try {
+      const emailApiKey = Deno.env.get('RESEND_API_KEY');
+      if (emailApiKey) {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${emailApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'Blumebyte HR <noreply@blumebyte.com>',
+            to: email,
+            subject: `Welcome to ${company.name} - Your Account Details`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #000;">Welcome to ${company.name}!</h2>
+                <p>Hello ${name},</p>
+                <p>Your account has been created in the Blumebyte HR system. Here are your login credentials:</p>
+                <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+                  <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background-color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 16px;">${tempPassword}</code></p>
+                  <p style="margin: 5px 0;"><strong>Role:</strong> ${role}</p>
+                </div>
+                <p><strong>Important:</strong> For security reasons, you will be required to change your password after your first login.</p>
+                <p>Please keep this information secure and do not share your password with anyone.</p>
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5;">
+                  <p style="color: #666; font-size: 14px;">If you have any questions, please contact your HR administrator.</p>
+                  <p style="color: #666; font-size: 14px;">Best regards,<br/>The ${company.name} Team</p>
+                </div>
+              </div>
+            `,
+          }),
+        });
+        console.log(`✅ Welcome email sent to ${email} with temporary password`);
+      } else {
+        // Fallback: Log to console for development
+        console.log(`\n${'='.repeat(80)}`);
+        console.log(`📨 NEW USER CREDENTIALS FOR: ${email}`);
+        console.log(`Name: ${name}`);
+        console.log(`Role: ${role}`);
+        console.log(`Temporary Password: ${tempPassword}`);
+        console.log(`Company: ${company.name}`);
+        console.log(`⚠️  User must change password on first login`);
+        console.log(`${'='.repeat(80)}\n`);
+      }
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail the user creation if email fails
+    }
     
     return c.json({ success: true, userId, tempPassword });
   } catch (e: any) {
@@ -2468,6 +2547,49 @@ app.post(`${PREFIX}/admin/request-user-update`, async (c) => {
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     console.log('request-user-update error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Manager requests to update a user (similar to admin but for managers)
+app.post(`${PREFIX}/manager/request-user-update`, async (c) => {
+  try {
+    const { user: managerUser, role } = await requireManagerOrAbove(c);
+    if (role !== 'manager') {
+      return c.json({ error: 'This endpoint is for Managers only. Admins should use /admin/request-user-update' }, 400);
+    }
+    
+    const { userId, updates, reason } = await c.req.json();
+    const requestId = `approval_req:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    
+    const existingUser = await kv.get(`employee:${userId}`);
+    if (!existingUser) return c.json({ error: 'User not found' }, 404);
+    
+    // Get manager's company for scoping
+    const managerProfile = await kv.get(`employee:${managerUser.id}`);
+    const companyId = managerProfile?.companyId || managerProfile?.company;
+    
+    const approvalRequest = {
+      id: requestId,
+      type: 'user_update',
+      requestedBy: managerUser.id,
+      requestedByName: managerProfile?.name || 'Manager',
+      requestedByRole: 'manager',
+      userId,
+      userName: existingUser.name,
+      updates,
+      reason: reason || 'Manager user update request',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      companyId,
+      company: companyId,
+    };
+    
+    await kv.set(requestId, approvalRequest);
+    return c.json({ success: true, requestId, message: 'Update request sent to Admin for approval' });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    console.log('manager request-user-update error:', e);
     return c.json({ error: e.message }, 500);
   }
 });

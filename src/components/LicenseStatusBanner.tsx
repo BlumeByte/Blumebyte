@@ -79,7 +79,7 @@ export function LicenseStatusBanner() {
         <AlertDescription className="mt-2">
           <div className="space-y-3">
             <p>
-              You have <strong className="text-red-700">{licenseInfo.usedLicenses} of {licenseInfo.purchasedLicenses}</strong> licenses in use.
+              You have <strong className="text-red-700">{licenseInfo.usedLicenses || 0} of {licenseInfo.purchasedLicenses || 0}</strong> licenses in use.
               You cannot add new users until you purchase more licenses.
             </p>
             <div className="flex gap-2">

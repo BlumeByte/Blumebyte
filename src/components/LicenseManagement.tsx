@@ -513,15 +513,15 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Purchased</p>
-                <p className="text-2xl font-bold text-blue-600">{licenseInfo.purchasedLicenses}</p>
+                <p className="text-2xl font-bold text-blue-600">{licenseInfo.purchasedLicenses || 0}</p>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Used</p>
-                <p className="text-2xl font-bold text-green-600">{licenseInfo.usedLicenses}</p>
+                <p className="text-2xl font-bold text-green-600">{licenseInfo.usedLicenses || 0}</p>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Available</p>
-                <p className="text-2xl font-bold text-purple-600">{licenseInfo.availableLicenses}</p>
+                <p className="text-2xl font-bold text-purple-600">{licenseInfo.availableLicenses || 0}</p>
               </div>
             </div>
 

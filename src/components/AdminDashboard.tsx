@@ -646,8 +646,20 @@ function AdminUsers() {
           toast.success('Employee created');
         }
       }
-      load();
-    } catch (e: any) { toast.error(e.message); }
+      await load();
+    } catch (e: any) { 
+      if (e.needsLicenses) {
+        const usedCount = e.usedLicenses || 0;
+        const purchasedCount = e.purchasedLicenses || 0;
+        if (e.isAdmin) {
+          toast.error(`No available licenses. You have used ${usedCount} of ${purchasedCount} licenses. Please contact your SuperAdmin to purchase more licenses.`);
+        } else {
+          toast.error(`No available licenses. You have used ${usedCount} of ${purchasedCount} licenses. Please purchase more licenses to add users.`);
+        }
+      } else {
+        toast.error(e.message || 'An error occurred');
+      }
+    }
     setSaving(false);
   };
 
