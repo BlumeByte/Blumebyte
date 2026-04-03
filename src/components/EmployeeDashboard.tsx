@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
+import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -71,7 +72,7 @@ export function EmployeeDashboard() {
         {/* License Status Alert for Non-SuperAdmin Users */}
         <UserLicenseAlert />
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); scrollToTop(); }} className="space-y-6">
           <TabsList className="flex flex-wrap gap-1 w-full max-w-5xl h-auto">
             <TabsTrigger value="overview"><LayoutDashboard className="w-4 h-4 mr-1" />Overview</TabsTrigger>
             <TabsTrigger value="profile"><User className="w-4 h-4 mr-1" />Profile</TabsTrigger>

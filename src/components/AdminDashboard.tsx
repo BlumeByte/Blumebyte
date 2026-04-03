@@ -32,6 +32,7 @@ import { ReportsPanel } from './ReportsPanel';
 import { MeetingsPanel } from './MeetingsPanel';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
+import { scrollToTop } from '../lib/navigation-utils';
 import { AuditLogsModule } from './AuditLogsModule';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { UserLicenseAlert } from './LicenseStatusBanner';
@@ -130,7 +131,7 @@ export function AdminDashboard() {
               const Icon = t.icon;
               const active = activeTab === t.id;
               return (
-                <button key={t.id} onClick={() => setActiveTab(t.id)}
+                <button key={t.id} onClick={() => { setActiveTab(t.id); scrollToTop(); }}
                   title={collapsed ? t.label : undefined}
                   className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-gray-500 hover:bg-gray-50'}`}
                   style={active ? { backgroundColor: branding.primaryColor + '15', color: branding.primaryColor } : undefined}>
@@ -2056,7 +2057,13 @@ function AdminSettings() {
 
   const handleSave = async () => {
     setSaving(true);
-    try { await api('/admin/company-settings', { method: 'PUT', body: JSON.stringify(settings), token: accessToken }); toast.success('Settings saved'); refreshBranding(); }
+    try { 
+      await api('/admin/company-settings', { method: 'PUT', body: JSON.stringify(settings), token: accessToken }); 
+      toast.success('Settings saved'); 
+      refreshBranding();
+      // Dispatch custom event to notify all components
+      window.dispatchEvent(new Event('branding-updated'));
+    }
     catch (e: any) { toast.error(e.message); }
     setSaving(false);
   };
@@ -2133,6 +2140,8 @@ function AdminSettings() {
       toast.success('Company logo updated');
       setSettings((prev: any) => ({ ...prev, logoUrl: res.logoUrl }));
       refreshBranding();
+      // Dispatch custom event to notify all components
+      window.dispatchEvent(new Event('branding-updated'));
       setCropDialogOpen(false);
       setCropImageSrc(null);
     } catch (err: any) {
@@ -2151,6 +2160,8 @@ function AdminSettings() {
       toast.success('Company logo removed');
       setSettings((prev: any) => ({ ...prev, logoUrl: '' }));
       refreshBranding();
+      // Dispatch custom event to notify all components
+      window.dispatchEvent(new Event('branding-updated'));
     } catch (err: any) { toast.error(err.message || 'Failed to remove logo'); }
     setRemovingLogo(false);
   };

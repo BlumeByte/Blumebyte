@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
+import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -504,7 +505,7 @@ export function SuperAdminDashboard() {
                     const Icon = item.icon;
                     const active = activeSection === item.id;
                     return (
-                      <button key={item.id} onClick={() => setActiveSection(item.id)}
+                      <button key={item.id} onClick={() => { setActiveSection(item.id); scrollToTop(); }}
                         title={collapsed ? item.label : undefined}
                         className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
                         style={active ? { backgroundColor: branding.primaryColor + '15', color: branding.primaryColor } : undefined}>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
+import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -455,6 +455,7 @@ export function ManagerDashboard() {
 
   const handleNavigation = (section: string) => {
     setActiveTab(section);
+    scrollToTop();
   };
 
   return (

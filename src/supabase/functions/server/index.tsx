@@ -1450,14 +1450,26 @@ app.get(`${PREFIX}/users/for-messages`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     const allEmployees = await kv.getByPrefix("employee:");
-    // CRITICAL: Apply company filtering for multi-tenant isolation
-    const filtered = await filterEmployeesByCompany(allEmployees, user.id, role);
+    
+    // CRITICAL FIX: SuperAdmins can see ALL users across ALL companies for messaging
+    let filtered;
+    if (role === 'SuperAdmin') {
+      // SuperAdmins can message anyone across all companies
+      filtered = allEmployees;
+      console.log(`SuperAdmin ${user.id} accessing all users for messaging: ${filtered.length} users`);
+    } else {
+      // Apply company filtering for multi-tenant isolation
+      filtered = await filterEmployeesByCompany(allEmployees, user.id, role);
+      console.log(`User ${user.id} accessing company-scoped users for messaging: ${filtered.length} users`);
+    }
+    
     const result = filtered
       .filter((e: any) => e.userId !== user.id)
       .map((e: any) => ({
         userId: e.userId, id: e.userId, name: e.name,
         role: e.role, department: e.department || "", position: e.position || "",
         profileImageUrl: e.profileImageUrl || "",
+        company: e.company || e.companyId || "",
       }));
     return c.json(result);
   } catch (e: any) {
@@ -4388,6 +4400,42 @@ app.post(`${PREFIX}/attendance/auto-clock-out`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     console.log("Auto clock-out error:", e.message);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Session logout report endpoint - sends notification to SuperAdmins and Admins
+app.post(`${PREFIX}/session/logout-report`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, userName, email, loginTime, logoutTime, wasAutoClockedOut, logoutType } = body;
+    
+    // Get all SuperAdmins and Admins to notify
+    const allEmployees = await kv.getByPrefix("employee:");
+    const adminsAndSuperAdmins = allEmployees.filter((e: any) => 
+      e.role === 'SuperAdmin' || e.role === 'Admin'
+    );
+    
+    // Create notifications for each admin
+    for (const admin of adminsAndSuperAdmins) {
+      const nid = crypto.randomUUID();
+      await kv.set(`notification:${nid}`, {
+        id: nid,
+        userId: admin.userId,
+        type: "session",
+        title: "User Session Ended",
+        message: `${userName} (${email}) logged out at ${new Date(logoutTime).toLocaleString()}. Login: ${new Date(loginTime).toLocaleString()}${wasAutoClockedOut ? ' - Auto clocked out' : ''}`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    
+    // Log the session end
+    console.log(`Session ended for ${userName} (${userId}): ${logoutType}, Auto clock-out: ${wasAutoClockedOut}`);
+    
+    return c.json({ success: true });
+  } catch (e: any) {
+    console.log("Logout report error:", e.message);
     return c.json({ error: e.message }, 500);
   }
 });

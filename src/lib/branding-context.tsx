@@ -70,7 +70,18 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     if (!token) return; // Don't poll if not logged in
     
     const iv = setInterval(fetchBranding, 60000); // Reduced from 15s to 60s
-    return () => clearInterval(iv);
+    
+    // Listen for custom branding update event
+    const handleBrandingUpdate = () => {
+      console.log('Branding update event received, refreshing...');
+      fetchBranding();
+    };
+    window.addEventListener('branding-updated', handleBrandingUpdate);
+    
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener('branding-updated', handleBrandingUpdate);
+    };
   }, [fetchBranding]);
 
   return (

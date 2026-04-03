@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
-import { ChevronDown, BarChart3, FileText, Clock, DollarSign, Trophy, Award, UserCheck, Users, Heart, Building2, GraduationCap, Briefcase, Zap, Sparkles, Globe, Target, Shield, Briefcase as BriefcaseIcon, Book, Calendar, Video, FileCheck } from 'lucide-react';
+import { ChevronDown, BarChart3, FileText, Clock, DollarSign, Trophy, Award, UserCheck, Users, Heart, Building2, GraduationCap, Briefcase, Zap, Sparkles, Globe, Target, Shield, Briefcase as BriefcaseIcon, Book, Calendar, Video, FileCheck, Menu, X } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from './ui/sheet';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export function SharedNavigation() {
   const navigate = useNavigate();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [closeTimeout, setCloseTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -188,7 +191,8 @@ export function SharedNavigation() {
             </div>
           </div>
           
-          <div className="flex gap-3">
+          {/* Desktop Auth Buttons */}
+          <div className="hidden md:flex gap-3">
             <Button variant="ghost" onClick={() => navigate('/login')}>
               Sign In
             </Button>
@@ -196,6 +200,147 @@ export function SharedNavigation() {
               Get Started
             </Button>
           </div>
+
+          {/* Mobile Menu Button */}
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="icon">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[400px] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>
+                  <img src={logoImage} alt="Blumebyte" className="h-8" />
+                </SheetTitle>
+              </SheetHeader>
+              
+              <div className="mt-6 space-y-4">
+                {/* Mobile Menu Content */}
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="platform">
+                    <AccordionTrigger className="text-sm font-medium">Our Platform</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 pl-2">
+                        {platformMenu.map((section, idx) => (
+                          <div key={idx}>
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">{section.title}</h4>
+                            <div className="space-y-2">
+                              {section.items.map((item: any, itemIdx: number) => (
+                                <button
+                                  key={itemIdx}
+                                  onClick={() => {
+                                    const routeMap: { [key: string]: string } = {
+                                      'Platform Overview': '/platform-overview',
+                                      'HR Data & Reporting': '/hr-data-reporting',
+                                      'Time & Attendance': '/time-attendance',
+                                      'Payroll': '/payroll',
+                                      'Performance Management': '/performance-management',
+                                      'Compensation': '/compensation',
+                                      'Applicant Tracking': '/applicant-tracking',
+                                      'Onboarding': '/onboarding',
+                                      'Employee Experience': '/employee-experience',
+                                    };
+                                    navigate(routeMap[item.name] || '/platform-overview');
+                                    setMobileMenuOpen(false);
+                                  }}
+                                  className="flex items-start gap-2 w-full text-left p-2 rounded-md hover:bg-gray-50"
+                                >
+                                  <item.icon className="h-4 w-4 text-gray-400 mt-0.5" />
+                                  <div>
+                                    <div className="text-sm font-medium">{item.name}</div>
+                                    <div className="text-xs text-gray-500">{item.description}</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="solutions">
+                    <AccordionTrigger className="text-sm font-medium">Solutions</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-2 pl-2">
+                        {solutionsMenu[0].items.map((item: any, idx: number) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              navigate(`/industry/${item.name.toLowerCase()}`);
+                              setMobileMenuOpen(false);
+                            }}
+                            className="flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-gray-50"
+                          >
+                            <item.icon className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm font-medium">{item.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="resources">
+                    <AccordionTrigger className="text-sm font-medium">Resources</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-2 pl-2">
+                        {resourcesMenu[0].items.map((item: any, idx: number) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              window.open('https://www.youtube.com/@BlumeByte', '_blank');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="flex items-start gap-2 w-full text-left p-2 rounded-md hover:bg-gray-50"
+                          >
+                            <item.icon className="h-4 w-4 text-gray-400 mt-0.5" />
+                            <div>
+                              <div className="text-sm font-medium">{item.name}</div>
+                              <div className="text-xs text-gray-500">{item.description}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+
+                <button
+                  onClick={() => {
+                    navigate('/pricing');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 rounded-md"
+                >
+                  Pricing
+                </button>
+
+                {/* Mobile Auth Buttons */}
+                <div className="pt-4 space-y-2 border-t">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => {
+                      navigate('/login');
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                  <Button 
+                    className="w-full bg-black text-white hover:bg-gray-800"
+                    onClick={() => {
+                      navigate('/company-signup');
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    Get Started
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </nav>
