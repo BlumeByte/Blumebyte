@@ -17,6 +17,8 @@ import {
 } from 'recharts';
 import { useBranding } from '../lib/branding-context';
 import { ClientOnlyChart } from './ClientOnlyChart';
+import { createClient } from '@supabase/supabase-js';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'];
 
@@ -86,8 +88,23 @@ export function ReportsPanel() {
   }, [accessToken, user?.role]);
 
   useEffect(() => { load(); }, [load]);
-  // PERFORMANCE: Reduced polling from 30s to 60s
-  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
+  
+  // Real-time subscription to Supabase broadcasts for instant updates
+  useEffect(() => {
+    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
+    const channel = supabase.channel('reports-changes');
+    
+    channel.on('broadcast', { event: 'data-changed' }, () => {
+      console.log('📊 Reports: Real-time update received, reloading data...');
+      load();
+    });
+    
+    channel.subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [load]);
 
   // Computed analytics
   const roleDistribution = (() => {

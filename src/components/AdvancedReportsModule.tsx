@@ -44,6 +44,8 @@ import { toast } from 'sonner@2.0.3';
 import { Alert, AlertDescription } from './ui/alert';
 import { exportToCSV, exportToPDF } from './ListControls';
 import { format } from 'date-fns';
+import { createClient } from '@supabase/supabase-js';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
@@ -123,9 +125,21 @@ export function AdvancedReportsModule() {
     fetchReportData();
   }, []);
 
+  // Real-time subscription to Supabase broadcasts for instant updates
   useEffect(() => {
-    const iv = setInterval(fetchReportData, 20000);
-    return () => clearInterval(iv);
+    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
+    const channel = supabase.channel('advanced-reports-changes');
+    
+    channel.on('broadcast', { event: 'data-changed' }, () => {
+      console.log('📊 Advanced Reports: Real-time update received, reloading data...');
+      fetchReportData();
+    });
+    
+    channel.subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Filter data by date range, department, and company

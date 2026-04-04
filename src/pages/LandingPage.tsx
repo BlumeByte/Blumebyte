@@ -175,17 +175,6 @@ export default function LandingPage() {
     }
   ];
 
-  const whyBlumebyte = [
-    {
-      title: 'Award-Winning Support',
-      items: [
-        { name: 'Award-Winning Service', icon: Trophy, description: '24/7 customer support' },
-        { name: 'Case Studies', icon: FileCheck, description: 'Success stories' },
-        { name: 'Implementation Support', icon: UserCheck, description: 'Guided onboarding' },
-      ]
-    }
-  ];
-
   const handleMouseEnter = (menu: string) => {
     setOpenDropdown(menu);
   };
@@ -226,9 +215,6 @@ export default function LandingPage() {
                           } else if (menu === 'Solutions' && (section.title === 'By Company Size' || section.title === 'By Stakeholder')) {
                             // Navigate to platform overview for company size and stakeholder
                             navigate('/platform-overview');
-                          } else if (menu === 'Why Blumebyte') {
-                            // Navigate to about page for Why Blumebyte items
-                            navigate('/about');
                           } else if (menu === 'Resources') {
                             navigate('/resources');
                           }
@@ -271,7 +257,6 @@ export default function LandingPage() {
               <div className="hidden md:flex items-center gap-1">
                 <DropdownMenu menu="Our Platform" content={platformMenu} />
                 <DropdownMenu menu="Solutions" content={solutionsMenu} />
-                <DropdownMenu menu="Why Blumebyte" content={whyBlumebyte} />
                 <DropdownMenu menu="Resources" content={resourcesMenu} />
                 <button 
                   onClick={() => navigate('/pricing')}
