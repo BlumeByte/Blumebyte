@@ -5,6 +5,7 @@ import { AuthProvider } from './lib/auth-context';
 import { BrandingProvider } from './lib/branding-context';
 import { Toaster } from './components/ui/sonner';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ScrollToTop } from './components/ScrollToTop';
 
 // Import static pages directly (not lazy loaded)
 import LandingPage from './pages/LandingPage';
@@ -62,6 +63,7 @@ function RootLayout() {
   return (
     <BrandingProvider>
       <AuthProvider>
+        <ScrollToTop />
         <Toaster richColors position="top-right" />
         {/* PERFORMANCE: Lazy load EmployeeChat in Suspense to reduce initial load */}
         <Suspense fallback={null}>

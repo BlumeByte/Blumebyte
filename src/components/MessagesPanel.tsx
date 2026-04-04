@@ -32,9 +32,13 @@ export function MessagesPanel() {
         api('/messages', { token: accessToken }),
         api('/users/for-messages', { token: accessToken }),
       ]);
+      console.log('Messages loaded:', msgs);
+      console.log('Users for messages loaded:', usrs);
       setMessages(Array.isArray(msgs) ? msgs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
       setUsers(Array.isArray(usrs) ? usrs : []);
-    } catch (e) { console.log(e); }
+    } catch (e) { 
+      console.error('Error loading messages/users:', e); 
+    }
     setLoading(false);
   }, [accessToken]);
 
