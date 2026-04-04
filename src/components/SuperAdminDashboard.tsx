@@ -60,6 +60,8 @@ import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 import { CompanySwitcher } from './CompanySwitcher';
 import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
+import { createClient } from '@supabase/supabase-js';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -996,7 +998,7 @@ function TimeOffCalendarView() {
     Promise.all([
       api('/leave-requests', { token: accessToken }),
       api('/users', { token: accessToken }),
-      api('/superadmin/meeting-1on1', { token: accessToken }).catch(() => []),
+      api('/superadmin/meeting', { token: accessToken }).catch(() => []),
     ]).then(([leavesData, usersData, meetingsData]) => {
       const leavesArr = Array.isArray(leavesData) ? leavesData : [];
       const usersArr = Array.isArray(usersData) ? usersData : [];
@@ -1162,8 +1164,23 @@ function AttendanceView() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
-  // Reduce polling to 60 seconds to minimize server load
-  useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
+  
+  // Real-time subscription for instant attendance updates
+  useEffect(() => {
+    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
+    const channel = supabase.channel('attendance-changes');
+    
+    channel.on('broadcast', { event: 'data-changed' }, () => {
+      console.log('📅 Attendance: Real-time update received, reloading data...');
+      load();
+    });
+    
+    channel.subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [load]);
 
   const handleSaveAutoSettings = async () => {
     setSavingAuto(true);
@@ -2033,6 +2050,23 @@ function LeaveManagementView() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+  
+  // Real-time subscription for instant leave updates
+  useEffect(() => {
+    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
+    const channel = supabase.channel('leave-changes');
+    
+    channel.on('broadcast', { event: 'data-changed' }, () => {
+      console.log('🏖️ Leave Management: Real-time update received, reloading data...');
+      load();
+    });
+    
+    channel.subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [load]);
 
   const handleSaveRequest = async () => {
     setSaving(true);

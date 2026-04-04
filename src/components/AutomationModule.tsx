@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { toast } from 'sonner';
 import { api } from '../lib/api-client';
+import { useAuth } from '../lib/auth-context';
 import {
   Zap, Plus, Pencil, Trash2, Play, Pause, Clock, Bell, CheckCircle,
   AlertCircle, Settings, Filter, CalendarClock, GitBranch, RefreshCw,
@@ -68,6 +69,7 @@ interface AutomationModuleProps {
 }
 
 export function AutomationModule({ companyId }: AutomationModuleProps) {
+  const { accessToken } = useAuth();
   const [activeTab, setActiveTab] = useState('workflows');
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [scheduledTasks, setScheduledTasks] = useState<any[]>([]);
@@ -132,18 +134,18 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     setLoading(true);
     try {
       const [workflowsRes, tasksRes, rulesRes, templatesRes, employeesRes] = await Promise.all([
-        api.get('/automation/workflows'),
-        api.get('/automation/scheduled-tasks'),
-        api.get('/automation/business-rules'),
-        api.get('/automation/notification-templates'),
-        api.get('/employees'),
+        api('/automation/workflows', { token: accessToken }).catch(() => []),
+        api('/automation/scheduled-tasks', { token: accessToken }).catch(() => []),
+        api('/automation/business-rules', { token: accessToken }).catch(() => []),
+        api('/automation/notification-templates', { token: accessToken }).catch(() => []),
+        api('/employees', { token: accessToken }).catch(() => []),
       ]);
 
-      setWorkflows(workflowsRes.data || []);
-      setScheduledTasks(tasksRes.data || []);
-      setBusinessRules(rulesRes.data || []);
-      setNotificationTemplates(templatesRes.data || []);
-      setAllEmployees(employeesRes.data || []);
+      setWorkflows(Array.isArray(workflowsRes) ? workflowsRes : []);
+      setScheduledTasks(Array.isArray(tasksRes) ? tasksRes : []);
+      setBusinessRules(Array.isArray(rulesRes) ? rulesRes : []);
+      setNotificationTemplates(Array.isArray(templatesRes) ? templatesRes : []);
+      setAllEmployees(Array.isArray(employeesRes) ? employeesRes : []);
     } catch (error: any) {
       console.error('Error loading automation data:', error);
       toast.error('Failed to load automation data');

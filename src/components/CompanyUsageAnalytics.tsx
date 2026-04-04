@@ -92,8 +92,8 @@ export function CompanyUsageAnalytics({ accessToken }: CompanyUsageAnalyticsProp
       ] = await Promise.all([
         api('/users', { token: accessToken }).catch(() => []),
         api('/admin/departments', { token: accessToken }).catch(() => []),
-        api('/leaves', { token: accessToken }).catch(() => []),
-        api('/attendance', { token: accessToken }).catch(() => []),
+        api('/leave-requests', { token: accessToken }).catch(() => []),
+        api('/attendance/all', { token: accessToken }).catch(() => []),
         api('/performance-reviews', { token: accessToken }).catch(() => []),
         api('/admin/assets', { token: accessToken }).catch(() => []),
         api('/messages', { token: accessToken }).catch(() => []),

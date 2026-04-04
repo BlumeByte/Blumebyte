@@ -1,0 +1,244 @@
+Uncaught SyntaxError: Unexpected token '<' (at script.js:3:1)
+PendingScript
+toe @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:46740
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:46762
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+iT @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:1
+tT @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:1Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/attendance 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79179
+await in u
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79160
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/leaves 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79178
+await in u
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79160
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/superadmin/meeting-1on1 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:80213
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/superadmin/meeting-1on1 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:80213
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75440
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75448
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75735
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75743
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+22294e0588310873b8cd1576c188ff8a8446d279a.js:46780 Error loading automation data: TypeError: Z.get is not a function
+    at O (2294e0588310873b8cd1576c188ff8a8446d279a.js:76867:11)
+    at 2294e0588310873b8cd1576c188ff8a8446d279a.js:76861:5
+    at vp (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:24249)
+    at fl (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:42323)
+    at w3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:41171)
+    at Ui (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:40214)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36826)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+    at sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:34209
+console.error @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:46780
+O @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:76875
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:76861
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+22294e0588310873b8cd1576c188ff8a8446d279a.js:46780 Error saving workflow: TypeError: Z.post is not a function
+    at ne (2294e0588310873b8cd1576c188ff8a8446d279a.js:76910:117)
+    at Object.sW (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:9858)
+    at aW (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:10012)
+    at lW (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:10069)
+    at SN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:31464)
+    at KA (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:31881)
+    at sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:36794
+    at sS (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36897)
+    at EA (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:8991)
+    at ST (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5:33168)
+console.error @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:46780
+ne @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:76912
+sW @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+aW @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+lW @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+SN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+KA @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+sS @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+EA @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+ST @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+Pg @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
+RW @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/attendance 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79179
+await in u
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79160
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/leaves 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79178
+await in u
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79160
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/admin/training-programs 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78725
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78741
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/admin/training-programs 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78725
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78741
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/admin/training-programs 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78725
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78741
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:81567  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/subscription/license-info 401 (Unauthorized)
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81567
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81588
+await in (anonymous)
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81595
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:81567  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/subscription/license-info 401 (Unauthorized)
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81567
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81588
+await in (anonymous)
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81595
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/attendance 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79179
+await in u
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79160
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/leaves 404 (Not Found)
+Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
+u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79178
+await in u
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79160
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
+2294e0588310873b8cd1576c188ff8a8446d279a.js:46780 Error loading automation data: TypeError: Z.get is not a function
+    at O (2294e0588310873b8cd1576c188ff8a8446d279a.js:76867:11)
+    at 2294e0588310873b8cd1576c188ff8a8446d279a.js:76861:5
+    at vp (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:24249)
+    at fl (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:42323)
+    at w3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:41171)
+    at Ui (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:40214)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36826)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+    at sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:34209
+console.error @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:46780
+O @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:76875
+(anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:76861
+vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+w3 @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
+zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
+(anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error

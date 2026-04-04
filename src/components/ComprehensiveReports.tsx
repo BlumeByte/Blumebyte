@@ -52,7 +52,7 @@ export function ComprehensiveReports() {
     setLoading(true);
     try {
       const [att, leave, users] = await Promise.all([
-        api('/attendance', { token: accessToken }).catch(() => []),
+        api('/attendance/all', { token: accessToken }).catch(() => []),
         api('/leave-requests', { token: accessToken }).catch(() => []),
         api('/users', { token: accessToken }).catch(() => []),
       ]);
@@ -136,7 +136,7 @@ export function ComprehensiveReports() {
         'Leave Type': l.leaveType,
         'Start Date': l.startDate,
         'End Date': l.endDate,
-        Days: l.days || '��',
+        Days: l.days || '',
         Status: l.status,
         Reason: l.reason || '—',
       })),

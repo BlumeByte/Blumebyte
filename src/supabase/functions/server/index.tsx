@@ -3764,6 +3764,61 @@ app.put(`${PREFIX}/superadmin/meeting/:id`, async (c) => {
 });
 
 // ============ ENTITY CRUD (SuperAdmin) ============
+
+// CUSTOM: Get companies with license counts (must be BEFORE makeCrud to override)
+app.get(`${PREFIX}/superadmin/company`, async (c) => {
+  try {
+    const { user, role } = await requireSuperAdmin(c);
+    let companies = await kv.getByPrefix('company:');
+    
+    // CRITICAL FIX: Filter companies by SuperAdmin's company scope
+    // Each SuperAdmin should ONLY see their own company
+    const superAdminCompany = await getCompanyId(user.id);
+    
+    if (superAdminCompany) {
+      // Filter to only show the SuperAdmin's own company
+      companies = companies.filter((company: any) => 
+        company.id === superAdminCompany || company.companyId === superAdminCompany
+      );
+      console.log(`SuperAdmin ${user.id} accessing company data - filtered to company: ${superAdminCompany}`);
+    } else {
+      // If SuperAdmin has no company assignment, return empty array
+      console.log(`SuperAdmin ${user.id} has no company assignment - returning empty`);
+      companies = [];
+    }
+    
+    // Enrich each company with license counts
+    const allEmployees = await kv.getByPrefix('employee:');
+    const enrichedCompanies = companies.map((company: any) => {
+      // Get subscription for this company
+      const companyId = company.id;
+      const companyEmployees = allEmployees.filter((emp: any) => 
+        (emp.companyId === companyId || emp.company === companyId)
+      );
+      const activeEmployees = companyEmployees.filter((emp: any) => emp.status === 'active');
+      
+      // Find subscription for this company
+      const subscription = company.subscription || {};
+      const purchasedLicenses = subscription.purchasedLicenses || 0;
+      const usedLicenses = activeEmployees.length;
+      
+      return {
+        ...company,
+        licenses: purchasedLicenses,
+        usedLicenses: usedLicenses,
+        availableLicenses: Math.max(0, purchasedLicenses - usedLicenses)
+      };
+    });
+    
+    return c.json(enrichedCompanies || []);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    console.log('Error listing companies with licenses:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 makeCrud("superadmin/company", "company:", requireSuperAdmin);
 makeCrud("superadmin/branch", "branch:", requireSuperAdmin);
 makeCrud("superadmin/department", "department:", requireSuperAdmin);
