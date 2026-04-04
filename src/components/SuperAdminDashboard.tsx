@@ -26,7 +26,7 @@ import {
   Award, Target, MessageSquare, GitMerge, UserCheck, BookOpen, Archive,
   MessageCircle, Send, Mail, User, Download, Upload, ArrowUpRight,
   Eye, Star, MapPin, GraduationCap, Gavel, Shield, Heart, Zap,
-  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Printer, Filter, LogOut, Play, CreditCard
+  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Printer, Filter, LogOut, Play, CreditCard, Activity
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { NotificationsBell } from './NotificationsBell';
