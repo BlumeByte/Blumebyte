@@ -7926,6 +7926,7 @@ app.post(`${PREFIX}/automation/workflows`, async (c) => {
     const workflow = {
       id,
       ...data,
+      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -8018,6 +8019,7 @@ app.post(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
     const task = {
       id,
       ...data,
+      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -8110,6 +8112,7 @@ app.post(`${PREFIX}/automation/business-rules`, async (c) => {
     const rule = {
       id,
       ...data,
+      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -8202,6 +8205,7 @@ app.post(`${PREFIX}/automation/notification-templates`, async (c) => {
     const template = {
       id,
       ...data,
+      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

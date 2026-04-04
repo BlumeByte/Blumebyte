@@ -93,7 +93,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
           jobSalaryRange: selectedJob.salary || selectedJob.salaryRange || '',
           jobType: selectedJob.type || selectedJob.employmentType || '',
           coverLetter,
-        }),
+        },
         token: accessToken,
       });
       toast.success('Application submitted! HR will review your application.');

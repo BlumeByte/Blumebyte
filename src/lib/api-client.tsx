@@ -51,8 +51,14 @@ export async function api(path: string, options: RequestInit & { token?: string 
   try {
     data = JSON.parse(text);
   } catch (parseError) {
-    console.error(`API response for ${method} ${path}: ${res.status}`, text);
-    throw new Error(`Server returned an invalid response for ${path} (${res.status}). Please try again later.`);
+    console.error(`API response for ${method} ${path}: ${res.status}`, text.substring(0, 500));
+    
+    // If server returned HTML or non-JSON, provide a cleaner error
+    if (text.trim().startsWith('<')) {
+      throw new Error(`Server error (${res.status}). Please check the server logs or try again later.`);
+    }
+    
+    throw new Error(`Invalid server response for ${path} (${res.status}). Response: ${text.substring(0, 100)}`);
   }
   
   if (!res.ok) {
