@@ -58,6 +58,8 @@ import { AutomationModule } from './AutomationModule';
 import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
+import { CompanySwitcher } from './CompanySwitcher';
+import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -85,6 +87,7 @@ const SIDEBAR_ITEMS = [
   { id: 'disciplinary', label: 'Disciplinary', icon: AlertCircle, group: 'operations' },
   { id: 'hr-reports', label: 'HR Reports & Analytics', icon: BarChart3, group: 'operations' },
   { id: 'advanced-reports', label: 'Advanced Reports', icon: TrendingUp, group: 'operations' },
+  { id: 'usage-analytics', label: 'Company Usage Analytics', icon: Activity, group: 'operations' },
   { id: 'labour-compliance', label: 'Labour Act Compliance', icon: FileCheck, group: 'operations' },
   { id: 'onboarding-training', label: 'Onboarding & Training', icon: BookOpen, group: 'development' },
   { id: 'overtime-expenses', label: 'OT & Expenses', icon: Clock, group: 'time' },
@@ -424,6 +427,8 @@ export function SuperAdminDashboard() {
   const { branding } = useBranding();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
+  const [selectedCompanyName, setSelectedCompanyName] = useState<string>('All Companies');
 
   const renderContent = () => {
     switch (activeSection) {
@@ -449,6 +454,7 @@ export function SuperAdminDashboard() {
       case 'overtime-expenses': return <div className="p-8"><OvertimeExpenseApproval /></div>;
       case 'surveys': return <div className="p-8"><SurveyBuilder /></div>;
       case 'engagement-analytics': return <div className="p-8"><EmployeeEngagementAnalytics /></div>;
+      case 'usage-analytics': return <CompanyUsageAnalytics accessToken={accessToken} />;
       case 'meetings-1on1': return <MeetingsPanel mode="admin" />;
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;
@@ -542,10 +548,20 @@ export function SuperAdminDashboard() {
       </aside>
 
       <div className={`flex-1 ${collapsed ? 'ml-[72px]' : 'ml-60'} transition-all duration-200 min-w-0`}>
-        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-2.5 flex items-center justify-end gap-3">
-          <SubscriptionBadge />
-          <NotificationsBell />
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Super Admin</Badge>
+        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-2.5 flex items-center justify-between gap-3">
+          <CompanySwitcher 
+            accessToken={accessToken}
+            currentCompanyId={selectedCompanyId}
+            onCompanySwitch={(companyId, companyName) => {
+              setSelectedCompanyId(companyId);
+              setSelectedCompanyName(companyName);
+            }}
+          />
+          <div className="flex items-center gap-3">
+            <SubscriptionBadge />
+            <NotificationsBell />
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Super Admin</Badge>
+          </div>
         </div>
         <div className="h-[calc(100vh-45px)] overflow-y-auto overflow-x-hidden">
           {renderContent()}

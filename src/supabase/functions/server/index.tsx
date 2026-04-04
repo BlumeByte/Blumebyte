@@ -133,6 +133,26 @@ const supabaseAdmin = () =>
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
+// --- Real-Time Broadcast Helper ---
+async function broadcastUpdate(channelName: string, eventType: string, key: string, data: any) {
+  try {
+    const sb = supabaseAdmin();
+    const channel = sb.channel(`realtime:${channelName}`);
+    
+    await channel.send({
+      type: 'broadcast',
+      event: eventType,
+      payload: { type: eventType, key, payload: data },
+    });
+    
+    console.log(`✅ Broadcast sent: ${channelName} → ${eventType} → ${key}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Broadcast error on ${channelName}:`, error);
+    return false;
+  }
+}
+
 // --- Auth Helpers --- (Updated)
 function extractUserToken(c: any): string | null {
   const xToken = c.req.header("X-User-Token");
@@ -543,6 +563,11 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
       };
       await kv.set(`${kvPrefix}${id}`, item);
       console.log(`✅ Created ${prefix}:${id} with companyId: ${companyId}`);
+      
+      // Broadcast real-time update
+      const channelName = kvPrefix.replace(':', '');
+      await broadcastUpdate(channelName, 'INSERT', id, item);
+      
       return c.json(item, 201);
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -567,6 +592,11 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
       }
       const item = { ...existing, ...body, id, updatedAt: new Date().toISOString() };
       await kv.set(`${kvPrefix}${id}`, item);
+      
+      // Broadcast real-time update
+      const channelName = kvPrefix.replace(':', '');
+      await broadcastUpdate(channelName, 'UPDATE', id, item);
+      
       return c.json(item);
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -588,6 +618,11 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
         }
       }
       await kv.del(`${kvPrefix}${id}`);
+      
+      // Broadcast real-time update
+      const channelName = kvPrefix.replace(':', '');
+      await broadcastUpdate(channelName, 'DELETE', id, { id });
+      
       return c.json({ success: true });
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -2313,6 +2348,9 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       // Don't fail the user creation if email fails
     }
     
+    // Broadcast real-time update to dashboard
+    await broadcastUpdate('users', 'INSERT', userId, { userId, email, name, role });
+    
     return c.json({ success: true, userId, tempPassword });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3017,6 +3055,9 @@ app.put(`${PREFIX}/users/:userId`, async (c) => {
       user_metadata: { name: updated.name, role: updated.role, companyId: updated.companyId, company: companyName },
     });
     
+    // Broadcast real-time update to dashboard
+    await broadcastUpdate('users', 'UPDATE', userId, updated);
+    
     return c.json(updated);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3114,6 +3155,9 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
         read: false, createdAt: new Date().toISOString(),
       });
     }
+    
+    // Broadcast real-time update to dashboard
+    await broadcastUpdate('users', 'DELETE', userId, { userId, email: targetEmail });
     
     console.log(`✅ User deletion complete: ${targetEmail}`);
     return c.json({ success: true, message: `User ${targetEmail} has been permanently deleted. Email can now be reused.` });
