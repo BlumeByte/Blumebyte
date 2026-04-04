@@ -105,7 +105,7 @@ export function CompanySwitcher({
           {companies.map((company) => (
             <SelectItem key={company.id} value={company.id}>
               <div className="flex flex-col">
-                <span className="font-medium">{company.name}</span>
+                <span className="font-medium">{typeof company.name === 'string' ? company.name : String(company.name || company.id)}</span>
                 <span className="text-xs text-muted-foreground">
                   {company.industry} • {company.usedLicenses || 0}/{company.licenses || 0} licenses
                 </span>

@@ -1514,6 +1514,7 @@ app.get(`${PREFIX}/users/for-messages`, async (c) => {
       .filter((e: any) => e.userId !== user.id)
       .map((e: any) => ({
         userId: e.userId, id: e.userId, name: e.name,
+        email: e.email || "",
         role: e.role, department: e.department || "", position: e.position || "",
         profileImageUrl: e.profileImageUrl || "",
         company: e.company || e.companyId || "",

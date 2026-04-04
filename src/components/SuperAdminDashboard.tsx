@@ -645,10 +645,19 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       safeFetch('/leave-requests'),
       safeFetch('/announcements'),
       safeFetch('/attendance/all'),
-    ]).then(([users, ref, leaves, announcements, attendance]) => {
+      safeFetch('/automation/workflows'),
+      safeFetch('/automation/scheduled-tasks'),
+      safeFetch('/automation/business-rules'),
+      safeFetch('/automation/notification-templates'),
+    ]).then(([users, ref, leaves, announcements, attendance, workflows, tasks, rules, templates]) => {
       const usersArr = Array.isArray(users) ? users : [];
       const leavesArr = Array.isArray(leaves) ? leaves : [];
       const attendanceArr = Array.isArray(attendance) ? attendance : [];
+      const workflowsData = workflows?.data || [];
+      const tasksData = tasks?.data || [];
+      const rulesData = rules?.data || [];
+      const templatesData = templates?.data || [];
+      
       setAllUsers(usersArr);
       setAllLeaves(leavesArr);
       setAllAttendance(attendanceArr);
@@ -661,6 +670,10 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
         pendingLeaves: leavesArr.filter((l: any) => l.status === 'pending').length,
         announcements: Array.isArray(announcements) ? announcements.length : 0,
         activeEmployees: usersArr.filter((u: any) => u.status === 'active').length,
+        workflows: Array.isArray(workflowsData) ? workflowsData.filter((w: any) => w.status === 'active').length : 0,
+        scheduledTasks: Array.isArray(tasksData) ? tasksData.filter((t: any) => t.status === 'active').length : 0,
+        businessRules: Array.isArray(rulesData) ? rulesData.filter((r: any) => r.status === 'active').length : 0,
+        notificationTemplates: Array.isArray(templatesData) ? templatesData.length : 0,
         roleDistribution: {
           superadmin: usersArr.filter((u: any) => u.role === 'superadmin').length,
           admin: usersArr.filter((u: any) => u.role === 'admin').length,
@@ -693,6 +706,8 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
     { label: 'Branches', value: stats.branches, icon: GitBranch, color: 'indigo', bg: 'bg-indigo-100', text: 'text-indigo-600' },
     { label: 'Assets', value: stats.assets, icon: Briefcase, color: 'orange', bg: 'bg-orange-100', text: 'text-orange-600' },
     { label: 'Pending Leaves', value: stats.pendingLeaves, icon: CalendarDays, color: 'amber', bg: 'bg-amber-100', text: 'text-amber-600' },
+    { label: 'Active Workflows', value: stats.workflows, icon: Zap, color: 'cyan', bg: 'bg-cyan-100', text: 'text-cyan-600', action: 'automation' },
+    { label: 'Business Rules', value: stats.businessRules, icon: Settings, color: 'violet', bg: 'bg-violet-100', text: 'text-violet-600', action: 'automation' },
   ];
 
   const quickActions = [
@@ -700,8 +715,8 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
     { label: 'Add Company', icon: Building2, action: 'companies', color: 'bg-green-500' },
     { label: 'View Reports', icon: BarChart3, action: 'hr-reports', color: 'bg-purple-500' },
     { label: 'Manage Leave', icon: CalendarDays, action: 'leave-management', color: 'bg-amber-500' },
-    { label: 'Recruitment', icon: UserPlus, action: 'recruitment', color: 'bg-pink-500' },
-    { label: 'Announcements', icon: Megaphone, action: 'announcements', color: 'bg-cyan-500' },
+    { label: 'Automation', icon: Zap, action: 'automation', color: 'bg-cyan-500' },
+    { label: 'Announcements', icon: Megaphone, action: 'announcements', color: 'bg-teal-500' },
   ];
 
   const roleData = stats.roleDistribution ? [
@@ -781,11 +796,22 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
         <ClockInOut />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-6">
         {statCards.map((card, idx) => {
           const Icon = card.icon;
+          const CardWrapper = card.action 
+            ? ({ children }: any) => (
+                <Card key={idx} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => onNavigate(card.action!)}>
+                  {children}
+                </Card>
+              )
+            : ({ children }: any) => (
+                <Card key={idx} className="hover:shadow-md transition-shadow">
+                  {children}
+                </Card>
+              );
           return (
-            <Card key={idx} className="hover:shadow-md transition-shadow">
+            <CardWrapper key={idx}>
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -797,7 +823,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </CardWrapper>
           );
         })}
       </div>
@@ -3481,26 +3507,31 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
     if (field.type === 'related-select' && field.relatedEntity) {
       const relItems = relatedData[field.relatedEntity] || [];
       const found = relItems.find(r => r.id === val);
-      return found?.name || val;
+      const name = found?.name || val;
+      // Ensure we return a string, not an object
+      return typeof name === 'string' ? name : String(name || val);
     }
     if (field.type === 'user-select') {
       const found = allUsers.find(u => (u.userId || u.id) === val);
-      return found?.name || val;
+      const name = found?.name || val;
+      // Ensure we return a string, not an object
+      return typeof name === 'string' ? name : String(name || val);
     }
     if (field.type === 'user-multi-select') {
       if (Array.isArray(val)) {
         return val.map(uid => {
           const found = allUsers.find(u => (u.userId || u.id) === uid);
-          return found?.name || uid;
+          const name = found?.name || uid;
+          return typeof name === 'string' ? name : String(name || uid);
         }).join(', ') || '—';
       }
-      return val;
+      return String(val);
     }
     if (field.type === 'questions') {
       if (Array.isArray(val)) return `${val.length} question(s)`;
       return '—';
     }
-    return val;
+    return typeof val === 'string' ? val : String(val);
   };
 
   const toggleSort = (field: string) => {
@@ -3679,7 +3710,7 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
                                 : item[f.key] === 'at-risk' || item[f.key] === 'overdue'
                                 ? 'bg-orange-100 text-orange-800'
                                 : ''
-                            }>{item[f.key]}</Badge>
+                            }>{typeof item[f.key] === 'string' ? item[f.key] : String(item[f.key] || '')}</Badge>
                           ) : f.key === 'rating' ? (
                             <div className="flex items-center gap-1">
                               {Array.from({ length: parseInt(item[f.key] || '0') }).map((_, i) => (
@@ -3953,7 +3984,7 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
                     <NativeSelect value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}>
                       <option value="">{`Select ${field.label.toLowerCase()}`}</option>
                       {(relatedData[field.relatedEntity!] || []).map(item => (
-                        <option key={item.id} value={item.id}>{item.name}</option>
+                        <option key={item.id} value={item.id}>{typeof item.name === 'string' ? item.name : String(item.name || item.id)}</option>
                       ))}
                     </NativeSelect>
                   ) : field.type === 'date' ? (
