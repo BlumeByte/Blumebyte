@@ -197,10 +197,10 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
       };
 
       if (editingItem) {
-        await api.put(`/automation/workflows/${editingItem.id}`, workflowData);
+        await api(`/automation/workflows/${editingItem.id}`, { method: 'PUT', body: workflowData, token: accessToken });
         toast.success('Workflow updated successfully');
       } else {
-        await api.post('/automation/workflows', workflowData);
+        await api('/automation/workflows', { method: 'POST', body: workflowData, token: accessToken });
         toast.success('Workflow created successfully');
       }
 
@@ -216,9 +216,10 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
 
   const handleToggleWorkflow = async (workflow: any) => {
     try {
-      await api.put(`/automation/workflows/${workflow.id}`, {
-        ...workflow,
-        enabled: !workflow.enabled,
+      await api(`/automation/workflows/${workflow.id}`, {
+        method: 'PUT',
+        body: { ...workflow, enabled: !workflow.enabled },
+        token: accessToken
       });
       toast.success(`Workflow ${workflow.enabled ? 'disabled' : 'enabled'}`);
       loadData();
@@ -232,7 +233,7 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     if (!confirm('Are you sure you want to delete this workflow?')) return;
 
     try {
-      await api.delete(`/automation/workflows/${id}`);
+      await api(`/automation/workflows/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Workflow deleted successfully');
       loadData();
     } catch (error: any) {
@@ -288,10 +289,10 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
       };
 
       if (editingItem) {
-        await api.put(`/automation/scheduled-tasks/${editingItem.id}`, taskData);
+        await api(`/automation/scheduled-tasks/${editingItem.id}`, { method: 'PUT', body: taskData, token: accessToken });
         toast.success('Scheduled task updated successfully');
       } else {
-        await api.post('/automation/scheduled-tasks', taskData);
+        await api('/automation/scheduled-tasks', { method: 'POST', body: taskData, token: accessToken });
         toast.success('Scheduled task created successfully');
       }
 
@@ -307,9 +308,10 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
 
   const handleToggleTask = async (task: any) => {
     try {
-      await api.put(`/automation/scheduled-tasks/${task.id}`, {
-        ...task,
-        enabled: !task.enabled,
+      await api(`/automation/scheduled-tasks/${task.id}`, {
+        method: 'PUT',
+        body: { ...task, enabled: !task.enabled },
+        token: accessToken
       });
       toast.success(`Task ${task.enabled ? 'disabled' : 'enabled'}`);
       loadData();
@@ -323,7 +325,7 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     if (!confirm('Are you sure you want to delete this scheduled task?')) return;
 
     try {
-      await api.delete(`/automation/scheduled-tasks/${id}`);
+      await api(`/automation/scheduled-tasks/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Scheduled task deleted successfully');
       loadData();
     } catch (error: any) {
@@ -379,10 +381,10 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
       };
 
       if (editingItem) {
-        await api.put(`/automation/business-rules/${editingItem.id}`, ruleData);
+        await api(`/automation/business-rules/${editingItem.id}`, { method: 'PUT', body: ruleData, token: accessToken });
         toast.success('Business rule updated successfully');
       } else {
-        await api.post('/automation/business-rules', ruleData);
+        await api('/automation/business-rules', { method: 'POST', body: ruleData, token: accessToken });
         toast.success('Business rule created successfully');
       }
 
@@ -400,7 +402,7 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     if (!confirm('Are you sure you want to delete this business rule?')) return;
 
     try {
-      await api.delete(`/automation/business-rules/${id}`);
+      await api(`/automation/business-rules/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Business rule deleted successfully');
       loadData();
     } catch (error: any) {
@@ -450,10 +452,10 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
       };
 
       if (editingItem) {
-        await api.put(`/automation/notification-templates/${editingItem.id}`, templateData);
+        await api(`/automation/notification-templates/${editingItem.id}`, { method: 'PUT', body: templateData, token: accessToken });
         toast.success('Template updated successfully');
       } else {
-        await api.post('/automation/notification-templates', templateData);
+        await api('/automation/notification-templates', { method: 'POST', body: templateData, token: accessToken });
         toast.success('Template created successfully');
       }
 
@@ -471,7 +473,7 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     if (!confirm('Are you sure you want to delete this template?')) return;
 
     try {
-      await api.delete(`/automation/notification-templates/${id}`);
+      await api(`/automation/notification-templates/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Template deleted successfully');
       loadData();
     } catch (error: any) {
