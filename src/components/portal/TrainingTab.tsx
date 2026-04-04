@@ -77,7 +77,7 @@ export function TrainingTab({ accessToken, availableTraining, enrollments, onRef
     try {
       await api('/employee/training-enroll', {
         method: 'POST',
-        body: JSON.stringify({ trainingId: program.id, trainingTitle: program.title || program.name }),
+        body: { trainingId: program.id, trainingTitle: program.title || program.name },
         token: accessToken,
       });
       toast.success(`Successfully enrolled in "${program.title || program.name}"`);

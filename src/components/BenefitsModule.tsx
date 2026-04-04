@@ -111,14 +111,14 @@ export function BenefitsModule() {
       if (editItem) {
         await api(`/admin/benefits/${editItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Benefit updated successfully');
       } else {
         await api('/admin/benefits', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
       }

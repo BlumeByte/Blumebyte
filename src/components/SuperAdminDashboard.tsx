@@ -927,7 +927,7 @@ function MyProfileView() {
 
   const handleSave = async () => {
     try {
-      await api('/employee/profile', { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+      await api('/employee/profile', { method: 'PUT', body: formData, token: accessToken });
       toast.success('Profile updated');
       setEditing(false);
       setProfile(formData);
@@ -1185,7 +1185,7 @@ function AttendanceView() {
   const handleSaveAutoSettings = async () => {
     setSavingAuto(true);
     try {
-      const res = await api('/auto-clock-settings', { method: 'PUT', body: JSON.stringify(autoSettings), token: accessToken });
+      const res = await api('/auto-clock-settings', { method: 'PUT', body: autoSettings, token: accessToken });
       setAutoSettings(res);
       toast.success('Auto-clock settings saved');
     } catch (e: any) { toast.error(e.message); }
@@ -1204,7 +1204,7 @@ function AttendanceView() {
   const handleSaveManualSettings = async () => {
     setSavingManual(true);
     try {
-      const res = await api('/manual-clock-settings', { method: 'PUT', body: JSON.stringify(manualSettings), token: accessToken });
+      const res = await api('/manual-clock-settings', { method: 'PUT', body: manualSettings, token: accessToken });
       setManualSettings(res);
       toast.success('Manual clock visibility settings saved');
     } catch (e: any) { toast.error(e.message); }
@@ -1224,11 +1224,11 @@ function AttendanceView() {
     setSaving(true);
     try {
       if (editRecord) {
-        await api('/attendance/admin-update', { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api('/attendance/admin-update', { method: 'PUT', body: formData, token: accessToken });
         toast.success('Attendance updated');
       } else {
         if (!formData.userId || !formData.date) { toast.error('Employee and date required'); setSaving(false); return; }
-        await api('/attendance/admin-create', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+        await api('/attendance/admin-create', { method: 'POST', body: formData, token: accessToken });
         toast.success('Attendance created');
       }
       setDialogOpen(false);
@@ -1240,7 +1240,7 @@ function AttendanceView() {
   const handleDelete = async (record: any) => {
     if (!confirm('Delete this attendance record?')) return;
     try {
-      await api('/attendance/admin-delete', { method: 'DELETE', body: JSON.stringify({ userId: record.userId, date: record.date }), token: accessToken });
+      await api('/attendance/admin-delete', { method: 'DELETE', body: { userId: record.userId, date: record.date }, token: accessToken });
       toast.success('Deleted');
       load();
     } catch (e: any) { toast.error(e.message); }
@@ -1585,11 +1585,11 @@ function PayrollView() {
     setSaving(true);
     try {
       if (editItem) {
-        await api(`/superadmin/payroll-run/${editItem.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api(`/superadmin/payroll-run/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
         toast.success('Payroll record updated');
       } else {
         const net = parseFloat(formData.basicSalary || 0) + parseFloat(formData.allowances || 0) - parseFloat(formData.deductions || 0);
-        await api('/superadmin/payroll-run', { method: 'POST', body: JSON.stringify({ ...formData, netPay: net.toFixed(2) }), token: accessToken });
+        await api('/superadmin/payroll-run', { method: 'POST', body: { ...formData, netPay: net.toFixed(2) }, token: accessToken });
         toast.success('Payroll record created');
       }
       setDialogOpen(false);
@@ -2072,10 +2072,10 @@ function LeaveManagementView() {
     setSaving(true);
     try {
       if (editItem) {
-        await api(`/leave-requests/${editItem.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api(`/leave-requests/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
         toast.success('Leave request updated');
       } else {
-        await api('/leave-requests', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+        await api('/leave-requests', { method: 'POST', body: formData, token: accessToken });
         toast.success('Leave request created');
       }
       setDialogOpen(false);
@@ -2086,7 +2086,7 @@ function LeaveManagementView() {
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
-      await api(`/leave-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status }), token: accessToken });
+      await api(`/leave-requests/${id}`, { method: 'PUT', body: { status }, token: accessToken });
       toast.success(`Leave ${status}`);
       load();
     } catch (e: any) { toast.error(e.message); }
@@ -2276,10 +2276,10 @@ function OnboardingView() {
     setSaving(true);
     try {
       if (editItem) {
-        await api(`/superadmin/onboard-checklist/${editItem.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api(`/superadmin/onboard-checklist/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
         toast.success('Updated');
       } else {
-        await api('/superadmin/onboard-checklist', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+        await api('/superadmin/onboard-checklist', { method: 'POST', body: formData, token: accessToken });
         toast.success('Checklist item created');
       }
       setDialogOpen(false);
@@ -2489,7 +2489,7 @@ function SelfServiceView({ onNavigate }: { onNavigate: (id: string) => void }) {
     if (!leaveForm.leaveType || !leaveForm.startDate) { toast.error('Leave type and start date required'); return; }
     setSavingLeave(true);
     try {
-      await api('/leave-requests', { method: 'POST', body: JSON.stringify(leaveForm), token: accessToken });
+      await api('/leave-requests', { method: 'POST', body: leaveForm, token: accessToken });
       toast.success('Leave request submitted');
       setLeaveDialogOpen(false);
       setLeaveForm({});
@@ -2684,10 +2684,10 @@ function AnnouncementsView() {
         createdByRole: 'superadmin',
       };
       if (editItem) {
-        await api(`/announcements/${editItem.id}`, { method: 'PUT', body: JSON.stringify(payload), token: accessToken });
+        await api(`/announcements/${editItem.id}`, { method: 'PUT', body: payload, token: accessToken });
         toast.success('Announcement updated');
       } else {
-        await api('/announcements', { method: 'POST', body: JSON.stringify(payload), token: accessToken });
+        await api('/announcements', { method: 'POST', body: payload, token: accessToken });
         toast.success('Announcement created');
       }
       setDialogOpen(false);
@@ -3100,11 +3100,11 @@ function UserManagementView() {
       };
       
       if (editUser) {
-        await api(`/users/${editUser.userId}`, { method: 'PUT', body: JSON.stringify(payload), token: accessToken });
+        await api(`/users/${editUser.userId}`, { method: 'PUT', body: payload, token: accessToken });
         toast.success('User updated');
         setDialogOpen(false);
       } else {
-        const res = await api('/superadmin/users/create', { method: 'POST', body: JSON.stringify(payload), token: accessToken });
+        const res = await api('/superadmin/users/create', { method: 'POST', body: payload, token: accessToken });
         setTempPassword(res.tempPassword);
         setShowTempPw(true);
         toast.success('User created');
@@ -3454,10 +3454,10 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
         // the server handles this, so no additional frontend check needed.
       }
       if (editItem) {
-        await api(`${config.apiPrefix}/${editItem.id}`, { method: 'PUT', body: JSON.stringify(submitData), token: accessToken });
+        await api(`${config.apiPrefix}/${editItem.id}`, { method: 'PUT', body: submitData, token: accessToken });
         toast.success('Updated successfully');
       } else {
-        await api(config.apiPrefix, { method: 'POST', body: JSON.stringify(submitData), token: accessToken });
+        await api(config.apiPrefix, { method: 'POST', body: submitData, token: accessToken });
         toast.success('Created successfully');
       }
       setDialogOpen(false);

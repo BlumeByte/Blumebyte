@@ -85,14 +85,14 @@ export function FinancialYearsModule() {
       if (editItem) {
         await api(`/financial-years/${editItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Financial year updated successfully');
       } else {
         await api('/financial-years', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Financial year created successfully');

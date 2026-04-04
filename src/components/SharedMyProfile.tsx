@@ -83,7 +83,7 @@ export function SharedMyProfile() {
   const handleEditSave = async () => {
     setSaving(true);
     try {
-      const result = await api('/employee/profile', { method: 'PUT', body: JSON.stringify(editData), token: accessToken });
+      const result = await api('/employee/profile', { method: 'PUT', body: editData, token: accessToken });
       if (result.pendingApproval) {
         toast.success('Profile changes submitted for HR approval');
       } else {

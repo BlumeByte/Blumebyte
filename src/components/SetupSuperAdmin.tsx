@@ -37,7 +37,7 @@ export function SetupSuperAdmin() {
     try {
       await api('/setup-superadmin', {
         method: 'POST',
-        body: JSON.stringify({ email, password, name }),
+        body: { email, password, name },
       });
       setSuccess(true);
       setTimeout(() => navigate('/login'), 2000);

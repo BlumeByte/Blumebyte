@@ -85,7 +85,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
     try {
       await api('/job-applications', {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           jobPostingId: selectedJob.id,
           jobTitle: selectedJob.title || selectedJob.name,
           jobDepartment: selectedJob.department || '',
@@ -125,7 +125,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
     try {
       const res = await api(`/my-tasks/${taskDialog.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ status: taskStatus, notes: taskNotes }),
+        body: { status: taskStatus, notes: taskNotes },
         token: accessToken,
       });
       toast.success('Task updated successfully');
@@ -152,7 +152,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
       const answers = Object.entries(trainingAnswers).sort(([a], [b]) => Number(a) - Number(b)).map(([, v]) => v);
       await api(`/my-training/${trainingDialog.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ assessmentAnswers: answers, completedByUser: user?.id, completedAt: new Date().toISOString() }),
+        body: { assessmentAnswers: answers, completedByUser: user?.id, completedAt: new Date().toISOString() },
         token: accessToken,
       });
       toast.success('Training assessment submitted');
@@ -175,11 +175,11 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
     try {
       await api(`/my-reviews/${reviewDialog.id}`, {
         method: 'PUT',
-        body: JSON.stringify({
+        body: {
           employeeNotes: reviewNotes,
           selfRating: reviewSelfRating ? Number(reviewSelfRating) : undefined,
           employeeSubmittedAt: new Date().toISOString(),
-        }),
+        },
         token: accessToken,
       });
       toast.success('Review response submitted');
@@ -206,7 +206,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
       const answers = Object.entries(questionnaireAnswers).sort(([a], [b]) => Number(a) - Number(b)).map(([, v]) => v);
       await api(`/my-questionnaires/${questionnaireDialog.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ answers, status: 'submitted', submittedAt: new Date().toISOString() }),
+        body: { answers, status: 'submitted', submittedAt: new Date().toISOString() },
         token: accessToken,
       });
       toast.success('Questionnaire submitted successfully');
@@ -222,7 +222,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
       const newStatus = item.status === 'completed' ? 'pending' : 'completed';
       await api(`/my-onboarding/${item.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ status: newStatus }),
+        body: { status: newStatus },
         token: accessToken,
       });
       toast.success(newStatus === 'completed' ? 'Step marked complete' : 'Step unmarked');

@@ -239,14 +239,14 @@ export function ManagerCrudPanel({ resourceType, title, description, icon: Icon 
       if (editItem) {
         await api(`${config.endpoint}/${editItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Updated successfully');
       } else {
         await api(config.endpoint, {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Created successfully');

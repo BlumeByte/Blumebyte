@@ -105,11 +105,11 @@ function TeamTab() {
         // Submit a request for approval instead of direct edit
         await api('/manager/request-user-update', { 
           method: 'POST', 
-          body: JSON.stringify({ 
+          body: { 
             userId: editUser.userId || editUser.id,
             updates: formData,
             reason: 'Manager employee update request'
-          }), 
+          }, 
           token: accessToken 
         });
         toast.success('Update request sent to Admin for approval'); 
@@ -287,7 +287,7 @@ function LeaveTab() {
 
   const handleAction = async (id: string, status: string) => {
     try { 
-      await api(`/leave-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status }), token: accessToken }); 
+      await api(`/leave-requests/${id}`, { method: 'PUT', body: { status }, token: accessToken }); 
       toast.success(`Leave ${status}`); 
       setLeaves(prev => prev.map(l => l.id === id ? { ...l, status } : l)); 
     }

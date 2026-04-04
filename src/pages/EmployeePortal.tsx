@@ -242,7 +242,7 @@ export default function EmployeePortal() {
     try {
       await api('/employee/leave-request', {
         method: 'POST',
-        body: JSON.stringify(leaveForm),
+        body: leaveForm,
         token: accessToken,
       });
       toast.success('Leave request submitted successfully');
@@ -303,7 +303,7 @@ export default function EmployeePortal() {
     try {
       await api('/employee/profile-update-request', {
         method: 'POST',
-        body: JSON.stringify({ changes: profileEditForm, reason: 'Profile information update' }),
+        body: { changes: profileEditForm, reason: 'Profile information update' },
         token: accessToken,
       });
       toast.success('Profile update request submitted for approval');

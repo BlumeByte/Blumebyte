@@ -179,10 +179,10 @@ export function SurveyBuilder() {
       };
 
       if (editingSurvey) {
-        await api(`/admin/survey/${editingSurvey.id}`, { method: 'PUT', body: JSON.stringify(payload), token: accessToken });
+        await api(`/admin/survey/${editingSurvey.id}`, { method: 'PUT', body: payload, token: accessToken });
         toast.success('Survey updated');
       } else {
-        await api('/admin/survey', { method: 'POST', body: JSON.stringify(payload), token: accessToken });
+        await api('/admin/survey', { method: 'POST', body: payload, token: accessToken });
         toast.success(status === 'active' ? 'Survey published!' : 'Survey saved as draft');
       }
 
@@ -198,7 +198,7 @@ export function SurveyBuilder() {
 
   const handleStatusChange = async (survey: Survey, newStatus: 'active' | 'closed') => {
     try {
-      await api(`/admin/survey/${survey.id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }), token: accessToken });
+      await api(`/admin/survey/${survey.id}`, { method: 'PUT', body: { status: newStatus }, token: accessToken });
       toast.success(`Survey ${newStatus === 'active' ? 'published' : 'closed'}`);
       loadSurveys();
     } catch (e: any) {

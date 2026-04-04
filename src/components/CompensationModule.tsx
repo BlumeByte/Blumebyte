@@ -111,14 +111,14 @@ export function CompensationModule() {
       if (editItem) {
         await api(`/admin/compensations/${editItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Compensation updated successfully');
       } else {
         await api('/admin/compensations', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Compensation created successfully');

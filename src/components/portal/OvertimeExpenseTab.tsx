@@ -90,11 +90,11 @@ export function OvertimeExpenseTab({ accessToken, overtimeRequests, expenseClaim
     try {
       await api('/employee/overtime-request', {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           date: overtimeForm.date,
           hours: parseFloat(overtimeForm.hours),
           reason: overtimeForm.reason,
-        }),
+        },
         token: accessToken,
       });
       toast.success('Overtime request submitted successfully');
@@ -118,10 +118,10 @@ export function OvertimeExpenseTab({ accessToken, overtimeRequests, expenseClaim
     try {
       await api('/employee/expense-claim', {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           ...expenseForm,
           amount: parseFloat(expenseForm.amount),
-        }),
+        },
         token: accessToken,
       });
       toast.success('Expense claim submitted successfully');

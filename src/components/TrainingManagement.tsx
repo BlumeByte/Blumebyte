@@ -52,10 +52,10 @@ export function TrainingManagement({ mode }: TrainingManagementProps) {
     setSaving(true);
     try {
       if (editItem) {
-        await api(`/training-programs/${editItem.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api(`/training-programs/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
         toast.success('Training updated');
       } else {
-        await api('/training-programs', { method: 'POST', body: JSON.stringify({ ...formData, status: 'pending' }), token: accessToken });
+        await api('/training-programs', { method: 'POST', body: { ...formData, status: 'pending' }, token: accessToken });
         toast.success('Training created');
       }
       setDialogOpen(false);
@@ -84,7 +84,7 @@ export function TrainingManagement({ mode }: TrainingManagementProps) {
       const newAssignments = [...new Set([...assignedUsers, ...selectedEmployees])];
       await api(`/training-programs/${assignDialog.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ assignedUsers: newAssignments }),
+        body: { assignedUsers: newAssignments },
         token: accessToken
       });
       toast.success(`Assigned to ${selectedEmployees.length} employee(s)`);

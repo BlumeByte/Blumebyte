@@ -33,7 +33,7 @@ export function ProfileChangeRequests() {
 
   const handleApprove = async (id: string) => {
     try {
-      await api(`/profile-change-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'approved' }), token: accessToken });
+      await api(`/profile-change-requests/${id}`, { method: 'PUT', body: { status: 'approved' }, token: accessToken });
       toast.success('Profile changes approved and applied');
       load();
     } catch (e: any) { toast.error(e.message); }
@@ -42,7 +42,7 @@ export function ProfileChangeRequests() {
   const handleReject = async () => {
     if (!rejectDialog) return;
     try {
-      await api(`/profile-change-requests/${rejectDialog.id}`, { method: 'PUT', body: JSON.stringify({ status: 'rejected', rejectionReason }), token: accessToken });
+      await api(`/profile-change-requests/${rejectDialog.id}`, { method: 'PUT', body: { status: 'rejected', rejectionReason }, token: accessToken });
       toast.success('Profile change request rejected');
       setRejectDialog(null);
       setRejectionReason('');

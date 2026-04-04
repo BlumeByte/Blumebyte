@@ -141,10 +141,10 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
       // Keep backward compat: if single participantId set
       if (data.participantId) data.participantName = getUserName(data.participantId);
       if (editItem) {
-        await api(`/meetings/${editItem.id}`, { method: 'PUT', body: JSON.stringify(data), token: accessToken });
+        await api(`/meetings/${editItem.id}`, { method: 'PUT', body: data, token: accessToken });
         toast.success('Meeting updated');
       } else {
-        await api('/meetings', { method: 'POST', body: JSON.stringify(data), token: accessToken });
+        await api('/meetings', { method: 'POST', body: data, token: accessToken });
         toast.success(mode === 'employee' ? 'Meeting request sent' : 'Meeting scheduled');
       }
       setDialogOpen(false); load();
@@ -154,7 +154,7 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
 
   const handleApprove = async (id: string) => {
     try {
-      await api(`/meetings/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'scheduled' }), token: accessToken });
+      await api(`/meetings/${id}`, { method: 'PUT', body: { status: 'scheduled' }, token: accessToken });
       toast.success('Meeting approved and scheduled');
       load();
     } catch (e: any) { toast.error(e.message); }
@@ -163,7 +163,7 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
   const handleReject = async () => {
     if (!rejectDialog) return;
     try {
-      await api(`/meetings/${rejectDialog.id}`, { method: 'PUT', body: JSON.stringify({ status: 'rejected', rejectionReason }), token: accessToken });
+      await api(`/meetings/${rejectDialog.id}`, { method: 'PUT', body: { status: 'rejected', rejectionReason }, token: accessToken });
       toast.success('Meeting declined');
       setRejectDialog(null); setRejectionReason(''); load();
     } catch (e: any) { toast.error(e.message); }

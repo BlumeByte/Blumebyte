@@ -504,7 +504,7 @@ function EmpProfile() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const result = await api('/employee/profile', { method: 'PUT', body: JSON.stringify(profile), token: accessToken });
+      const result = await api('/employee/profile', { method: 'PUT', body: profile, token: accessToken });
       if (result.pendingApproval) {
         toast.success('Change request submitted for HR approval');
         loadProfile();
@@ -778,7 +778,7 @@ function EmpLeave() {
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      await api('/leave-requests', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+      await api('/leave-requests', { method: 'POST', body: formData, token: accessToken });
       toast.success('Leave request submitted');
       setDialogOpen(false);
       setFormData({});
@@ -916,7 +916,7 @@ function EmpTasks() {
 
   const updateStatus = async (id: string, status: string) => {
     setUpdating(id);
-    try { await api(`/my-tasks/${id}`, { method: 'PUT', body: JSON.stringify({ status }), token: accessToken }); toast.success(`Task marked as ${status}`); load(); } catch (e: any) { toast.error(e.message); }
+    try { await api(`/my-tasks/${id}`, { method: 'PUT', body: { status }, token: accessToken }); toast.success(`Task marked as ${status}`); load(); } catch (e: any) { toast.error(e.message); }
     setUpdating(null);
   };
 
@@ -1009,7 +1009,7 @@ function EmpOnboarding() {
 
   const updateStatus = async (id: string, status: string) => {
     setUpdating(id);
-    try { await api(`/my-onboarding/${id}`, { method: 'PUT', body: JSON.stringify({ status }), token: accessToken }); toast.success(`Item marked as ${status}`); load(); } catch (e: any) { toast.error(e.message); }
+    try { await api(`/my-onboarding/${id}`, { method: 'PUT', body: { status }, token: accessToken }); toast.success(`Item marked as ${status}`); load(); } catch (e: any) { toast.error(e.message); }
     setUpdating(null);
   };
 

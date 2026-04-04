@@ -103,7 +103,7 @@ export function LoginPage() {
     try {
       const result = await api('/auth/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ email: resetEmail }),
+        body: { email: resetEmail },
       });
       setResetSuccess(true);
       // In development, the backend returns the reset link

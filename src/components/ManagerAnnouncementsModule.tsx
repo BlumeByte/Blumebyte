@@ -113,14 +113,14 @@ export function ManagerAnnouncementsModule() {
       if (editItem) {
         await api(`/announcements/${editItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Announcement updated successfully');
       } else {
         await api('/announcements', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Announcement created successfully');

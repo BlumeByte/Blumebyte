@@ -93,14 +93,14 @@ export function PayGradesModule() {
       if (editItem) {
         await api(`/admin/paygrades/${editItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Pay grade updated successfully');
       } else {
         await api('/admin/paygrades', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Pay grade created successfully');

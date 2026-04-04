@@ -59,7 +59,7 @@ export function MessagesPanel() {
     }
     setSending(true);
     try {
-      await api('/messages', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+      await api('/messages', { method: 'POST', body: formData, token: accessToken });
       toast.success('Message sent');
       setDialogOpen(false);
       setFormData({});
@@ -214,7 +214,7 @@ export function MessagesPanel() {
                             if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
                               const msg = (e.target as HTMLInputElement).value.trim();
                               try {
-                                await api('/messages', { method: 'POST', body: JSON.stringify({ recipientId: selectedMessage.senderId, message: msg }), token: accessToken });
+                                await api('/messages', { method: 'POST', body: { recipientId: selectedMessage.senderId, message: msg }, token: accessToken });
                                 toast.success('Reply sent');
                                 (e.target as HTMLInputElement).value = '';
                                 load();

@@ -40,7 +40,7 @@ export function PaymentVerification() {
       const response = await api('/subscription/verify', {
         method: 'POST',
         token: accessToken,
-        body: JSON.stringify({ reference: paymentReference }),
+        body: { reference: paymentReference },
       });
 
       if (response.success) {

@@ -48,7 +48,7 @@ export function HiringApprovalPanel() {
     try {
       await api(`/job-applications/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ status }),
+        body: { status },
         token: accessToken,
       });
       toast.success(

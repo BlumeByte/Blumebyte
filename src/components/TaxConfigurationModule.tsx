@@ -107,14 +107,14 @@ export function TaxConfigurationModule() {
       if (editItem) {
         await api(`/tax-configurations/${editItem.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Tax configuration updated successfully');
       } else {
         await api('/tax-configurations', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
           token: accessToken,
         });
         toast.success('Tax configuration created successfully');

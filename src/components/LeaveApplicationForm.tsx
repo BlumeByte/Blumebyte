@@ -76,7 +76,7 @@ export function LeaveApplicationForm({ mode = 'employee' }: LeaveApplicationForm
     try {
       await api('/leave-requests', {
         method: 'POST',
-        body: JSON.stringify(formData),
+        body: formData,
         token: accessToken,
       });
       toast.success('Leave request submitted successfully');

@@ -335,10 +335,10 @@ function AdminEmployees() {
     setSaving(true);
     try {
       if (editUser) {
-        await api(`/users/${editUser.userId || editUser.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api(`/users/${editUser.userId || editUser.id}`, { method: 'PUT', body: formData, token: accessToken });
         toast.success('Updated'); setDialogOpen(false);
       } else {
-        const res = await api('/users/create', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+        const res = await api('/users/create', { method: 'POST', body: formData, token: accessToken });
         setTempPw(res.tempPassword);
         setShowTempPw(true);
         toast.success('Employee created');
@@ -608,11 +608,11 @@ function AdminUsers() {
         if (!isSuperAdmin) {
           await api('/admin/request-user-update', { 
             method: 'POST', 
-            body: JSON.stringify({ 
+            body: { 
               userId: editUser.userId || editUser.id,
               updates: formData,
               reason: 'Admin user update request'
-            }), 
+            }, 
             token: accessToken 
           });
           toast.success('Update request sent to SuperAdmin for approval');
@@ -620,7 +620,7 @@ function AdminUsers() {
           // SuperAdmin can directly update
           await api(`/users/${editUser.userId || editUser.id}`, { 
             method: 'PUT', 
-            body: JSON.stringify(formData), 
+            body: formData, 
             token: accessToken 
           });
           toast.success('Updated');
@@ -631,17 +631,17 @@ function AdminUsers() {
         if (!isSuperAdmin) {
           await api('/admin/request-user-create', { 
             method: 'POST', 
-            body: JSON.stringify({ 
+            body: { 
               userData: formData,
               reason: 'Admin user creation request'
-            }), 
+            }, 
             token: accessToken 
           });
           toast.success('User creation request sent to SuperAdmin for approval');
           setDialogOpen(false);
         } else {
           // SuperAdmin can directly create
-          const res = await api('/users/create', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+          const res = await api('/users/create', { method: 'POST', body: formData, token: accessToken });
           setTempPw(res.tempPassword);
           setShowTempPw(true);
           toast.success('Employee created');
@@ -826,8 +826,8 @@ function AdminDepartments() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (editItem) { await api(`/admin/departments/${editItem.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken }); }
-      else { await api('/admin/departments', { method: 'POST', body: JSON.stringify(formData), token: accessToken }); }
+      if (editItem) { await api(`/admin/departments/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken }); }
+      else { await api('/admin/departments', { method: 'POST', body: formData, token: accessToken }); }
       toast.success('Saved'); setDialogOpen(false); load();
     } catch (e: any) { toast.error(e.message); }
     setSaving(false);
@@ -899,7 +899,7 @@ function AdminLeave() {
 
   const handleAction = async (id: string, status: string) => {
     try {
-      await api(`/leave-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status }), token: accessToken });
+      await api(`/leave-requests/${id}`, { method: 'PUT', body: { status }, token: accessToken });
       toast.success(`Leave ${status}`);
       setLeaves(prev => prev.map(l => l.id === id ? { ...l, status } : l));
     } catch (e: any) { toast.error(e.message); }
@@ -982,8 +982,8 @@ function AdminAssets() {
         submitData.status = 'available';
       }
       // Multiple assets can be assigned to the same user — no per-user limit
-      if (editItem) { await api(`/admin/assets/${editItem.id}`, { method: 'PUT', body: JSON.stringify(submitData), token: accessToken }); }
-      else { await api('/admin/assets', { method: 'POST', body: JSON.stringify(submitData), token: accessToken }); }
+      if (editItem) { await api(`/admin/assets/${editItem.id}`, { method: 'PUT', body: submitData, token: accessToken }); }
+      else { await api('/admin/assets', { method: 'POST', body: submitData, token: accessToken }); }
       toast.success('Saved'); setDialogOpen(false); load();
     } catch (e: any) { toast.error(e.message); }
     setSaving(false);
@@ -1009,9 +1009,9 @@ function AdminAssets() {
     try {
       const submitData = { ...categoryFormData, status: categoryFormData.status || 'active' };
       if (editCategory) {
-        await api(`/admin/asset-categories/${editCategory.id}`, { method: 'PUT', body: JSON.stringify(submitData), token: accessToken });
+        await api(`/admin/asset-categories/${editCategory.id}`, { method: 'PUT', body: submitData, token: accessToken });
       } else {
-        await api('/admin/asset-categories', { method: 'POST', body: JSON.stringify(submitData), token: accessToken });
+        await api('/admin/asset-categories', { method: 'POST', body: submitData, token: accessToken });
       }
       toast.success('Category saved');
       setCategoryDialogOpen(false);
@@ -1262,7 +1262,7 @@ function AdminAttendance() {
   const handleSaveManualSettings = async () => {
     setSavingManual(true);
     try {
-      const res = await api('/manual-clock-settings', { method: 'PUT', body: JSON.stringify(manualSettings), token: accessToken });
+      const res = await api('/manual-clock-settings', { method: 'PUT', body: manualSettings, token: accessToken });
       setManualSettings(res);
       toast.success('Manual clock visibility settings saved');
     } catch (e: any) { toast.error(e.message); }
@@ -1518,7 +1518,7 @@ function AdminAnnouncements() {
         targetDepartments: formData.targetAudience === 'all' ? [] : (formData.targetDepartments || []),
         createdByRole: 'admin',
       };
-      await api('/admin/announcements', { method: 'POST', body: JSON.stringify(payload), token: accessToken });
+      await api('/admin/announcements', { method: 'POST', body: payload, token: accessToken });
       toast.success('Published');
       setDialogOpen(false);
       setFormData({ priority: 'normal', targetAudience: 'all', targetDepartments: [] });
@@ -1619,7 +1619,7 @@ function AdminProfileChangeRequests() {
 
   const handleApprove = async (id: string) => {
     try {
-      await api(`/profile-change-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'approved' }), token: accessToken });
+      await api(`/profile-change-requests/${id}`, { method: 'PUT', body: { status: 'approved' }, token: accessToken });
       toast.success('Profile changes approved and applied');
       load();
     } catch (e: any) { toast.error(e.message); }
@@ -1628,7 +1628,7 @@ function AdminProfileChangeRequests() {
   const handleReject = async () => {
     if (!rejectDialog) return;
     try {
-      await api(`/profile-change-requests/${rejectDialog.id}`, { method: 'PUT', body: JSON.stringify({ status: 'rejected', rejectionReason }), token: accessToken });
+      await api(`/profile-change-requests/${rejectDialog.id}`, { method: 'PUT', body: { status: 'rejected', rejectionReason }, token: accessToken });
       toast.success('Profile change request rejected');
       setRejectDialog(null);
       setRejectionReason('');
@@ -1812,7 +1812,7 @@ function PendingApprovalsPanel() {
     try {
       await api(`/superadmin/approval/${requestId}/reject`, { 
         method: 'POST', 
-        body: JSON.stringify({ reason }), 
+        body: { reason }, 
         token: accessToken 
       });
       toast.success('Request rejected');
@@ -2048,7 +2048,7 @@ function AdminSettings() {
   const handleSaveAutoClock = async () => {
     setSavingAutoClock(true);
     try {
-      const res = await api('/auto-clock-settings', { method: 'PUT', body: JSON.stringify(autoClockSettings), token: accessToken });
+      const res = await api('/auto-clock-settings', { method: 'PUT', body: autoClockSettings, token: accessToken });
       setAutoClockSettings(res);
       toast.success('Auto-clock settings saved');
     } catch (e: any) { toast.error(e.message); }
@@ -2058,7 +2058,7 @@ function AdminSettings() {
   const handleSave = async () => {
     setSaving(true);
     try { 
-      await api('/admin/company-settings', { method: 'PUT', body: JSON.stringify(settings), token: accessToken }); 
+      await api('/admin/company-settings', { method: 'PUT', body: settings, token: accessToken }); 
       toast.success('Settings saved'); 
       refreshBranding();
       // Dispatch custom event to notify all components
@@ -2416,9 +2416,9 @@ function AdminHiring() {
     setSaving(true);
     try {
       if (editItem) {
-        await api(`/admin/job-postings/${editItem.id}`, { method: 'PUT', body: JSON.stringify(formData), token: accessToken });
+        await api(`/admin/job-postings/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
       } else {
-        await api('/admin/job-postings', { method: 'POST', body: JSON.stringify(formData), token: accessToken });
+        await api('/admin/job-postings', { method: 'POST', body: formData, token: accessToken });
       }
       toast.success(editItem ? 'Job posting updated' : 'Job posting created');
       setDialogOpen(false);
@@ -2784,10 +2784,10 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
       });
 
       if (editItem) {
-        await api(`${config.apiPrefix}/${editItem.id}`, { method: 'PUT', body: JSON.stringify(submitData), token: accessToken });
+        await api(`${config.apiPrefix}/${editItem.id}`, { method: 'PUT', body: submitData, token: accessToken });
         toast.success(`Updated successfully`);
       } else {
-        await api(config.apiPrefix, { method: 'POST', body: JSON.stringify(submitData), token: accessToken });
+        await api(config.apiPrefix, { method: 'POST', body: submitData, token: accessToken });
         toast.success(`Created successfully`);
       }
       setDialogOpen(false);

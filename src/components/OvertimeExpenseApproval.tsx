@@ -55,7 +55,7 @@ export function OvertimeExpenseApproval() {
     setProcessing(id);
     try {
       const endpoint = type === 'overtime' ? `/admin/overtime-requests/${id}` : `/admin/expense-claims/${id}`;
-      await api(endpoint, { method: 'PUT', body: JSON.stringify({ status: 'approved' }), token: accessToken });
+      await api(endpoint, { method: 'PUT', body: { status: 'approved' }, token: accessToken });
       toast.success(`${type === 'overtime' ? 'Overtime request' : 'Expense claim'} approved`);
       loadData();
     } catch (e: any) {

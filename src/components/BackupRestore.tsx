@@ -102,7 +102,7 @@ export function BackupRestore() {
       const text = await file.text();
       const backup = JSON.parse(text);
       if (!backup.data) throw new Error('Invalid backup file format');
-      const result = await api('/backup/restore', { method: 'POST', body: JSON.stringify({ data: backup.data }), token: accessToken });
+      const result = await api('/backup/restore', { method: 'POST', body: { data: backup.data }, token: accessToken });
       setRestoreResult({ success: true, count: result.restoredCount, filename: file.name });
       toast.success(`Restored ${result.restoredCount} records`);
     } catch (err: any) {
@@ -117,7 +117,7 @@ export function BackupRestore() {
     if (!confirm('Approve this deletion? The user will be permanently removed and all teams will be notified.')) return;
     setProcessing(true);
     try {
-      await api(`/deletion-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'approved' }), token: accessToken });
+      await api(`/deletion-requests/${id}`, { method: 'PUT', body: { status: 'approved' }, token: accessToken });
       toast.success('Deletion approved. User removed and all teams notified.');
       loadRequests();
     } catch (e: any) { toast.error(e.message); }
@@ -128,7 +128,7 @@ export function BackupRestore() {
     if (!rejectDialog) return;
     setProcessing(true);
     try {
-      await api(`/deletion-requests/${rejectDialog.id}`, { method: 'PUT', body: JSON.stringify({ status: 'rejected', rejectionReason }), token: accessToken });
+      await api(`/deletion-requests/${rejectDialog.id}`, { method: 'PUT', body: { status: 'rejected', rejectionReason }, token: accessToken });
       toast.success('Deletion request rejected. Requester notified.');
       setRejectDialog(null); setRejectionReason('');
       loadRequests();
@@ -177,7 +177,7 @@ export function BackupRestore() {
     if (!confirm('FINAL WARNING: This will permanently delete ALL data except SuperAdmin accounts. Download a backup first! Continue?')) return;
     setResettingAll(true); setResetAllResult(null);
     try {
-      const result = await api('/superadmin/reset-all-data', { method: 'POST', body: JSON.stringify({ confirmPhrase }), token: accessToken });
+      const result = await api('/superadmin/reset-all-data', { method: 'POST', body: { confirmPhrase }, token: accessToken });
       setResetAllResult({ success: true, ...result });
       toast.success(`Factory reset complete. ${result.deletedRecords} records deleted.`);
       setConfirmPhrase('');
@@ -194,7 +194,7 @@ export function BackupRestore() {
     if (!confirm('FINAL WARNING: This will permanently delete YOUR account and all associated data. Download a backup first! Continue?')) return;
     setDeletingAccount(true); setDeleteAccountResult(null);
     try {
-      const result = await api('/superadmin/delete-account', { method: 'POST', body: JSON.stringify({ deleteAccountPhrase }), token: accessToken });
+      const result = await api('/superadmin/delete-account', { method: 'POST', body: { deleteAccountPhrase }, token: accessToken });
       setDeleteAccountResult({ success: true, ...result });
       toast.success(`Account deleted. ${result.deletedRecords} records removed.`);
       setDeleteAccountPhrase('');
