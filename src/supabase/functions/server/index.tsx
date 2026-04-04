@@ -397,16 +397,22 @@ async function ensureCompanyId(item: any, userId: string): Promise<any> {
 
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
-  // CRITICAL: STRICT multi-tenant isolation - NEVER return all items as fallback
+  // CRITICAL FIX: SuperAdmins can see ALL items across ALL companies
+  if (role === 'SuperAdmin') {
+    console.log(`applyCompanyFilter: SuperAdmin ${userId} accessing all items: ${items.length} total`);
+    return items;
+  }
+  
+  // For other roles: STRICT multi-tenant isolation
   const assignedCompanies = await resolveCompanyScope(userId);
   
   // If no company scope, return EMPTY - strict isolation
   if (!assignedCompanies || assignedCompanies.length === 0) {
-    console.log(`applyCompanyFilter: User ${userId} has no assignedCompanies - returning empty for strict tenant isolation`);
+    console.log(`applyCompanyFilter: User ${userId} (${role}) has no assignedCompanies - returning empty for strict tenant isolation`);
     return [];
   }
   
-  // Filter items by company for ALL roles (including SuperAdmin)
+  // Filter items by company
   return items.filter((item: any) => {
     const itemCompany = item.company || item.companyId || item.companyName;
     if (!itemCompany) return false; // STRICT: Exclude items without company assignment
@@ -416,16 +422,22 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
 
 // --- Filter employees by company scope ---
 async function filterEmployeesByCompany(employees: any[], userId: string, role: string): Promise<any[]> {
-  // CRITICAL: STRICT multi-tenant isolation - NEVER return all employees as fallback
+  // CRITICAL FIX: SuperAdmins can see ALL employees across ALL companies
+  if (role === 'SuperAdmin') {
+    console.log(`filterEmployeesByCompany: SuperAdmin ${userId} accessing all employees: ${employees.length} total`);
+    return employees;
+  }
+  
+  // For other roles: STRICT multi-tenant isolation
   const scope = await resolveCompanyScope(userId);
   
   // If no scope, return EMPTY - strict isolation
   if (!scope || scope.length === 0) {
-    console.log(`filterEmployeesByCompany: User ${userId} has no company scope - returning empty for strict tenant isolation`);
+    console.log(`filterEmployeesByCompany: User ${userId} (${role}) has no company scope - returning empty for strict tenant isolation`);
     return [];
   }
   
-  // Filter by company for ALL roles (including SuperAdmin)
+  // Filter by company
   return employees.filter((e: any) => {
     const empCompany = e.company || e.companyId;
     if (!empCompany) return false; // Exclude employees without company
@@ -2335,12 +2347,19 @@ app.get(`${PREFIX}/users`, async (c) => {
     const { user, role } = await requireAuth(c);
     const allEmployees = await kv.getByPrefix("employee:");
     
-    // CRITICAL: STRICT multi-tenant isolation for ALL roles
-    const scope = await resolveCompanyScope(user.id);
-    
+    // Employees can only see themselves
     if (role === "employee") {
       return c.json([allEmployees.find((e: any) => e.userId === user.id)].filter(Boolean));
     }
+    
+    // CRITICAL FIX: SuperAdmins can see ALL users across ALL companies
+    if (role === "SuperAdmin") {
+      console.log(`/users: SuperAdmin ${user.id} accessing all users: ${allEmployees.length} users`);
+      return c.json(allEmployees);
+    }
+    
+    // For Admins and Managers: STRICT multi-tenant isolation
+    const scope = await resolveCompanyScope(user.id);
     
     // If no scope, return EMPTY - strict isolation (no company = no data)
     if (!scope || scope.length === 0) {
@@ -8256,7 +8275,7 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
 
     // Log the code prominently for development
     console.log(`
-╔════════════════════════════════════════════╗
+╔��═══════════════════════════════════════════╗
 ║        2FA VERIFICATION CODE               ║
 ║                                            ║
 ║  Email: ${email.padEnd(37)}║

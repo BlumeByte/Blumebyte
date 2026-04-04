@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
 import { ChevronDown, BarChart3, FileText, Clock, DollarSign, Trophy, Award, UserCheck, Users, Heart, Building2, GraduationCap, Briefcase, Zap, Sparkles, Globe, Target, Shield, Briefcase as BriefcaseIcon, Book, Calendar, Video, FileCheck, Menu, X } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from './ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
@@ -213,6 +213,9 @@ export function SharedNavigation() {
                 <SheetTitle>
                   <img src={logoImage} alt="Blumebyte" className="h-8" />
                 </SheetTitle>
+                <SheetDescription className="sr-only">
+                  Navigation menu for Blumebyte platform, solutions, resources, and pricing
+                </SheetDescription>
               </SheetHeader>
               
               <div className="mt-6 space-y-4">
