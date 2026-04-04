@@ -29,8 +29,15 @@ export async function api(path: string, options: RequestInit & { token?: string 
     }
   }
   
+  // CRITICAL FIX: Stringify body if it's an object
+  let bodyToSend = fetchOpts.body;
+  if (bodyToSend && typeof bodyToSend === 'object' && !(bodyToSend instanceof FormData)) {
+    bodyToSend = JSON.stringify(bodyToSend);
+  }
+  
   const res = await fetch(`${BASE}${path}`, {
     ...fetchOpts,
+    body: bodyToSend,
     headers: {
       ...authHeaders(token, !!needsJson),
       ...(fetchOpts.headers || {}),
