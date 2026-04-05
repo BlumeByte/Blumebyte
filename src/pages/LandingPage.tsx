@@ -6,6 +6,7 @@ import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingU
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { TechSliders3D } from '../components/TechSliders3D';
+import { HeroUIUXAnimation } from '../components/HeroUIUXAnimation';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -290,31 +291,39 @@ export default function LandingPage() {
             className="w-full h-full object-cover"
           />
           {/* Dark overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-black/90" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-28 md:py-36 relative z-10">
-          <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium mb-6 border border-white/20">
-              <Sparkles className="h-4 w-4" />
-              AI-Powered HR Management
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left side: Text Content */}
+            <div className="text-left">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium mb-6 border border-white/20">
+                <Sparkles className="h-4 w-4" />
+                AI-Powered HR Management
+              </div>
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight text-white">
+                Modern HR Management for Growing Companies
+              </h1>
+              <p className="text-xl text-gray-200 mb-4">
+                Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more - all in one powerful platform.
+              </p>
+              <p className="text-2xl font-bold text-white mb-8">
+                Starting at just $5 per employee/month
+              </p>
+              <div className="flex gap-4">
+                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-lg px-8">
+                  Get Started Now
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white text-white hover:bg-white hover:text-black text-lg px-8">
+                  View Pricing
+                </Button>
+              </div>
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight text-white">
-              Modern HR Management for Growing Companies
-            </h1>
-            <p className="text-xl text-gray-200 mb-4 max-w-2xl mx-auto">
-              Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more - all in one powerful platform.
-            </p>
-            <p className="text-2xl font-bold text-white mb-8">
-              Starting at just $5 per employee/month
-            </p>
-            <div className="flex gap-4 justify-center">
-              <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-lg px-8">
-                Get Started Now
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white text-white hover:bg-white hover:text-black text-lg px-8">
-                View Pricing
-              </Button>
+
+            {/* Right side: 3D UI/UX Animation */}
+            <div className="hidden lg:block">
+              <HeroUIUXAnimation />
             </div>
           </div>
         </div>
