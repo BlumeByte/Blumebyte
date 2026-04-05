@@ -282,7 +282,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section with Background Image */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden min-h-[700px]">
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
@@ -291,27 +291,27 @@ export default function LandingPage() {
             className="w-full h-full object-cover"
           />
           {/* Dark overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-black/90" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/85 to-black/90" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Left side: Text Content */}
-            <div className="text-left">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium mb-6 border border-white/20">
+            <div className="text-left space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium border border-white/20">
                 <Sparkles className="h-4 w-4" />
                 AI-Powered HR Management
               </div>
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight text-white">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white">
                 Modern HR Management for Growing Companies
               </h1>
-              <p className="text-xl text-gray-200 mb-4">
+              <p className="text-xl text-gray-200">
                 Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more - all in one powerful platform.
               </p>
-              <p className="text-2xl font-bold text-white mb-8">
+              <p className="text-2xl font-bold text-white">
                 Starting at just $5 per employee/month
               </p>
-              <div className="flex gap-4">
+              <div className="flex gap-4 pt-4">
                 <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-lg px-8">
                   Get Started Now
                 </Button>
@@ -322,7 +322,7 @@ export default function LandingPage() {
             </div>
 
             {/* Right side: 3D UI/UX Animation */}
-            <div className="hidden lg:block">
+            <div className="hidden lg:flex items-center justify-center h-[600px]">
               <HeroUIUXAnimation />
             </div>
           </div>

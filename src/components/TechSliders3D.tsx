@@ -93,7 +93,7 @@ const Slider3D: React.FC<Slider3DProps> = ({ title, description, icon: Icon, col
               className={`absolute top-0 left-0 h-full ${color} rounded-xl shadow-lg`}
               style={{
                 width: `${value}%`,
-                background: `linear-gradient(135deg, ${color.includes('blue') ? '#3b82f6' : color.includes('purple') ? '#a855f7' : color.includes('green') ? '#10b981' : color.includes('amber') ? '#f59e0b' : color.includes('red') ? '#ef4444' : color.includes('indigo') ? '#6366f1' : color.includes('pink') ? '#ec4899' : '#8b5cf6'} 0%, ${color.includes('blue') ? '#1e40af' : color.includes('purple') ? '#7e22ce' : color.includes('green') ? '#059669' : color.includes('amber') ? '#d97706' : color.includes('red') ? '#b91c1c' : color.includes('indigo') ? '#4338ca' : color.includes('pink') ? '#be185d' : '#6d28d9'} 100%)`,
+                background: 'linear-gradient(135deg, #1f2937 0%, #000000 100%)',
               }}
               animate={{
                 boxShadow: isDragging
@@ -200,7 +200,7 @@ export function TechSliders3D() {
       title: 'Employee Engagement',
       description: 'Real-time engagement metrics',
       icon: Users,
-      color: 'bg-blue-500',
+      color: 'bg-gray-900',
       value: 85,
     },
     {
@@ -208,7 +208,7 @@ export function TechSliders3D() {
       title: 'Time Efficiency',
       description: 'Automated time tracking',
       icon: Clock,
-      color: 'bg-purple-500',
+      color: 'bg-black',
       value: 92,
     },
     {
@@ -216,7 +216,7 @@ export function TechSliders3D() {
       title: 'Data Analytics',
       description: 'Advanced HR insights',
       icon: BarChart3,
-      color: 'bg-green-500',
+      color: 'bg-gray-800',
       value: 78,
     },
     {
@@ -224,7 +224,7 @@ export function TechSliders3D() {
       title: 'Performance Growth',
       description: 'Track team improvements',
       icon: TrendingUp,
-      color: 'bg-amber-500',
+      color: 'bg-gray-700',
       value: 88,
     },
     {
@@ -232,7 +232,7 @@ export function TechSliders3D() {
       title: 'Compliance Rate',
       description: 'Stay audit-ready',
       icon: FileText,
-      color: 'bg-red-500',
+      color: 'bg-gray-900',
       value: 95,
     },
     {
@@ -240,7 +240,7 @@ export function TechSliders3D() {
       title: 'Goal Achievement',
       description: 'OKRs & targets tracking',
       icon: Target,
-      color: 'bg-indigo-500',
+      color: 'bg-black',
       value: 82,
     },
     {
@@ -248,7 +248,7 @@ export function TechSliders3D() {
       title: 'Recognition Impact',
       description: 'Employee appreciation',
       icon: Award,
-      color: 'bg-pink-500',
+      color: 'bg-gray-800',
       value: 90,
     },
     {
@@ -256,7 +256,7 @@ export function TechSliders3D() {
       title: 'Automation Level',
       description: 'Reduce manual work',
       icon: Zap,
-      color: 'bg-violet-500',
+      color: 'bg-gray-700',
       value: 87,
     },
   ]);
