@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
+import { TechSliders3D } from '../components/TechSliders3D';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -318,6 +319,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* 3D Interactive Tech Sliders Section */}
+      <TechSliders3D />
 
       {/* Features Section */}
       <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 bg-gray-50">

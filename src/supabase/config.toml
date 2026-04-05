@@ -1,27 +1,20 @@
 # Blumebyte HR Management - Supabase Configuration
 # Project: ivohczdtuxasyfoiphqu
+# NOTE: Edge functions are deployed separately via Supabase CLI, NOT through Figma Make
 
 [project]
-# Your Supabase project reference ID
 project_id = "ivohczdtuxasyfoiphqu"
 
 [api]
 enabled = true
-# Port used for local development
 port = 54321
-# Schemas to expose in the auto-generated API
 schemas = ["public", "storage", "graphql_public"]
-# Extra search path for schemas
 extra_search_path = ["public", "extensions"]
-# Maximum number of rows returned from a query
 max_rows = 1000
 
 [db]
-# Port used for local database
 port = 54322
-# Shadow database for migrations (optional)
 shadow_port = 54320
-# PostgreSQL major version
 major_version = 15
 
 [db.pooler]
@@ -34,42 +27,34 @@ max_client_conn = 100
 [realtime]
 enabled = true
 port = 54323
-# Realtime subscriptions for tables
 ip_version = "ipv4"
 
 [studio]
 enabled = true
 port = 54324
-# Supabase Studio local access
 api_url = "http://localhost"
 
 [inbucket]
 enabled = true
 port = 54325
-# Email testing
 smtp_port = 54326
 pop3_port = 54327
 
 [storage]
 enabled = true
 port = 54328
-# File upload size limit (MB)
 file_size_limit = "50MB"
 
 [auth]
 enabled = true
-# Site URL for email confirmation redirects
 site_url = "https://blumebyte.vercel.app"
-# Additional redirect URLs (for OAuth)
 additional_redirect_urls = [
   "http://localhost:5173",
   "http://localhost:5173/auth/callback",
   "https://blumebyte.vercel.app/auth/callback"
 ]
-# JWT expiry time
 jwt_expiry = 3600
 enable_signup = true
-# Email confirmations
 enable_confirmations = false
 
 [auth.email]
@@ -79,22 +64,12 @@ enable_confirmations = false
 
 [auth.external.google]
 enabled = true
-# OAuth redirect URI
 redirect_uri = "https://blumebyte.vercel.app/auth/callback"
 
-# Edge Functions Configuration
+# Edge Functions - DISABLED for Figma Make deployments
+# Deploy manually via: supabase functions deploy server --project-ref ivohczdtuxasyfoiphqu
 [functions]
-enabled = true
-
-[functions.server]
-# Your main edge function
-verify_jwt = false
-
-# Edge Functions Environment Variables
-# These are loaded when deploying functions
-[functions.env]
-SUPABASE_URL = "https://ivohczdtuxasyfoiphqu.supabase.co"
-# Note: Add SUPABASE_SERVICE_ROLE_KEY in Supabase Dashboard -> Edge Functions -> Environment Variables
+enabled = false
 
 # Analytics
 [analytics]

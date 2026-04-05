@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "integrations": {
+    "supabase": {
+      "enabled": false,
+      "edgeFunctions": {
+        "deploy": false,
+        "enabled": false
+      }
+    }
+  },
+  "deployment": {
+    "skipSupabase": true
+  }
+}

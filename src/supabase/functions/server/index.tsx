@@ -3849,6 +3849,7 @@ makeCrud("superadmin/onboard-checklist", "onboard-checklist:", requireSuperAdmin
 makeCrud("admin/asset-categories", "asset-category:", requireAdminOrAbove);
 makeCrud("admin/paygrades", "paygrade:", requireAdminOrAbove);
 makeCrud("admin/financial-years", "financial-year:", requireAdminOrAbove);
+makeCrud("admin/tax-configurations", "tax-configuration:", requireAdminOrAbove);
 makeCrud("admin/leave-types", "leave-type:", requireAdminOrAbove);
 makeCrud("admin/departments", "department:", requireAdminOrAbove);
 makeCrud("admin/compensations", "compensation:", requireAdminOrAbove);
