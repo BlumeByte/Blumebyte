@@ -499,18 +499,22 @@ export function CompensationModule() {
               <div className="border rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
                 <Label className="mb-2 block">Select Departments</Label>
                 <div className="space-y-2">
-                  {departments.map(dept => (
-                    <div key={dept} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`dept-${dept}`}
-                        checked={selectedDepts.includes(dept)}
-                        onCheckedChange={() => toggleDeptSelection(dept)}
-                      />
-                      <Label htmlFor={`dept-${dept}`} className="cursor-pointer font-normal">
-                        {dept}
-                      </Label>
-                    </div>
-                  ))}
+                  {departments.map(dept => {
+                    const deptId = typeof dept === 'string' ? dept : (dept?.id || dept?.name);
+                    const deptName = typeof dept === 'string' ? dept : (dept?.name || dept?.id);
+                    return (
+                      <div key={deptId} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`dept-${deptId}`}
+                          checked={selectedDepts.includes(deptId)}
+                          onCheckedChange={() => toggleDeptSelection(deptId)}
+                        />
+                        <Label htmlFor={`dept-${deptId}`} className="cursor-pointer font-normal">
+                          {deptName}
+                        </Label>
+                      </div>
+                    );
+                  })}
                 </div>
                 {selectedDepts.length > 0 && (
                   <p className="text-xs text-green-600 mt-2">
@@ -525,18 +529,22 @@ export function CompensationModule() {
               <div className="border rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
                 <Label className="mb-2 block">Select Branches</Label>
                 <div className="space-y-2">
-                  {branches.map(branch => (
-                    <div key={branch} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`branch-${branch}`}
-                        checked={selectedBranches.includes(branch)}
-                        onCheckedChange={() => toggleBranchSelection(branch)}
-                      />
-                      <Label htmlFor={`branch-${branch}`} className="cursor-pointer font-normal">
-                        {branch}
-                      </Label>
-                    </div>
-                  ))}
+                  {branches.map(branch => {
+                    const branchId = typeof branch === 'string' ? branch : (branch?.id || branch?.name);
+                    const branchName = typeof branch === 'string' ? branch : (branch?.name || branch?.id);
+                    return (
+                      <div key={branchId} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`branch-${branchId}`}
+                          checked={selectedBranches.includes(branchId)}
+                          onCheckedChange={() => toggleBranchSelection(branchId)}
+                        />
+                        <Label htmlFor={`branch-${branchId}`} className="cursor-pointer font-normal">
+                          {branchName}
+                        </Label>
+                      </div>
+                    );
+                  })}
                 </div>
                 {selectedBranches.length > 0 && (
                   <p className="text-xs text-green-600 mt-2">

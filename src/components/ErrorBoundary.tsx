@@ -56,30 +56,62 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError && this.state.error) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <Card className="max-w-md w-full">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-4">
+          <Card className="max-w-lg w-full shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="w-5 h-5" />
-                Something went wrong
+                Oops! Something Went Wrong
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
-                An unexpected error occurred. Please try refreshing the page.
+              <p className="text-sm text-gray-700">
+                We encountered an unexpected error. Don't worry - your data is safe. 
+                Please try refreshing the page or contact our support team if the problem persists.
               </p>
+              
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  <strong>Need Help?</strong> Contact us at{' '}
+                  <a href="mailto:support@blumebyte.com" className="underline font-semibold">
+                    support@blumebyte.com
+                  </a>
+                  {' '}with the error details below.
+                </p>
+              </div>
+              
               <details className="text-xs text-gray-500">
-                <summary className="cursor-pointer font-medium mb-2">Error details</summary>
-                <pre className="bg-gray-100 p-2 rounded overflow-auto">
+                <summary className="cursor-pointer font-medium mb-2 hover:text-gray-700">
+                  📋 View Technical Error Details
+                </summary>
+                <pre className="bg-gray-100 p-3 rounded overflow-auto text-[10px] border border-gray-200">
                   {this.state.error.message}
+                  {this.state.error.stack && (
+                    <>
+                      {'\n\n'}
+                      Stack trace:
+                      {'\n'}
+                      {this.state.error.stack}
+                    </>
+                  )}
                 </pre>
               </details>
-              <Button
-                onClick={() => window.location.reload()}
-                className="w-full"
-              >
-                Reload Page
-              </Button>
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => window.location.reload()}
+                  className="flex-1"
+                >
+                  🔄 Reload Page
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.href = '/'}
+                  className="flex-1"
+                >
+                  🏠 Go Home
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -1,51 +1,62 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../lib/auth-context';
+import { api } from '../lib/api-client';
+import { useCurrency, CURRENCIES } from '../lib/currency-context';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { toast } from 'sonner';
-import { DollarSign, Save } from 'lucide-react';
-
-const CURRENCIES = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
-  { code: 'GHS', symbol: '₵', name: 'Ghanaian Cedi' },
-  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
-  { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
-  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
-  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
-  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
-  { code: 'CHF', symbol: 'Fr', name: 'Swiss Franc' },
-  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
-  { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal' },
-];
+import { toast } from 'sonner@2.0.3';
+import { DollarSign, Save, Loader2 } from 'lucide-react';
 
 export function GlobalCurrencySettings() {
-  const [currency, setCurrency] = useState(localStorage.getItem('global_currency') || 'USD');
+  const { accessToken, user } = useAuth();
+  const { currencyCode, setCurrency: updateCurrency, loading: currencyLoading } = useCurrency();
+  const [currency, setCurrency] = useState(currencyCode);
   const [loading, setLoading] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
-  const handleSave = () => {
+  useEffect(() => {
+    setCurrency(currencyCode);
+  }, [currencyCode]);
+
+  useEffect(() => {
+    const loadCompanyId = async () => {
+      if (!accessToken || !user?.id) return;
+      try {
+        const employee = await api(`/employees/${user.id}`, { token: accessToken });
+        setCompanyId(employee?.companyId || employee?.company);
+      } catch (error) {
+        console.error('Failed to load company ID:', error);
+      }
+    };
+    loadCompanyId();
+  }, [accessToken, user?.id]);
+
+  const handleSave = async () => {
+    if (!companyId) {
+      toast.error('No company found');
+      return;
+    }
+
     setLoading(true);
     try {
-      localStorage.setItem('global_currency', currency);
-      const selectedCurrency = CURRENCIES.find(c => c.code === currency);
-      if (selectedCurrency) {
-        localStorage.setItem('global_currency_symbol', selectedCurrency.symbol);
-      }
+      await api(`/companies/${companyId}/currency`, {
+        method: 'PUT',
+        body: { currency },
+        token: accessToken,
+      });
+
+      await updateCurrency(currency);
+      
       toast.success(`Currency updated to ${currency}`);
       
-      // Trigger a custom event to notify other components
-      window.dispatchEvent(new CustomEvent('currencyChanged', { detail: { currency } }));
-      
+      // Reload to apply changes everywhere
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving currency:', error);
-      toast.error('Failed to save currency');
+      toast.error(error.message || 'Failed to save currency');
     } finally {
       setLoading(false);
     }
@@ -53,13 +64,21 @@ export function GlobalCurrencySettings() {
 
   const selectedCurrency = CURRENCIES.find(c => c.code === currency);
 
+  if (currencyLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
         <p className="text-sm text-blue-800">
-          <strong>Global Currency Setting</strong>
+          <strong>🏢 Tenant-Specific Currency</strong>
           <br />
-          This currency will be used across all modules, companies, and users in the system. All monetary values will be displayed with this currency symbol.
+          This currency will be used across all modules and users <strong>in your company only</strong>. Other companies will see their own currency settings.
         </p>
       </div>
 
@@ -97,14 +116,27 @@ export function GlobalCurrencySettings() {
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={loading} className="w-full">
-          <Save className="w-4 h-4 mr-2" />
-          {loading ? 'Saving...' : 'Save Currency Settings'}
+        <Button 
+          onClick={handleSave} 
+          disabled={loading || currency === currencyCode} 
+          className="w-full"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save Currency Settings
+            </>
+          )}
         </Button>
 
         <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
           <p className="text-xs text-yellow-800">
-            <strong>Note:</strong> Changing the currency will reload the application to apply changes across all modules. All users will see monetary values in the selected currency.
+            <strong>⚡ Multi-Tenant Isolation:</strong> This currency change only affects users in your company. Other tenants maintain their own currency settings.
           </p>
         </div>
       </div>
@@ -112,26 +144,20 @@ export function GlobalCurrencySettings() {
   );
 }
 
-// Helper function to get the current currency symbol
+// Legacy helper functions for backward compatibility
 export function getCurrencySymbol(): string {
   return localStorage.getItem('global_currency_symbol') || '$';
 }
 
-// Helper function to get the current currency code
 export function getCurrencyCode(): string {
   return localStorage.getItem('global_currency') || 'USD';
 }
 
-// Helper function to format amount with currency
 export function formatCurrency(amount: number): string {
   const symbol = getCurrencySymbol();
-  const code = getCurrencyCode();
-  
-  // Format with commas
   const formatted = amount.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  
   return `${symbol}${formatted}`;
 }

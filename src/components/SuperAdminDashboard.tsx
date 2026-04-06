@@ -61,6 +61,7 @@ import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 import { CompanySwitcher } from './CompanySwitcher';
 import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
 import { GlobalCurrencySettings } from './GlobalCurrencySettings';
+import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
@@ -467,8 +468,14 @@ export function SuperAdminDashboard() {
       case 'billings-subscriptions': return (
         <div className="p-8 space-y-8">
           <LicenseManagement />
+          
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">Global Currency Settings</h2>
+            <h2 className="text-2xl font-bold mb-6">🎨 Company Branding</h2>
+            <CompanyBrandingSettings />
+          </div>
+          
+          <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">💱 Global Currency Settings</h2>
             <Card>
               <CardHeader>
                 <CardTitle>Select Default Currency</CardTitle>
@@ -478,8 +485,9 @@ export function SuperAdminDashboard() {
               </CardContent>
             </Card>
           </div>
+          
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">Working Hours Configuration</h2>
+            <h2 className="text-2xl font-bold mb-6">⏰ Working Hours Configuration</h2>
             <WorkingHoursConfig />
           </div>
         </div>

@@ -5,9 +5,10 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
+import { useNavigate } from 'react-router';
 import {
   Bell, Check, CheckCheck, MessageCircle, UserPlus, CalendarDays, Briefcase,
-  AlertCircle, DollarSign, FileText, Users, X, Loader2, Trash2, UserMinus, ShieldAlert
+  AlertCircle, DollarSign, FileText, Users, X, Loader2, Trash2, UserMinus, ShieldAlert, ArrowRight
 } from 'lucide-react';
 
 const TYPE_ICONS: Record<string, any> = {
@@ -68,6 +69,7 @@ export function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   const fetchNotifications = useCallback(async () => {
     if (!accessToken) return;
@@ -168,7 +170,7 @@ export function NotificationsBell() {
               </div>
             ) : (
               <div>
-                {notifications.slice(0, 50).map(n => {
+                {notifications.slice(0, 5).map(n => {
                   const Icon = TYPE_ICONS[n.type] || TYPE_ICONS.default;
                   const colorClass = TYPE_COLORS[n.type] || TYPE_COLORS.default;
                   return (
@@ -194,6 +196,24 @@ export function NotificationsBell() {
               </div>
             )}
           </ScrollArea>
+
+          {/* View All Button */}
+          {notifications.length > 0 && (
+            <div className="px-4 py-3 border-t bg-gray-50">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-center"
+                onClick={() => {
+                  setOpen(false);
+                  navigate('/notifications');
+                }}
+              >
+                View All Notifications ({notifications.length})
+                <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

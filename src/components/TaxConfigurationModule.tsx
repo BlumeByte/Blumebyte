@@ -35,7 +35,7 @@ export function TaxConfigurationModule() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api('/tax-configurations', { token: accessToken });
+      const data = await api('/admin/tax-configurations', { token: accessToken });
       setTaxConfigs(Array.isArray(data) ? data : []);
     } catch (e) {
       console.log('Failed to load tax configurations:', e);
@@ -105,14 +105,14 @@ export function TaxConfigurationModule() {
       };
 
       if (editItem) {
-        await api(`/tax-configurations/${editItem.id}`, {
+        await api(`/admin/tax-configurations/${editItem.id}`, {
           method: 'PUT',
           body: payload,
           token: accessToken,
         });
         toast.success('Tax configuration updated successfully');
       } else {
-        await api('/tax-configurations', {
+        await api('/admin/tax-configurations', {
           method: 'POST',
           body: payload,
           token: accessToken,
@@ -130,7 +130,7 @@ export function TaxConfigurationModule() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this tax configuration?')) return;
     try {
-      await api(`/tax-configurations/${id}`, { method: 'DELETE', token: accessToken });
+      await api(`/admin/tax-configurations/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Tax configuration deleted successfully');
       load();
     } catch (e: any) {

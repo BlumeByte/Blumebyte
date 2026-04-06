@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider } from './lib/auth-context';
 import { BrandingProvider } from './lib/branding-context';
+import { CurrencyProvider } from './lib/currency-context';
 import { Toaster } from './components/ui/sonner';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ScrollToTop } from './components/ScrollToTop';
@@ -48,6 +49,9 @@ const LicensePaymentVerification = lazy(() => import('./components/LicensePaymen
 // PERFORMANCE: Lazy load EmployeeChat to reduce initial bundle
 const EmployeeChat = lazy(() => import('./components/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
 
+// PERFORMANCE: Lazy load NotificationsPage
+const NotificationsPage = lazy(() => import('./components/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
+
 // Loading fallback component
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -63,13 +67,15 @@ function RootLayout() {
   return (
     <BrandingProvider>
       <AuthProvider>
-        <ScrollToTop />
-        <Toaster richColors position="top-right" />
-        {/* PERFORMANCE: Lazy load EmployeeChat in Suspense to reduce initial load */}
-        <Suspense fallback={null}>
-          <EmployeeChat />
-        </Suspense>
-        <Outlet />
+        <CurrencyProvider>
+          <ScrollToTop />
+          <Toaster richColors position="top-right" />
+          {/* PERFORMANCE: Lazy load EmployeeChat in Suspense to reduce initial load */}
+          <Suspense fallback={null}>
+            <EmployeeChat />
+          </Suspense>
+          <Outlet />
+        </CurrencyProvider>
       </AuthProvider>
     </BrandingProvider>
   );
@@ -168,6 +174,14 @@ const FeaturesPageWrapper = () => <FeaturesPage />;
 const IntegrationsPageWrapper = () => <IntegrationsPage />;
 const IndustryPageWrapper = () => <IndustryPage />;
 const ResourcesPageWrapper = () => <ResourcesPage />;
+
+const NotificationsPageWrapper = () => (
+  <ProtectedRoute allowedRoles={['superadmin', 'admin', 'manager', 'employee']}>
+    <Suspense fallback={<LoadingFallback />}>
+      <NotificationsPage />
+    </Suspense>
+  </ProtectedRoute>
+);
 
 const NotFoundPage = () => <Navigate to="/login" replace />;
 
@@ -282,6 +296,10 @@ export const router = createBrowserRouter([
       {
         path: '/resources',
         Component: ResourcesPageWrapper,
+      },
+      {
+        path: '/notifications',
+        Component: NotificationsPageWrapper,
       },
       {
         path: '/hr-data-reporting',

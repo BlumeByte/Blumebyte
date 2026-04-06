@@ -1,0 +1,237 @@
+sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:127 [Hydrated]
+script.js:3 Uncaught SyntaxError: Unexpected token '<'
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:80893 🔧 Attempting to fix company scope...
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:80898 ✅ Company scope check result: Object
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69939 📊 Loading Reports & Analytics data...
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:1 (2.101.1) 2026-04-06T11:40:54.308Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69939 📊 Loading Reports & Analytics data...
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:2 (2.101.1) 2026-04-06T11:40:55.215Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69947 🔒 TENANT ISOLATION: Reports filtered for companies: Array(1)
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69947 📊 Report Data Loaded: Object
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69947 🔒 TENANT ISOLATION: Reports filtered for companies: Array(1)
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69947 📊 Report Data Loaded: Object
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:3 (2.101.1) 2026-04-06T11:41:25.448Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:73893 Advanced Reports Data Loaded: Object
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69939 📊 Loading Reports & Analytics data...
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:4 (2.101.1) 2026-04-06T11:42:28.595Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69947 🔒 TENANT ISOLATION: Reports filtered for companies: Array(1)
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:69947 📊 Report Data Loaded: Object
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:5 (2.101.1) 2026-04-06T11:43:06.539Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:6 (2.101.1) 2026-04-06T11:43:07.902Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:22425
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76221 Failed to load financial years: Error: Route not found: GET /make-server-668731fc/financial-years
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76218:17
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load financial years: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load financial years: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load financial years: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load financial years: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+ Failed to load tax configurations: 
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76516 Failed to load tax configurations: Error: Route not found: GET /make-server-668731fc/tax-configurations
+    at Z (26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:26807:15)
+    at async 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:76513:18
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 Error handled by React Router default ErrorBoundary: Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36624)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+    at sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:34209
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 Error handled by React Router default ErrorBoundary: Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at Ig (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:35876)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36679)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%2C%20headOfDepartment%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at Ig (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:35876)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36679)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 React Router caught the following error during render Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%2C%20headOfDepartment%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at Ig (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:35876)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36679)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at Ig (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:35876)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36679)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 React Router caught the following error during render Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at Ig (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:35876)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36679)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at Ig (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:35876)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36679)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515
+26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515 React Router caught the following error during render Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
+    at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)
+    at fr (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:1475)
+    at Ky (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:45673)
+    at Wy (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39726)
+    at F3 (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39654)
+    at Op (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:39508)
+    at Ig (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:35876)
+    at JN (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8:36679)
+    at zs (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:3274)
+console.error @ 26393531722a5ab6b5dbfabc79ea8a708a8d0535.js:47515

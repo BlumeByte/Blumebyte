@@ -32,7 +32,7 @@ export function FinancialYearsModule() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api('/financial-years', { token: accessToken });
+      const data = await api('/admin/financial-years', { token: accessToken });
       setYears(Array.isArray(data) ? data : []);
     } catch (e) {
       console.log('Failed to load financial years:', e);
@@ -83,14 +83,14 @@ export function FinancialYearsModule() {
       };
 
       if (editItem) {
-        await api(`/financial-years/${editItem.id}`, {
+        await api(`/admin/financial-years/${editItem.id}`, {
           method: 'PUT',
           body: payload,
           token: accessToken,
         });
         toast.success('Financial year updated successfully');
       } else {
-        await api('/financial-years', {
+        await api('/admin/financial-years', {
           method: 'POST',
           body: payload,
           token: accessToken,
@@ -108,7 +108,7 @@ export function FinancialYearsModule() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this financial year?')) return;
     try {
-      await api(`/financial-years/${id}`, { method: 'DELETE', token: accessToken });
+      await api(`/admin/financial-years/${id}`, { method: 'DELETE', token: accessToken });
       toast.success('Financial year deleted successfully');
       load();
     } catch (e: any) {

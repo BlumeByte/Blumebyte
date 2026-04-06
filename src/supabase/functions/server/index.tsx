@@ -358,26 +358,41 @@ async function logAudit(params: {
 // --- Company scope resolver ---
 async function resolveCompanyScope(userId: string): Promise<string[] | null> {
   const kvData = await kv.get(`employee:${userId}`);
+  
+  // Build scope from multiple sources (assignedCompanies, company, companyId)
+  // This handles mixed data where some employees use company name and others use UUID
+  const scope: string[] = [];
+  
+  // 1. Check KV assignedCompanies (usually UUIDs)
   if (kvData?.assignedCompanies?.length) {
-    console.log(`✅ resolveCompanyScope: Found assignedCompanies in KV for user ${userId}:`, kvData.assignedCompanies);
-    return kvData.assignedCompanies;
-  }
-  const sb = supabaseAdmin();
-  const { data } = await sb.auth.admin.getUserById(userId);
-  if (data?.user?.user_metadata?.assignedCompanies?.length) {
-    console.log(`✅ resolveCompanyScope: Found assignedCompanies in auth metadata for user ${userId}:`, data.user.user_metadata.assignedCompanies);
-    return data.user.user_metadata.assignedCompanies;
+    scope.push(...kvData.assignedCompanies);
   }
   
-  // FALLBACK: If assignedCompanies not set, use companyId/company from employee record
-  // This handles legacy users created before assignedCompanies was implemented
-  if (kvData?.companyId || kvData?.company) {
-    const companyId = kvData.companyId || kvData.company;
-    console.log(`⚠️ resolveCompanyScope: assignedCompanies not found, using fallback companyId for user ${userId}: ${companyId}`);
-    return [companyId];
+  // 2. Check auth metadata assignedCompanies (backup)
+  if (scope.length === 0) {
+    const sb = supabaseAdmin();
+    const { data } = await sb.auth.admin.getUserById(userId);
+    if (data?.user?.user_metadata?.assignedCompanies?.length) {
+      scope.push(...data.user.user_metadata.assignedCompanies);
+    }
   }
   
-  console.log(`❌ resolveCompanyScope: No assignedCompanies found for user ${userId}. KV data:`, kvData, 'Auth metadata:', data?.user?.user_metadata);
+  // 3. CRITICAL: Also add company/companyId field (handles legacy data with company names)
+  if (kvData?.company) {
+    if (!scope.includes(kvData.company)) {
+      scope.push(kvData.company);
+    }
+  }
+  if (kvData?.companyId && !scope.includes(kvData.companyId)) {
+    scope.push(kvData.companyId);
+  }
+  
+  if (scope.length > 0) {
+    console.log(`✅ resolveCompanyScope: User ${userId} can access companies:`, scope);
+    return scope;
+  }
+  
+  console.log(`❌ resolveCompanyScope: No company scope found for user ${userId}. KV data:`, kvData);
   return null;
 }
 
@@ -1901,6 +1916,45 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
   }
 });
 
+// BRANDING MANAGEMENT: SuperAdmin-only control over company branding
+app.put(`${PREFIX}/superadmin/company-branding`, async (c) => {
+  try {
+    const { user, role } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    
+    // CRITICAL FIX: Update company-scoped settings (SuperAdmin only)
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    if (!companyId) return c.json({ error: "Company not found" }, 404);
+    
+    const existing = await kv.get(`company-settings:${companyId}`) || {};
+    // Strip logoUrl/logoPath from body — only the upload/remove routes should change these
+    const { logoUrl: _lu, logoPath: _lp, ...safeBody } = body;
+    const updated = { ...existing, ...safeBody, companyId, updatedAt: new Date().toISOString() };
+    await kv.set(`company-settings:${companyId}`, updated);
+    
+    console.log(`🎨 Branding updated for company ${companyId} by SuperAdmin ${user.id}:`, { 
+      companyName: updated.companyName, 
+      primaryColor: updated.primaryColor 
+    });
+    
+    // Return with fresh signed URL if logo exists
+    if (updated.logoPath) {
+      try {
+        const sb = supabaseAdmin();
+        const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(updated.logoPath, 60 * 60 * 24 * 7);
+        if (urlData?.signedUrl) updated.logoUrl = urlData.signedUrl;
+      } catch (e) { console.log("Logo URL refresh on settings save:", e); }
+    }
+    return c.json(updated);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Keep legacy endpoint for backward compatibility
 app.put(`${PREFIX}/admin/company-settings`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
@@ -3953,10 +4007,10 @@ makeCrud("admin/tasks", "task:", requireAdminOrAbove);
 makeCrud("admin/feedback", "feedback:", requireAdminOrAbove);
 makeCrud("admin/training-program", "training:", requireAdminOrAbove);
 
-// ============ COMPANY LOGO UPLOAD ============
+// ============ COMPANY LOGO UPLOAD (SuperAdmin only) ============
 app.post(`${PREFIX}/upload/company-logo`, async (c) => {
   try {
-    const { user, role } = await requireAdminOrAbove(c);
+    const { user, role } = await requireSuperAdmin(c);
     await ensureBucket();
     
     // CRITICAL FIX: Get company scope for logo upload
@@ -3997,10 +4051,10 @@ app.post(`${PREFIX}/upload/company-logo`, async (c) => {
   }
 });
 
-// ============ REMOVE COMPANY LOGO ============
-app.delete(`${PREFIX}/admin/remove-company-logo`, async (c) => {
+// ============ REMOVE COMPANY LOGO (SuperAdmin only) ============
+app.delete(`${PREFIX}/superadmin/remove-company-logo`, async (c) => {
   try {
-    const { user, role } = await requireAdminOrAbove(c);
+    const { user, role } = await requireSuperAdmin(c);
     
     // CRITICAL FIX: Get company scope for logo removal
     const scope = await resolveCompanyScope(user.id);
@@ -6275,6 +6329,46 @@ app.get(`${PREFIX}/companies`, async (c) => {
     return c.json(companies || []);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Update company currency (SuperAdmin/Admin only)
+app.put(`${PREFIX}/companies/:id/currency`, async (c) => {
+  try {
+    const { user, role } = await requireAdminOrAbove(c);
+    const companyId = c.req.param("id");
+    const { currency } = await c.req.json();
+    
+    // Validate currency code
+    const validCurrencies = ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'ZAR', 'KES', 'CAD', 'AUD', 'INR', 'JPY', 'CNY', 'CHF', 'AED', 'SAR'];
+    if (!validCurrencies.includes(currency)) {
+      return c.json({ error: 'Invalid currency code' }, 400);
+    }
+    
+    // Get company
+    const company = await kv.get(`company:${companyId}`);
+    if (!company) {
+      return c.json({ error: 'Company not found' }, 404);
+    }
+    
+    // Verify user has access to this company
+    const scope = await resolveCompanyScope(user.id);
+    if (!scope?.length || !companyMatches(scope, companyId)) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
+    
+    // Update company currency
+    company.currency = currency;
+    await kv.set(`company:${companyId}`, company);
+    
+    console.log(`💱 Currency updated to ${currency} for company ${companyId} by user ${user.id}`);
+    
+    return c.json({ success: true, currency });
+  } catch (e: any) {
+    console.error('❌ Error updating currency:', e);
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
     return c.json({ error: e.message }, 500);
   }
 });
