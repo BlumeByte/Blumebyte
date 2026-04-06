@@ -24,6 +24,7 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!accessToken) {
       setLoading(false);
+      document.documentElement.classList.remove('dark');
       return;
     }
 
@@ -33,15 +34,19 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
         const isDark = settings?.darkMode === true;
         setDarkMode(isDark);
         
-        // Apply dark mode to document
+        // Apply dark mode to HTML element for global application
         if (isDark) {
           document.documentElement.classList.add('dark');
+          document.body.classList.add('dark');
         } else {
           document.documentElement.classList.remove('dark');
+          document.body.classList.remove('dark');
         }
       })
       .catch((err) => {
         console.log('Error loading dark mode settings:', err);
+        document.documentElement.classList.remove('dark');
+        document.body.classList.remove('dark');
       })
       .finally(() => {
         setLoading(false);
@@ -56,8 +61,10 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
           
           if (isDark) {
             document.documentElement.classList.add('dark');
+            document.body.classList.add('dark');
           } else {
             document.documentElement.classList.remove('dark');
+            document.body.classList.remove('dark');
           }
         })
         .catch(console.log);

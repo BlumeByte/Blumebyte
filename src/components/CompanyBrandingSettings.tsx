@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { useBranding } from '../lib/branding-context';
-import { api } from '../lib/api-client';
+import { api, apiUpload } from '../lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -143,12 +143,7 @@ export function CompanyBrandingSettings() {
       const formData = new FormData();
       formData.append('file', blob, 'logo.png');
 
-      const result = await api('/upload/company-logo', {
-        method: 'POST',
-        body: formData,
-        token: accessToken,
-        isFormData: true,
-      });
+      const result = await apiUpload('/upload/company-logo', formData, accessToken);
 
       setSettings({ ...settings, logoUrl: result.logoUrl });
       toast.success('✅ Logo uploaded successfully');
