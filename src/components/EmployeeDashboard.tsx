@@ -29,12 +29,14 @@ import { SharedMyProfile } from './SharedMyProfile';
 import { ClockInOut } from './ClockInOut';
 import { MeetingsPanel } from './MeetingsPanel';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
+import { useCurrency } from '../lib/currency-context';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
   const { branding } = useBranding();
+  const { currencySymbol } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
 
   // Poll batch auto-clockout every 60s for all accounts

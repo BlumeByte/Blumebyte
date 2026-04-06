@@ -2014,35 +2014,19 @@ function PendingApprovalsPanel() {
 
 function AdminSettings() {
   const { accessToken } = useAuth();
-  const { refresh: refreshBranding } = useBranding();
-  const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [removingLogo, setRemovingLogo] = useState(false);
-  const logoRef = useRef<HTMLInputElement>(null);
 
   // Auto-clock settings
   const [autoClockSettings, setAutoClockSettings] = useState<any>({ enabled: false, clockInTime: '08:00', clockOutTime: '17:00', mode: 'all', specificUsers: [], inactivityTimeout: 30 });
   const [savingAutoClock, setSavingAutoClock] = useState(false);
 
-  // Crop state
-  const [cropDialogOpen, setCropDialogOpen] = useState(false);
-  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
-  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
-  const [cropZoom, setCropZoom] = useState(1);
-  const cropContainerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0 });
-
   useEffect(() => {
-    Promise.all([
-      api('/company-settings', { token: accessToken }).catch(() => ({})),
-      api('/auto-clock-settings', { token: accessToken }).catch(() => null),
-    ]).then(([compSettings, autoSettings]) => {
-      setSettings(compSettings || {});
-      if (autoSettings) setAutoClockSettings(autoSettings);
-    }).finally(() => setLoading(false));
+    api('/auto-clock-settings', { token: accessToken })
+      .then((autoSettings) => {
+        if (autoSettings) setAutoClockSettings(autoSettings);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [accessToken]);
 
   const handleSaveAutoClock = async () => {
@@ -2055,212 +2039,12 @@ function AdminSettings() {
     setSavingAutoClock(false);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try { 
-      await api('/admin/company-settings', { method: 'PUT', body: settings, token: accessToken }); 
-      toast.success('Settings saved'); 
-      refreshBranding();
-      // Dispatch custom event to notify all components
-      window.dispatchEvent(new Event('branding-updated'));
-    }
-    catch (e: any) { toast.error(e.message); }
-    setSaving(false);
-  };
-
-  // Step 1: File selected → open crop dialog
-  const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'].includes(file.type)) {
-      toast.error('Only image files are allowed for company logo');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error(`Logo must be less than 5MB. Your file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCropImageSrc(reader.result as string);
-      setCropPosition({ x: 0, y: 0 });
-      setCropZoom(1);
-      setCropDialogOpen(true);
-    };
-    reader.readAsDataURL(file);
-    if (logoRef.current) logoRef.current.value = '';
-  };
-
-  // Step 2: Crop and upload
-  const handleCropAndUploadLogo = async () => {
-    if (!cropImageSrc) return;
-    setUploadingLogo(true);
-    try {
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = cropImageSrc;
-      });
-
-      const CROP_SIZE = 256;
-      const canvas = document.createElement('canvas');
-      canvas.width = CROP_SIZE;
-      canvas.height = CROP_SIZE;
-      const ctx = canvas.getContext('2d')!;
-
-      const containerSize = 224;
-      const imgDisplaySize = containerSize * cropZoom;
-      const imgCenterX = (containerSize * (50 + cropPosition.x)) / 100;
-      const imgCenterY = (containerSize * (50 + cropPosition.y)) / 100;
-      const visibleLeft = -imgCenterX + imgDisplaySize / 2;
-      const visibleTop = -imgCenterY + imgDisplaySize / 2;
-      const scaleX = img.width / imgDisplaySize;
-      const scaleY = img.height / imgDisplaySize;
-      const srcX = visibleLeft * scaleX;
-      const srcY = visibleTop * scaleY;
-      const srcW = containerSize * scaleX;
-      const srcH = containerSize * scaleY;
-
-      // Circular clip
-      ctx.beginPath();
-      ctx.arc(CROP_SIZE / 2, CROP_SIZE / 2, CROP_SIZE / 2, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
-
-      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, CROP_SIZE, CROP_SIZE);
-
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
-      if (!blob) { toast.error('Failed to process image'); setUploadingLogo(false); return; }
-
-      const fd = new FormData();
-      fd.append('file', blob, 'company-logo.png');
-      const res = await apiUpload('/upload/company-logo', fd, accessToken);
-      toast.success('Company logo updated');
-      setSettings((prev: any) => ({ ...prev, logoUrl: res.logoUrl }));
-      refreshBranding();
-      // Dispatch custom event to notify all components
-      window.dispatchEvent(new Event('branding-updated'));
-      setCropDialogOpen(false);
-      setCropImageSrc(null);
-    } catch (err: any) {
-      console.error('Logo crop/upload error:', err);
-      toast.error(err.message || 'Logo upload failed');
-    }
-    setUploadingLogo(false);
-  };
-
-  // Remove logo
-  const handleRemoveLogo = async () => {
-    if (!confirm('Remove the company logo? This cannot be undone.')) return;
-    setRemovingLogo(true);
-    try {
-      await api('/admin/remove-company-logo', { method: 'DELETE', token: accessToken });
-      toast.success('Company logo removed');
-      setSettings((prev: any) => ({ ...prev, logoUrl: '' }));
-      refreshBranding();
-      // Dispatch custom event to notify all components
-      window.dispatchEvent(new Event('branding-updated'));
-    } catch (err: any) { toast.error(err.message || 'Failed to remove logo'); }
-    setRemovingLogo(false);
-  };
-
-  // Crop drag handlers
-  const handleCropMouseDown = (e: React.MouseEvent) => {
-    isDragging.current = true;
-    const rect = cropContainerRef.current?.getBoundingClientRect();
-    const sz = rect?.width || 224;
-    dragStart.current = { x: e.clientX - (cropPosition.x / 100) * sz, y: e.clientY - (cropPosition.y / 100) * sz };
-  };
-  const handleCropMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging.current) return;
-    const rect = cropContainerRef.current?.getBoundingClientRect();
-    const sz = rect?.width || 224;
-    setCropPosition({ x: ((e.clientX - dragStart.current.x) / sz) * 100, y: ((e.clientY - dragStart.current.y) / sz) * 100 });
-  };
-  const handleCropMouseUp = () => { isDragging.current = false; };
-  const handleCropTouchStart = (e: React.TouchEvent) => {
-    isDragging.current = true;
-    const t = e.touches[0];
-    const rect = cropContainerRef.current?.getBoundingClientRect();
-    const sz = rect?.width || 224;
-    dragStart.current = { x: t.clientX - (cropPosition.x / 100) * sz, y: t.clientY - (cropPosition.y / 100) * sz };
-  };
-  const handleCropTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging.current) return;
-    const t = e.touches[0];
-    const rect = cropContainerRef.current?.getBoundingClientRect();
-    const sz = rect?.width || 224;
-    setCropPosition({ x: ((t.clientX - dragStart.current.x) / sz) * 100, y: ((t.clientY - dragStart.current.y) / sz) * 100 });
-  };
-  const handleCropTouchEnd = () => { isDragging.current = false; };
-
-  const colors = ['#1d4ed8', '#3b82f6', '#0d9488', '#059669', '#7c3aed', '#dc2626', '#ea580c', '#ca8a04', '#4f46e5', '#be185d', '#0891b2', '#16a34a', '#9333ea', '#2563eb', '#64748b'];
-
   if (loading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>;
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <Card>
-        <CardHeader><CardTitle className="text-sm">Company Branding</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {/* Company Logo */}
-          <div>
-            <Label>Company Logo</Label>
-            <div className="mt-2 flex items-center gap-4">
-              <div className="relative group">
-                {settings.logoUrl ? (
-                  <img src={settings.logoUrl} alt="Company Logo" className="w-20 h-20 rounded-full object-cover border-2 border-gray-200 bg-white" />
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
-                    <Building2 className="w-8 h-8 text-gray-300" />
-                  </div>
-                )}
-                <button
-                  onClick={() => logoRef.current?.click()}
-                  disabled={uploadingLogo}
-                  className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                >
-                  {uploadingLogo ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Camera className="w-5 h-5 text-white" />}
-                </button>
-                {settings.logoUrl && (
-                  <button
-                    onClick={handleRemoveLogo}
-                    disabled={removingLogo}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs hover:bg-red-600"
-                    title="Remove logo"
-                  >
-                    {removingLogo ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                  </button>
-                )}
-                <input ref={logoRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={handleLogoFileSelect} />
-              </div>
-              <div className="space-y-1.5">
-                <Button variant="outline" size="sm" onClick={() => logoRef.current?.click()} disabled={uploadingLogo}>
-                  <Upload className="w-3.5 h-3.5 mr-1" />Upload Logo
-                </Button>
-                {settings.logoUrl && (
-                  <Button variant="outline" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 ml-2" onClick={handleRemoveLogo} disabled={removingLogo}>
-                    {removingLogo ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}Remove
-                  </Button>
-                )}
-                <p className="text-[10px] text-gray-400">Max 5MB. JPG, PNG, GIF, WEBP. Image will be cropped to a circle.</p>
-              </div>
-            </div>
-          </div>
-          <div><Label>Company Name</Label><Input value={settings.companyName || ''} onChange={e => setSettings({ ...settings, companyName: e.target.value })} /></div>
-          <div><Label>Description</Label><Textarea value={settings.description || ''} onChange={e => setSettings({ ...settings, description: e.target.value })} /></div>
-          <div><Label>Primary Color</Label>
-            <div className="flex flex-wrap gap-2 mt-2">{colors.map(c => (
-              <button key={c} className={`w-8 h-8 rounded-lg border-2 transition-all ${settings.primaryColor === c ? 'border-gray-900 scale-110' : 'border-transparent'}`}
-                style={{ backgroundColor: c }} onClick={() => setSettings({ ...settings, primaryColor: c })} />
-            ))}</div>
-          </div>
-          <Button onClick={handleSave} disabled={saving}>{saving && <Loader2 className="w-4 h-4 animate-spin mr-1" />}Save Settings</Button>
-        </CardContent>
-      </Card>
-
+      {/* Company Branding has been moved to SuperAdmin only */}
+      
       {/* Auto Clock-In / Clock-Out Settings */}
       <Card>
         <CardHeader>
@@ -2322,64 +2106,6 @@ function AdminSettings() {
           )}
         </CardContent>
       </Card>
-
-      {/* Logo Crop Dialog */}
-      <Dialog open={cropDialogOpen} onOpenChange={(open) => { if (!open && !uploadingLogo) { setCropDialogOpen(false); setCropImageSrc(null); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Crop Company Logo</DialogTitle></DialogHeader>
-          <p className="text-sm text-gray-500">Drag the image to reposition. Use the slider to zoom in/out. The logo will be cropped to a circle.</p>
-          <div className="flex flex-col items-center gap-4 py-4">
-            <div
-              ref={cropContainerRef}
-              className="relative w-56 h-56 rounded-full overflow-hidden border-4 border-blue-200 cursor-move select-none bg-gray-100 shadow-inner"
-              onMouseDown={handleCropMouseDown}
-              onMouseMove={handleCropMouseMove}
-              onMouseUp={handleCropMouseUp}
-              onMouseLeave={handleCropMouseUp}
-              onTouchStart={handleCropTouchStart}
-              onTouchMove={handleCropTouchMove}
-              onTouchEnd={handleCropTouchEnd}
-            >
-              {cropImageSrc && (
-                <img
-                  src={cropImageSrc}
-                  alt="Crop preview"
-                  className="absolute pointer-events-none"
-                  draggable={false}
-                  style={{
-                    width: `${100 * cropZoom}%`,
-                    height: `${100 * cropZoom}%`,
-                    objectFit: 'cover',
-                    left: `${50 + cropPosition.x}%`,
-                    top: `${50 + cropPosition.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                />
-              )}
-            </div>
-            <div className="flex items-center gap-3 w-full max-w-xs">
-              <span className="text-xs text-gray-500 font-medium">−</span>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="0.05"
-                value={cropZoom}
-                onChange={e => setCropZoom(parseFloat(e.target.value))}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-              <span className="text-xs text-gray-500 font-medium">+</span>
-            </div>
-            <p className="text-[11px] text-gray-400">The logo will be saved as a circular image</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setCropDialogOpen(false); setCropImageSrc(null); }}>Cancel</Button>
-            <Button onClick={handleCropAndUploadLogo} disabled={uploadingLogo}>
-              {uploadingLogo && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Crop & Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -45,24 +45,23 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // Get user's company settings
-        const employee = await api(`/employees/${user.id}`, { token: accessToken });
-        const companyId = employee?.companyId || employee?.company;
-
-        if (companyId) {
-          // Get company settings
-          const company = await api(`/companies/${companyId}`, { token: accessToken });
-          
-          if (company?.currency) {
-            const curr = CURRENCIES.find(c => c.code === company.currency);
-            if (curr) {
-              setCurrencyCode(curr.code);
-              setCurrencySymbol(curr.symbol);
-            }
-          }
+        // Get company settings directly (includes currency)
+        const settings = await api('/company-settings', { token: accessToken });
+        
+        if (settings?.currencyCode && settings?.currencySymbol) {
+          // Use currency from company settings (supports custom currencies)
+          setCurrencyCode(settings.currencyCode);
+          setCurrencySymbol(settings.currencySymbol);
+        } else {
+          // Fallback to default USD
+          setCurrencyCode('USD');
+          setCurrencySymbol('$');
         }
       } catch (error) {
         console.error('Failed to load currency settings:', error);
+        // Use default on error
+        setCurrencyCode('USD');
+        setCurrencySymbol('$');
       } finally {
         setLoading(false);
       }
@@ -72,29 +71,22 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, [accessToken, user?.id]);
 
   // Update currency (SuperAdmin only)
-  const updateCurrency = async (code: string) => {
+  const updateCurrency = async (code: string, customSymbol?: string) => {
     if (!accessToken || !user?.id) return;
 
     try {
+      // For standard currencies, find from CURRENCIES list
       const curr = CURRENCIES.find(c => c.code === code);
-      if (!curr) throw new Error('Invalid currency code');
-
-      // Get user's company
-      const employee = await api(`/employees/${user.id}`, { token: accessToken });
-      const companyId = employee?.companyId || employee?.company;
-
-      if (!companyId) throw new Error('No company found');
-
-      // Update company settings
-      await api(`/companies/${companyId}`, {
-        method: 'PUT',
-        body: { currency: code },
-        token: accessToken,
-      });
-
+      
       // Update local state
-      setCurrencyCode(curr.code);
-      setCurrencySymbol(curr.symbol);
+      if (curr) {
+        setCurrencyCode(curr.code);
+        setCurrencySymbol(curr.symbol);
+      } else if (customSymbol) {
+        // Custom currency
+        setCurrencyCode(code);
+        setCurrencySymbol(customSymbol);
+      }
 
       // Trigger event to refresh all components
       window.dispatchEvent(new CustomEvent('currencyChanged', { detail: { currency: code } }));

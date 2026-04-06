@@ -50,13 +50,18 @@ export function CompanyBrandingSettings() {
         body: settings, 
         token: accessToken 
       });
-      toast.success('✅ Company branding updated successfully');
+      toast.success('✅ Company branding updated successfully. Reloading...');
       refreshBranding();
       window.dispatchEvent(new Event('branding-updated'));
+      
+      // Reload page after 1 second to apply changes everywhere
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (e: any) {
       toast.error(e.message || 'Failed to save branding');
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   // Step 1: File selected → open crop dialog

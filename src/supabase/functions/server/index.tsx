@@ -1901,6 +1901,14 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
     
     const settings = await kv.get(`company-settings:${companyId}`);
     if (!settings) return c.json({});
+    
+    // Set default currency if not set
+    if (!settings.currencyCode) {
+      settings.currencyCode = 'USD';
+      settings.currencySymbol = '$';
+      settings.isCustomCurrency = false;
+    }
+    
     // Refresh logo signed URL if path exists
     if (settings.logoPath) {
       try {
@@ -6333,24 +6341,22 @@ app.get(`${PREFIX}/companies`, async (c) => {
   }
 });
 
+// Helper function to get currency symbol
+function getCurrencySymbol(code: string): string {
+  const symbols: Record<string, string> = {
+    'USD': '$', 'EUR': '€', 'GBP': '£', 'NGN': '₦', 'GHS': '₵',
+    'ZAR': 'R', 'KES': 'KSh', 'CAD': 'C$', 'AUD': 'A$', 'INR': '₹',
+    'JPY': '¥', 'CNY': '¥', 'CHF': 'CHF', 'AED': 'د.إ', 'SAR': '﷼'
+  };
+  return symbols[code] || code;
+}
+
 // Update company currency (SuperAdmin/Admin only)
 app.put(`${PREFIX}/companies/:id/currency`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
     const companyId = c.req.param("id");
-    const { currency } = await c.req.json();
-    
-    // Validate currency code
-    const validCurrencies = ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'ZAR', 'KES', 'CAD', 'AUD', 'INR', 'JPY', 'CNY', 'CHF', 'AED', 'SAR'];
-    if (!validCurrencies.includes(currency)) {
-      return c.json({ error: 'Invalid currency code' }, 400);
-    }
-    
-    // Get company
-    const company = await kv.get(`company:${companyId}`);
-    if (!company) {
-      return c.json({ error: 'Company not found' }, 404);
-    }
+    const { currency, customCurrencySymbol, customCurrencyCode } = await c.req.json();
     
     // Verify user has access to this company
     const scope = await resolveCompanyScope(user.id);
@@ -6358,13 +6364,44 @@ app.put(`${PREFIX}/companies/:id/currency`, async (c) => {
       return c.json({ error: 'Access denied' }, 403);
     }
     
-    // Update company currency
-    company.currency = currency;
-    await kv.set(`company:${companyId}`, company);
+    // Update company-settings instead of company record
+    const settings = await kv.get(`company-settings:${companyId}`) || {};
     
-    console.log(`💱 Currency updated to ${currency} for company ${companyId} by user ${user.id}`);
+    // If custom currency provided, use it; otherwise validate standard currency
+    if (customCurrencyCode && customCurrencySymbol) {
+      settings.currencyCode = customCurrencyCode.toUpperCase();
+      settings.currencySymbol = customCurrencySymbol;
+      settings.isCustomCurrency = true;
+    } else {
+      // Validate standard currency code
+      const validCurrencies = ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'ZAR', 'KES', 'CAD', 'AUD', 'INR', 'JPY', 'CNY', 'CHF', 'AED', 'SAR'];
+      if (!validCurrencies.includes(currency)) {
+        return c.json({ error: 'Invalid currency code' }, 400);
+      }
+      settings.currencyCode = currency;
+      settings.currencySymbol = getCurrencySymbol(currency);
+      settings.isCustomCurrency = false;
+    }
     
-    return c.json({ success: true, currency });
+    settings.companyId = companyId;
+    settings.updatedAt = new Date().toISOString();
+    await kv.set(`company-settings:${companyId}`, settings);
+    
+    // Also update the company record for backward compatibility
+    const company = await kv.get(`company:${companyId}`);
+    if (company) {
+      company.currency = settings.currencyCode;
+      await kv.set(`company:${companyId}`, company);
+    }
+    
+    console.log(`💱 Currency updated to ${settings.currencyCode} (${settings.currencySymbol}) for company ${companyId} by user ${user.id}`);
+    
+    return c.json({ 
+      success: true, 
+      currency: settings.currencyCode,
+      currencySymbol: settings.currencySymbol,
+      isCustomCurrency: settings.isCustomCurrency || false
+    });
   } catch (e: any) {
     console.error('❌ Error updating currency:', e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
