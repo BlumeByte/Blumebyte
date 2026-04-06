@@ -241,7 +241,18 @@ export function ReportsPanel() {
           <BarChart3 className="w-5 h-5 text-blue-600" />
           <h2 className="text-lg font-semibold">Reports & Analytics</h2>
         </div>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={async () => {
+            try {
+              const data = await api('/debug/tenant-data', { token: accessToken });
+              console.log('🐛 DEBUG TENANT DATA:', data);
+              alert('Debug data logged to console. Press F12 to view.');
+            } catch (e) {
+              console.error('Debug failed:', e);
+            }
+          }}>🐛 Debug</Button>
+          <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+        </div>
       </div>
 
       <div className="flex gap-1 border-b pb-0">

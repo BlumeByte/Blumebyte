@@ -444,17 +444,37 @@ async function filterEmployeesByCompany(employees: any[], userId: string, role: 
   // SuperAdmins are company-level admins, NOT platform-wide admins
   const scope = await resolveCompanyScope(userId);
   
+  console.log(`🔍 DEBUG filterEmployeesByCompany: User ${userId} (${role}) has scope:`, scope);
+  
   // If no scope, return EMPTY - strict isolation
   if (!scope || scope.length === 0) {
     console.log(`⚠️ filterEmployeesByCompany: User ${userId} (${role}) has no company scope - returning empty for strict tenant isolation`);
     return [];
   }
   
+  // DEBUG: Log sample employee companies for debugging
+  if (employees.length > 0 && employees.length <= 10) {
+    console.log(`🔍 DEBUG: Sample employee companies:`, employees.map(e => ({
+      id: e.id || e.userId,
+      name: e.name,
+      company: e.company,
+      companyId: e.companyId,
+      assignedCompanies: e.assignedCompanies
+    })));
+  }
+  
   // Filter by company for ALL roles
   const filtered = employees.filter((e: any) => {
     const empCompany = e.company || e.companyId;
-    if (!empCompany) return false; // Exclude employees without company
-    return scope.includes(empCompany);
+    if (!empCompany) {
+      console.log(`⚠️ Employee ${e.id || e.userId} (${e.name}) has NO company field - excluding`);
+      return false; // Exclude employees without company
+    }
+    const included = scope.includes(empCompany);
+    if (!included && employees.length <= 10) {
+      console.log(`⚠️ Employee ${e.id || e.userId} (${e.name}) company "${empCompany}" NOT in scope [${scope.join(', ')}] - excluding`);
+    }
+    return included;
   });
   
   console.log(`✅ filterEmployeesByCompany: User ${userId} (${role}) accessing ${filtered.length}/${employees.length} employees in companies: ${scope.join(', ')}`);
@@ -4194,6 +4214,62 @@ app.get(`${PREFIX}/reports/attendance`, async (c) => {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401); 
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403); 
     return c.json({ error: e.message }, 500); 
+  }
+});
+
+// DEBUG ENDPOINT: Show raw vs filtered data for troubleshooting
+app.get(`${PREFIX}/debug/tenant-data`, async (c) => {
+  try {
+    const { user, role } = await requireAdminOrAbove(c);
+    
+    // Get user's profile
+    const profile = await kv.get(`employee:${user.id}`);
+    const scope = await resolveCompanyScope(user.id);
+    
+    // Get all employees
+    const allEmployees = await kv.getByPrefix("employee:");
+    const filteredEmployees = await filterEmployeesByCompany(allEmployees, user.id, role);
+    
+    // Get sample data
+    const sampleEmployees = allEmployees.slice(0, 5).map(e => ({
+      id: e.id || e.userId,
+      name: e.name,
+      email: e.email,
+      role: e.role,
+      company: e.company,
+      companyId: e.companyId,
+      assignedCompanies: e.assignedCompanies
+    }));
+    
+    return c.json({
+      debug: {
+        currentUser: {
+          id: user.id,
+          role: role,
+          profile: {
+            company: profile?.company,
+            companyId: profile?.companyId,
+            assignedCompanies: profile?.assignedCompanies
+          },
+          resolvedScope: scope
+        },
+        dataCounts: {
+          totalEmployeesInSystem: allEmployees.length,
+          employeesUserCanSee: filteredEmployees.length,
+          totalAttendanceRecords: (await kv.getByPrefix("attendance:")).length,
+          totalDepartments: (await kv.getByPrefix("department:")).length
+        },
+        sampleEmployees: sampleEmployees,
+        filteredEmployeeIds: filteredEmployees.slice(0, 5).map(e => ({
+          id: e.id || e.userId,
+          name: e.name,
+          company: e.company || e.companyId
+        }))
+      }
+    });
+  } catch (e: any) {
+    console.error(`❌ Error in /debug/tenant-data:`, e);
+    return c.json({ error: e.message }, 500);
   }
 });
 
