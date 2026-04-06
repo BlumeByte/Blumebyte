@@ -5825,6 +5825,78 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
   }
 });
 
+// Get license information (used by LicenseManagement and LicenseStatusBanner)
+app.get(`${PREFIX}/subscription/license-info`, async (c) => {
+  try {
+    const { user, role } = await requireAuth(c);
+    
+    // Get company scope
+    const scope = await resolveCompanyScope(user.id);
+    const companyId = scope?.[0];
+    
+    if (!companyId) {
+      return c.json({ 
+        error: 'No company scope',
+        totalLicenses: 0,
+        usedLicenses: 0,
+        availableLicenses: 0
+      }, 200);
+    }
+    
+    // Get all employees in the same company
+    const allEmployees = await kv.getByPrefix('employee:');
+    const companyEmployees = allEmployees.filter((emp: any) => 
+      (emp.company === companyId || emp.companyId === companyId)
+    );
+    
+    // Find superadmin in this company
+    const superadmin = companyEmployees.find((emp: any) => emp.role === 'superadmin');
+    
+    if (!superadmin) {
+      return c.json({ 
+        error: 'No superadmin found',
+        totalLicenses: 0,
+        usedLicenses: companyEmployees.length,
+        availableLicenses: 0
+      }, 200);
+    }
+    
+    // Get subscription
+    const subscription = await kv.get(`subscription:${superadmin.id}`);
+    
+    if (!subscription) {
+      return c.json({ 
+        error: 'No subscription found',
+        totalLicenses: 0,
+        usedLicenses: companyEmployees.length,
+        availableLicenses: 0
+      }, 200);
+    }
+    
+    const totalLicenses = subscription.userCount || 0;
+    const usedLicenses = companyEmployees.length;
+    const availableLicenses = Math.max(0, totalLicenses - usedLicenses);
+    
+    const now = new Date();
+    const endDate = new Date(subscription.endDate);
+    const isActive = now < endDate;
+    
+    return c.json({
+      totalLicenses,
+      usedLicenses,
+      availableLicenses,
+      subscriptionStatus: isActive ? 'active' : 'expired',
+      plan: subscription.plan,
+      endDate: subscription.endDate,
+      companyId
+    });
+  } catch (e: any) {
+    console.error('Error getting license info:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Initialize Paystack payment
 app.post(`${PREFIX}/subscription/initialize`, async (c) => {
   try {
