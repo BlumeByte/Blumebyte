@@ -415,6 +415,13 @@ async function ensureCompanyId(item: any, userId: string): Promise<any> {
   };
 }
 
+// --- Case-insensitive company matching helper ---
+// FIX: Handles case mismatches like "BLUMEBYTE" vs "blumebyte" to ensure proper tenant isolation
+function companyMatches(scope: string[], company: string | undefined | null): boolean {
+  if (!company || !scope?.length) return false;
+  return scope.some(s => s.toLowerCase() === company.toLowerCase());
+}
+
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
   // CRITICAL FIX: ALL roles including SuperAdmins are filtered by their company scope
@@ -431,7 +438,8 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
   const filtered = items.filter((item: any) => {
     const itemCompany = item.company || item.companyId || item.companyName;
     if (!itemCompany) return false; // STRICT: Exclude items without company assignment
-    return assignedCompanies.includes(itemCompany);
+    // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
+    return assignedCompanies.some(ac => ac.toLowerCase() === itemCompany.toLowerCase());
   });
   
   console.log(`✅ applyCompanyFilter: User ${userId} (${role}) accessing ${filtered.length}/${items.length} items in companies: ${assignedCompanies.join(', ')}`);
@@ -470,7 +478,8 @@ async function filterEmployeesByCompany(employees: any[], userId: string, role: 
       console.log(`⚠️ Employee ${e.id || e.userId} (${e.name}) has NO company field - excluding`);
       return false; // Exclude employees without company
     }
-    const included = scope.includes(empCompany);
+    // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
+    const included = scope.some(s => s.toLowerCase() === empCompany.toLowerCase());
     if (!included && employees.length <= 10) {
       console.log(`⚠️ Employee ${e.id || e.userId} (${e.name}) company "${empCompany}" NOT in scope [${scope.join(', ')}] - excluding`);
     }
@@ -519,7 +528,7 @@ async function isItemInUserCompany(userId: string, itemCompanyId: string | undef
   if (!itemCompanyId) return true; // No company constraint
   const userScope = await resolveCompanyScope(userId);
   if (!userScope?.length) return false;
-  return userScope.includes(itemCompanyId);
+  return companyMatches(userScope, itemCompanyId);
 }
 
 // --- Generic CRUD factory ---
@@ -1210,7 +1219,7 @@ app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
     const subscription = await kv.get(`subscription:${authUser.id}`);
     const allUsers = await kv.getByPrefix('employee:');
     // CRITICAL: Filter to only this company's users
-    const companyUsers = allUsers.filter((u: any) => scope.includes(u.companyId) || scope.includes(u.company));
+    const companyUsers = allUsers.filter((u: any) => companyMatches(scope, u.companyId) || companyMatches(scope, u.company));
     
     // If no subscription or inactive, deactivate all non-superadmin users IN THIS COMPANY
     if (!subscription || subscription.status !== 'active') {
@@ -1470,7 +1479,7 @@ app.get(`${PREFIX}/profile-change-requests`, async (c) => {
     }
     
     const employees = await kv.getByPrefix("employee:");
-    const companyEmployees = employees.filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company));
+    const companyEmployees = employees.filter((e: any) => companyMatches(scope, e.companyId) || companyMatches(scope, e.company));
     const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.userId || e.id));
     
     console.log(`✅ Found ${companyEmployees.length} employees in company, IDs:`, Array.from(companyEmployeeIds).slice(0, 5));
@@ -2441,7 +2450,7 @@ app.get(`${PREFIX}/users`, async (c) => {
     let filtered = allEmployees.filter((e: any) => {
       const empCompany = e.companyId || e.company;
       if (!empCompany) return false; // Exclude unscoped employees
-      return scope.includes(empCompany);
+      return companyMatches(scope, empCompany);
     });
     
     console.log(`✅ /users: User ${user.id} (${role}) accessing ${filtered.length} users in companies: ${scope.join(', ')}`);
@@ -2879,7 +2888,7 @@ app.get(`${PREFIX}/superadmin/pending-approvals`, async (c) => {
       // Filter approvals to only show those from the SuperAdmin's company
       allApprovals = allApprovals.filter((a: any) => {
         // Check if the approval request has a companyId or relates to a company employee
-        return scope.includes(a.companyId) || scope.includes(a.company);
+        return companyMatches(scope, a.companyId) || companyMatches(scope, a.company);
       });
     }
     
@@ -3125,7 +3134,7 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
     
     // CRITICAL: Verify target belongs to caller's company
     const callerScope = await resolveCompanyScope(caller.id);
-    if (callerScope?.length && targetCompany && !callerScope.includes(targetCompany)) {
+    if (callerScope?.length && targetCompany && !companyMatches(callerScope, targetCompany)) {
       return c.json({ error: "Cannot delete user from another company" }, 403);
     }
     
@@ -3274,7 +3283,7 @@ app.get(`${PREFIX}/deletion-requests`, async (c) => {
       
       if (scope?.length) {
         const employees = await kv.getByPrefix("employee:");
-        const companyEmployees = employees.filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company));
+        const companyEmployees = employees.filter((e: any) => companyMatches(scope, e.companyId) || companyMatches(scope, e.company));
         const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.id || e.userId));
         
         console.log(`✅ Found ${companyEmployees.length} employees in company for deletion requests`);
@@ -3366,7 +3375,7 @@ app.post(`${PREFIX}/superadmin/reset-user-data/:userId`, async (c) => {
     // CRITICAL FIX: Verify target belongs to caller's company
     const callerScope = await resolveCompanyScope(caller.id);
     const targetCompany = target?.companyId || target?.company;
-    if (callerScope?.length && targetCompany && !callerScope.includes(targetCompany)) {
+    if (callerScope?.length && targetCompany && !companyMatches(callerScope, targetCompany)) {
       return c.json({ error: "Cannot reset data for user from another company" }, 403);
     }
     let deleted = 0;
@@ -3408,13 +3417,13 @@ app.post(`${PREFIX}/superadmin/reset-all-data`, async (c) => {
       for (const item of items) {
         // CRITICAL: Only delete items belonging to this company
         const itemCompany = item.companyId || item.company;
-        if (itemCompany && !callerScope.includes(itemCompany)) continue; // Skip other company's data
+        if (itemCompany && !companyMatches(callerScope, itemCompany)) continue; // Skip other company's data
         // For items without company (attendance, messages, notifications), check userId
         if (!itemCompany) {
           if (item.userId) {
             const emp = await kv.get(`employee:${item.userId}`);
             const empCompany = emp?.companyId || emp?.company;
-            if (empCompany && !callerScope.includes(empCompany)) continue;
+            if (empCompany && !companyMatches(callerScope, empCompany)) continue;
           } else {
             continue; // Skip items with no way to determine company
           }
@@ -3431,7 +3440,7 @@ app.post(`${PREFIX}/superadmin/reset-all-data`, async (c) => {
     
     // Only delete employees from THIS company (never other companies)
     const allEmployees = await kv.getByPrefix("employee:");
-    const companyEmployees = allEmployees.filter((e: any) => callerScope.includes(e.companyId) || callerScope.includes(e.company));
+    const companyEmployees = allEmployees.filter((e: any) => companyMatches(callerScope, e.companyId) || companyMatches(callerScope, e.company));
     const sb = supabaseAdmin();
     for (const emp of companyEmployees) {
       if (emp.role === "superadmin") continue;
@@ -3475,7 +3484,7 @@ app.post(`${PREFIX}/superadmin/delete-account`, async (c) => {
         if (prefix === "company:" && itemCompany === companyId) {
           await kv.del(`${prefix}${itemCompany}`);
           deleted++;
-        } else if (itemCompany && callerScope.includes(itemCompany)) {
+        } else if (itemCompany && companyMatches(callerScope, itemCompany)) {
           const key = item.userId && item.date ? `${prefix}${item.userId}:${item.date}` : `${prefix}${item.id}`;
           await kv.del(key);
           deleted++;
@@ -3484,7 +3493,7 @@ app.post(`${PREFIX}/superadmin/delete-account`, async (c) => {
           if (item.userId) {
             const emp = await kv.get(`employee:${item.userId}`);
             const empCompany = emp?.companyId || emp?.company;
-            if (empCompany && callerScope.includes(empCompany)) {
+            if (empCompany && companyMatches(callerScope, empCompany)) {
               const key = item.userId && item.date ? `${prefix}${item.userId}:${item.date}` : `${prefix}${item.id}`;
               await kv.del(key);
               deleted++;
@@ -3502,7 +3511,7 @@ app.post(`${PREFIX}/superadmin/delete-account`, async (c) => {
     
     // 3. Delete ALL employees from THIS company (including SuperAdmin this time)
     const allEmployees = await kv.getByPrefix("employee:");
-    const companyEmployees = allEmployees.filter((e: any) => callerScope.includes(e.companyId) || callerScope.includes(e.company));
+    const companyEmployees = allEmployees.filter((e: any) => companyMatches(callerScope, e.companyId) || companyMatches(callerScope, e.company));
     const sb = supabaseAdmin();
     for (const emp of companyEmployees) {
       const uid = emp.userId || emp.id;
@@ -4264,7 +4273,8 @@ app.get(`${PREFIX}/debug/tenant-data`, async (c) => {
           id: e.id || e.userId,
           name: e.name,
           company: e.company || e.companyId
-        }))
+        })),
+        note: "✅ Company matching is now CASE-INSENSITIVE (BLUMEBYTE = blumebyte)"
       }
     });
   } catch (e: any) {
@@ -5493,7 +5503,7 @@ app.get(`${PREFIX}/backup`, async (c) => {
     const allEmps = await kv.getByPrefix("employee:");
     const companyEmpIds = new Set(
       allEmps
-        .filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company))
+        .filter((e: any) => companyMatches(scope, e.companyId) || companyMatches(scope, e.company))
         .map((e: any) => e.userId || e.id)
     );
     
@@ -5502,11 +5512,11 @@ app.get(`${PREFIX}/backup`, async (c) => {
       // Filter items by company scope
       const filtered = items.filter((item: any) => {
         const itemCompany = item.companyId || item.company;
-        if (itemCompany) return scope.includes(itemCompany);
+        if (itemCompany) return companyMatches(scope, itemCompany);
         // For user-specific items, check if userId belongs to company
         if (item.userId) return companyEmpIds.has(item.userId);
         // For company: prefix, filter by id
-        if (p === "company:" && item.id) return scope.includes(item.id);
+        if (p === "company:" && item.id) return companyMatches(scope, item.id);
         // For employee: prefix, already handled by companyId
         if (p === "employee:") return companyEmpIds.has(item.userId || item.id);
         return false;
@@ -5724,7 +5734,7 @@ app.get(`${PREFIX}/subscription/user-count`, async (c) => {
     const scope = await resolveCompanyScope(user.id);
     const allUsers = await kv.getByPrefix('employee:');
     const companyUsers = scope?.length 
-      ? allUsers.filter((u: any) => scope.includes(u.companyId) || scope.includes(u.company))
+      ? allUsers.filter((u: any) => companyMatches(scope, u.companyId) || companyMatches(scope, u.company))
       : allUsers;
     
     // Count company users only (including superadmin, admin, manager, employee)
@@ -6268,7 +6278,7 @@ app.get(`${PREFIX}/departments`, async (c) => {
     departments = departments.filter((d: any) => {
       const dCompany = d.companyId || d.company;
       if (!dCompany) return false; // STRICT: Exclude items without company
-      return scope.includes(dCompany);
+      return companyMatches(scope, dCompany);
     });
     
     console.log(`✅ /departments: Returning ${departments.length} departments for companies: ${scope.join(', ')}`);
@@ -6315,7 +6325,7 @@ app.get(`${PREFIX}/payroll-runs`, async (c) => {
     payrollRuns = payrollRuns.filter((p: any) => {
       const pCompany = p.companyId || p.company;
       if (!pCompany) return false; // STRICT: Exclude items without company
-      return scope.includes(pCompany);
+      return companyMatches(scope, pCompany);
     });
     
     console.log(`✅ /payroll-runs: Returning ${payrollRuns.length} runs for companies: ${scope.join(', ')}`);
@@ -6388,7 +6398,7 @@ app.get(`${PREFIX}/assets`, async (c) => {
       assets = assets.filter((a: any) => {
         const aCompany = a.companyId || a.company;
         if (!aCompany) return false; // STRICT: Exclude items without company
-        return scope.includes(aCompany);
+        return companyMatches(scope, aCompany);
       });
     }
     
