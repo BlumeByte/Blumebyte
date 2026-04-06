@@ -17,6 +17,7 @@ import {
   Camera, Upload, Trash2, Image, File, AlertCircle, Printer, ArrowUpDown, ArrowUp, ArrowDown, Clock, Star
 } from 'lucide-react';
 import { useBranding } from '../lib/branding-context';
+import { useCurrency } from '../lib/currency-context';
 
 function exportToPDFDoc(title: string, content: string, companyName = 'Blumebyte') {
   const w = window.open('', '_blank');
@@ -30,6 +31,7 @@ function exportToPDFDoc(title: string, content: string, companyName = 'Blumebyte
 export function SharedMyProfile() {
   const { user, accessToken, refreshProfile } = useAuth();
   const { branding } = useBranding();
+  const { currencySymbol } = useCurrency();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'profile' | 'payslips' | 'leave-history' | 'documents'>('profile');
@@ -481,7 +483,7 @@ export function SharedMyProfile() {
           const sorted = [...payslips].sort((a, b) => { const av = a[payslipSort.key]||'', bv = b[payslipSort.key]||''; return payslipSort.dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av)); });
           const toggleSort = (k: string) => setPayslipSort(p => p.key === k ? { key: k, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: 'desc' });
           const SI = ({ c }: { c: string }) => payslipSort.key === c ? (payslipSort.dir === 'asc' ? <ArrowUp className="w-3 h-3 ml-1 inline" /> : <ArrowDown className="w-3 h-3 ml-1 inline" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline opacity-30" />;
-          const printAll = () => { if (!profile) return; const rows = sorted.map(p => { const net = (parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `<tr><td>${p.period||'—'}</td><td>${p.payDate||'—'}</td><td>GHS ${parseFloat(p.basicSalary||0).toLocaleString()}</td><td>GHS ${parseFloat(p.allowances||0).toLocaleString()}</td><td>GHS ${parseFloat(p.deductions||0).toLocaleString()}</td><td><strong>GHS ${parseFloat(net).toLocaleString()}</strong></td><td>${p.status||'pending'}</td></tr>`; }).join(''); exportToPDFDoc('Payslip Report', `<h1>${branding.companyName} — Payslip Report</h1><p class="sub">Employee: ${profile.name} | Generated: ${new Date().toLocaleString()}</p><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f3f4f6;"><th>Period</th><th>Pay Date</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`, branding.companyName); };
+          const printAll = () => { if (!profile) return; const rows = sorted.map(p => { const net = (parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `<tr><td>${p.period||'—'}</td><td>${p.payDate||'—'}</td><td>${currencySymbol} ${parseFloat(p.basicSalary||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.allowances||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.deductions||0).toLocaleString()}</td><td><strong>${currencySymbol} ${parseFloat(net).toLocaleString()}</strong></td><td>${p.status||'pending'}</td></tr>`; }).join(''); exportToPDFDoc('Payslip Report', `<h1>${branding.companyName} — Payslip Report</h1><p class="sub">Employee: ${profile.name} | Generated: ${new Date().toLocaleString()}</p><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f3f4f6;"><th>Period</th><th>Pay Date</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`, branding.companyName); };
           return (
           <Card>
             <CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">My Payslips</CardTitle>{payslips.length > 0 && <div className="flex gap-2"><Button variant="outline" size="sm" onClick={printAll}><Printer className="w-3.5 h-3.5 mr-1" />Print All</Button><Button variant="outline" size="sm" onClick={() => { const csv = ['Period,Pay Date,Basic,Allowances,Deductions,Net,Status',...sorted.map(p => { const net=(parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `${p.period||''},${p.payDate||''},${p.basicSalary||0},${p.allowances||0},${p.deductions||0},${net},${p.status||'pending'}`; })].join('\n'); const b=new Blob([csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='payslips.csv'; a.click(); URL.revokeObjectURL(u); toast.success('Exported'); }}><Download className="w-3.5 h-3.5 mr-1" />CSV</Button></div>}</div></CardHeader>
@@ -507,10 +509,10 @@ export function SharedMyProfile() {
                         <TableRow key={idx}>
                           <TableCell className="font-medium">{p.period || '\u2014'}</TableCell>
                           <TableCell>{p.payDate || '\u2014'}</TableCell>
-                          <TableCell>GHS {parseFloat(p.basicSalary || 0).toLocaleString()}</TableCell>
+                          <TableCell>{currencySymbol} {parseFloat(p.basicSalary || 0).toLocaleString()}</TableCell>
                           <TableCell className="text-green-600">+{parseFloat(p.allowances || 0).toLocaleString()}</TableCell>
                           <TableCell className="text-red-600">-{parseFloat(p.deductions || 0).toLocaleString()}</TableCell>
-                          <TableCell className="font-semibold">GHS {parseFloat(net).toLocaleString()}</TableCell>
+                          <TableCell className="font-semibold">{currencySymbol} {parseFloat(net).toLocaleString()}</TableCell>
                           <TableCell><Badge className={p.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>{p.status || 'pending'}</Badge></TableCell>
                           <TableCell><Button variant="outline" size="sm" onClick={() => generateDocument(`Payslip - ${p.period || 'N/A'}`)}><Download className="w-3 h-3 mr-1" />PDF</Button></TableCell>
                         </TableRow>
@@ -682,7 +684,7 @@ export function SharedMyProfile() {
                 <div className="grid grid-cols-3 gap-3">
                   <div><Label>Department</Label><Input value={editData.department || ''} onChange={e => setEditData({ ...editData, department: e.target.value })} placeholder="e.g., Human Resources" /></div>
                   <div><Label>Company</Label><Input value={editData.company || ''} onChange={e => setEditData({ ...editData, company: e.target.value })} placeholder="e.g., Blumebyte" /></div>
-                  <div><Label>Salary</Label><Input value={editData.salary || ''} onChange={e => setEditData({ ...editData, salary: e.target.value })} placeholder="e.g., GHS 5,000" /></div>
+                  <div><Label>Salary</Label><Input value={editData.salary || ''} onChange={e => setEditData({ ...editData, salary: e.target.value })} placeholder={`e.g., ${currencySymbol} 5,000`} /></div>
                 </div>
                 <Separator />
               </>

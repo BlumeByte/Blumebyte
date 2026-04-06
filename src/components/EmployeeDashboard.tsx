@@ -191,7 +191,7 @@ function EmpOverview({ onNavigate }: { onNavigate: (tab: string) => void }) {
 
   const printPayslips = () => {
     if (!profile) return;
-    const rows = payslips.map(p => { const net = (parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `<tr><td>${p.period||'—'}</td><td>${p.payDate||'—'}</td><td>GHS ${parseFloat(p.basicSalary||0).toLocaleString()}</td><td>GHS ${parseFloat(p.allowances||0).toLocaleString()}</td><td>GHS ${parseFloat(p.deductions||0).toLocaleString()}</td><td><strong>GHS ${parseFloat(net).toLocaleString()}</strong></td><td>${p.status||'pending'}</td></tr>`; }).join('');
+    const rows = payslips.map(p => { const net = (parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `<tr><td>${p.period||'—'}</td><td>${p.payDate||'—'}</td><td>${currencySymbol} ${parseFloat(p.basicSalary||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.allowances||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.deductions||0).toLocaleString()}</td><td><strong>${currencySymbol} ${parseFloat(net).toLocaleString()}</strong></td><td>${p.status||'pending'}</td></tr>`; }).join('');
     printDoc('Payslip Report', `<h1>${branding.companyName} — Payslip Report</h1><p class="sub">Employee: ${profile.name} | Generated: ${new Date().toLocaleString()}</p><table><thead><tr><th>Period</th><th>Pay Date</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
   };
 

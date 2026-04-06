@@ -182,7 +182,7 @@ export function AdminDashboard() {
           {activeTab === 'assets' && <AdminAssets />}
           {activeTab === 'attendance' && <AdminAttendance />}
           {activeTab === 'workflows' && <AdminCrudPanel entityKey="workflows" />}
-          {activeTab === 'automation' && <AutomationModule companyId={profile?.companyId} />}
+          {activeTab === 'automation' && <AutomationModule companyId={user?.companyId || user?.company} />}
           {activeTab === 'performance-reviews' && <AdminCrudPanel entityKey="performance-reviews" />}
           {activeTab === 'disciplinary' && <AdminCrudPanel entityKey="disciplinary" />}
           {activeTab === 'compliance' && <AdminCrudPanel entityKey="compliance" />}

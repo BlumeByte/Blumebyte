@@ -334,6 +334,33 @@ export function CompanyBrandingSettings() {
             />
           </div>
 
+          {/* Dark Mode */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              Dark Mode
+            </Label>
+            <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg border">
+              <div>
+                <p className="text-sm font-medium">Enable Dark Mode for All Users</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  When enabled, all users in your company will see a dark interface
+                </p>
+              </div>
+              <button
+                onClick={() => setSettings({ ...settings, darkMode: !settings.darkMode })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  settings.darkMode ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings.darkMode ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           {/* Preview */}
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-lg border">
             <p className="text-xs text-gray-500 mb-3">Preview:</p>
