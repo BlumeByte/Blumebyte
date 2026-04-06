@@ -69,6 +69,17 @@ export function ReportsPanel() {
         api('/profile', { token: accessToken }).catch(() => null),
       ]);
       
+      // TENANT ISOLATION CHECK: Log company scope
+      const userCompanies = profile?.assignedCompanies || (profile?.companyId ? [profile.companyId] : []);
+      console.log('🔒 TENANT ISOLATION: Reports filtered for companies:', userCompanies);
+      console.log('📊 Report Data Loaded:', {
+        users: u?.length || 0,
+        attendance: a?.length || 0,
+        departments: d?.length || 0,
+        leaves: l?.length || 0,
+        userRole: user?.role,
+      });
+      
       const myDept = profile?.department || '';
       const myDepts = profile?.departments || (profile?.department ? [profile.department] : []);
       setManagerDepartment(myDept);
@@ -83,7 +94,9 @@ export function ReportsPanel() {
       setAttendanceData(Array.isArray(a) ? (isManager ? a.filter(att => myDepts.includes(att.department)) : a) : []);
       setDepartmentsData(Array.isArray(d) ? (isManager ? d.filter(dept => myDepts.includes(dept.name)) : d) : []);
       setLeavesData(Array.isArray(l) ? (isManager ? l.filter(lv => myDepts.includes(lv.department)) : l) : []);
-    } catch (e) { console.log(e); }
+    } catch (e) { 
+      console.error('❌ Error loading reports:', e);
+    }
     setLoading(false);
   }, [accessToken, user?.role]);
 

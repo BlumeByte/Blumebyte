@@ -22,9 +22,13 @@ export function ProfileChangeRequests() {
 
   const load = useCallback(async () => {
     try {
+      console.log('📋 Loading profile change requests...');
       const data = await api('/profile-change-requests', { token: accessToken });
+      console.log('✅ Profile change requests loaded:', data?.length || 0);
       setRequests(Array.isArray(data) ? data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
-    } catch (e) { console.log(e); }
+    } catch (e) { 
+      console.error('❌ Error loading profile change requests:', e); 
+    }
     setLoading(false);
   }, [accessToken]);
 

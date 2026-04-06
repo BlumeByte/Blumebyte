@@ -417,52 +417,48 @@ async function ensureCompanyId(item: any, userId: string): Promise<any> {
 
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
-  // CRITICAL FIX: SuperAdmins can see ALL items across ALL companies
-  if (role === 'superadmin' || role === 'SuperAdmin') {
-    console.log(`applyCompanyFilter: SuperAdmin ${userId} accessing all items: ${items.length} total`);
-    return items;
-  }
-  
-  // For other roles: STRICT multi-tenant isolation
+  // CRITICAL FIX: ALL roles including SuperAdmins are filtered by their company scope
+  // SuperAdmins are company-level admins, NOT platform-wide admins
   const assignedCompanies = await resolveCompanyScope(userId);
   
   // If no company scope, return EMPTY - strict isolation
   if (!assignedCompanies || assignedCompanies.length === 0) {
-    console.log(`applyCompanyFilter: User ${userId} (${role}) has no assignedCompanies - returning empty for strict tenant isolation`);
+    console.log(`⚠️ applyCompanyFilter: User ${userId} (${role}) has no assignedCompanies - returning empty for strict tenant isolation`);
     return [];
   }
   
-  // Filter items by company
-  return items.filter((item: any) => {
+  // Filter items by company for ALL roles
+  const filtered = items.filter((item: any) => {
     const itemCompany = item.company || item.companyId || item.companyName;
     if (!itemCompany) return false; // STRICT: Exclude items without company assignment
     return assignedCompanies.includes(itemCompany);
   });
+  
+  console.log(`✅ applyCompanyFilter: User ${userId} (${role}) accessing ${filtered.length}/${items.length} items in companies: ${assignedCompanies.join(', ')}`);
+  return filtered;
 }
 
 // --- Filter employees by company scope ---
 async function filterEmployeesByCompany(employees: any[], userId: string, role: string): Promise<any[]> {
-  // CRITICAL FIX: SuperAdmins can see ALL employees across ALL companies
-  if (role === 'superadmin' || role === 'SuperAdmin') {
-    console.log(`filterEmployeesByCompany: SuperAdmin ${userId} accessing all employees: ${employees.length} total`);
-    return employees;
-  }
-  
-  // For other roles: STRICT multi-tenant isolation
+  // CRITICAL FIX: ALL roles including SuperAdmins are filtered by their company scope
+  // SuperAdmins are company-level admins, NOT platform-wide admins
   const scope = await resolveCompanyScope(userId);
   
   // If no scope, return EMPTY - strict isolation
   if (!scope || scope.length === 0) {
-    console.log(`filterEmployeesByCompany: User ${userId} (${role}) has no company scope - returning empty for strict tenant isolation`);
+    console.log(`⚠️ filterEmployeesByCompany: User ${userId} (${role}) has no company scope - returning empty for strict tenant isolation`);
     return [];
   }
   
-  // Filter by company
-  return employees.filter((e: any) => {
+  // Filter by company for ALL roles
+  const filtered = employees.filter((e: any) => {
     const empCompany = e.company || e.companyId;
     if (!empCompany) return false; // Exclude employees without company
     return scope.includes(empCompany);
   });
+  
+  console.log(`✅ filterEmployeesByCompany: User ${userId} (${role}) accessing ${filtered.length}/${employees.length} employees in companies: ${scope.join(', ')}`);
+  return filtered;
 }
 
 // --- Centralized error handler ---
@@ -1291,6 +1287,11 @@ app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
 app.get(`${PREFIX}/profile`, async (c) => {
   try {
     const { user, role, kvData } = await requireAuth(c);
+    
+    // DEBUG: Log tenant isolation info
+    const scope = await resolveCompanyScope(user.id);
+    console.log(`🔍 /profile: User ${user.id} (${role}), companyScope: ${scope?.join(', ') || 'NONE'}, kvData.companyId: ${kvData?.companyId}, kvData.assignedCompanies: ${kvData?.assignedCompanies?.join(', ') || 'NONE'}`);
+    
     // Regenerate profile image signed URL if file exists
     let profileImageUrl = kvData?.profileImageUrl || "";
     const profileFile = await kv.get(`file:${user.id}:profile-image`);
@@ -1430,24 +1431,42 @@ app.get(`${PREFIX}/profile-change-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     const all = await kv.getByPrefix("profile-change:");
+    console.log(`🔍 /profile-change-requests: User ${user.id} (${role}), total requests: ${all.length}`);
     
     // Employee only sees their own requests
     if (role === "employee") {
-      return c.json(all.filter((r: any) => r.userId === user.id));
+      const filtered = all.filter((r: any) => r.userId === user.id);
+      console.log(`📤 Employee ${user.id} sees ${filtered.length} own requests`);
+      return c.json(filtered);
     }
     
     // CRITICAL: For superadmin/admin/manager, filter by company scope
     const scope = await resolveCompanyScope(user.id);
-    if (!scope?.length) return c.json([]);
+    console.log(`🔒 User ${user.id} company scope:`, scope);
+    
+    if (!scope?.length) {
+      console.log(`⚠️ No company scope for ${user.id}, returning empty`);
+      return c.json([]);
+    }
     
     const employees = await kv.getByPrefix("employee:");
-    const companyEmployeeIds = new Set(
-      employees
-        .filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company))
-        .map((e: any) => e.userId || e.id)
-    );
-    return c.json(all.filter((r: any) => companyEmployeeIds.has(r.userId)));
+    const companyEmployees = employees.filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company));
+    const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.userId || e.id));
+    
+    console.log(`✅ Found ${companyEmployees.length} employees in company, IDs:`, Array.from(companyEmployeeIds).slice(0, 5));
+    
+    const filtered = all.filter((r: any) => {
+      const hasMatch = companyEmployeeIds.has(r.userId);
+      if (!hasMatch && all.length < 10) {
+        console.log(`⚠️ Request ${r.id} userId ${r.userId} not in company employee set`);
+      }
+      return hasMatch;
+    });
+    
+    console.log(`📤 Returning ${filtered.length} profile change requests for user ${user.id}`);
+    return c.json(filtered);
   } catch (e: any) {
+    console.error(`❌ Error in /profile-change-requests:`, e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     return c.json({ error: e.message }, 500);
   }
@@ -1501,17 +1520,9 @@ app.get(`${PREFIX}/users/for-messages`, async (c) => {
     const allEmployees = await kv.getByPrefix("employee:");
     console.log(`📊 Total employees in system: ${allEmployees.length}`);
     
-    // CRITICAL FIX: SuperAdmins can see ALL users across ALL companies for messaging
-    let filtered;
-    if (role === 'superadmin' || role === 'SuperAdmin') {
-      // SuperAdmins can message anyone across all companies
-      filtered = allEmployees;
-      console.log(`✅ SuperAdmin ${user.id} accessing all users for messaging: ${filtered.length} users`);
-    } else {
-      // Apply company filtering for multi-tenant isolation
-      filtered = await filterEmployeesByCompany(allEmployees, user.id, role);
-      console.log(`✅ User ${user.id} (role: ${role}) accessing company-scoped users for messaging: ${filtered.length} users`);
-    }
+    // CRITICAL FIX: ALL roles including SuperAdmins are filtered by company scope
+    const filtered = await filterEmployeesByCompany(allEmployees, user.id, role);
+    console.log(`✅ User ${user.id} (${role}) accessing ${filtered.length} company-scoped users for messaging`);
     
     const result = filtered
       .filter((e: any) => e.userId !== user.id)
@@ -2391,24 +2402,19 @@ app.get(`${PREFIX}/users`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     const allEmployees = await kv.getByPrefix("employee:");
+    console.log(`🔍 /users called by ${user.id} (${role}), total employees: ${allEmployees.length}`);
     
     // Employees can only see themselves
     if (role === "employee") {
       return c.json([allEmployees.find((e: any) => e.userId === user.id)].filter(Boolean));
     }
     
-    // CRITICAL FIX: SuperAdmins can see ALL users across ALL companies
-    if (role === "superadmin" || role === "SuperAdmin") {
-      console.log(`/users: SuperAdmin ${user.id} accessing all users: ${allEmployees.length} users`);
-      return c.json(allEmployees);
-    }
-    
-    // For Admins and Managers: STRICT multi-tenant isolation
+    // CRITICAL FIX: ALL roles including SuperAdmins are filtered by company scope
     const scope = await resolveCompanyScope(user.id);
     
     // If no scope, return EMPTY - strict isolation (no company = no data)
     if (!scope || scope.length === 0) {
-      console.log(`/users: User ${user.id} (${role}) has no company scope - returning empty`);
+      console.log(`⚠️ /users: User ${user.id} (${role}) has no company scope - returning empty`);
       return c.json([]);
     }
     
@@ -2417,6 +2423,8 @@ app.get(`${PREFIX}/users`, async (c) => {
       if (!empCompany) return false; // Exclude unscoped employees
       return scope.includes(empCompany);
     });
+    
+    console.log(`✅ /users: User ${user.id} (${role}) accessing ${filtered.length} users in companies: ${scope.join(', ')}`);
     
     // Admin cannot see superadmins
     if (role === "admin") {
@@ -3236,25 +3244,39 @@ app.get(`${PREFIX}/deletion-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     let all = await kv.getByPrefix("deletion-request:");
+    console.log(`🔍 /deletion-requests: User ${user.id} (${role}), total requests: ${all.length}`);
     
     // CRITICAL FIX: Filter deletion requests by company for multi-tenant isolation
     if (role === "superadmin" || role === "admin") {
       // SuperAdmin/Admin see deletion requests for employees in their company only
       const scope = await resolveCompanyScope(user.id);
+      console.log(`🔒 User ${user.id} company scope:`, scope);
+      
       if (scope?.length) {
         const employees = await kv.getByPrefix("employee:");
-        const companyEmployeeIds = new Set(
-          employees
-            .filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company))
-            .map((e: any) => e.id || e.userId)
-        );
-        all = all.filter((r: any) => companyEmployeeIds.has(r.targetUserId));
+        const companyEmployees = employees.filter((e: any) => scope.includes(e.companyId) || scope.includes(e.company));
+        const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.id || e.userId));
+        
+        console.log(`✅ Found ${companyEmployees.length} employees in company for deletion requests`);
+        
+        all = all.filter((r: any) => {
+          const hasMatch = companyEmployeeIds.has(r.targetUserId);
+          if (!hasMatch && all.length < 10) {
+            console.log(`⚠️ Deletion request ${r.id} targetUserId ${r.targetUserId} not in company employee set`);
+          }
+          return hasMatch;
+        });
+        
+        console.log(`📤 Returning ${all.length} deletion requests after company filtering`);
       }
       return c.json(all.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     }
     
-    return c.json(all.filter((r: any) => r.requestedBy === user.id).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    const filtered = all.filter((r: any) => r.requestedBy === user.id);
+    console.log(`📤 Manager/non-superadmin ${user.id} sees ${filtered.length} own deletion requests`);
+    return c.json(filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   } catch (e: any) {
+    console.error(`❌ Error in /deletion-requests:`, e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     return c.json({ error: e.message }, 500);
   }
@@ -4125,32 +4147,54 @@ app.get(`${PREFIX}/reports/users`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
     const allEmployees = await kv.getByPrefix("employee:");
+    console.log(`🔒 TENANT ISOLATION: /reports/users called by ${user.id} (${role}), total employees in system: ${allEmployees.length}`);
+    
     // CRITICAL: Filter by company for multi-tenant isolation
     const employees = await filterEmployeesByCompany(allEmployees, user.id, role);
+    console.log(`✅ TENANT ISOLATION: User ${user.id} can see ${employees.length} employees after filtering`);
+    
     const attendance = await kv.getByPrefix("attendance:");
     const allowedUserIds = new Set(employees.map((e: any) => e.userId || e.id));
     const report = employees.map((e: any) => {
       const empAtt = attendance.filter((a: any) => a.userId === (e.userId || e.id));
       return { userId: e.userId || e.id, name: e.name, email: e.email, role: e.role, department: e.department, company: e.company, position: e.position, status: e.status, phone: e.phone, attendanceDays: empAtt.length, totalHoursWorked: empAtt.reduce((s: number, a: any) => s + (parseFloat(a.totalHours) || 0), 0).toFixed(1), joinDate: e.createdAt };
     });
+    
+    console.log(`📤 Returning ${report.length} employee reports with company isolation enforced`);
     return c.json(report);
-  } catch (e: any) { if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401); if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403); return c.json({ error: e.message }, 500); }
+  } catch (e: any) { 
+    console.error(`❌ Error in /reports/users:`, e);
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401); 
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403); 
+    return c.json({ error: e.message }, 500); 
+  }
 });
 
 app.get(`${PREFIX}/reports/attendance`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
     const allEmployees = await kv.getByPrefix("employee:");
+    console.log(`🔒 TENANT ISOLATION: /reports/attendance called by ${user.id} (${role})`);
+    
     // CRITICAL: Filter by company for multi-tenant isolation
     const filteredEmployees = await filterEmployeesByCompany(allEmployees, user.id, role);
+    console.log(`✅ TENANT ISOLATION: User ${user.id} can see ${filteredEmployees.length} employees for attendance`);
+    
     const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.userId || e.id));
     const empMap: Record<string, string> = {};
     for (const e of filteredEmployees) empMap[e.userId || e.id] = e.name;
     const attendance = await kv.getByPrefix("attendance:");
     const filteredAttendance = attendance.filter((a: any) => allowedUserIds.has(a.userId));
+    
+    console.log(`📤 Returning ${filteredAttendance.length} attendance records after tenant isolation`);
     const report = filteredAttendance.map((a: any) => ({ ...a, employeeName: empMap[a.userId] || a.userId })).sort((a: any, b: any) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
     return c.json(report);
-  } catch (e: any) { if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401); if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403); return c.json({ error: e.message }, 500); }
+  } catch (e: any) { 
+    console.error(`❌ Error in /reports/attendance:`, e);
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401); 
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403); 
+    return c.json({ error: e.message }, 500); 
+  }
 });
 
 // ============ LEAVE REQUESTS ============
@@ -6065,9 +6109,12 @@ app.get(`${PREFIX}/departments`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     let departments = await kv.getByPrefix('department:');
-    // CRITICAL FIX: Filter by company scope for ALL roles including SuperAdmin
+    console.log(`🔒 TENANT ISOLATION: /departments called by ${user.id} (${role}), total: ${departments.length}`);
+    
+    // CRITICAL FIX: ALL roles including SuperAdmins are filtered by company scope
     const scope = await resolveCompanyScope(user.id);
     if (!scope?.length) {
+      console.log(`⚠️ User ${user.id} has no company scope, returning empty`);
       return c.json([]);
     }
     departments = departments.filter((d: any) => {
@@ -6075,8 +6122,11 @@ app.get(`${PREFIX}/departments`, async (c) => {
       if (!dCompany) return false; // STRICT: Exclude items without company
       return scope.includes(dCompany);
     });
+    
+    console.log(`✅ /departments: Returning ${departments.length} departments for companies: ${scope.join(', ')}`);
     return c.json(departments || []);
   } catch (e: any) {
+    console.error(`❌ Error in /departments:`, e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     return c.json({ error: e.message }, 500);
   }
@@ -6106,10 +6156,12 @@ app.get(`${PREFIX}/payroll-runs`, async (c) => {
   try {
     const { user, role } = await requireManagerOrAbove(c);
     let payrollRuns = await kv.getByPrefix('payroll-run:');
+    console.log(`🔒 TENANT ISOLATION: /payroll-runs called by ${user.id} (${role}), total: ${payrollRuns.length}`);
     
-    // CRITICAL FIX: Filter by company scope for ALL roles including SuperAdmin
+    // CRITICAL FIX: ALL roles including SuperAdmins are filtered by company scope
     const scope = await resolveCompanyScope(user.id);
     if (!scope?.length) {
+      console.log(`⚠️ User ${user.id} has no company scope, returning empty`);
       return c.json([]);
     }
     payrollRuns = payrollRuns.filter((p: any) => {
@@ -6118,8 +6170,10 @@ app.get(`${PREFIX}/payroll-runs`, async (c) => {
       return scope.includes(pCompany);
     });
     
+    console.log(`✅ /payroll-runs: Returning ${payrollRuns.length} runs for companies: ${scope.join(', ')}`);
     return c.json(payrollRuns || []);
   } catch (e: any) {
+    console.error(`❌ Error in /payroll-runs:`, e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
     return c.json({ error: e.message }, 500);

@@ -450,7 +450,7 @@ export function SuperAdminDashboard() {
       case 'financial-years': return <div className="p-8"><FinancialYearsModule /></div>;
       case 'tax-configuration': return <div className="p-8"><TaxConfigurationModule /></div>;
       case 'benefits': return <div className="p-8"><BenefitsModule /></div>;
-      case 'hr-reports': return <ReportsPanel />;
+      case 'hr-reports': return <div className="p-8"><ReportsPanel /></div>;
       case 'advanced-reports': return <div className="p-8"><AdvancedReportsModule /></div>;
       case 'audit-logs': return <div className="p-8"><AuditLogsModule /></div>;
       case 'onboarding-training': return <OnboardingView />;

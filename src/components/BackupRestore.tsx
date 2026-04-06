@@ -55,9 +55,13 @@ export function BackupRestore() {
   const loadRequests = useCallback(async () => {
     setLoadingReqs(true);
     try {
+      console.log('🗑️ Loading deletion requests...');
       const data = await api('/deletion-requests', { token: accessToken });
+      console.log('✅ Deletion requests loaded:', data?.length || 0);
       setRequests(Array.isArray(data) ? data : []);
-    } catch (e) { console.log(e); }
+    } catch (e) { 
+      console.error('❌ Error loading deletion requests:', e); 
+    }
     setLoadingReqs(false);
   }, [accessToken]);
 
