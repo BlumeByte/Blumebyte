@@ -1,0 +1,429 @@
+📊 Report Data Loaded: 
+Object
+attendance
+: 
+0
+departments
+: 
+3
+leaves
+: 
+0
+profile
+: 
+"loaded"
+userRole
+: 
+"superadmin"
+users
+: 
+0
+[[Prototype]]
+: 
+Object
+19c6694……32b4ce1e28.js:70055 🐛 DEBUG TENANT DATA: 
+Object
+debug
+: 
+currentUser
+: 
+id
+: 
+"df4a49df-f6d7-4c79-b88b-a0cdf2f5b30b"
+profile
+: 
+assignedCompanies
+: 
+Array(1)
+0
+: 
+"7cbecfa5-7d1b-45bf-8591-32f4bb168cee"
+length
+: 
+1
+[[Prototype]]
+: 
+Array(0)
+company
+: 
+"BLUMEBYTE"
+companyId
+: 
+"7cbecfa5-7d1b-45bf-8591-32f4bb168cee"
+[[Prototype]]
+: 
+Object
+constructor
+: 
+ƒ Object()
+hasOwnProperty
+: 
+ƒ hasOwnProperty()
+isPrototypeOf
+: 
+ƒ isPrototypeOf()
+propertyIsEnumerable
+: 
+ƒ propertyIsEnumerable()
+toLocaleString
+: 
+ƒ toLocaleString()
+toString
+: 
+ƒ toString()
+valueOf
+: 
+ƒ valueOf()
+__defineGetter__
+: 
+ƒ __defineGetter__()
+__defineSetter__
+: 
+ƒ __defineSetter__()
+__lookupGetter__
+: 
+ƒ __lookupGetter__()
+__lookupSetter__
+: 
+ƒ __lookupSetter__()
+__proto__
+: 
+(...)
+get __proto__
+: 
+ƒ __proto__()
+set __proto__
+: 
+ƒ __proto__()
+resolvedScope
+: 
+Array(1)
+0
+: 
+"7cbecfa5-7d1b-45bf-8591-32f4bb168cee"
+length
+: 
+1
+[[Prototype]]
+: 
+Array(0)
+at
+: 
+ƒ at()
+concat
+: 
+ƒ concat()
+constructor
+: 
+ƒ Array()
+copyWithin
+: 
+ƒ copyWithin()
+entries
+: 
+ƒ entries()
+every
+: 
+ƒ every()
+fill
+: 
+ƒ fill()
+filter
+: 
+ƒ filter()
+find
+: 
+ƒ find()
+findIndex
+: 
+ƒ findIndex()
+findLast
+: 
+ƒ findLast()
+findLastIndex
+: 
+ƒ findLastIndex()
+flat
+: 
+ƒ flat()
+flatMap
+: 
+ƒ flatMap()
+forEach
+: 
+ƒ forEach()
+includes
+: 
+ƒ includes()
+indexOf
+: 
+ƒ indexOf()
+join
+: 
+ƒ join()
+keys
+: 
+ƒ keys()
+lastIndexOf
+: 
+ƒ lastIndexOf()
+length
+: 
+0
+map
+: 
+ƒ map()
+pop
+: 
+ƒ pop()
+push
+: 
+ƒ push()
+reduce
+: 
+ƒ reduce()
+reduceRight
+: 
+ƒ reduceRight()
+reverse
+: 
+ƒ reverse()
+shift
+: 
+ƒ shift()
+slice
+: 
+ƒ slice()
+some
+: 
+ƒ some()
+sort
+: 
+ƒ sort()
+splice
+: 
+ƒ splice()
+toLocaleString
+: 
+ƒ toLocaleString()
+toReversed
+: 
+ƒ toReversed()
+toSorted
+: 
+ƒ toSorted()
+toSpliced
+: 
+ƒ toSpliced()
+toString
+: 
+ƒ toString()
+unshift
+: 
+ƒ unshift()
+values
+: 
+ƒ values()
+with
+: 
+ƒ with()
+Symbol(Symbol.iterator)
+: 
+ƒ values()
+Symbol(Symbol.unscopables)
+: 
+{at: true, copyWithin: true, entries: true, fill: true, find: true, …}
+[[Prototype]]
+: 
+Object
+role
+: 
+"superadmin"
+[[Prototype]]
+: 
+Object
+constructor
+: 
+ƒ Object()
+hasOwnProperty
+: 
+ƒ hasOwnProperty()
+isPrototypeOf
+: 
+ƒ isPrototypeOf()
+propertyIsEnumerable
+: 
+ƒ propertyIsEnumerable()
+toLocaleString
+: 
+ƒ toLocaleString()
+toString
+: 
+ƒ toString()
+valueOf
+: 
+ƒ valueOf()
+__defineGetter__
+: 
+ƒ __defineGetter__()
+__defineSetter__
+: 
+ƒ __defineSetter__()
+__lookupGetter__
+: 
+ƒ __lookupGetter__()
+__lookupSetter__
+: 
+ƒ __lookupSetter__()
+__proto__
+: 
+(...)
+get __proto__
+: 
+ƒ __proto__()
+set __proto__
+: 
+ƒ __proto__()
+dataCounts
+: 
+employeesUserCanSee
+: 
+0
+totalAttendanceRecords
+: 
+17
+totalDepartments
+: 
+6
+totalEmployeesInSystem
+: 
+7
+[[Prototype]]
+: 
+Object
+filteredEmployeeIds
+: 
+Array(0)
+length
+: 
+0
+[[Prototype]]
+: 
+Array(0)
+note
+: 
+"✅ Company matching is now CASE-INSENSITIVE (BLUMEBYTE = blumebyte)"
+sampleEmployees
+: 
+Array(5)
+0
+: 
+{id: 'df4a49df-f6d7-4c79-b88b-a0cdf2f5b30b', name: 'Super Administrator', email: 'blumebyte@gmail.com', role: 'superadmin', company: 'BLUMEBYTE', …}
+1
+: 
+{id: 'e131d51f-a169-4f42-be7f-8b9d106d14fc', name: 'Support', email: 'support@blumebyte.com', role: 'employee', company: 'BLUMEBYTE', …}
+2
+: 
+{id: '8c26c34f-461d-4ee6-90f3-91379f3b51a9', name: 'Security', email: 'security@blumebyte.com', role: 'employee', company: 'BLUMEBYTE', …}
+3
+: 
+{id: 'c4ec509f-9da8-4197-8df2-da5fcefc9e3f', name: 'Bead Ma ', email: 'beadmatics@gmail.com', role: 'superadmin', company: 'd929075b-d3be-4bce-b383-a828835b1e20', …}
+4
+: 
+{id: 'b306fe96-65c9-4191-9c4f-fbb0c47a4f6e', name: 'Privacy', email: 'privacy@blumebyte.com', role: 'manager', company: 'BLUMEBYTE', …}
+length
+: 
+5
+[[Prototype]]
+: 
+Array(0)
+[[Prototype]]
+: 
+Object
+constructor
+: 
+ƒ Object()
+hasOwnProperty
+: 
+ƒ hasOwnProperty()
+isPrototypeOf
+: 
+ƒ isPrototypeOf()
+propertyIsEnumerable
+: 
+ƒ propertyIsEnumerable()
+toLocaleString
+: 
+ƒ toLocaleString()
+toString
+: 
+ƒ toString()
+valueOf
+: 
+ƒ valueOf()
+__defineGetter__
+: 
+ƒ __defineGetter__()
+__defineSetter__
+: 
+ƒ __defineSetter__()
+__lookupGetter__
+: 
+ƒ __lookupGetter__()
+__lookupSetter__
+: 
+ƒ __lookupSetter__()
+__proto__
+: 
+(...)
+get __proto__
+: 
+ƒ __proto__()
+set __proto__
+: 
+ƒ __proto__()
+[[Prototype]]
+: 
+Object
+constructor
+: 
+ƒ Object()
+hasOwnProperty
+: 
+ƒ hasOwnProperty()
+isPrototypeOf
+: 
+ƒ isPrototypeOf()
+propertyIsEnumerable
+: 
+ƒ propertyIsEnumerable()
+toLocaleString
+: 
+ƒ toLocaleString()
+toString
+: 
+ƒ toString()
+valueOf
+: 
+ƒ valueOf()
+__defineGetter__
+: 
+ƒ __defineGetter__()
+__defineSetter__
+: 
+ƒ __defineSetter__()
+__lookupGetter__
+: 
+ƒ __lookupGetter__()
+__lookupSetter__
+: 
+ƒ __lookupSetter__()
+__proto__
+: 
+(...)
+get __proto__
+: 
+ƒ __proto__()
+set __proto__
+: 
+ƒ __proto__()

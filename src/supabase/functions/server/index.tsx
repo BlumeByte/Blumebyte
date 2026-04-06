@@ -4239,6 +4239,22 @@ app.get(`${PREFIX}/debug/tenant-data`, async (c) => {
     const allEmployees = await kv.getByPrefix("employee:");
     const filteredEmployees = await filterEmployeesByCompany(allEmployees, user.id, role);
     
+    // DETAILED DEBUG: Check why filtering fails
+    const debugFiltering = allEmployees.slice(0, 7).map(e => {
+      const empCompany = e.company || e.companyId;
+      const matchResult = scope.some(s => s.toLowerCase() === (empCompany || '').toLowerCase());
+      return {
+        name: e.name,
+        company: empCompany,
+        companyType: typeof empCompany,
+        scopeUppercase: scope,
+        empLowercase: empCompany?.toLowerCase(),
+        scopeLowercase: scope.map(s => s.toLowerCase()),
+        shouldMatch: matchResult,
+        included: matchResult
+      };
+    });
+    
     // Get sample data
     const sampleEmployees = allEmployees.slice(0, 5).map(e => ({
       id: e.id || e.userId,
@@ -4274,6 +4290,7 @@ app.get(`${PREFIX}/debug/tenant-data`, async (c) => {
           name: e.name,
           company: e.company || e.companyId
         })),
+        detailedFilterDebug: debugFiltering,
         note: "✅ Company matching is now CASE-INSENSITIVE (BLUMEBYTE = blumebyte)"
       }
     });

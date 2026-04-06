@@ -1,0 +1,30 @@
+sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:127 [Hydrated]
+19c669486dfd6a511def65d481023532b4ce1e28.js:80893 🔧 Attempting to fix company scope...
+script.js:3 Uncaught SyntaxError: Unexpected token '<'
+19c669486dfd6a511def65d481023532b4ce1e28.js:80898 ✅ Company scope check result: Object
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+19c669486dfd6a511def65d481023532b4ce1e28.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:1 (2.101.1) 2026-04-06T11:18:26.347Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 19c669486dfd6a511def65d481023532b4ce1e28.js:22425
+19c669486dfd6a511def65d481023532b4ce1e28.js:73893 Advanced Reports Data Loaded: Object
+19c669486dfd6a511def65d481023532b4ce1e28.js:69939 📊 Loading Reports & Analytics data...
+19c669486dfd6a511def65d481023532b4ce1e28.js:22425 GoTrueClient@sb-ivohczdtuxasyfoiphqu-auth-token:2 (2.101.1) 2026-04-06T11:18:30.482Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+Hu @ 19c669486dfd6a511def65d481023532b4ce1e28.js:22425
+19c669486dfd6a511def65d481023532b4ce1e28.js:69947 🔒 TENANT ISOLATION: Reports filtered for companies: Array(1)
+19c669486dfd6a511def65d481023532b4ce1e28.js:69947 📊 Report Data Loaded: Object
+19c669486dfd6a511def65d481023532b4ce1e28.js:70055 🐛 DEBUG TENANT DATA: Object
