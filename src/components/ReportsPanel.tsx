@@ -61,12 +61,13 @@ export function ReportsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      console.log('📊 Loading Reports & Analytics data...');
       const [u, a, d, l, profile] = await Promise.all([
-        api('/reports/users', { token: accessToken }).catch(() => []),
-        api('/reports/attendance', { token: accessToken }).catch(() => []),
-        api('/admin/departments', { token: accessToken }).catch(() => []),
-        api('/leave-requests', { token: accessToken }).catch(() => []),
-        api('/profile', { token: accessToken }).catch(() => null),
+        api('/reports/users', { token: accessToken }).catch((e) => { console.error('❌ /reports/users failed:', e); return []; }),
+        api('/reports/attendance', { token: accessToken }).catch((e) => { console.error('❌ /reports/attendance failed:', e); return []; }),
+        api('/admin/departments', { token: accessToken }).catch((e) => { console.error('❌ /admin/departments failed:', e); return []; }),
+        api('/leave-requests', { token: accessToken }).catch((e) => { console.error('❌ /leave-requests failed:', e); return []; }),
+        api('/profile', { token: accessToken }).catch((e) => { console.error('❌ /profile failed:', e); return null; }),
       ]);
       
       // TENANT ISOLATION CHECK: Log company scope
@@ -78,6 +79,7 @@ export function ReportsPanel() {
         departments: d?.length || 0,
         leaves: l?.length || 0,
         userRole: user?.role,
+        profile: profile ? 'loaded' : 'missing',
       });
       
       const myDept = profile?.department || '';
