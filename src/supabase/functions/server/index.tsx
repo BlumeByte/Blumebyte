@@ -418,7 +418,7 @@ async function ensureCompanyId(item: any, userId: string): Promise<any> {
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
   // CRITICAL FIX: SuperAdmins can see ALL items across ALL companies
-  if (role === 'SuperAdmin') {
+  if (role === 'superadmin' || role === 'SuperAdmin') {
     console.log(`applyCompanyFilter: SuperAdmin ${userId} accessing all items: ${items.length} total`);
     return items;
   }
@@ -443,7 +443,7 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
 // --- Filter employees by company scope ---
 async function filterEmployeesByCompany(employees: any[], userId: string, role: string): Promise<any[]> {
   // CRITICAL FIX: SuperAdmins can see ALL employees across ALL companies
-  if (role === 'SuperAdmin') {
+  if (role === 'superadmin' || role === 'SuperAdmin') {
     console.log(`filterEmployeesByCompany: SuperAdmin ${userId} accessing all employees: ${employees.length} total`);
     return employees;
   }
@@ -1496,18 +1496,21 @@ app.put(`${PREFIX}/profile-change-requests/:id`, async (c) => {
 app.get(`${PREFIX}/users/for-messages`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
+    console.log(`🔍 /users/for-messages called by user ${user.id} with role: "${role}"`);
+    
     const allEmployees = await kv.getByPrefix("employee:");
+    console.log(`📊 Total employees in system: ${allEmployees.length}`);
     
     // CRITICAL FIX: SuperAdmins can see ALL users across ALL companies for messaging
     let filtered;
-    if (role === 'SuperAdmin') {
+    if (role === 'superadmin' || role === 'SuperAdmin') {
       // SuperAdmins can message anyone across all companies
       filtered = allEmployees;
-      console.log(`SuperAdmin ${user.id} accessing all users for messaging: ${filtered.length} users`);
+      console.log(`✅ SuperAdmin ${user.id} accessing all users for messaging: ${filtered.length} users`);
     } else {
       // Apply company filtering for multi-tenant isolation
       filtered = await filterEmployeesByCompany(allEmployees, user.id, role);
-      console.log(`User ${user.id} accessing company-scoped users for messaging: ${filtered.length} users`);
+      console.log(`✅ User ${user.id} (role: ${role}) accessing company-scoped users for messaging: ${filtered.length} users`);
     }
     
     const result = filtered
@@ -1519,8 +1522,11 @@ app.get(`${PREFIX}/users/for-messages`, async (c) => {
         profileImageUrl: e.profileImageUrl || "",
         company: e.company || e.companyId || "",
       }));
+    
+    console.log(`📤 Returning ${result.length} users for messaging (excluded self)`);
     return c.json(result);
   } catch (e: any) {
+    console.error(`❌ Error in /users/for-messages:`, e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     return c.json({ error: e.message }, 500);
   }
@@ -2392,7 +2398,7 @@ app.get(`${PREFIX}/users`, async (c) => {
     }
     
     // CRITICAL FIX: SuperAdmins can see ALL users across ALL companies
-    if (role === "SuperAdmin") {
+    if (role === "superadmin" || role === "SuperAdmin") {
       console.log(`/users: SuperAdmin ${user.id} accessing all users: ${allEmployees.length} users`);
       return c.json(allEmployees);
     }
@@ -4533,7 +4539,7 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
     // Get all SuperAdmins and Admins to notify
     const allEmployees = await kv.getByPrefix("employee:");
     const adminsAndSuperAdmins = allEmployees.filter((e: any) => 
-      e.role === 'SuperAdmin' || e.role === 'Admin'
+      e.role === 'superadmin' || e.role === 'SuperAdmin' || e.role === 'admin' || e.role === 'Admin'
     );
     
     // Create notifications for each admin

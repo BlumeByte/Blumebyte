@@ -34,8 +34,33 @@ export function MessagesPanel() {
       ]);
       console.log('Messages loaded:', msgs);
       console.log('Users for messages loaded:', usrs);
+      
+      // If no users returned, try fallback to /employees endpoint
+      let usersList = Array.isArray(usrs) ? usrs : [];
+      if (usersList.length === 0) {
+        console.log('No users from /users/for-messages, trying /employees fallback...');
+        try {
+          const employees = await api('/employees', { token: accessToken });
+          console.log('Employees fallback loaded:', employees);
+          usersList = Array.isArray(employees) ? employees.map((e: any) => ({
+            userId: e.userId || e.id,
+            id: e.userId || e.id,
+            name: e.name,
+            email: e.email || '',
+            role: e.role,
+            department: e.department || '',
+            position: e.position || '',
+            profileImageUrl: e.profileImageUrl || '',
+            company: e.company || e.companyId || '',
+          })) : [];
+        } catch (fallbackErr) {
+          console.error('Fallback /employees also failed:', fallbackErr);
+        }
+      }
+      
       setMessages(Array.isArray(msgs) ? msgs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
-      setUsers(Array.isArray(usrs) ? usrs : []);
+      setUsers(usersList);
+      console.log('Final users list set:', usersList.length, 'users');
     } catch (e) { 
       console.error('Error loading messages/users:', e); 
     }
