@@ -176,7 +176,7 @@ export function NotificationsBell() {
                   return (
                     <div
                       key={n.id}
-                      className={`px-4 py-3 flex gap-3 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 ${!n.read ? 'bg-blue-50/40' : ''}`}
+                      className={`px-4 py-3 flex gap-3 hover:bg-accent cursor-pointer transition-colors border-b border-border ${!n.read ? 'bg-blue-50 dark:bg-blue-950/40' : ''}`}
                       onClick={() => { if (!n.read) markAsRead(n.id); }}
                     >
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${colorClass}`}>
@@ -184,10 +184,10 @@ export function NotificationsBell() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <p className={`text-sm leading-tight ${!n.read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{n.title}</p>
+                          <p className={`text-sm leading-tight ${!n.read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{n.title}</p>
                           {!n.read && <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                         <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
                       </div>
                     </div>

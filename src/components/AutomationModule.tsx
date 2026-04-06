@@ -134,17 +134,17 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     setLoading(true);
     try {
       const [workflowsRes, tasksRes, rulesRes, templatesRes, employeesRes] = await Promise.all([
-        api('/automation/workflows', { token: accessToken }).catch(() => []),
-        api('/automation/scheduled-tasks', { token: accessToken }).catch(() => []),
-        api('/automation/business-rules', { token: accessToken }).catch(() => []),
-        api('/automation/notification-templates', { token: accessToken }).catch(() => []),
+        api('/automation/workflows', { token: accessToken }).catch(() => ({ data: [] })),
+        api('/automation/scheduled-tasks', { token: accessToken }).catch(() => ({ data: [] })),
+        api('/automation/business-rules', { token: accessToken }).catch(() => ({ data: [] })),
+        api('/automation/notification-templates', { token: accessToken }).catch(() => ({ data: [] })),
         api('/employees', { token: accessToken }).catch(() => []),
       ]);
 
-      setWorkflows(Array.isArray(workflowsRes) ? workflowsRes : []);
-      setScheduledTasks(Array.isArray(tasksRes) ? tasksRes : []);
-      setBusinessRules(Array.isArray(rulesRes) ? rulesRes : []);
-      setNotificationTemplates(Array.isArray(templatesRes) ? templatesRes : []);
+      setWorkflows(Array.isArray(workflowsRes?.data) ? workflowsRes.data : (Array.isArray(workflowsRes) ? workflowsRes : []));
+      setScheduledTasks(Array.isArray(tasksRes?.data) ? tasksRes.data : (Array.isArray(tasksRes) ? tasksRes : []));
+      setBusinessRules(Array.isArray(rulesRes?.data) ? rulesRes.data : (Array.isArray(rulesRes) ? rulesRes : []));
+      setNotificationTemplates(Array.isArray(templatesRes?.data) ? templatesRes.data : (Array.isArray(templatesRes) ? templatesRes : []));
       setAllEmployees(Array.isArray(employeesRes) ? employeesRes : []);
     } catch (error: any) {
       console.error('Error loading automation data:', error);

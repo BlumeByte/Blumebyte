@@ -43,6 +43,7 @@ import { ProfileChangeRequests } from './ProfileChangeRequests';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
+import { useCurrency } from '../lib/currency-context';
 import { AuditLogsModule } from './AuditLogsModule';
 import { AdvancedReportsModule } from './AdvancedReportsModule';
 import { LicenseManagement } from './LicenseManagement';
@@ -501,8 +502,8 @@ export function SuperAdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <aside className={`${collapsed ? 'w-[72px]' : 'w-60'} bg-white border-r border-gray-200 flex flex-col fixed h-screen z-30 transition-all duration-200 overflow-hidden`}>
+    <div className="min-h-screen bg-background flex">
+      <aside className={`${collapsed ? 'w-[72px]' : 'w-60'} bg-card border-r border-border flex flex-col fixed h-screen z-30 transition-all duration-200 overflow-hidden`}>
         <div className={`p-3 flex items-center ${collapsed ? 'justify-center' : 'justify-between'} flex-shrink-0`}>
           {collapsed ? (
             <button onClick={() => setCollapsed(false)} className="w-10 h-10 rounded-xl flex items-center justify-center hover:scale-105 transition-transform overflow-hidden" style={brandGradientStyle(branding.primaryColor)} title="Expand sidebar">
@@ -514,7 +515,7 @@ export function SuperAdminDashboard() {
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
                   {branding.logoUrl ? <img src={branding.logoUrl} alt="" className="w-full h-full object-contain p-0.5" /> : <span className="text-white text-lg font-bold">{branding.companyName?.[0] || 'B'}</span>}
                 </div>
-                <div><p className="text-sm font-semibold text-gray-900">{branding.companyName}</p><p className="text-[10px] text-gray-400 uppercase">Super Admin</p></div>
+                <div><p className="text-sm font-semibold text-foreground">{branding.companyName}</p><p className="text-[10px] text-muted-foreground uppercase">Super Admin</p></div>
               </div>
               <button onClick={() => setCollapsed(true)} className="p-1.5 rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"><PanelLeftClose className="w-4 h-4" /></button>
             </>
@@ -535,7 +536,7 @@ export function SuperAdminDashboard() {
                     return (
                       <button key={item.id} onClick={() => { setActiveSection(item.id); scrollToTop(); }}
                         title={collapsed ? item.label : undefined}
-                        className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+                        className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
                         style={active ? { backgroundColor: branding.primaryColor + '15', color: branding.primaryColor } : undefined}>
                         <Icon className="w-[18px] h-[18px] flex-shrink-0" style={active ? { color: branding.primaryColor } : undefined} />
                         <span className={`text-[13px] ${active ? 'font-medium' : ''} ${collapsed ? 'hidden' : 'block truncate'}`}>{item.label}</span>
@@ -559,7 +560,7 @@ export function SuperAdminDashboard() {
               ) : (
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0">{user?.name?.[0] || 'S'}</div>
               )}
-              <div className="flex-1 min-w-0"><p className="text-xs font-medium text-gray-900 truncate">{user?.name}</p><p className="text-[10px] text-gray-400 truncate">{user?.email}</p></div>
+              <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{user?.name}</p><p className="text-[10px] text-muted-foreground truncate">{user?.email}</p></div>
               <button onClick={logout} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0 transition-colors" title="Log Out"><LogOut className="w-4 h-4" /></button>
             </div>
           )}
@@ -570,7 +571,7 @@ export function SuperAdminDashboard() {
       </aside>
 
       <div className={`flex-1 ${collapsed ? 'ml-[72px]' : 'ml-60'} transition-all duration-200 min-w-0`}>
-        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-2.5 flex items-center justify-between gap-3">
+        <div className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-6 py-2.5 flex items-center justify-between gap-3">
           <CompanySwitcher 
             accessToken={accessToken}
             currentCompanyId={selectedCompanyId}
@@ -606,8 +607,8 @@ function RecruitmentView() {
         </div>
       </div>
       <div className="flex gap-1 mb-6 border-b">
-        <button onClick={() => setActiveSubTab('postings')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeSubTab === 'postings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Job Postings</button>
-        <button onClick={() => setActiveSubTab('applications')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeSubTab === 'applications' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Applications & Hiring</button>
+        <button onClick={() => setActiveSubTab('postings')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeSubTab === 'postings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Job Postings</button>
+        <button onClick={() => setActiveSubTab('applications')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeSubTab === 'applications' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Applications & Hiring</button>
       </div>
       {activeSubTab === 'postings' && <EntityCrud entityKey="recruitment" config={ENTITY_CONFIGS.recruitment} />}
       {activeSubTab === 'applications' && <HiringApprovalPanel />}
@@ -1141,8 +1142,8 @@ function TimeOffCalendarView() {
                   ...dayMeetings.map(m => ({ type: 'meeting', ...m })),
                 ];
                 return (
-                  <div key={day} className={`bg-white p-2 min-h-[80px] ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''}`}>
-                    <span className={`text-sm ${isToday ? 'font-bold text-blue-600' : 'text-gray-700'}`}>{day}</span>
+                  <div key={day} className={`bg-card p-2 min-h-[80px] ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''}`}>
+                    <span className={`text-sm ${isToday ? 'font-bold text-blue-600' : 'text-foreground'}`}>{day}</span>
                     <div className="mt-1 space-y-0.5">
                       {allEvents.slice(0, 3).map((event, idx) => (
                         event.type === 'leave' ? (
@@ -1604,6 +1605,7 @@ function AttendanceView() {
 // ========== PAYROLL ==========
 function PayrollView() {
   const { accessToken } = useAuth();
+  const { currencySymbol } = useCurrency();
   const [items, setItems] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1670,7 +1672,7 @@ function PayrollView() {
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Total Payroll</p><p className="text-2xl font-bold mt-1">GHS {totalPayroll.toLocaleString()}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Total Payroll</p><p className="text-2xl font-bold mt-1">{currencySymbol} {totalPayroll.toLocaleString()}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Records</p><p className="text-2xl font-bold mt-1">{items.length}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Paid</p><p className="text-2xl font-bold text-green-600 mt-1">{paidCount}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Pending</p><p className="text-2xl font-bold text-amber-600 mt-1">{pendingCount}</p></CardContent></Card>
@@ -1685,7 +1687,7 @@ function PayrollView() {
               <XAxis key="xaxis" dataKey="month" />
               <YAxis key="yaxis" />
               <Tooltip key="tooltip" />
-              <Area key="area-amount" type="monotone" dataKey="amount" stroke="#3b82f6" fill="#dbeafe" name="Payroll (GHS)" />
+              <Area key="area-amount" type="monotone" dataKey="amount" stroke="#3b82f6" fill="#dbeafe" name={`Payroll (${currencySymbol})`} />
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
@@ -1707,10 +1709,10 @@ function PayrollView() {
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.employeeName || '\u2014'}</TableCell>
                     <TableCell>{item.period || '\u2014'}</TableCell>
-                    <TableCell>GHS {parseFloat(item.basicSalary || 0).toLocaleString()}</TableCell>
+                    <TableCell>{currencySymbol} {parseFloat(item.basicSalary || 0).toLocaleString()}</TableCell>
                     <TableCell className="text-green-600">+{parseFloat(item.allowances || 0).toLocaleString()}</TableCell>
                     <TableCell className="text-red-600">-{parseFloat(item.deductions || 0).toLocaleString()}</TableCell>
-                    <TableCell className="font-semibold">GHS {parseFloat(item.netPay || 0).toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">{currencySymbol} {parseFloat(item.netPay || 0).toLocaleString()}</TableCell>
                     <TableCell><Badge className={item.status === 'paid' ? 'bg-green-100 text-green-800' : item.status === 'processing' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{item.status}</Badge></TableCell>
                     <TableCell>
                       <div className="flex gap-1">

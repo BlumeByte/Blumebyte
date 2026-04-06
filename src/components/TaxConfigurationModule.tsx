@@ -15,10 +15,12 @@ import { toast } from 'sonner@2.0.3';
 import { Loader2, Plus, Receipt, Pencil, Trash2, Eye, TrendingUp } from 'lucide-react';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';
+import { useCurrency } from '../lib/currency-context';
 
 export function TaxConfigurationModule() {
   const { accessToken, user } = useAuth();
   const { branding } = useBranding();
+  const { currencySymbol } = useCurrency();
   const [taxConfigs, setTaxConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -269,7 +271,7 @@ export function TaxConfigurationModule() {
                     </TableCell>
                     <TableCell>
                       {item.calculationType === 'percentage' && `${item.rate}%`}
-                      {item.calculationType === 'fixed' && `$${item.rate}`}
+                      {item.calculationType === 'fixed' && `${currencySymbol}${item.rate}`}
                       {item.calculationType === 'brackets' && `${item.brackets?.length || 0} brackets`}
                     </TableCell>
                     <TableCell>
@@ -529,7 +531,7 @@ export function TaxConfigurationModule() {
                     {viewItem.calculationType === 'percentage' ? 'Rate' : 'Amount'}
                   </Label>
                   <p className="font-semibold mt-1">
-                    {viewItem.calculationType === 'percentage' ? `${viewItem.rate}%` : `$${viewItem.rate}`}
+                    {viewItem.calculationType === 'percentage' ? `${viewItem.rate}%` : `${currencySymbol}${viewItem.rate}`}
                   </p>
                 </div>
               )}

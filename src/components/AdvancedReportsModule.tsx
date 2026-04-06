@@ -46,6 +46,7 @@ import { exportToCSV, exportToPDF } from './ListControls';
 import { format } from 'date-fns';
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { useCurrency } from '../lib/currency-context';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
@@ -62,6 +63,7 @@ interface ReportData {
 
 export function AdvancedReportsModule() {
   const { user, accessToken } = useAuth();
+  const { currencySymbol } = useCurrency();
   const role = user?.role;
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<ReportData>({});
@@ -253,7 +255,7 @@ export function AdvancedReportsModule() {
       { metric: 'Active Employees', value: overviewMetrics.activeEmployees },
       { metric: 'Average Attendance', value: `${overviewMetrics.avgAttendance}%` },
       { metric: 'Pending Leaves', value: overviewMetrics.pendingLeaves },
-      { metric: 'Total Payroll', value: `$${overviewMetrics.totalPayroll.toFixed(2)}` },
+      { metric: 'Total Payroll', value: `${currencySymbol}${overviewMetrics.totalPayroll.toFixed(2)}` },
     ];
     exportToCSV(exportData, 'hr-overview-report');
     toast.success('Report exported to CSV');
@@ -434,7 +436,7 @@ export function AdvancedReportsModule() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${overviewMetrics.totalPayroll.toLocaleString()}
+              {currencySymbol}{overviewMetrics.totalPayroll.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">Period total</p>
           </CardContent>

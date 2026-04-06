@@ -1,3 +1,20 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
+import { Separator } from './ui/separator';
+import {
+  Clock, DollarSign, Loader2, CheckCircle2, XCircle, AlertCircle,
+  Receipt, Timer, Search, RefreshCw, Eye, Filter, TrendingUp,
+  Banknote, Users
+} from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
 import { useCurrency } from '../lib/currency-context';
 import { api } from '../lib/api-client';

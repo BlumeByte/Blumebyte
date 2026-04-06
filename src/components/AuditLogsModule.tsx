@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from './ui/alert';
 import { ScrollArea } from './ui/scroll-area';
+import { useBranding } from '../lib/branding-context';
 
 interface AuditLog {
   id: string;
@@ -57,6 +58,7 @@ const ACTION_COLORS: Record<string, string> = {
 
 export function AuditLogsModule() {
   const { user, accessToken } = useAuth();
+  const { branding } = useBranding();
   const role = user?.role;
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +187,7 @@ export function AuditLogsModule() {
       resource: log.resourceType,
       resourceId: log.resourceId,
     }));
-    exportToPDF('Audit Logs', exportData, ['timestamp', 'user', 'action', 'resource', 'resourceId'], 'Blumebyte HR');
+    exportToPDF('Audit Logs', exportData, ['timestamp', 'user', 'action', 'resource', 'resourceId'], branding.companyName);
     toast.success('Exported to PDF');
   };
 

@@ -15,10 +15,12 @@ import { toast } from 'sonner@2.0.3';
 import { Loader2, Plus, Heart, Pencil, Trash2, Eye, TrendingUp, User, Building2} from 'lucide-react';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';
+import { useCurrency } from '../lib/currency-context';
 
 export function BenefitsModule() {
   const { accessToken, user } = useAuth();
   const { branding } = useBranding();
+  const { currencySymbol } = useCurrency();
   const [benefits, setBenefits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -289,10 +291,10 @@ export function BenefitsModule() {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-semibold text-green-600">
-                      ${item.employerCost?.toLocaleString()}
+                      {currencySymbol}{item.employerCost?.toLocaleString()}
                     </TableCell>
                     <TableCell className="font-semibold text-orange-600">
-                      ${item.employeeCost?.toLocaleString()}
+                      {currencySymbol}{item.employeeCost?.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -547,13 +549,13 @@ export function BenefitsModule() {
                 <div>
                   <Label className="text-xs text-gray-500">Employer Cost</Label>
                   <p className="text-lg font-bold text-green-600 mt-1">
-                    ${viewItem.employerCost?.toLocaleString()}/mo
+                    {currencySymbol}{viewItem.employerCost?.toLocaleString()}/mo
                   </p>
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500">Employee Cost</Label>
                   <p className="text-lg font-bold text-orange-600 mt-1">
-                    ${viewItem.employeeCost?.toLocaleString()}/mo
+                    {currencySymbol}{viewItem.employeeCost?.toLocaleString()}/mo
                   </p>
                 </div>
               </div>

@@ -41,7 +41,10 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       }
 
       const res = await fetch(`${BASE}/company-settings`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          'Authorization': `Bearer ${publicAnonKey}`,
+          'X-User-Token': token
+        },
       });
       if (res.ok) {
         const data = await res.json();

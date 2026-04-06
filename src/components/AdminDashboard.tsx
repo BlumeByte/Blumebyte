@@ -101,8 +101,8 @@ export function AdminDashboard() {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <aside className={`${collapsed ? 'w-[72px]' : 'w-56'} bg-white border-r border-gray-200 flex flex-col fixed h-screen z-30 transition-all duration-200 overflow-hidden`}>
+    <div className="min-h-screen bg-background flex">
+      <aside className={`${collapsed ? 'w-[72px]' : 'w-56'} bg-card border-r border-border flex flex-col fixed h-screen z-30 transition-all duration-200 overflow-hidden`}>
         <div className={`p-3 flex items-center ${collapsed ? 'justify-center' : 'justify-between'} flex-shrink-0`}>
           {collapsed ? (
             <button onClick={() => setCollapsed(false)} className="w-10 h-10 rounded-xl flex items-center justify-center hover:scale-105 transition-transform overflow-hidden" style={brandGradientStyle(branding.primaryColor)} title="Expand sidebar">
@@ -163,7 +163,7 @@ export function AdminDashboard() {
       </aside>
 
       <div className={`flex-1 ${collapsed ? 'ml-[72px]' : 'ml-56'} transition-all duration-200 min-w-0`}>
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-6 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold">{TABS.find(t => t.id === activeTab)?.label}</h1>
           <div className="flex items-center gap-3">
             <NotificationsBell />

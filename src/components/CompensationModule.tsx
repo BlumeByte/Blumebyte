@@ -15,10 +15,12 @@ import { toast } from 'sonner@2.0.3';
 import { Loader2, Plus, DollarSign, Pencil, Trash2, Eye, TrendingUp, Users, Building2, User } from 'lucide-react';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';
+import { useCurrency } from '../lib/currency-context';
 
 export function CompensationModule() {
   const { accessToken, user } = useAuth();
   const { branding } = useBranding();
+  const { currencySymbol } = useCurrency();
   const [compensations, setCompensations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -307,7 +309,7 @@ export function CompensationModule() {
                         {item.type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold">${item.amount?.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">{currencySymbol}{item.amount?.toLocaleString()}</TableCell>
                     <TableCell>{item.frequency}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -614,7 +616,7 @@ export function CompensationModule() {
                 <div>
                   <Label className="text-xs text-gray-500">Amount</Label>
                   <p className="text-lg font-bold text-green-600 mt-1">
-                    ${viewItem.amount?.toLocaleString()}
+                    {currencySymbol}{viewItem.amount?.toLocaleString()}
                   </p>
                 </div>
                 <div>

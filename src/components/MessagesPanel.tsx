@@ -180,15 +180,15 @@ export function MessagesPanel() {
                 <div className="divide-y max-h-[500px] overflow-y-auto">
                   {filteredList.map(m => (
                     <div key={m.id}
-                      className={`p-3 cursor-pointer hover:bg-gray-50 transition-colors ${selectedMessage?.id === m.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''} ${activeTab === 'inbox' && !m.read ? 'bg-blue-50/50' : ''}`}
+                      className={`p-3 cursor-pointer hover:bg-accent transition-colors ${selectedMessage?.id === m.id ? 'bg-blue-50 dark:bg-blue-950 border-l-2 border-l-blue-500' : ''} ${activeTab === 'inbox' && !m.read ? 'bg-blue-50/50 dark:bg-blue-950/50' : ''}`}
                       onClick={() => { setSelectedMessage(m); handleMarkRead(m); }}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm truncate ${!m.read && activeTab === 'inbox' ? 'font-semibold' : 'font-medium'}`}>
                             {activeTab === 'inbox' ? m.senderName : `To: ${m.recipientName}`}
                           </p>
-                          <p className="text-xs text-gray-500 truncate mt-0.5">{m.message}</p>
-                          <p className="text-[10px] text-gray-400 mt-1">{new Date(m.createdAt).toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{m.message}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">{new Date(m.createdAt).toLocaleString()}</p>
                         </div>
                         {activeTab === 'inbox' && !m.read && <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0 ml-2" />}
                       </div>

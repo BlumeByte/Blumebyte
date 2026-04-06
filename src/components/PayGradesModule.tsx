@@ -13,10 +13,12 @@ import { toast } from 'sonner@2.0.3';
 import { Loader2, Plus, TrendingUp, Pencil, Trash2, Eye, Award } from 'lucide-react';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';
+import { useCurrency } from '../lib/currency-context';
 
 export function PayGradesModule() {
   const { accessToken, user } = useAuth();
   const { branding } = useBranding();
+  const { currencySymbol } = useCurrency();
   const [grades, setGrades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -255,14 +257,14 @@ export function PayGradesModule() {
                     </TableCell>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell className="font-semibold text-green-600">
-                      ${item.minSalary?.toLocaleString()}
+                      {currencySymbol}{item.minSalary?.toLocaleString()}
                     </TableCell>
                     <TableCell className="font-semibold text-green-600">
-                      ${item.maxSalary?.toLocaleString()}
+                      {currencySymbol}{item.maxSalary?.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <div className="text-xs text-gray-500">
-                        Spread: ${(item.maxSalary - item.minSalary)?.toLocaleString()}
+                        Spread: {currencySymbol}{(item.maxSalary - item.minSalary)?.toLocaleString()}
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-sm">
@@ -361,10 +363,10 @@ export function PayGradesModule() {
             {formData.minSalary && formData.maxSalary && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
                 <p className="text-blue-800">
-                  <strong>Salary Range:</strong> ${parseFloat(formData.minSalary).toLocaleString()} - ${parseFloat(formData.maxSalary).toLocaleString()}
+                  <strong>Salary Range:</strong> {currencySymbol}{parseFloat(formData.minSalary).toLocaleString()} - {currencySymbol}{parseFloat(formData.maxSalary).toLocaleString()}
                 </p>
                 <p className="text-blue-600 text-xs mt-1">
-                  Spread: ${(parseFloat(formData.maxSalary) - parseFloat(formData.minSalary)).toLocaleString()}
+                  Spread: {(parseFloat(formData.maxSalary) - parseFloat(formData.minSalary)).toLocaleString()}
                 </p>
               </div>
             )}
@@ -413,23 +415,23 @@ export function PayGradesModule() {
                 <div>
                   <Label className="text-xs text-gray-500">Minimum Salary</Label>
                   <p className="text-xl font-bold text-green-600 mt-1">
-                    ${viewItem.minSalary?.toLocaleString()}
+                    {currencySymbol}{viewItem.minSalary?.toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500">Maximum Salary</Label>
                   <p className="text-xl font-bold text-green-600 mt-1">
-                    ${viewItem.maxSalary?.toLocaleString()}
+                    {currencySymbol}{viewItem.maxSalary?.toLocaleString()}
                   </p>
                 </div>
               </div>
               <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded">
                 <Label className="text-xs text-gray-500">Salary Range</Label>
                 <p className="text-sm mt-1">
-                  <strong>Spread:</strong> ${(viewItem.maxSalary - viewItem.minSalary)?.toLocaleString()}
+                  <strong>Spread:</strong> {(viewItem.maxSalary - viewItem.minSalary)?.toLocaleString()}
                 </p>
                 <p className="text-xs text-gray-600 mt-1">
-                  This grade allows for salary progression from ${viewItem.minSalary?.toLocaleString()} to ${viewItem.maxSalary?.toLocaleString()}
+                  This grade allows for salary progression from {currencySymbol}{viewItem.minSalary?.toLocaleString()} to {currencySymbol}{viewItem.maxSalary?.toLocaleString()}
                 </p>
               </div>
               <div>

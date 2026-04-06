@@ -461,7 +461,7 @@ export function ManagerDashboard() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-56 bg-white border-r flex flex-col fixed h-screen">
+      <aside className="w-56 bg-card border-r border-border flex flex-col fixed h-screen">
         <div className="p-4 border-b">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
@@ -652,7 +652,7 @@ export function ManagerDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 ml-56 transition-all duration-200 min-w-0">
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b px-6 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-6 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold">
             {activeTab === 'overview' && 'Overview'}
             {activeTab === 'team' && 'My Team'}
