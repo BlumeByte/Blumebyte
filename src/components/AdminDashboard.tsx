@@ -2855,10 +2855,10 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
                   </div>
                 ) : f.type === 'questions' ? (
                   <div className="space-y-2">
-                    <div className="border rounded-lg p-3 bg-gray-50/50 space-y-2 max-h-60 overflow-y-auto">
+                    <div className="border rounded-lg p-3 bg-accent/50 space-y-2 max-h-60 overflow-y-auto">
                       {(Array.isArray(formData[f.key]) && formData[f.key].length > 0 ? formData[f.key] : f.defaultQuestions || []).map((q: string, idx: number) => (
                         <div key={idx} className="flex items-start gap-2 group">
-                          <span className="text-xs text-gray-400 font-mono mt-2.5 min-w-[20px]">Q{idx + 1}</span>
+                          <span className="text-xs text-muted-foreground font-mono mt-2.5 min-w-[20px]">Q{idx + 1}</span>
                           <Input
                             value={q}
                             onChange={e => {

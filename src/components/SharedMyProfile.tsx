@@ -365,7 +365,7 @@ export function SharedMyProfile() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div><CardTitle className="text-base">My Full Profile</CardTitle><p className="text-sm text-gray-500 mt-0.5">All HR-entered details about your employment</p></div>
+                <div><CardTitle className="text-base">My Full Profile</CardTitle><p className="text-sm text-muted-foreground mt-0.5">All HR-entered details about your employment</p></div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={openEditDialog}><Pencil className="w-4 h-4 mr-1" />{isPrivilegedRole ? 'Edit Profile' : 'Edit Contact Info'}</Button>
                   <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1" />Refresh</Button>
@@ -374,10 +374,10 @@ export function SharedMyProfile() {
             </CardHeader>
             <CardContent>
               {/* Profile Header */}
-              <div className="bg-gray-50 rounded-xl p-5 mb-6 flex items-center gap-4">
+              <div className="bg-accent rounded-xl p-5 mb-6 flex items-center gap-4">
                 <div className="relative group">
                   {profile?.profileImageUrl ? (
-                    <img src={profile.profileImageUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
+                    <img src={profile.profileImageUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover border-2 border-card shadow-sm" />
                   ) : (
                     <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">{profile?.name?.[0] || 'U'}</div>
                   )}
@@ -419,8 +419,8 @@ export function SharedMyProfile() {
                     { label: 'Marital Status', value: profile?.maritalStatus },
                     { label: 'Nationality', value: profile?.nationality },
                   ].map((f, i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-[11px] text-gray-400">{f.label}</p>
+                    <div key={i} className="bg-accent rounded-lg p-3">
+                      <p className="text-[11px] text-muted-foreground">{f.label}</p>
                       <p className="text-sm font-medium mt-0.5">{f.value || '\u2014'}</p>
                     </div>
                   ))}
@@ -439,8 +439,8 @@ export function SharedMyProfile() {
                     { label: 'Region / State', value: profile?.state },
                     { label: 'Country', value: profile?.country },
                   ].map((f, i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-[11px] text-gray-400">{f.label}</p>
+                    <div key={i} className="bg-accent rounded-lg p-3">
+                      <p className="text-[11px] text-muted-foreground">{f.label}</p>
                       <p className="text-sm font-medium mt-0.5">{f.value || '\u2014'}</p>
                     </div>
                   ))}
@@ -459,8 +459,8 @@ export function SharedMyProfile() {
                     { label: 'Salary', value: profile?.salary },
                     { label: 'Joined', value: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : null },
                   ].map((f, i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-[11px] text-gray-400">{f.label}</p>
+                    <div key={i} className="bg-accent rounded-lg p-3">
+                      <p className="text-[11px] text-muted-foreground">{f.label}</p>
                       <p className="text-sm font-medium mt-0.5">{f.value || '\u2014'}</p>
                     </div>
                   ))}
@@ -471,8 +471,8 @@ export function SharedMyProfile() {
               <div>
                 <div className="flex items-center gap-2 mb-3"><Shield className="w-4 h-4 text-red-500" /><h3 className="font-semibold text-sm">Emergency Contact</h3></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-3"><p className="text-[11px] text-gray-400">Emergency Contact Name</p><p className="text-sm font-medium mt-0.5">{profile?.emergencyContact || '\u2014'}</p></div>
-                  <div className="bg-gray-50 rounded-lg p-3"><p className="text-[11px] text-gray-400">Emergency Phone</p><p className="text-sm font-medium mt-0.5">{profile?.emergencyPhone || '\u2014'}</p></div>
+                  <div className="bg-accent rounded-lg p-3"><p className="text-[11px] text-muted-foreground">Emergency Contact Name</p><p className="text-sm font-medium mt-0.5">{profile?.emergencyContact || '\u2014'}</p></div>
+                  <div className="bg-accent rounded-lg p-3"><p className="text-[11px] text-muted-foreground">Emergency Phone</p><p className="text-sm font-medium mt-0.5">{profile?.emergencyPhone || '\u2014'}</p></div>
                 </div>
               </div>
             </CardContent>
@@ -572,7 +572,7 @@ export function SharedMyProfile() {
                     <Upload className="w-5 h-5 text-blue-600" />
                     <div>
                       <CardTitle className="text-base">My Uploaded Files</CardTitle>
-                      <p className="text-sm text-gray-500 mt-0.5">Upload contracts, documents, and files (max {MAX_FILE_MB}MB each, {MAX_FILES} files total)</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">Upload contracts, documents, and files (max {MAX_FILE_MB}MB each, {MAX_FILES} files total)</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -601,14 +601,14 @@ export function SharedMyProfile() {
                 ) : (
                   <div className="space-y-2">
                     {myFiles.filter(f => f.type !== 'profile-image').map(f => (
-                      <div key={f.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div key={f.id} className="flex items-center justify-between p-3 bg-accent rounded-lg hover:bg-accent/80 transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center border text-blue-500">
+                          <div className="w-9 h-9 rounded-lg bg-card flex items-center justify-center border text-blue-500">
                             {f.mimeType?.startsWith('image/') ? <Image className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                           </div>
                           <div>
                             <p className="text-sm font-medium">{f.fileName}</p>
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-muted-foreground">
                               {(f.fileSize / 1024).toFixed(1)}KB &middot; {f.type || 'general'} &middot; {new Date(f.createdAt).toLocaleDateString()}
                             </p>
                           </div>
@@ -634,7 +634,7 @@ export function SharedMyProfile() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-blue-600" /><div><CardTitle className="text-base">Employment Documents & Certificates</CardTitle><p className="text-sm text-gray-500 mt-0.5">Official documents generated from your employee record</p></div></div>
+                  <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-blue-600" /><div><CardTitle className="text-base">Employment Documents & Certificates</CardTitle><p className="text-sm text-muted-foreground mt-0.5">Official documents generated from your employee record</p></div></div>
                   <Button variant="outline" size="sm" onClick={() => { 
                     const csv = `Document,Date,Type\nEmployment Contract,${new Date().toLocaleDateString()},PDF\nAppointment Letter,${new Date().toLocaleDateString()},PDF\nTax Forms,${new Date().toLocaleDateString()},PDF\nBenefits Enrollment,${new Date().toLocaleDateString()},PDF`;
                     const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob);
@@ -651,10 +651,10 @@ export function SharedMyProfile() {
                   { name: 'Benefits Enrollment', date: 'Feb 01, 2024', color: 'text-green-500' },
                   { name: `Performance Review Q4 2025`, date: 'Dec 15, 2025', color: 'text-purple-500' },
                 ].map((doc, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div key={idx} className="flex items-center justify-between p-4 bg-accent rounded-lg hover:bg-accent/80 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg bg-white flex items-center justify-center border ${doc.color}`}><FileText className="w-5 h-5" /></div>
-                      <div><p className="text-sm font-medium">{doc.name}</p><p className="text-xs text-gray-400">{doc.date} &middot; PDF</p></div>
+                      <div className={`w-10 h-10 rounded-lg bg-card flex items-center justify-center border ${doc.color}`}><FileText className="w-5 h-5" /></div>
+                      <div><p className="text-sm font-medium">{doc.name}</p><p className="text-xs text-muted-foreground">{doc.date} &middot; PDF</p></div>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => generateDocument(doc.name)}><Eye className="w-3.5 h-3.5 mr-1" />Preview</Button>

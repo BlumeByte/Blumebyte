@@ -254,14 +254,14 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
         <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center"><Briefcase className="w-5 h-5 text-green-600" /></div>
         <div>
           <h1 className="text-xl font-bold">My Self-Service Hub</h1>
-          <p className="text-sm text-gray-500">Apply for vacancies, complete tasks, view reviews & more</p>
+          <p className="text-sm text-muted-foreground">Apply for vacancies, complete tasks, view reviews & more</p>
         </div>
       </div>
 
       <div className="flex gap-1 mt-4 border-b overflow-x-auto">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             {t.label}
           </button>
         ))}
@@ -278,17 +278,17 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 <Card className="mb-6">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <div><CardTitle className="text-base">Open Job Vacancies</CardTitle><p className="text-sm text-gray-500 mt-0.5">Current open positions &mdash; click "Apply Now" to submit</p></div>
+                      <div><CardTitle className="text-base">Open Job Vacancies</CardTitle><p className="text-sm text-muted-foreground mt-0.5">Current open positions &mdash; click "Apply Now" to submit</p></div>
                       <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1" />Refresh</Button>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="relative mb-4">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input placeholder="Search by title, department, location..." value={jobSearch} onChange={e => setJobSearch(e.target.value)} className="pl-9" />
                     </div>
                     {filteredJobs.length === 0 ? (
-                      <div className="text-center py-12 text-gray-400"><Briefcase className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No open positions at this time</p></div>
+                      <div className="text-center py-12 text-muted-foreground"><Briefcase className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No open positions at this time</p></div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {filteredJobs.map(job => (
@@ -298,18 +298,18 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                                 <h3 className="font-semibold text-sm flex-1 min-w-0">{job.title || job.name}</h3>
                                 <Badge className="bg-green-100 text-green-700 text-[10px] flex-shrink-0">Open</Badge>
                               </div>
-                              <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><Building2 className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.department || job.company || 'General'}</span></p>
-                              <div className="flex flex-wrap gap-2 mt-1 text-[11px] text-gray-500">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2"><Building2 className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.department || job.company || 'General'}</span></p>
+                              <div className="flex flex-wrap gap-2 mt-1 text-[11px] text-muted-foreground">
                                 {job.location && <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.location}</span></span>}
                                 {(job.type || job.employmentType) && <span className="flex items-center gap-0.5 whitespace-nowrap"><Clock className="w-3 h-3 flex-shrink-0" />{job.type || job.employmentType}</span>}
                               </div>
-                              {job.deadline && <p className="text-[11px] text-gray-500 mt-1 flex items-center gap-0.5"><CalendarDays className="w-3 h-3 flex-shrink-0" />Deadline: {job.deadline}</p>}
+                              {job.deadline && <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-0.5"><CalendarDays className="w-3 h-3 flex-shrink-0" />Deadline: {job.deadline}</p>}
                               {(job.salary || job.salaryRange) && (
                                 <p className="text-xs text-green-600 font-medium mt-2 flex items-center gap-1"><DollarSign className="w-3 h-3 flex-shrink-0" /><span className="truncate">{job.salary || job.salaryRange}</span></p>
                               )}
-                              {job.description && <p className="text-xs text-gray-500 mt-2 line-clamp-2">{job.description}</p>}
+                              {job.description && <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{job.description}</p>}
                               <div className="flex flex-col gap-2 mt-auto pt-3 border-t">
-                                <span className="text-[10px] text-gray-400">Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : 'Recently'}</span>
+                                <span className="text-[10px] text-muted-foreground">Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : 'Recently'}</span>
                                 <div className="flex gap-1.5 flex-wrap">
                                   <Button variant="outline" size="sm" className="h-7 text-xs flex-1 min-w-[80px]" onClick={() => { setSelectedJob(job); setDetailDialogOpen(true); }}>
                                     <Eye className="w-3 h-3 mr-1" />Details
@@ -335,19 +335,19 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-blue-600" /><div><CardTitle className="text-base">My Applications</CardTitle><p className="text-sm text-gray-500">Track your submitted applications</p></div></div>
+                      <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-blue-600" /><div><CardTitle className="text-base">My Applications</CardTitle><p className="text-sm text-muted-foreground">Track your submitted applications</p></div></div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     {myApplications.length === 0 ? (
-                      <div className="text-center py-8 text-gray-400"><p>No applications submitted yet</p></div>
+                      <div className="text-center py-8 text-muted-foreground"><p>No applications submitted yet</p></div>
                     ) : (
                       <div className="space-y-3">
                         {myApplications.map(app => (
-                          <div key={app.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                          <div key={app.id} className="flex items-center justify-between p-4 bg-accent rounded-lg">
                             <div>
                               <p className="font-medium text-sm">{app.jobTitle}</p>
-                              <p className="text-xs text-gray-500">{app.jobCompany || app.jobDepartment || ''} &middot; Applied {new Date(app.createdAt).toLocaleDateString()}</p>
+                              <p className="text-xs text-muted-foreground">{app.jobCompany || app.jobDepartment || ''} &middot; Applied {new Date(app.createdAt).toLocaleDateString()}</p>
                             </div>
                             <Badge className={statusColor(app.status)}>{app.status}</Badge>
                           </div>
@@ -371,19 +371,19 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                   </CardHeader>
                   <CardContent>
                     {myTasks.length === 0 ? (
-                      <div className="text-center py-10 text-gray-400"><ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No tasks assigned to you</p></div>
+                      <div className="text-center py-10 text-muted-foreground"><ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No tasks assigned to you</p></div>
                     ) : (
                       <div className="space-y-2">
                         {myTasks.map(t => (
                           <div key={t.id} onClick={() => openTask(t)}
-                            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors group">
+                            className="flex items-center justify-between p-4 bg-accent rounded-lg hover:bg-blue-50 cursor-pointer transition-colors group">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="text-sm font-semibold">{t.title || t.name}</p>
                                 <Badge className={statusColor(t.status || 'pending')}>{t.status || 'pending'}</Badge>
                                 {t.priority && <Badge variant="outline" className="text-[10px]">{t.priority}</Badge>}
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5">
+                              <p className="text-xs text-muted-foreground mt-0.5">
                                 {t.dueDate ? `Due: ${new Date(t.dueDate).toLocaleDateString()}` : 'No due date'}
                                 {t.category ? ` \u2022 ${t.category}` : ''}
                                 {t.description ? ` \u2014 ${t.description.slice(0, 80)}` : ''}
@@ -403,7 +403,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                   </CardHeader>
                   <CardContent>
                     {myTraining.length === 0 ? (
-                      <div className="text-center py-10 text-gray-400"><GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No training programs assigned</p></div>
+                      <div className="text-center py-10 text-muted-foreground"><GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No training programs assigned</p></div>
                     ) : (
                       <div className="space-y-2">
                         {myTraining.map(t => (
@@ -415,7 +415,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                                 <Badge className={statusColor(t.status || 'planned')}>{t.status || 'planned'}</Badge>
                                 {t.type && <Badge variant="outline" className="text-[10px]">{t.type}</Badge>}
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5">
+                              <p className="text-xs text-muted-foreground mt-0.5">
                                 {t.duration ? `${t.duration} hours` : ''}
                                 {t.instructorName ? ` \u2022 Instructor: ${t.instructorName}` : ''}
                                 {t.startDate ? ` \u2022 Start: ${new Date(t.startDate).toLocaleDateString()}` : ''}
@@ -442,7 +442,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 </CardHeader>
                 <CardContent>
                   {myOnboarding.length === 0 ? (
-                    <div className="text-center py-12 text-gray-400">
+                    <div className="text-center py-12 text-muted-foreground">
                       <GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-40" />
                       <p>Your onboarding steps will appear here once assigned by HR</p>
                     </div>
@@ -467,7 +467,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                       {myOnboarding.map(item => (
                         <div key={item.id}
                           onClick={() => handleOnboardingToggle(item)}
-                          className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer transition-colors ${item.status === 'completed' ? 'bg-green-50' : 'bg-gray-50 hover:bg-blue-50'}`}>
+                          className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer transition-colors ${item.status === 'completed' ? 'bg-green-50' : 'bg-accent hover:bg-blue-50'}`}>
                           {item.status === 'completed' ? (
                             <CheckSquare className="w-5 h-5 text-green-500 flex-shrink-0" />
                           ) : (
@@ -475,8 +475,8 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                           )}
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-medium ${item.status === 'completed' ? 'line-through text-gray-400' : ''}`}>{item.title || item.name || item.step}</p>
-                            {item.description && <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>}
-                            {item.category && <span className="text-[10px] text-gray-400">{item.category}</span>}
+                            {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+                            {item.category && <span className="text-[10px] text-muted-foreground">{item.category}</span>}
                           </div>
                           <Badge className={statusColor(item.status || 'pending')}>{item.status || 'pending'}</Badge>
                         </div>
@@ -498,18 +498,18 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 </CardHeader>
                 <CardContent>
                   {myReviews.length === 0 ? (
-                    <div className="text-center py-12 text-gray-400"><Star className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No reviews found</p></div>
+                    <div className="text-center py-12 text-muted-foreground"><Star className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No reviews found</p></div>
                   ) : (
                     <div className="space-y-2">
                       {myReviews.map(r => (
                         <div key={r.id} onClick={() => openReview(r)}
-                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-amber-50 cursor-pointer transition-colors group">
+                          className="flex items-center justify-between p-4 bg-accent rounded-lg hover:bg-amber-50 cursor-pointer transition-colors group">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-semibold">{r.title || r.period || r.reviewPeriod || r.reviewType || 'Performance Review'}</p>
                               <Badge className={statusColor(r.status || 'pending')}>{r.status || 'pending'}</Badge>
                             </div>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {r.reviewerName || r.reviewer || r.reviewedBy ? `Reviewer: ${r.reviewerName || r.reviewer || r.reviewedBy}` : ''}
                               {r.rating || r.score ? ` \u2022 Rating: ${r.rating || r.score}/5` : ''}
                               {r.createdAt ? ` \u2022 ${new Date(r.createdAt).toLocaleDateString()}` : ''}
@@ -536,12 +536,12 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 </CardHeader>
                 <CardContent>
                   {myQuestionnaires.length === 0 ? (
-                    <div className="text-center py-12 text-gray-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No questionnaires assigned at this time</p></div>
+                    <div className="text-center py-12 text-muted-foreground"><FileText className="w-8 h-8 mx-auto mb-2 opacity-40" /><p>No questionnaires assigned at this time</p></div>
                   ) : (
                     <div className="space-y-2">
                       {myQuestionnaires.map(q => (
                         <div key={q.id} onClick={() => openQuestionnaire(q)}
-                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-purple-50 cursor-pointer transition-colors group">
+                          className="flex items-center justify-between p-4 bg-accent rounded-lg hover:bg-purple-50 cursor-pointer transition-colors group">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-semibold">
@@ -549,7 +549,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                               </p>
                               <Badge className={statusColor(q.status || 'pending')}>{q.status || 'pending'}</Badge>
                             </div>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {q.period ? `Period: ${q.period}` : ''}
                               {q.employeeName ? ` \u2022 For: ${q.employeeName}` : ''}
                               {q.reviewerName ? ` \u2022 From: ${q.reviewerName}` : ''}
@@ -589,9 +589,9 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Apply for {selectedJob?.title || selectedJob?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="bg-gray-50 rounded-lg p-3">
+            <div className="bg-accent rounded-lg p-3">
               <p className="text-sm font-medium">{selectedJob?.title || selectedJob?.name}</p>
-              <p className="text-xs text-gray-500">{selectedJob?.department || selectedJob?.company || ''}</p>
+              <p className="text-xs text-muted-foreground">{selectedJob?.department || selectedJob?.company || ''}</p>
               {(selectedJob?.salary || selectedJob?.salaryRange) && <p className="text-xs text-green-600 mt-1">{selectedJob?.salary || selectedJob?.salaryRange}</p>}
             </div>
             <div>
@@ -625,8 +625,8 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 { label: 'Description', value: selectedJob.description },
                 { label: 'Requirements', value: selectedJob.requirements },
               ].filter(f => f.value).map((f, i) => (
-                <div key={i} className="flex justify-between items-start py-1.5 border-b border-gray-100 last:border-0">
-                  <span className="text-sm text-gray-500">{f.label}</span>
+                <div key={i} className="flex justify-between items-start py-1.5 border-b last:border-0">
+                  <span className="text-sm text-muted-foreground">{f.label}</span>
                   <span className="text-sm text-right max-w-[60%]">{f.value}</span>
                 </div>
               ))}
@@ -655,12 +655,12 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 {taskDialog.category && <Badge variant="outline" className="text-[10px]">{taskDialog.category}</Badge>}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {taskDialog.dueDate && <div><Label className="text-xs text-gray-500">Due Date</Label><p className="text-sm">{new Date(taskDialog.dueDate).toLocaleDateString()}</p></div>}
-                {(taskDialog.assignedByName || taskDialog.assignedBy) && <div><Label className="text-xs text-gray-500">Assigned By</Label><p className="text-sm">{taskDialog.assignedByName || taskDialog.assignedBy}</p></div>}
-                {taskDialog.progress && <div><Label className="text-xs text-gray-500">Progress</Label><p className="text-sm">{taskDialog.progress}%</p></div>}
-                {taskDialog.createdAt && <div><Label className="text-xs text-gray-500">Created</Label><p className="text-sm">{new Date(taskDialog.createdAt).toLocaleDateString()}</p></div>}
+                {taskDialog.dueDate && <div><Label className="text-xs text-muted-foreground">Due Date</Label><p className="text-sm">{new Date(taskDialog.dueDate).toLocaleDateString()}</p></div>}
+                {(taskDialog.assignedByName || taskDialog.assignedBy) && <div><Label className="text-xs text-muted-foreground">Assigned By</Label><p className="text-sm">{taskDialog.assignedByName || taskDialog.assignedBy}</p></div>}
+                {taskDialog.progress && <div><Label className="text-xs text-muted-foreground">Progress</Label><p className="text-sm">{taskDialog.progress}%</p></div>}
+                {taskDialog.createdAt && <div><Label className="text-xs text-muted-foreground">Created</Label><p className="text-sm">{new Date(taskDialog.createdAt).toLocaleDateString()}</p></div>}
               </div>
-              {taskDialog.description && <div><Label className="text-xs text-gray-500">Description</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg whitespace-pre-wrap">{taskDialog.description}</p></div>}
+              {taskDialog.description && <div><Label className="text-xs text-muted-foreground">Description</Label><p className="text-sm mt-1 p-3 bg-accent rounded-lg whitespace-pre-wrap">{taskDialog.description}</p></div>}
               <Separator />
               <div>
                 <Label className="text-xs font-medium">Update Status</Label>

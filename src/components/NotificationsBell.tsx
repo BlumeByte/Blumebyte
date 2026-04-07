@@ -132,9 +132,9 @@ export function NotificationsBell() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => { setOpen(!open); if (!open) fetchNotifications(); }}
-        className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        className="relative p-2 rounded-lg hover:bg-accent transition-colors"
       >
-        <Bell className="w-5 h-5 text-gray-500" />
+        <Bell className="w-5 h-5 text-muted-foreground" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -143,8 +143,8 @@ export function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-          <div className="px-4 py-3 flex items-center justify-between border-b">
+        <div className="absolute right-0 top-full mt-2 w-96 bg-popover text-popover-foreground rounded-xl shadow-2xl border border-border z-50 overflow-hidden">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-border">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold">Notifications</h3>
               {unreadCount > 0 && <Badge className="bg-red-100 text-red-700 text-[10px]">{unreadCount} new</Badge>}
@@ -199,7 +199,7 @@ export function NotificationsBell() {
 
           {/* View All Button */}
           {notifications.length > 0 && (
-            <div className="px-4 py-3 border-t bg-gray-50">
+            <div className="px-4 py-3 border-t border-border bg-accent/50">
               <Button
                 variant="outline"
                 size="sm"

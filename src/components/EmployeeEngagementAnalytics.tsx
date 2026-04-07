@@ -1,19 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import {
-  Clock, DollarSign, GraduationCap, ClipboardList, TrendingUp,
-  Users, Calendar, Award, AlertCircle, CheckCircle2, XCircle,
-  Loader2, RefreshCw, BarChart3, PieChart as PieChartIcon
-} from 'lucide-react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
 import { ClientOnlyChart } from './ClientOnlyChart';
+import { useCurrency } from '../lib/currency-context';
 
 export function EmployeeEngagementAnalytics() {
   const { accessToken } = useAuth();
+  const { currencySymbol } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [data, setData] = useState<any>({
@@ -182,7 +174,7 @@ export function EmployeeEngagementAnalytics() {
           <CardContent>
             <div className="text-2xl font-bold">{expenseMetrics.total}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              ₦{expenseMetrics.totalAmount.toLocaleString()} total
+              {currencySymbol}{expenseMetrics.totalAmount.toLocaleString()} total
             </p>
             <div className="flex gap-2 mt-2">
               <Badge className="bg-yellow-100 text-yellow-800">{expenseMetrics.pending} pending</Badge>
@@ -335,7 +327,7 @@ export function EmployeeEngagementAnalytics() {
                   <div>
                     <p className="font-medium">Overtime Cost</p>
                     <p className="text-sm text-muted-foreground">
-                      Total overtime cost: ₦{overtimeMetrics.totalCost.toLocaleString()}
+                      Total overtime cost: {currencySymbol}{overtimeMetrics.totalCost.toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -346,7 +338,7 @@ export function EmployeeEngagementAnalytics() {
                   <div>
                     <p className="font-medium">Expense Reimbursements</p>
                     <p className="text-sm text-muted-foreground">
-                      Approved expenses: ₦{expenseMetrics.approvedAmount.toLocaleString()}
+                      Approved expenses: {currencySymbol}{expenseMetrics.approvedAmount.toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -410,7 +402,7 @@ export function EmployeeEngagementAnalytics() {
                     type="bar"
                     data={overtimeChartData}
                     xKey="month"
-                    yKeys={[{ key: 'cost', name: 'Cost (₦)', color: '#10b981' }]}
+                    yKeys={[{ key: 'cost', name: `Cost (${currencySymbol})`, color: '#10b981' }]}
                     height={300}
                   />
                 ) : (
@@ -435,7 +427,7 @@ export function EmployeeEngagementAnalytics() {
                     type="bar"
                     data={expenseCategoryData}
                     xKey="name"
-                    yKeys={[{ key: 'value', name: 'Amount (₦)', color: '#3b82f6' }]}
+                    yKeys={[{ key: 'value', name: `Amount (${currencySymbol})`, color: '#3b82f6' }]}
                     height={300}
                   />
                 ) : (
