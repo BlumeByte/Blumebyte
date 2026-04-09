@@ -46,20 +46,32 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
           'X-User-Token': token
         },
       });
+      
       if (res.ok) {
         const data = await res.json();
-        setBranding({
+        console.log('🎨 Branding data fetched from backend:', {
+          companyName: data.companyName,
+          primaryColor: data.primaryColor,
+          logoUrl: data.logoUrl,
+          hasData: !!data.companyName
+        });
+        
+        const updatedBranding = {
           companyName: data.companyName || DEFAULT_BRANDING.companyName,
           description: data.description || DEFAULT_BRANDING.description,
           primaryColor: data.primaryColor || DEFAULT_BRANDING.primaryColor,
           logoUrl: data.logoUrl || '',
-        });
+        };
+        
+        console.log('🎨 Setting branding to:', updatedBranding);
+        setBranding(updatedBranding);
       } else {
+        console.warn('❌ Branding fetch failed with status:', res.status);
         // On error, use default branding
         setBranding(DEFAULT_BRANDING);
       }
     } catch (e) {
-      console.log('Branding fetch error:', e);
+      console.error('❌ Branding fetch error:', e);
       // On error, keep using default branding - don't block the app
       setBranding(DEFAULT_BRANDING);
     }

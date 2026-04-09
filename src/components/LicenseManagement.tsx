@@ -905,10 +905,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
               <CheckCircle className="w-3 h-3 text-green-600" />
               <span>Secure payment powered by Paystack</span>
             </div>
-            <p className="mt-1 text-gray-400">
-              Currency: set via <code className="bg-gray-100 px-1 rounded">PAYSTACK_CURRENCY</code> env var (default: GHS).
-              If payment fails, set to <strong>NGN</strong> for Nigerian Paystack accounts or <strong>USD</strong> for international.
-            </p>
           </div>
 
           {/* Test Paystack Connection */}

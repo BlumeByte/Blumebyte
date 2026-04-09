@@ -1,7 +1,23 @@
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
 import { ClientOnlyChart } from './ClientOnlyChart';
 import { useCurrency } from '../lib/currency-context';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import {
+  Clock,
+  DollarSign,
+  GraduationCap,
+  ClipboardList,
+  RefreshCw,
+  Loader2,
+  TrendingUp,
+  CheckCircle2,
+  Award,
+} from 'lucide-react';
 
 export function EmployeeEngagementAnalytics() {
   const { accessToken } = useAuth();

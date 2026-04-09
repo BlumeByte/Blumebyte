@@ -28,9 +28,9 @@ export function GlobalCurrencySettings() {
     const loadCompanyData = async () => {
       if (!accessToken || !user?.id) return;
       try {
-        // Get company ID from employee record
-        const employee = await api(`/employees/${user.id}`, { token: accessToken });
-        const cId = employee?.companyId || employee?.company;
+        // Get company ID from profile (which includes company info)
+        const profile = await api('/profile', { token: accessToken });
+        const cId = profile?.companyId || profile?.company;
         setCompanyId(cId);
 
         // Check if current currency is custom

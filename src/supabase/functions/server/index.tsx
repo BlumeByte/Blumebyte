@@ -1897,9 +1897,22 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
     // CRITICAL FIX: Get company-scoped settings
     const scope = await resolveCompanyScope(user.id);
     const companyId = scope?.[0];
-    if (!companyId) return c.json({});
+    
+    console.log(`🔍 GET /company-settings - User: ${user.id}, Role: ${role}, CompanyId: ${companyId}`);
+    
+    if (!companyId) {
+      console.warn(`⚠️ No company ID found for user ${user.id}`);
+      return c.json({});
+    }
     
     const settings = await kv.get(`company-settings:${companyId}`);
+    console.log(`🎨 Fetched settings for ${companyId}:`, {
+      hasSettings: !!settings,
+      companyName: settings?.companyName,
+      primaryColor: settings?.primaryColor,
+      hasLogo: !!settings?.logoUrl || !!settings?.logoPath
+    });
+    
     if (!settings) return c.json({});
     
     // Set default currency if not set
