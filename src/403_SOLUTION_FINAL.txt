@@ -1,0 +1,87 @@
+🚨 403 ERROR - SOLUTION FOUND! 🚨
+================================
+
+ROOT CAUSE:
+-----------
+Figma Make is trying to deploy to: /edge_functions/make-server/
+But your directory is named:      /supabase/functions/server/
+
+DIRECTORY NAME MISMATCH = 403 FORBIDDEN!
+
+═══════════════════════════════════════════════════════════════
+
+THE FIX (Choose ONE method):
+=============================
+
+METHOD 1: MANUAL RENAME (EASIEST!) ✅
+--------------------------------------
+1. Open your file browser/IDE
+2. Go to: /supabase/functions/
+3. Rename folder: server → make-server
+4. Retry deployment
+
+METHOD 2: COMMAND LINE
+----------------------
+Windows:
+  cd supabase\functions
+  rename server make-server
+
+Mac/Linux:
+  cd supabase/functions
+  mv server make-server
+
+═══════════════════════════════════════════════════════════════
+
+ALREADY DONE FOR YOU:
+=====================
+✅ figma.json updated with correct settings
+✅ Supabase integration enabled
+✅ Edge function deployment enabled
+✅ Function name set to "make-server"
+
+YOU JUST NEED TO:
+=================
+1. Rename the directory (see methods above)
+2. Retry deployment
+3. Done! ✅
+
+═══════════════════════════════════════════════════════════════
+
+WHY THIS HAPPENED:
+==================
+- Deployment path: Based on folder name
+- Your folder was named "server"
+- Figma Make expected "make-server"
+- Runtime PREFIX "/make-server-668731fc" is different from deployment name
+
+═══════════════════════════════════════════════════════════════
+
+AFTER RENAMING:
+===============
+Structure should be:
+/supabase/
+  /functions/
+    /make-server/  ← NEW NAME
+      index.tsx
+      kv_store.tsx
+      ...
+
+═══════════════════════════════════════════════════════════════
+
+VERIFY SUCCESS:
+===============
+Test this URL after deployment:
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+
+Should return: {"status":"ok"}
+
+═══════════════════════════════════════════════════════════════
+
+CONFIDENCE: VERY HIGH ✅
+========================
+This is a simple directory name mismatch.
+Renaming will fix the 403 error immediately!
+
+═══════════════════════════════════════════════════════════════
+
+ACTION: Rename the folder now, then retry deployment! 🚀

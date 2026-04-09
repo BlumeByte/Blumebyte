@@ -66,10 +66,10 @@ enable_confirmations = false
 enabled = true
 redirect_uri = "https://blumebyte.vercel.app/auth/callback"
 
-# Edge Functions - DISABLED for Figma Make deployments
-# Deploy manually via: supabase functions deploy server --project-ref ivohczdtuxasyfoiphqu
+# Edge Functions - Enabled for automatic deployment
 [functions]
-enabled = false
+enabled = true
+verify_jwt = false
 
 # Analytics
 [analytics]

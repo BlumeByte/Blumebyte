@@ -2,14 +2,16 @@
   "version": "1.0",
   "integrations": {
     "supabase": {
-      "enabled": false,
+      "enabled": true,
+      "projectRef": "ivohczdtuxasyfoiphqu",
       "edgeFunctions": {
-        "deploy": false,
-        "enabled": false
+        "deploy": true,
+        "enabled": true,
+        "functionName": "make-server"
       }
     }
   },
   "deployment": {
-    "skipSupabase": true
+    "skipSupabase": false
   }
 }

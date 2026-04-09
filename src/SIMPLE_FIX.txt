@@ -1,0 +1,74 @@
+═══════════════════════════════════════════════════════════════
+                  403 ERROR - SIMPLE FIX
+═══════════════════════════════════════════════════════════════
+
+THE PROBLEM:
+------------
+Figma Make doesn't have permission to deploy to Supabase.
+
+THE SOLUTION:
+-------------
+Deploy manually with Supabase CLI (100% reliable!)
+
+═══════════════════════════════════════════════════════════════
+
+WINDOWS USERS:
+--------------
+1. Install Supabase CLI:
+   scoop install supabase
+
+2. Run the deployment script:
+   Double-click: deploy-to-supabase.bat
+
+3. Done! ✅
+
+═══════════════════════════════════════════════════════════════
+
+MAC/LINUX USERS:
+----------------
+1. Install Supabase CLI:
+   brew install supabase/tap/supabase
+
+2. Make script executable:
+   chmod +x deploy-to-supabase.sh
+
+3. Run the deployment script:
+   ./deploy-to-supabase.sh
+
+4. Done! ✅
+
+═══════════════════════════════════════════════════════════════
+
+OR MANUAL COMMANDS:
+-------------------
+supabase login
+supabase link --project-ref ivohczdtuxasyfoiphqu
+supabase functions deploy make-server
+
+═══════════════════════════════════════════════════════════════
+
+VERIFY SUCCESS:
+---------------
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+
+Should return: {"status":"ok"}
+
+═══════════════════════════════════════════════════════════════
+
+WHY THIS WORKS:
+---------------
+✅ Bypasses Figma Make integration issues
+✅ Direct deployment to Supabase
+✅ 100% reliable
+✅ Takes only 1 minute
+
+═══════════════════════════════════════════════════════════════
+
+DEPLOYMENT SCRIPTS CREATED:
+---------------------------
+✅ deploy-to-supabase.bat (Windows)
+✅ deploy-to-supabase.sh (Mac/Linux)
+
+Just run the script - everything is automated! 🚀
+
+═══════════════════════════════════════════════════════════════

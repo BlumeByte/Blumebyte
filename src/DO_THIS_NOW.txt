@@ -1,0 +1,40 @@
+═══════════════════════════════════════════════════════════════
+                    FIX 403 ERROR - DO THIS NOW!
+═══════════════════════════════════════════════════════════════
+
+THE FIX:
+--------
+Rename this folder:
+  FROM: /supabase/functions/server/
+  TO:   /supabase/functions/make-server/
+
+HOW:
+----
+1. Open your file browser
+2. Go to: supabase → functions
+3. Right-click "server" folder
+4. Rename to "make-server"
+5. Retry deployment
+
+OR USE COMMAND LINE:
+--------------------
+Windows:  cd supabase\functions && rename server make-server
+Mac:      cd supabase/functions && mv server make-server
+
+═══════════════════════════════════════════════════════════════
+
+WHY:
+----
+Figma Make is looking for "make-server" folder
+Your folder is named "server"
+Mismatch = 403 error
+
+AFTER RENAMING:
+---------------
+Retry deployment → Should work! ✅
+
+═══════════════════════════════════════════════════════════════
+
+That's it! One folder rename fixes everything! 🚀
+
+═══════════════════════════════════════════════════════════════
