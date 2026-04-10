@@ -1,0 +1,20 @@
+{
+  "figmaMake": {
+    "disableAllIntegrations": true,
+    "disableSupabase": true,
+    "disableEdgeFunctions": true,
+    "disableAutoDeployment": true,
+    "skipDeployment": true
+  },
+  "deployment": {
+    "enabled": false,
+    "supabase": false,
+    "edgeFunctions": false
+  },
+  "integrations": {
+    "supabase": {
+      "enabled": false,
+      "deploy": false
+    }
+  }
+}

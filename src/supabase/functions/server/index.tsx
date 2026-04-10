@@ -2125,7 +2125,12 @@ app.get(`${PREFIX}/reference-data`, async (c) => {
       console.log(`reference-data: User ${user.id} has no companyId scope - returning empty for strict isolation`);
       return c.json({ companies: [], departments: [], branches: [], assets: [], assetCategories: [], paygrades: [], leaveTypes: [], financialYears: [] });
     }
-    const companies = allCompanies.filter((c: any) => scope!.includes(c.id));
+    // CRITICAL FIX: Companies filter should include both direct matches AND companies owned by this tenant
+    const companies = allCompanies.filter((c: any) => 
+      scope!.includes(c.id) || // Direct match (the tenant's main company record)
+      c.companyId === companyId || // Company record owned by this tenant
+      c.company === companyId // Legacy field compatibility
+    );
     const departments = allDepartments.filter((d: any) => d.companyId === companyId || d.company === companyId);
     const branches = allBranches.filter((b: any) => b.companyId === companyId || b.company === companyId);
     const assets = allAssets.filter((a: any) => a.companyId === companyId || a.company === companyId);
@@ -3905,15 +3910,17 @@ app.get(`${PREFIX}/superadmin/company`, async (c) => {
     let companies = await kv.getByPrefix('company:');
     
     // CRITICAL FIX: Filter companies by SuperAdmin's company scope
-    // Each SuperAdmin should ONLY see their own company
+    // Each SuperAdmin should see their own company AND any sub-companies they created
     const superAdminCompany = await getCompanyId(user.id);
     
     if (superAdminCompany) {
-      // Filter to only show the SuperAdmin's own company
+      // Filter to show: 1) The tenant's main company record, 2) Any companies owned by this tenant
       companies = companies.filter((company: any) => 
-        company.id === superAdminCompany || company.companyId === superAdminCompany
+        company.id === superAdminCompany || // The tenant's main company record
+        company.companyId === superAdminCompany || // Company owned by this tenant
+        company.company === superAdminCompany // Legacy field compatibility
       );
-      console.log(`SuperAdmin ${user.id} accessing company data - filtered to company: ${superAdminCompany}`);
+      console.log(`SuperAdmin ${user.id} accessing company data - filtered to tenant: ${superAdminCompany}, found ${companies.length} companies`);
     } else {
       // If SuperAdmin has no company assignment, return empty array
       console.log(`SuperAdmin ${user.id} has no company assignment - returning empty`);

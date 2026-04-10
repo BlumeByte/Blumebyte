@@ -55,17 +55,26 @@ export function CompanyBrandingSettings() {
       
       console.log('✅ Branding save response:', response);
       
-      toast.success('✅ Company branding updated successfully. Refreshing...');
+      toast.success('✅ Company branding updated successfully!');
       
-      // Trigger immediate refresh
-      refreshBranding();
+      // Trigger immediate refresh multiple times to ensure it sticks
+      await refreshBranding();
       window.dispatchEvent(new Event('branding-updated'));
+      
+      // Trigger multi-tab sync
+      localStorage.setItem('branding-refresh-trigger', Date.now().toString());
+      
+      // Wait a bit and refresh again to ensure backend has propagated
+      setTimeout(async () => {
+        await refreshBranding();
+        window.dispatchEvent(new Event('branding-updated'));
+      }, 500);
       
       // Force reload to ensure all components pick up the changes
       setTimeout(() => {
         console.log('🔄 Reloading page to apply branding changes...');
         window.location.reload();
-      }, 1000);
+      }, 1500);
     } catch (e: any) {
       console.error('❌ Branding save error:', e);
       toast.error(e.message || 'Failed to save branding');
@@ -158,8 +167,9 @@ export function CompanyBrandingSettings() {
       toast.success('✅ Logo uploaded successfully');
       setCropDialogOpen(false);
       setCropImageSrc(null);
-      refreshBranding();
+      await refreshBranding();
       window.dispatchEvent(new Event('branding-updated'));
+      localStorage.setItem('branding-refresh-trigger', Date.now().toString());
     } catch (e: any) {
       toast.error(e.message || 'Logo upload failed');
     }
@@ -173,8 +183,9 @@ export function CompanyBrandingSettings() {
       await api('/superadmin/remove-company-logo', { method: 'DELETE', token: accessToken });
       setSettings({ ...settings, logoUrl: '' });
       toast.success('Logo removed');
-      refreshBranding();
+      await refreshBranding();
       window.dispatchEvent(new Event('branding-updated'));
+      localStorage.setItem('branding-refresh-trigger', Date.now().toString());
     } catch (e: any) {
       toast.error(e.message || 'Failed to remove logo');
     }

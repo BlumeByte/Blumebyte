@@ -78,24 +78,38 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Fetch branding in background without blocking initial render
+    // Fetch branding immediately on mount
     fetchBranding();
-    // PERFORMANCE: Only poll if user is logged in, and reduce frequency to 60 seconds
+    
+    // Only poll if user is logged in
     const token = localStorage.getItem('auth-token');
     if (!token) return; // Don't poll if not logged in
     
-    const iv = setInterval(fetchBranding, 60000); // Reduced from 15s to 60s
+    // Poll every 30 seconds for branding updates (balance between freshness and performance)
+    const iv = setInterval(fetchBranding, 30000);
     
-    // Listen for custom branding update event
+    // Listen for custom branding update event for immediate refresh
     const handleBrandingUpdate = () => {
-      console.log('Branding update event received, refreshing...');
+      console.log('🎨 Branding update event received, refreshing immediately...');
       fetchBranding();
+      // Refresh again after a short delay to ensure backend has propagated
+      setTimeout(fetchBranding, 1000);
     };
     window.addEventListener('branding-updated', handleBrandingUpdate);
+    
+    // Listen for storage events (for multi-tab sync)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'branding-refresh-trigger') {
+        console.log('🎨 Branding refresh triggered from another tab');
+        fetchBranding();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
     
     return () => {
       clearInterval(iv);
       window.removeEventListener('branding-updated', handleBrandingUpdate);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [fetchBranding]);
 
