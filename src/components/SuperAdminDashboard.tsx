@@ -339,8 +339,8 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
     title: 'Job Postings',
     apiPrefix: '/superadmin/job-posting',
     fields: [
-      { key: 'roleTitle', label: 'Role Title' },
-      { key: 'title', label: 'Job Title (internal reference)' },
+      // roleTitle is used on the public hiring page; title is the internal reference
+      { key: 'roleTitle', label: 'Role Title (shown publicly)' },
       { key: 'department', label: 'Department' },
       { key: 'location', label: 'Location' },
       { key: 'employmentType', label: 'Employment Type', type: 'select', options: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Remote', 'Hybrid'] },

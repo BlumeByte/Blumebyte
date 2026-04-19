@@ -41,14 +41,15 @@ interface TenantUser {
 }
 
 // ─── Care Auth Context ────────────────────────────────────────────────────────
+// Use sessionStorage so the token is cleared when the tab/browser closes
 function getCareToken(): string | null {
-  return localStorage.getItem('care_token');
+  return sessionStorage.getItem('care_token');
 }
 function setCareToken(token: string) {
-  localStorage.setItem('care_token', token);
+  sessionStorage.setItem('care_token', token);
 }
 function clearCareToken() {
-  localStorage.removeItem('care_token');
+  sessionStorage.removeItem('care_token');
 }
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
@@ -261,7 +262,7 @@ export default function CareDashboard() {
       const result = await api('/care/reset-password', {
         method: 'POST',
         token,
-        body: { email: resetEmail, tenantId: resetTarget.id },
+        body: { email: resetEmail },
       });
       setResetLinkResult(result?.resetLink || result?.message || 'Reset email sent.');
       toast.success('Password reset initiated.');

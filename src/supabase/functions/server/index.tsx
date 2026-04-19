@@ -9301,7 +9301,7 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
       id: j.id,
       companyName: j.companyName || j.company || '',
       roleTitle: j.roleTitle || j.title || '',
-      employmentType: j.employmentType || j.employement_type || '',
+      employmentType: j.employmentType || j.employment_type || '',
       location: j.location || '',
       description: j.description || '',
       requirements: j.requirements || '',

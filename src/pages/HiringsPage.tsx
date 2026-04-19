@@ -313,7 +313,11 @@ function JobCard({
   onDetails: () => void;
   onApply: () => void;
 }) {
-  const preview = job.description?.slice(0, 150) + (job.description && job.description.length > 150 ? '…' : '');
+  const preview = job.description
+    ? job.description.length > 150
+      ? job.description.slice(0, 150) + '…'
+      : job.description
+    : '';
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
       {/* Header */}
