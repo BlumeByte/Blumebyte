@@ -42,6 +42,7 @@ import { AutomationModule } from './AutomationModule';
 import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
+import { TwoFactorSettings } from './TwoFactorSettings';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -2142,6 +2143,9 @@ function AdminSettings() {
           )}
         </CardContent>
       </Card>
+
+      {/* 2FA Settings */}
+      <TwoFactorSettings />
     </div>
   );
 }

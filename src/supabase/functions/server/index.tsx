@@ -4064,6 +4064,100 @@ makeCrud("admin/departments", "department:", requireAdminOrAbove);
 makeCrud("admin/compensations", "compensation:", requireAdminOrAbove);
 makeCrud("admin/benefits", "benefit:", requireAdminOrAbove);
 
+// POST /admin/payroll/calculate — auto-calculate tax deductions + benefit allowances for a given employee + basic salary
+app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
+  try {
+    const { user } = await requireAdminOrAbove(c);
+    const { userId, basicSalary: baseSalaryStr, period } = await c.req.json();
+    const basicSalary = parseFloat(baseSalaryStr || 0);
+
+    const scope = await resolveCompanyScope(user.id);
+
+    // Fetch tax configurations and benefit plans
+    const [allTaxes, allBenefits, allOT, allExpenses] = await Promise.all([
+      kv.getByPrefix('tax-configuration:'),
+      kv.getByPrefix('benefit:'),
+      kv.getByPrefix('overtime:'),
+      kv.getByPrefix('expense:'),
+    ]);
+
+    // Filter by company scope
+    const taxes = allTaxes.filter((t: any) => !t.companyId || scope?.includes(t.companyId));
+    const benefits = allBenefits.filter((b: any) => !b.companyId || scope?.includes(b.companyId));
+
+    // Calculate tax deduction
+    let taxDeduction = 0;
+    for (const tax of taxes) {
+      if (tax.enabled === false) continue;
+      if (tax.applicableTo && tax.applicableTo !== 'all' && tax.applicableTo !== 'employees') continue;
+      if (tax.type === 'percentage') {
+        taxDeduction += basicSalary * (parseFloat(tax.rate || 0) / 100);
+      } else if (tax.type === 'flat') {
+        taxDeduction += parseFloat(tax.amount || 0);
+      } else if (tax.type === 'bracket' && Array.isArray(tax.brackets)) {
+        let remaining = basicSalary;
+        for (const bracket of tax.brackets) {
+          if (remaining <= 0) break;
+          const min = parseFloat(bracket.min || 0);
+          const max = parseFloat(bracket.max || 0) || Infinity;
+          const rate = parseFloat(bracket.rate || 0) / 100;
+          const taxable = Math.min(remaining, max - min);
+          taxDeduction += taxable * rate;
+          remaining -= taxable;
+        }
+      }
+    }
+
+    // Calculate benefit allowance (employer contribution)
+    let benefitAllowance = 0;
+    for (const benefit of benefits) {
+      if (benefit.enabled === false) continue;
+      if (userId && benefit.eligibleUsers?.length && !benefit.eligibleUsers.includes(userId)) continue;
+      if (benefit.contributionType === 'percentage') {
+        benefitAllowance += basicSalary * (parseFloat(benefit.employerContribution || 0) / 100);
+      } else {
+        benefitAllowance += parseFloat(benefit.employerContribution || 0);
+      }
+    }
+
+    // Calculate approved OT bonus
+    let otBonus = 0;
+    if (userId) {
+      const approvedOT = allOT.filter((r: any) =>
+        r.userId === userId && r.status === 'approved' && (!period || r.date?.startsWith(period))
+      );
+      otBonus = approvedOT.reduce((s: number, r: any) => s + (parseFloat(r.rate || 0) * parseFloat(r.hours || 0)), 0);
+    }
+
+    // Calculate approved expense reimbursement
+    let expenseReimbursement = 0;
+    if (userId) {
+      const approvedExp = allExpenses.filter((e: any) =>
+        e.userId === userId && (e.status === 'approved' || e.status === 'reimbursed') &&
+        (!period || e.date?.startsWith(period))
+      );
+      expenseReimbursement = approvedExp.reduce((s: number, e: any) => s + parseFloat(e.amount || 0), 0);
+    }
+
+    const totalAllowances = benefitAllowance + otBonus + expenseReimbursement;
+    const netPay = basicSalary + totalAllowances - taxDeduction;
+
+    return c.json({
+      basicSalary,
+      taxDeduction: parseFloat(taxDeduction.toFixed(2)),
+      benefitAllowance: parseFloat(benefitAllowance.toFixed(2)),
+      otBonus: parseFloat(otBonus.toFixed(2)),
+      expenseReimbursement: parseFloat(expenseReimbursement.toFixed(2)),
+      totalAllowances: parseFloat(totalAllowances.toFixed(2)),
+      netPay: parseFloat(netPay.toFixed(2)),
+    });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Public read-only endpoints for employees to access reference data
 app.get(`${PREFIX}/leave-types`, async (c) => {
   try {

@@ -38,6 +38,7 @@ import { BackupRestore } from './BackupRestore';
 import { HiringApprovalPanel } from './HiringApprovalPanel';
 import { ClockInOut } from './ClockInOut';
 import { ReportsPanel } from './ReportsPanel';
+import { TwoFactorSettings } from './TwoFactorSettings';
 import { MeetingsPanel } from './MeetingsPanel';
 import { ProfileChangeRequests } from './ProfileChangeRequests';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
@@ -495,6 +496,11 @@ export function SuperAdminDashboard() {
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">⏰ Working Hours Configuration</h2>
             <WorkingHoursConfig />
+          </div>
+
+          <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">🔐 Two-Factor Authentication</h2>
+            <TwoFactorSettings />
           </div>
         </div>
       );
@@ -1761,6 +1767,7 @@ function PayrollView() {
   const [formData, setFormData] = useState<any>({});
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [calculating, setCalculating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1774,6 +1781,35 @@ function PayrollView() {
     } catch (e) { console.log(e); }
     setLoading(false);
   }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Auto-calculate tax + benefits using server-side calculation
+  const handleAutoCalculate = async () => {
+    if (!formData.basicSalary || !formData.userId) {
+      toast.error('Select an employee and enter Basic Salary first');
+      return;
+    }
+    setCalculating(true);
+    try {
+      const result = await api('/admin/payroll/calculate', {
+        method: 'POST',
+        body: { userId: formData.userId, basicSalary: formData.basicSalary, period: formData.period },
+        token: accessToken,
+      });
+      setFormData((prev: any) => ({
+        ...prev,
+        deductions: result.taxDeduction?.toFixed(2) ?? prev.deductions,
+        allowances: result.totalAllowances?.toFixed(2) ?? prev.allowances,
+        taxDeduction: result.taxDeduction?.toFixed(2),
+        benefitAllowance: result.benefitAllowance?.toFixed(2),
+        otBonus: result.otBonus?.toFixed(2),
+        expenseReimbursement: result.expenseReimbursement?.toFixed(2),
+      }));
+      toast.success(`Calculated: Tax ${currencySymbol}${result.taxDeduction?.toFixed(2)}, Benefits ${currencySymbol}${result.benefitAllowance?.toFixed(2)}, OT ${currencySymbol}${result.otBonus?.toFixed(2)}`);
+    } catch (e: any) { toast.error('Failed to auto-calculate: ' + e.message); }
+    setCalculating(false);
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -1930,6 +1966,13 @@ function PayrollView() {
               <div><Label>Allowances</Label><Input type="number" value={formData.allowances || ''} onChange={e => setFormData({ ...formData, allowances: e.target.value })} /></div>
               <div><Label>Deductions</Label><Input type="number" value={formData.deductions || ''} onChange={e => setFormData({ ...formData, deductions: e.target.value })} /></div>
             </div>
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={handleAutoCalculate} disabled={calculating}>
+              {calculating && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />}
+              ⚡ Auto-Calculate Tax + Benefits
+            </Button>
+            {(formData.taxDeduction || formData.benefitAllowance) && (
+              <p className="text-xs text-muted-foreground">Tax deducted: {currencySymbol}{formData.taxDeduction} · Employer benefits: {currencySymbol}{formData.benefitAllowance}</p>
+            )}
             <div>
               <Label>Status</Label>
               <NativeSelect value={formData.status || 'pending'} onChange={e => setFormData({ ...formData, status: e.target.value })}>
