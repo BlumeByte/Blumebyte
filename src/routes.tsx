@@ -40,7 +40,6 @@ import OnboardingPage from './pages/OnboardingPage';
 import EmployeeExperiencePage from './pages/EmployeeExperiencePage';
 import HiringsPage from './pages/HiringsPage';
 import HiringDetailPage from './pages/HiringDetailPage';
-import CareDashboard from './pages/CareDashboard';
 import UltimateadminSupport from './pages/UltimateadminSupport';
 
 // PERFORMANCE: Lazy load heavy dashboard components
@@ -183,7 +182,6 @@ const IndustryPageWrapper = () => <IndustryPage />;
 const ResourcesPageWrapper = () => <ResourcesPage />;
 const HiringsPageWrapper = () => <HiringsPage />;
 const HiringDetailPageWrapper = () => <HiringDetailPage />;
-const CareDashboardWrapper = () => <CareDashboard />;
 const UltimateadminSupportWrapper = () => <UltimateadminSupport />;
 
 const NotificationsPageWrapper = () => (
@@ -354,11 +352,11 @@ export const router = createBrowserRouter([
       },
       {
         path: '/care-dashboard',
-        Component: CareDashboardWrapper,
+        element: <Navigate to="/ultimateadmin/support" replace />,
       },
       {
         path: '/care',
-        Component: CareDashboardWrapper,
+        element: <Navigate to="/ultimateadmin/support" replace />,
       },
       {
         path: '/ultimateadmin/support',
