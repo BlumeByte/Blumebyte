@@ -18,7 +18,7 @@ export function useDarkMode() {
 }
 
 /** Dashboard routes where dark mode should be applied. */
-const DASHBOARD_PATHS = ['/admin', '/manager', '/employee', '/superadmin', '/notifications'];
+const DASHBOARD_PATHS = ['/admin', '/manager', '/employee', '/superadmin', '/notifications', '/ultimateadmin'];
 
 function isDashboardPath(pathname: string): boolean {
   return DASHBOARD_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
