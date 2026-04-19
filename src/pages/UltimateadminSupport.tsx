@@ -1028,12 +1028,13 @@ export default function UltimateadminSupport() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isSupportSessionActive()) { setAuthState(false); return; }
+    // Always check the current Supabase session first so that an already-authenticated
+    // ultimateadmin user is routed straight to the dashboard without seeing the login form.
     getSupportToken().then(async (t) => {
       if (!t) { clearSupportSession(); setAuthState(false); return; }
       try {
         const result = await api('/ultimateadmin/support/verify', { token: t });
-        if (result?.allowed) { setToken(t); setAuthState(true); }
+        if (result?.allowed) { setSupportSession(); setToken(t); setAuthState(true); }
         else { clearSupportSession(); setAuthState(false); }
       } catch { clearSupportSession(); setAuthState(false); }
     });

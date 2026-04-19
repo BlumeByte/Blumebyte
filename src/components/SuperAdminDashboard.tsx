@@ -356,7 +356,7 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
       { key: 'visibilityType', label: 'Visibility (set to "public_global" to appear on the public Hirings page)', type: 'select', options: ['internal_only', 'public_global'] },
       { key: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
     ],
-    defaults: { visibilityType: 'internal_only', status: 'active' },
+    defaults: { visibilityType: 'public_global', status: 'active' },
   },
   disciplinary: {
     title: 'Disciplinary Cases',
