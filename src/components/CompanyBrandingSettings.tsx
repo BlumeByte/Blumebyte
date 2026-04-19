@@ -329,6 +329,7 @@ export function CompanyBrandingSettings() {
               {PRESET_COLORS.map((color) => (
                 <button
                   key={color}
+                  aria-label={`Select color ${color}`}
                   className={`w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 ${
                     settings.primaryColor === color
                       ? 'border-foreground scale-110 shadow-lg'
@@ -362,6 +363,7 @@ export function CompanyBrandingSettings() {
                 </p>
               </div>
               <button
+                aria-label={settings.darkMode ? 'Disable dark mode' : 'Enable dark mode'}
                 onClick={() => setSettings({ ...settings, darkMode: !settings.darkMode })}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   settings.darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'

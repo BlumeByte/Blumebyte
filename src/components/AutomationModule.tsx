@@ -125,10 +125,12 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     trigger: '',
   });
 
-  // Load data
+  // Load data whenever accessToken becomes available
   useEffect(() => {
-    loadData();
-  }, []);
+    if (accessToken) {
+      loadData();
+    }
+  }, [accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     setLoading(true);

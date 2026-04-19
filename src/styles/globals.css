@@ -165,6 +165,19 @@
     color: var(--foreground);
   }
 
+  /* Radix UI portal (Select, Dialog, DropdownMenu, Popover) dark mode.
+     Portals render at document.body level, outside any .dark wrapper div,
+     so we target them directly via the html.dark selector. */
+  html.dark [data-radix-popper-content-wrapper],
+  html.dark [data-radix-select-viewport],
+  html.dark [role="listbox"],
+  html.dark [role="menu"],
+  html.dark [role="dialog"] {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+    border-color: var(--border);
+  }
+
   /* Fix date and time input icons visibility */
   input[type="date"],
   input[type="time"],
@@ -194,6 +207,13 @@
   }
 
   /* Dark mode support for date/time inputs */
+  .dark input[type="date"],
+  .dark input[type="time"],
+  .dark input[type="datetime-local"] {
+    color-scheme: dark;
+    background-color: var(--input-background);
+    color: var(--foreground);
+  }
   .dark input[type="date"]::-webkit-calendar-picker-indicator,
   .dark input[type="time"]::-webkit-calendar-picker-indicator,
   .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {

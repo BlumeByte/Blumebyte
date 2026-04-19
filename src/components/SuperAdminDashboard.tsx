@@ -822,10 +822,10 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       const usersArr = Array.isArray(users) ? users : [];
       const leavesArr = Array.isArray(leaves) ? leaves : [];
       const attendanceArr = Array.isArray(attendance) ? attendance : [];
-      const workflowsData = workflows?.data || [];
-      const tasksData = tasks?.data || [];
-      const rulesData = rules?.data || [];
-      const templatesData = templates?.data || [];
+      const workflowsData = Array.isArray(workflows?.data) ? workflows.data : (Array.isArray(workflows) ? workflows : []);
+      const tasksData = Array.isArray(tasks?.data) ? tasks.data : (Array.isArray(tasks) ? tasks : []);
+      const rulesData = Array.isArray(rules?.data) ? rules.data : (Array.isArray(rules) ? rules : []);
+      const templatesData = Array.isArray(templates?.data) ? templates.data : (Array.isArray(templates) ? templates : []);
       
       setAllUsers(usersArr);
       setAllLeaves(leavesArr);
@@ -839,9 +839,9 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
         pendingLeaves: leavesArr.filter((l: any) => l.status === 'pending').length,
         announcements: Array.isArray(announcements) ? announcements.length : 0,
         activeEmployees: usersArr.filter((u: any) => u.status === 'active').length,
-        workflows: Array.isArray(workflowsData) ? workflowsData.filter((w: any) => w.status === 'active').length : 0,
-        scheduledTasks: Array.isArray(tasksData) ? tasksData.filter((t: any) => t.status === 'active').length : 0,
-        businessRules: Array.isArray(rulesData) ? rulesData.filter((r: any) => r.status === 'active').length : 0,
+        workflows: Array.isArray(workflowsData) ? workflowsData.filter((w: any) => w.enabled !== false || w.status === 'active').length : 0,
+        scheduledTasks: Array.isArray(tasksData) ? tasksData.filter((t: any) => t.enabled !== false || t.status === 'active').length : 0,
+        businessRules: Array.isArray(rulesData) ? rulesData.filter((r: any) => r.enabled !== false || r.status === 'active').length : 0,
         notificationTemplates: Array.isArray(templatesData) ? templatesData.length : 0,
         roleDistribution: {
           superadmin: usersArr.filter((u: any) => u.role === 'superadmin').length,
@@ -1091,12 +1091,12 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
             ) : (
               <div className="space-y-2">
                 {recentLeaves.map((l, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                  <div key={idx} className="flex items-center justify-between p-2.5 bg-muted/60 rounded-lg border border-border">
                     <div>
                       <p className="text-sm font-medium">{l.employeeName || 'Employee'}</p>
-                      <p className="text-xs text-gray-500">{l.leaveType || l.type || 'Leave'} \u2022 {l.startDate || '\u2014'}</p>
+                      <p className="text-xs text-muted-foreground">{l.leaveType || l.type || 'Leave'} {'•'} {l.startDate || '—'}</p>
                     </div>
-                    <Badge className={l.status === 'approved' ? 'bg-green-100 text-green-800' : l.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}>{l.status}</Badge>
+                    <Badge className={l.status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : l.status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}>{l.status}</Badge>
                   </div>
                 ))}
               </div>
