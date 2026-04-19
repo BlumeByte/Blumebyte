@@ -343,6 +343,7 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
     fields: [
       // roleTitle is used on the public hiring page; title is the internal reference
       { key: 'roleTitle', label: 'Role Title (shown publicly)' },
+      { key: 'companyName', label: 'Company Name (shown publicly)' },
       { key: 'department', label: 'Department' },
       { key: 'location', label: 'Location' },
       { key: 'employmentType', label: 'Employment Type', type: 'select', options: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Remote', 'Hybrid'] },
@@ -474,8 +475,6 @@ export function SuperAdminDashboard() {
       case 'profile-requests': return <ProfileChangeRequests />;
       case 'settings': return (
         <div className="p-8 space-y-8">
-          <LicenseManagement />
-          
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">🎨 Company Branding</h2>
             <CompanyBrandingSettings />
@@ -505,6 +504,11 @@ export function SuperAdminDashboard() {
         </div>
       );
       case 'global-hiring-applications': return <GlobalHiringApplicationsPanel accessToken={accessToken} />;
+      case 'billings-subscriptions': return (
+        <div className="p-8 space-y-8">
+          <LicenseManagement />
+        </div>
+      );
       default:
         if (ENTITY_CONFIGS[activeSection]) {
           return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} />;
@@ -1792,7 +1796,7 @@ function PayrollView() {
     }
     setCalculating(true);
     try {
-      const result = await api('/admin/payroll/calculate', {
+      const result = await api('/superadmin/payroll/calculate', {
         method: 'POST',
         body: { userId: formData.userId, basicSalary: formData.basicSalary, period: formData.period },
         token: accessToken,
