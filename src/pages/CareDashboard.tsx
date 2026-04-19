@@ -163,7 +163,8 @@ function TenantRow({
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function CareDashboard() {
   const navigate = useNavigate();
-  const [authenticated, setAuthenticated] = useState<boolean>(!!getCareToken());
+  // Tri-state: null = checking, false = not authenticated, true = authenticated
+  const [authenticated, setAuthenticated] = useState<boolean | null>(getCareToken() ? null : false);
   const [careProfile, setCareProfile] = useState<any>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -188,10 +189,14 @@ export default function CareDashboard() {
   const isDeveloper = careProfile?.role === 'developer';
 
   const loadProfile = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setAuthenticated(false);
+      return;
+    }
     try {
       const p = await api('/care/profile', { token });
       setCareProfile(p);
+      setAuthenticated(true);
     } catch {
       clearCareToken();
       setAuthenticated(false);
@@ -225,11 +230,17 @@ export default function CareDashboard() {
   }, [token]);
 
   useEffect(() => {
-    if (authenticated) {
+    // Always verify token on mount; also reload when authenticated flips to true after login
+    if (authenticated !== false) {
       loadProfile();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: verify once on mount
+
+  useEffect(() => {
+    if (authenticated === true) {
       loadTenants();
     }
-  }, [authenticated, loadProfile, loadTenants]);
+  }, [authenticated, loadTenants]);
 
   useEffect(() => {
     if (activeTab === 'applications') loadApplications();
@@ -309,8 +320,16 @@ export default function CareDashboard() {
     setAuthenticated(false);
   };
 
+  if (authenticated === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-white" />
+      </div>
+    );
+  }
+
   if (!authenticated) {
-    return <CareDashboardLogin onLogin={() => setAuthenticated(true)} />;
+    return <CareDashboardLogin onLogin={() => { setAuthenticated(null); loadProfile(); }} />;
   }
 
   return (

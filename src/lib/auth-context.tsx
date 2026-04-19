@@ -123,8 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Only set timer if user is logged in
     if (user) {
-      // 1 hour of inactivity before auto-logout (as requested)
-      const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
+      // 2 hours of inactivity before auto-logout (as requested)
+      const INACTIVITY_TIMEOUT = 2 * 60 * 60 * 1000;
       
       inactivityTimerRef.current = setTimeout(async () => {
         console.log('Auto-logout due to inactivity');
@@ -202,8 +202,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         // Page is visible again - check how long it was hidden
         const hiddenDuration = Date.now() - lastActivityRef.current;
-        // Only force logout if hidden for more than 1 hour (same as inactivity timeout)
-        const MAX_HIDDEN_DURATION = 60 * 60 * 1000; // 1 hour - keeps user logged in when switching tabs
+        // Only force logout if hidden for more than 2 hours (same as inactivity timeout)
+        const MAX_HIDDEN_DURATION = 2 * 60 * 60 * 1000; // 2 hours
         
         if (hiddenDuration > MAX_HIDDEN_DURATION) {
           console.log('Auto-logout: Page was hidden for too long');

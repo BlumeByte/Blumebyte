@@ -9564,23 +9564,17 @@ app.post(`${PREFIX}/auth/reset-password`, async (c) => {
   }
 });
 
-// --- Catch-all 404 handler (returns JSON for better debugging) ---
-app.notFound((c) => {
-  console.log(`404 Not Found: ${c.req.method} ${c.req.url}`);
-  return c.json({ error: `Route not found: ${c.req.method} ${c.req.path}` }, 404);
-});
-
-// Server started with payment-before-registration flow - v2.1 (UPDATED)
-Deno.serve(app.fetch);
 // ============ PUBLIC HIRING ENDPOINTS (no auth required) ============
 
 // GET /public/jobs — list all active public_global job postings
 app.get(`${PREFIX}/public/jobs`, async (c) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
+    // Include all non-draft, non-closed, non-filled public_global postings
+    const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
     const eligible = all.filter((j: any) =>
       j.visibilityType === 'public_global' &&
-      (j.status === 'active' || j.status === 'open')
+      ACTIVE_STATUSES.has(j.status)
     );
 
     // Build public job objects, backfilling companyName from company record if absent
@@ -9660,7 +9654,8 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
 
     // Verify job exists and is public
     const job = await kv.get(`job-posting:${jobId}`);
-    if (!job || job.visibilityType !== 'public_global' || (job.status !== 'active' && job.status !== 'open')) {
+    const APPLY_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+    if (!job || job.visibilityType !== 'public_global' || !APPLY_STATUSES.has(job.status)) {
       return c.json({ error: 'Job not found or no longer accepting applications' }, 404);
     }
 
@@ -9972,4 +9967,13 @@ app.delete(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
     return c.json({ error: e.message }, 500);
   }
 });
+
+// --- Catch-all 404 handler (returns JSON for better debugging) ---
+app.notFound((c) => {
+  console.log(`404 Not Found: ${c.req.method} ${c.req.url}`);
+  return c.json({ error: `Route not found: ${c.req.method} ${c.req.path}` }, 404);
+});
+
+// Server started with payment-before-registration flow - v2.1 (UPDATED)
+Deno.serve(app.fetch);
 

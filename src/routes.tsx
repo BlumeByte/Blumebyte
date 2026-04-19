@@ -355,6 +355,10 @@ export const router = createBrowserRouter([
         Component: CareDashboardWrapper,
       },
       {
+        path: '/care',
+        Component: CareDashboardWrapper,
+      },
+      {
         path: '*',
         Component: NotFoundPage,
       },
