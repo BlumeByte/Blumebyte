@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api-client';
 import { useAuth } from '../lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
@@ -75,45 +75,46 @@ export function AdvancedReportsModule() {
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedCompany, setSelectedCompany] = useState('all');
 
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
+    if (!accessToken) return;
     try {
       setLoading(true);
       
-      // Fetch all necessary data in parallel
-      const [employees, attendance, leaves, payroll, performance, training, assets, companies, departments] = await Promise.all([
-        api('/employees', { token: accessToken }).catch((err) => { console.error('Failed to fetch employees:', err); return []; }),
-        api('/attendance-records', { token: accessToken }).catch((err) => { console.error('Failed to fetch attendance:', err); return []; }),
+      // Fetch all necessary data in parallel using the same endpoints as ReportsPanel
+      const [employees, attendance, leaves, payroll, performance, ref] = await Promise.all([
+        api('/reports/users', { token: accessToken }).catch((err) => { console.error('Failed to fetch employees:', err); return []; }),
+        api('/reports/attendance', { token: accessToken }).catch((err) => { console.error('Failed to fetch attendance:', err); return []; }),
         api('/leave-requests', { token: accessToken }).catch((err) => { console.error('Failed to fetch leaves:', err); return []; }),
         api('/payroll-runs', { token: accessToken }).catch((err) => { console.error('Failed to fetch payroll:', err); return []; }),
         api('/performance-reviews', { token: accessToken }).catch((err) => { console.error('Failed to fetch performance:', err); return []; }),
-        api('/training-enrollments', { token: accessToken }).catch((err) => { console.error('Failed to fetch training:', err); return []; }),
-        api('/assets', { token: accessToken }).catch((err) => { console.error('Failed to fetch assets:', err); return []; }),
-        api('/companies', { token: accessToken }).catch((err) => { console.error('Failed to fetch companies:', err); return []; }),
-        api('/departments', { token: accessToken }).catch((err) => { console.error('Failed to fetch departments:', err); return []; }),
+        api('/reference-data', { token: accessToken }).catch((err) => { console.error('Failed to fetch reference data:', err); return {}; }),
       ]);
 
+      const refData = ref || {};
+      const companiesList = Array.isArray(refData.companies) ? refData.companies : [];
+      const departmentsList = Array.isArray(refData.departments) ? refData.departments : [];
+      const assetsList = Array.isArray(refData.assets) ? refData.assets : [];
+
       console.log('Advanced Reports Data Loaded:', {
-        employees: employees?.length || 0,
-        attendance: attendance?.length || 0,
-        leaves: leaves?.length || 0,
-        payroll: payroll?.length || 0,
-        performance: performance?.length || 0,
-        training: training?.length || 0,
-        assets: assets?.length || 0,
-        companies: companies?.length || 0,
-        departments: departments?.length || 0,
+        employees: Array.isArray(employees) ? employees.length : 0,
+        attendance: Array.isArray(attendance) ? attendance.length : 0,
+        leaves: Array.isArray(leaves) ? leaves.length : 0,
+        payroll: Array.isArray(payroll) ? payroll.length : 0,
+        performance: Array.isArray(performance) ? performance.length : 0,
+        companies: companiesList.length,
+        departments: departmentsList.length,
       });
 
       setReportData({
-        employees: employees || [],
-        attendance: attendance || [],
-        leaves: leaves || [],
-        payroll: payroll || [],
-        performance: performance || [],
-        training: training || [],
-        assets: assets || [],
-        companies: companies || [],
-        departments: departments || [],
+        employees: Array.isArray(employees) ? employees : [],
+        attendance: Array.isArray(attendance) ? attendance : [],
+        leaves: Array.isArray(leaves) ? leaves : [],
+        payroll: Array.isArray(payroll) ? payroll : [],
+        performance: Array.isArray(performance) ? performance : [],
+        training: [],
+        assets: assetsList,
+        companies: companiesList,
+        departments: departmentsList,
       });
     } catch (err) {
       console.error('Failed to fetch report data:', err);
@@ -121,14 +122,17 @@ export function AdvancedReportsModule() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
-    fetchReportData();
-  }, []);
+    if (accessToken) {
+      fetchReportData();
+    }
+  }, [accessToken, fetchReportData]);
 
   // Real-time subscription to Supabase broadcasts for instant updates
   useEffect(() => {
+    if (!accessToken) return;
     const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
     const channel = supabase.channel('advanced-reports-changes');
     
@@ -142,7 +146,7 @@ export function AdvancedReportsModule() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [accessToken, fetchReportData]);
 
   // Filter data by date range, department, and company
   const filterData = (data: any[]) => {
@@ -243,7 +247,7 @@ export function AdvancedReportsModule() {
   // Performance distribution
   const performanceData = Object.entries(
     (reportData.performance || []).reduce((acc: Record<string, number>, review) => {
-      const rating = review.overallRating || 'Not Rated';
+      const rating = review.overallRating || review.rating || 'Not Rated';
       acc[rating] = (acc[rating] || 0) + 1;
       return acc;
     }, {})

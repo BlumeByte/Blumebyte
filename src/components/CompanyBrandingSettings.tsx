@@ -244,11 +244,11 @@ export function CompanyBrandingSettings() {
           <div className="space-y-2">
             <Label>Company Logo</Label>
             <div className="flex items-start gap-4">
-              <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-gray-200">
+              <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-border">
                 {settings.logoUrl ? (
                   <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
-                  <ImageIcon className="w-8 h-8 text-gray-400" />
+                  <ImageIcon className="w-8 h-8 text-muted-foreground" />
                 )}
               </div>
               <div className="flex-1 space-y-2">
@@ -288,7 +288,7 @@ export function CompanyBrandingSettings() {
                     Remove
                   </Button>
                 )}
-                <p className="text-[10px] text-gray-400">
+                <p className="text-[10px] text-muted-foreground">
                   Max 5MB. JPG, PNG, GIF, WEBP. Image will be cropped to a circle.
                 </p>
               </div>
@@ -303,7 +303,7 @@ export function CompanyBrandingSettings() {
               onChange={(e) => setSettings({ ...settings, companyName: e.target.value })}
               placeholder="Enter your company name"
             />
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-muted-foreground">
               This will replace "Blumebyte" in PDFs, emails, and all user interfaces for your company.
             </p>
           </div>
@@ -329,9 +329,10 @@ export function CompanyBrandingSettings() {
               {PRESET_COLORS.map((color) => (
                 <button
                   key={color}
+                  aria-label={`Select color ${color}`}
                   className={`w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 ${
                     settings.primaryColor === color
-                      ? 'border-gray-900 scale-110 shadow-lg'
+                      ? 'border-foreground scale-110 shadow-lg'
                       : 'border-transparent'
                   }`}
                   style={{ backgroundColor: color }}
@@ -354,17 +355,18 @@ export function CompanyBrandingSettings() {
             <Label className="flex items-center gap-2">
               Dark Mode
             </Label>
-            <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg border">
+            <div className="flex items-center justify-between bg-muted p-4 rounded-lg border">
               <div>
                 <p className="text-sm font-medium">Enable Dark Mode for All Users</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   When enabled, all users in your company will see a dark interface
                 </p>
               </div>
               <button
+                aria-label={settings.darkMode ? 'Disable dark mode' : 'Enable dark mode'}
                 onClick={() => setSettings({ ...settings, darkMode: !settings.darkMode })}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  settings.darkMode ? 'bg-blue-600' : 'bg-gray-300'
+                  settings.darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                 }`}
               >
                 <span
@@ -377,9 +379,9 @@ export function CompanyBrandingSettings() {
           </div>
 
           {/* Preview */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-lg border">
-            <p className="text-xs text-gray-500 mb-3">Preview:</p>
-            <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-muted p-6 rounded-lg border">
+            <p className="text-xs text-muted-foreground mb-3">Preview:</p>
+            <div className="bg-card p-4 rounded-lg shadow-sm border">
               <div className="flex items-center gap-3">
                 {settings.logoUrl && (
                   <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-full object-cover" />
@@ -388,15 +390,15 @@ export function CompanyBrandingSettings() {
                   <h3 className="font-bold text-lg" style={{ color: settings.primaryColor || '#10b981' }}>
                     {settings.companyName || 'Your Company Name'}
                   </h3>
-                  <p className="text-sm text-gray-600">{settings.description || 'Your tagline'}</p>
+                  <p className="text-sm text-muted-foreground">{settings.description || 'Your tagline'}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Tenant Isolation Notice */}
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-            <p className="text-xs text-blue-800">
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+            <p className="text-xs text-blue-800 dark:text-blue-300">
               <strong>🔒 Tenant Isolation:</strong> These branding changes only affect users in your company.
               Other companies maintain their own separate branding settings.
             </p>

@@ -20,7 +20,7 @@ import {
   Copy, RefreshCw, PanelLeftClose, PanelLeftOpen, AlertCircle, Settings,
   Clock, CheckCircle, MessageCircle, User, UserCheck, Upload, FileText, Download, LogOut, Camera,
   UserCog, XCircle, Zap, GitMerge, Target, ClipboardList, FileCheck, BarChart3, Eye, ChevronUp, ChevronDown, Play,
-  MessageSquare, BookOpen, GraduationCap
+  MessageSquare, BookOpen, GraduationCap, CreditCard, ExternalLink
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { NotificationsBell } from './NotificationsBell';
@@ -42,6 +42,7 @@ import { AutomationModule } from './AutomationModule';
 import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
+import { TwoFactorSettings } from './TwoFactorSettings';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -116,7 +117,7 @@ export function AdminDashboard() {
                 </div>
                 <div><p className="text-sm font-semibold">{branding.companyName}</p><p className="text-[10px] text-gray-400 uppercase">Admin</p></div>
               </div>
-              <button onClick={() => setCollapsed(true)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><PanelLeftClose className="w-4 h-4" /></button>
+              <button onClick={() => setCollapsed(true)} aria-label="Collapse sidebar" className="p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"><PanelLeftClose className="w-4 h-4" /></button>
             </>
           )}
         </div>
@@ -132,8 +133,9 @@ export function AdminDashboard() {
               const active = activeTab === t.id;
               return (
                 <button key={t.id} onClick={() => { setActiveTab(t.id); scrollToTop(); }}
+                  aria-label={t.label}
                   title={collapsed ? t.label : undefined}
-                  className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-gray-500 hover:bg-gray-50'}`}
+                  className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                   style={active ? { backgroundColor: branding.primaryColor + '15', color: branding.primaryColor } : undefined}>
                   <Icon className="w-[18px] h-[18px] flex-shrink-0" style={active ? { color: branding.primaryColor } : undefined} />
                   <span className={`text-[13px] ${active ? 'font-medium' : ''} ${collapsed ? 'hidden' : 'block truncate'}`}>{t.label}</span>
@@ -144,7 +146,7 @@ export function AdminDashboard() {
         </div>
         <div className="border-t p-2 flex-shrink-0">
           {collapsed ? (
-            <button onClick={() => setCollapsed(false)} className="w-full flex justify-center p-2 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors" title="Expand sidebar"><PanelLeftOpen className="w-5 h-5" /></button>
+            <button onClick={() => setCollapsed(false)} aria-label="Expand sidebar" className="w-full flex justify-center p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Expand sidebar"><PanelLeftOpen className="w-5 h-5" /></button>
           ) : (
             <div className="flex items-center gap-2 p-1">
               {user?.profileImageUrl ? (
@@ -153,11 +155,11 @@ export function AdminDashboard() {
                 <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-xs font-bold flex-shrink-0">{user?.name?.[0]}</div>
               )}
               <div className="flex-1 min-w-0"><p className="text-xs font-medium truncate">{user?.name}</p><p className="text-[10px] text-gray-400 truncate">{user?.email}</p></div>
-              <button onClick={logout} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0 transition-colors" title="Log Out"><LogOut className="w-4 h-4" /></button>
+              <button onClick={logout} aria-label="Log Out" className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex-shrink-0 transition-colors" title="Log Out"><LogOut className="w-4 h-4" /></button>
             </div>
           )}
           {collapsed && (
-            <button onClick={logout} className="w-full flex items-center justify-center p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Log Out"><LogOut className="w-5 h-5" /></button>
+            <button onClick={logout} aria-label="Log Out" className="w-full flex items-center justify-center p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Log Out"><LogOut className="w-5 h-5" /></button>
           )}
         </div>
       </aside>
@@ -2044,6 +2046,40 @@ function AdminSettings() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Company Branding has been moved to SuperAdmin only */}
+
+      {/* Billing & Subscription */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-green-500" />Billing &amp; Subscription
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Manage your company's subscription, view billing history, and update payment details.
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open('/subscription', '_blank')}
+              className="flex items-center gap-1"
+            >
+              <CreditCard className="w-3.5 h-3.5" />Manage Subscription
+              <ExternalLink className="w-3 h-3 ml-0.5 opacity-60" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open('/payment-verify', '_blank')}
+              className="flex items-center gap-1"
+            >
+              <CheckCircle className="w-3.5 h-3.5" />Verify Payment
+              <ExternalLink className="w-3 h-3 ml-0.5 opacity-60" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Auto Clock-In / Clock-Out Settings */}
       <Card>
@@ -2054,11 +2090,12 @@ function AdminSettings() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Enable Auto Clock-In / Clock-Out</p>
-              <p className="text-xs text-gray-500">Automatically manage attendance for all or specific users</p>
+              <p className="text-xs text-muted-foreground">Automatically manage attendance for all or specific users</p>
             </div>
             <button
+              aria-label={autoClockSettings.enabled ? 'Disable auto clock' : 'Enable auto clock'}
               onClick={() => setAutoClockSettings({ ...autoClockSettings, enabled: !autoClockSettings.enabled })}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoClockSettings.enabled ? 'bg-purple-600' : 'bg-gray-300'}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoClockSettings.enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'}`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoClockSettings.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -2089,7 +2126,7 @@ function AdminSettings() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="text-xs text-gray-500 space-y-0.5 bg-gray-50 rounded-lg p-3">
+              <div className="text-xs text-muted-foreground space-y-0.5 bg-muted rounded-lg p-3">
                 <p>Auto clock-in when user opens the platform</p>
                 <p>Auto-pause after {autoClockSettings.inactivityTimeout || 30} minutes of inactivity</p>
                 <p>Auto clock-out at <strong>{autoClockSettings.clockOutTime || '17:00'}</strong> if still clocked in</p>
@@ -2106,17 +2143,21 @@ function AdminSettings() {
           )}
         </CardContent>
       </Card>
+
+      {/* 2FA Settings */}
+      <TwoFactorSettings />
     </div>
   );
 }
 
 function AdminHiring() {
   const { accessToken } = useAuth();
+  const { branding } = useBranding();
   const [subTab, setSubTab] = useState<'postings' | 'applications'>('postings');
   const [postings, setPostings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({ status: 'open', type: 'full-time' });
+  const [formData, setFormData] = useState<any>({ status: 'open', type: 'full-time', visibilityType: 'internal_only' });
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -2141,10 +2182,16 @@ function AdminHiring() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Ensure roleTitle mirrors title for the public jobs endpoint compatibility
+      const payload = {
+        ...formData,
+        roleTitle: formData.roleTitle || formData.title || '',
+        companyName: formData.companyName || branding.companyName || '',
+      };
       if (editItem) {
-        await api(`/admin/job-postings/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
+        await api(`/admin/job-postings/${editItem.id}`, { method: 'PUT', body: payload, token: accessToken });
       } else {
-        await api('/admin/job-postings', { method: 'POST', body: formData, token: accessToken });
+        await api('/admin/job-postings', { method: 'POST', body: payload, token: accessToken });
       }
       toast.success(editItem ? 'Job posting updated' : 'Job posting created');
       setDialogOpen(false);
@@ -2161,7 +2208,7 @@ function AdminHiring() {
 
   const openNew = () => {
     setEditItem(null);
-    setFormData({ status: 'open', type: 'full-time' });
+    setFormData({ status: 'open', type: 'full-time', visibilityType: 'internal_only', companyName: branding.companyName || '' });
     setDialogOpen(true);
   };
 
@@ -2211,17 +2258,18 @@ function AdminHiring() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Job Title</TableHead><TableHead>Department</TableHead><TableHead>Type</TableHead>
-                    <TableHead>Location</TableHead><TableHead>Salary</TableHead><TableHead>Status</TableHead><TableHead className="w-28">Actions</TableHead>
+                    <TableHead>Location</TableHead><TableHead>Salary</TableHead><TableHead>Visibility</TableHead><TableHead>Status</TableHead><TableHead className="w-28">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {postings.map(p => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.title || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.department || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.type || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.location || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.salaryRange || '\u2014'}</TableCell>
+                      <TableCell className="font-medium">{p.title || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.department || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.type || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.location || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.salaryRange || '—'}</TableCell>
+                      <TableCell><Badge className={p.visibilityType === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-muted text-muted-foreground'}>{p.visibilityType === 'public_global' ? '🌍 Global' : 'Internal'}</Badge></TableCell>
                       <TableCell><Badge className={statusColor(p.status)}>{p.status}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -2252,7 +2300,7 @@ function AdminHiring() {
         <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editItem ? 'Edit' : 'Create'} Job Posting</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <div><Label className="text-xs">Job Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., Software Engineer" /></div>
+            <div><Label className="text-xs">Job Title / Role Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value, roleTitle: e.target.value })} placeholder="e.g., Software Engineer" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Department</Label>
                 <Select value={(() => {
@@ -2300,16 +2348,27 @@ function AdminHiring() {
             </div>
             <div><Label className="text-xs">Job Description</Label><Textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={3} placeholder="Detailed job description..." /></div>
             <div><Label className="text-xs">Requirements</Label><Textarea value={formData.requirements || ''} onChange={e => setFormData({ ...formData, requirements: e.target.value })} rows={2} placeholder="Required qualifications..." /></div>
-            <div><Label className="text-xs">Status</Label>
-              <Select value={formData.status || 'open'} onValueChange={v => setFormData({ ...formData, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Visibility</Label>
+                <Select value={formData.visibilityType || 'internal_only'} onValueChange={v => setFormData({ ...formData, visibilityType: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="internal_only">Internal Only</SelectItem>
+                    <SelectItem value="public_global">🌍 Global (public job board)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label className="text-xs">Status</Label>
+                <Select value={formData.status || 'open'} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>

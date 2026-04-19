@@ -1,0 +1,29 @@
+{
+  "_comment": "Figma asset sync configuration. Add one entry per exported node.",
+  "_instructions": [
+    "1. Set FIGMA_TOKEN in GitHub repository secrets (Settings → Secrets → Actions).",
+    "2. Set FIGMA_FILE_KEY in GitHub repository variables (Settings → Variables → Actions),",
+    "   or hard-code it in the 'file_key' field below.",
+    "   File key is the alphanumeric ID in your Figma URL:",
+    "   https://www.figma.com/file/{FILE_KEY}/...",
+    "3. For each asset you want to sync, add an entry to 'nodes'.",
+    "   - id:     The Figma node ID (right-click a layer in Figma → Copy/Paste → Copy link,",
+    "             then extract the node-id from the URL query param ?node-id=X%3AY → 'X:Y').",
+    "   - name:   Human-readable label used in the generated manifest (not the filename).",
+    "   - format: PNG | JPG | SVG | PDF  (default: PNG).",
+    "   - scale:  Export scale 1–4 (default: 2 for @2x).",
+    "4. After the workflow runs, 'figma-assets.json' is updated with the 'hash' field",
+    "   that was actually saved to src/assets/{hash}.{ext}.",
+    "   Reference that hash in your code as:  import img from 'figma:asset/{hash}.{ext}'"
+  ],
+  "file_key": "REPLACE_WITH_YOUR_FIGMA_FILE_KEY",
+  "nodes": [
+    {
+      "id": "REPLACE_WITH_NODE_ID",
+      "name": "Logo",
+      "format": "PNG",
+      "scale": 2,
+      "hash": "fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2"
+    }
+  ]
+}

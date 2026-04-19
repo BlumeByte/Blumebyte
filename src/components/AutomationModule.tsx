@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -125,12 +125,7 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     trigger: '',
   });
 
-  // Load data
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [workflowsRes, tasksRes, rulesRes, templatesRes, employeesRes] = await Promise.all([
@@ -152,7 +147,14 @@ export function AutomationModule({ companyId }: AutomationModuleProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
+
+  // Load data whenever accessToken becomes available
+  useEffect(() => {
+    if (accessToken) {
+      loadData();
+    }
+  }, [accessToken, loadData]);
 
   // Workflow handlers
   const handleCreateWorkflow = () => {

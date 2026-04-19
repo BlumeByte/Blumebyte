@@ -188,6 +188,13 @@ export function SharedNavigation() {
               >
                 Pricing
               </button>
+              <button 
+                onClick={() => navigate('/hirings')}
+                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors flex items-center gap-1"
+              >
+                <Briefcase className="h-4 w-4" />
+                Hirings
+              </button>
             </div>
           </div>
           
@@ -317,6 +324,17 @@ export function SharedNavigation() {
                   className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 rounded-md"
                 >
                   Pricing
+                </button>
+
+                <button
+                  onClick={() => {
+                    navigate('/hirings');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 rounded-md flex items-center gap-2"
+                >
+                  <Briefcase className="h-4 w-4 text-gray-500" />
+                  Hirings
                 </button>
 
                 {/* Mobile Auth Buttons */}

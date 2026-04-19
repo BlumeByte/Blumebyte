@@ -180,12 +180,12 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
 
   const statusColor = (s: string) => {
     switch (s) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'pending-approval': return 'bg-amber-100 text-amber-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'cancelled': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'scheduled': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+      case 'pending-approval': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+      case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
+      case 'cancelled': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -258,20 +258,20 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
           {pendingMeetings.length > 0 && <Badge className="bg-amber-100 text-amber-800">{pendingMeetings.length} pending</Badge>}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+          <Button variant="outline" size="sm" onClick={load} aria-label="Refresh meetings"><RefreshCw className="w-4 h-4" /></Button>
           <Button size="sm" onClick={openNew}><Plus className="w-4 h-4 mr-1" />{mode === 'employee' ? 'Request Meeting' : 'Schedule Meeting'}</Button>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card><CardContent className="pt-5 text-center"><p className="text-2xl font-bold text-blue-600">{scheduledMeetings.length}</p><p className="text-xs text-gray-500">Scheduled</p></CardContent></Card>
-        <Card><CardContent className="pt-5 text-center"><p className="text-2xl font-bold text-amber-600">{pendingMeetings.length}</p><p className="text-xs text-gray-500">Pending Approval</p></CardContent></Card>
-        <Card><CardContent className="pt-5 text-center"><p className="text-2xl font-bold text-green-600">{meetings.filter(m => m.status === 'completed').length}</p><p className="text-xs text-gray-500">Completed</p></CardContent></Card>
+        <Card><CardContent className="pt-5 text-center"><p className="text-2xl font-bold text-blue-600">{scheduledMeetings.length}</p><p className="text-xs text-muted-foreground">Scheduled</p></CardContent></Card>
+        <Card><CardContent className="pt-5 text-center"><p className="text-2xl font-bold text-amber-600">{pendingMeetings.length}</p><p className="text-xs text-muted-foreground">Pending Approval</p></CardContent></Card>
+        <Card><CardContent className="pt-5 text-center"><p className="text-2xl font-bold text-green-600">{meetings.filter(m => m.status === 'completed').length}</p><p className="text-xs text-muted-foreground">Completed</p></CardContent></Card>
       </div>
 
-      <div className="flex gap-1 border-b">
+      <div className="flex gap-1 border-b" role="tablist">
         {[{ id: 'all', label: 'All Meetings' }, { id: 'pending', label: `Pending (${pendingMeetings.length})` }, { id: 'calendar', label: 'Calendar View' }].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{t.label}</button>
+          <button role="tab" aria-selected={activeTab === t.id} key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{t.label}</button>
         ))}
       </div>
 
@@ -297,36 +297,36 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
                 return (
                   <div 
                     key={idx} 
-                    className={`border rounded-lg p-2 min-h-[90px] ${!d.isCurrentMonth ? 'bg-gray-50 text-gray-400' : ''} ${isToday ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : ''} ${hasMeetings ? 'bg-amber-50 border-amber-200' : ''} ${weekend && d.isCurrentMonth ? 'bg-gray-100' : ''} ${holiday && d.isCurrentMonth ? 'bg-red-50 border-red-300' : ''} ${usersOnLeave.length > 0 && d.isCurrentMonth ? 'bg-purple-50 border-purple-200' : ''}`}
+                    className={`border rounded-lg p-2 min-h-[90px] ${!d.isCurrentMonth ? 'bg-muted/40 text-muted-foreground' : 'bg-card'} ${isToday ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 ring-2 ring-blue-200 dark:ring-blue-800' : ''} ${hasMeetings && !isToday ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : ''} ${weekend && d.isCurrentMonth && !hasMeetings && !isToday ? 'bg-muted/60' : ''} ${holiday && d.isCurrentMonth ? 'bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800' : ''} ${usersOnLeave.length > 0 && d.isCurrentMonth ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800' : ''}`}
                     title={holiday ? holiday.name : usersOnLeave.length > 0 ? `On Leave: ${usersOnLeave.join(', ')}` : undefined}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <p className={`text-sm font-bold ${isToday ? 'text-blue-700' : weekend ? 'text-red-500' : ''}`}>{d.day}</p>
+                      <p className={`text-sm font-bold ${isToday ? 'text-blue-700 dark:text-blue-400' : weekend ? 'text-red-500 dark:text-red-400' : ''}`}>{d.day}</p>
                       {blocked && <Badge className="text-[9px] h-4 px-1 bg-red-500 text-white">BLOCKED</Badge>}
                     </div>
                     
                     {holiday && (
-                      <div className="mb-1 p-1 bg-red-100 rounded text-[9px] text-red-800 truncate" title={holiday.name}>
+                      <div className="mb-1 p-1 bg-red-100 dark:bg-red-900/50 rounded text-[9px] text-red-800 dark:text-red-300 truncate" title={holiday.name}>
                         🎉 {holiday.name}
                       </div>
                     )}
                     
                     {usersOnLeave.slice(0, 2).map((name, i) => (
-                      <div key={i} className="mb-1 p-1 bg-purple-100 rounded text-[9px] text-purple-800 truncate" title={`${name} on leave`}>
+                      <div key={i} className="mb-1 p-1 bg-purple-100 dark:bg-purple-900/50 rounded text-[9px] text-purple-800 dark:text-purple-300 truncate" title={`${name} on leave`}>
                         🏖️ {name}
                       </div>
                     ))}
                     {usersOnLeave.length > 2 && (
-                      <p className="text-[8px] text-purple-600">+{usersOnLeave.length - 2} more</p>
+                      <p className="text-[8px] text-purple-600 dark:text-purple-400">+{usersOnLeave.length - 2} more</p>
                     )}
                     
                     {dayMeetings.slice(0, 2).map(m => (
-                      <div key={m.id} className="mt-1 p-1 bg-blue-100 rounded text-[9px] text-blue-800 truncate" title={`${m.title} at ${m.startTime}`}>
+                      <div key={m.id} className="mt-1 p-1 bg-blue-100 dark:bg-blue-900/50 rounded text-[9px] text-blue-800 dark:text-blue-300 truncate" title={`${m.title} at ${m.startTime}`}>
                         <CalendarCheck className="w-2.5 h-2.5 inline mr-0.5" />{m.startTime} {m.title}
                       </div>
                     ))}
                     {dayMeetings.length > 2 && (
-                      <p className="text-[8px] text-blue-600 mt-0.5">+{dayMeetings.length - 2} more</p>
+                      <p className="text-[8px] text-blue-600 dark:text-blue-400 mt-0.5">+{dayMeetings.length - 2} more</p>
                     )}
                   </div>
                 );
@@ -334,12 +334,12 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
             </div>
             
             {/* Legend */}
-            <div className="mt-4 flex flex-wrap gap-3 text-xs">
-              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-50 border-2 border-blue-500 rounded"></div><span>Today</span></div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-50 border border-amber-200 rounded"></div><span>Has Meetings</span></div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-100 rounded"></div><span>Weekend</span></div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-50 border border-red-300 rounded"></div><span>Holiday</span></div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-50 border border-purple-200 rounded"></div><span>Leave Day</span></div>
+            <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-50 dark:bg-blue-950/40 border-2 border-blue-500 rounded"></div><span>Today</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded"></div><span>Has Meetings</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-muted rounded"></div><span>Weekend</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded"></div><span>Holiday</span></div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded"></div><span>Leave Day</span></div>
             </div>
           </CardContent>
         </Card>

@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { TechSliders3D } from '../components/TechSliders3D';
 import { HeroUIUXAnimation } from '../components/HeroUIUXAnimation';
+import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const features = [
     {
@@ -103,183 +102,9 @@ export default function LandingPage() {
     },
   ];
 
-  // Dropdown menu content
-  const platformMenu = [
-    {
-      title: 'Core Platform',
-      items: [
-        { name: 'Platform Overview', icon: BarChart3, description: 'Complete HR management solution' },
-        { name: 'HR Data & Reporting', icon: FileText, description: 'Advanced analytics and insights' },
-        { name: 'Time & Attendance', icon: Clock, description: 'Clock in/out and time tracking' },
-      ]
-    },
-    {
-      title: 'Workforce Management',
-      items: [
-        { name: 'Payroll', icon: DollarSign, description: 'Streamlined payroll processing' },
-        { name: 'Performance Management', icon: Trophy, description: 'Track and improve performance' },
-        { name: 'Compensation', icon: Award, description: 'Manage pay grades and bonuses' },
-      ]
-    },
-    {
-      title: 'Talent & Growth',
-      items: [
-        { name: 'Applicant Tracking', icon: UserCheck, description: 'Recruit and hire top talent' },
-        { name: 'Onboarding', icon: Users, description: 'Seamless new hire experience' },
-        { name: 'Employee Experience', icon: Heart, description: 'Boost engagement and satisfaction' },
-      ]
-    }
-  ];
-
-  const solutionsMenu = [
-    {
-      title: 'By Industry',
-      items: [
-        { name: 'Construction', icon: Building2 },
-        { name: 'Education', icon: GraduationCap },
-        { name: 'Finance', icon: DollarSign },
-        { name: 'Healthcare', icon: Heart },
-        { name: 'Manufacturing', icon: Briefcase },
-        { name: 'Technology', icon: Zap },
-      ]
-    },
-    {
-      title: 'By Company Size',
-      items: [
-        { name: 'Startups', icon: Sparkles },
-        { name: 'Small Companies (1-50)', icon: Users },
-        { name: 'Mid-sized (51-200)', icon: Building2 },
-        { name: 'Large Companies (200+)', icon: Globe },
-      ]
-    },
-    {
-      title: 'By Stakeholder',
-      items: [
-        { name: 'Executives', icon: Target },
-        { name: 'HR Leaders', icon: Users },
-        { name: 'Finance Teams', icon: DollarSign },
-        { name: 'IT Departments', icon: Shield },
-      ]
-    }
-  ];
-
-  const resourcesMenu = [
-    {
-      title: 'Learn',
-      items: [
-        { name: 'HR Toolkit', icon: Briefcase, description: 'Templates and tools' },
-        { name: 'Content Library', icon: Book, description: 'Guides and resources' },
-        { name: 'HR Glossary', icon: FileText, description: 'Industry terminology' },
-        { name: 'Webinar Library', icon: Video, description: 'On-demand videos' },
-        { name: 'Events Hub', icon: Calendar, description: 'Upcoming events' },
-        { name: 'HR Virtual Summit', icon: Trophy, description: 'Annual conference' },
-      ]
-    }
-  ];
-
-  const handleMouseEnter = (menu: string) => {
-    setOpenDropdown(menu);
-  };
-
-  const handleMouseLeave = () => {
-    setOpenDropdown(null);
-  };
-
-  const DropdownMenu = ({ menu, content }: { menu: string; content: any[] }) => (
-    <div
-      className="relative"
-      onMouseEnter={() => handleMouseEnter(menu)}
-      onMouseLeave={handleMouseLeave}
-    >
-      <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors">
-        {menu}
-        <ChevronDown className="h-4 w-4" />
-      </button>
-      
-      {openDropdown === menu && (
-        <div className="absolute top-full left-0 mt-2 w-[600px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-6">
-          <div className="grid grid-cols-2 gap-6">
-            {content.map((section, idx) => (
-              <div key={idx}>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  {section.title}
-                </h3>
-                <ul className="space-y-2">
-                  {section.items.map((item: any, itemIdx: number) => (
-                    <li key={itemIdx}>
-                      <button 
-                        onClick={() => {
-                          setOpenDropdown(null);
-                          if (menu === 'Our Platform') {
-                            navigate('/platform-overview');
-                          } else if (menu === 'Solutions' && section.title === 'By Industry') {
-                            navigate(`/industry/${item.name.toLowerCase()}`);
-                          } else if (menu === 'Solutions' && (section.title === 'By Company Size' || section.title === 'By Stakeholder')) {
-                            // Navigate to platform overview for company size and stakeholder
-                            navigate('/platform-overview');
-                          } else if (menu === 'Resources') {
-                            navigate('/resources');
-                          }
-                        }}
-                        className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-gray-50 transition-colors group"
-                      >
-                        <item.icon className="h-5 w-5 text-gray-400 group-hover:text-black mt-0.5 shrink-0" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 group-hover:text-black">
-                            {item.name}
-                          </div>
-                          {item.description && (
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {item.description}
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-8">
-              <img src={logoImage} alt="Blumebyte" className="h-8 cursor-pointer" onClick={() => navigate('/')} />
-              
-              {/* Desktop Navigation with Dropdowns */}
-              <div className="hidden md:flex items-center gap-1">
-                <DropdownMenu menu="Our Platform" content={platformMenu} />
-                <DropdownMenu menu="Solutions" content={solutionsMenu} />
-                <DropdownMenu menu="Resources" content={resourcesMenu} />
-                <button 
-                  onClick={() => navigate('/pricing')}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors"
-                >
-                  Pricing
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>
-                Sign In
-              </Button>
-              <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
-                Get Started
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PublicNavbar />
 
       {/* Hero Section with Background Image */}
       <section className="relative overflow-hidden min-h-[700px]">
@@ -582,65 +407,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            <div className="md:col-span-1">
-              <img src={logoImage} alt="Blumebyte" className="h-10 mb-4" />
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Modern HR management platform for growing companies across Africa and beyond.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-black mb-4 text-sm uppercase tracking-wide">Platform</h3>
-              <ul className="space-y-3 text-sm text-gray-600">
-                <li><button onClick={() => navigate('/platform-overview')} className="hover:text-black transition-colors">Overview</button></li>
-                <li><button onClick={() => navigate('/features')} className="hover:text-black transition-colors">Features</button></li>
-                <li><button onClick={() => navigate('/integrations')} className="hover:text-black transition-colors">Integrations</button></li>
-                <li><button onClick={() => navigate('/pricing')} className="hover:text-black transition-colors">Pricing</button></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-black mb-4 text-sm uppercase tracking-wide">Resources</h3>
-              <ul className="space-y-3 text-sm text-gray-600">
-                <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Tutorials</button></li>
-                <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Webinars</button></li>
-                <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Documentation</button></li>
-                <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Support</button></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-black mb-4 text-sm uppercase tracking-wide">Legal</h3>
-              <ul className="space-y-3 text-sm text-gray-600">
-                <li><button onClick={() => navigate('/privacy-policy')} className="hover:text-black transition-colors">Privacy Policy</button></li>
-                <li><button onClick={() => navigate('/terms-conditions')} className="hover:text-black transition-colors">Terms of Service</button></li>
-                <li><button onClick={() => navigate('/security-policy')} className="hover:text-black transition-colors">Security</button></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-gray-500">
-              © 2026 Blumebyte. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-500 uppercase tracking-wide">Follow us</span>
-              <button 
-                onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')}
-                className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:border-red-600 transition-all duration-200"
-                aria-label="YouTube"
-              >
-                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
 
       {/* Homepage Chat Agent for visitors */}
       <HomepageChatAgent />

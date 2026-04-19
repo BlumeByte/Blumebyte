@@ -38,6 +38,7 @@ import { BackupRestore } from './BackupRestore';
 import { HiringApprovalPanel } from './HiringApprovalPanel';
 import { ClockInOut } from './ClockInOut';
 import { ReportsPanel } from './ReportsPanel';
+import { TwoFactorSettings } from './TwoFactorSettings';
 import { MeetingsPanel } from './MeetingsPanel';
 import { ProfileChangeRequests } from './ProfileChangeRequests';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
@@ -109,6 +110,8 @@ const SIDEBAR_ITEMS = [
   { id: 'audit-logs', label: 'Audit Logs', icon: Shield, group: 'system' },
   { id: 'backup-restore', label: 'Backup & Restore', icon: Archive, group: 'system' },
   { id: 'billings-subscriptions', label: 'Billings & Subscriptions', icon: CreditCard, group: 'system' },
+  { id: 'global-hiring-applications', label: 'Global Hiring Apps', icon: Briefcase, group: 'operations' },
+  { id: 'settings', label: 'Settings', icon: Settings, group: 'system' },
 ];
 
 const GROUPS = [
@@ -129,6 +132,7 @@ type EntityConfig = {
   title: string;
   apiPrefix: string;
   fields: { key: string; label: string; type?: string; options?: string[]; relatedEntity?: string; defaultQuestions?: string[] }[];
+  defaults?: Record<string, any>;
 };
 
 const ENTITY_CONFIGS: Record<string, EntityConfig> = {
@@ -338,16 +342,21 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
     title: 'Job Postings',
     apiPrefix: '/superadmin/job-posting',
     fields: [
-      { key: 'title', label: 'Job Title' },
+      // roleTitle is used on the public hiring page; title is the internal reference
+      { key: 'roleTitle', label: 'Role Title (shown publicly)' },
+      { key: 'companyName', label: 'Company Name (shown publicly)' },
       { key: 'department', label: 'Department' },
       { key: 'location', label: 'Location' },
-      { key: 'type', label: 'Employment Type', type: 'select', options: ['full-time', 'part-time', 'contract', 'internship'] },
-      { key: 'salaryRange', label: 'Salary Range' },
+      { key: 'employmentType', label: 'Employment Type', type: 'select', options: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Remote', 'Hybrid'] },
       { key: 'description', label: 'Job Description' },
       { key: 'requirements', label: 'Requirements' },
-      { key: 'applicants', label: 'Number of Applicants' },
-      { key: 'status', label: 'Status', type: 'select', options: ['draft', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
+      { key: 'qualifications', label: 'Qualifications' },
+      { key: 'salaryRange', label: 'Salary Range' },
+      { key: 'deadline', label: 'Application Deadline', type: 'date' },
+      { key: 'visibilityType', label: 'Visibility (set to "public_global" to appear on the public Hirings page)', type: 'select', options: ['internal_only', 'public_global'] },
+      { key: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
     ],
+    defaults: { visibilityType: 'internal_only', status: 'active' },
   },
   disciplinary: {
     title: 'Disciplinary Cases',
@@ -460,16 +469,14 @@ export function SuperAdminDashboard() {
       case 'surveys': return <div className="p-8"><SurveyBuilder /></div>;
       case 'engagement-analytics': return <div className="p-8"><EmployeeEngagementAnalytics /></div>;
       case 'usage-analytics': return <CompanyUsageAnalytics accessToken={accessToken} />;
-      case 'meetings-1on1': return <MeetingsPanel mode="admin" />;
+      case 'meetings-1on1': return <div className="p-8"><MeetingsPanel mode="admin" /></div>;
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;
       case 'recruitment': return <RecruitmentView />;
       case 'automation': return <div className="p-8"><AutomationModule companyId={user?.companyId || ''} /></div>;
       case 'profile-requests': return <ProfileChangeRequests />;
-      case 'billings-subscriptions': return (
+      case 'settings': return (
         <div className="p-8 space-y-8">
-          <LicenseManagement />
-          
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">🎨 Company Branding</h2>
             <CompanyBrandingSettings />
@@ -491,6 +498,17 @@ export function SuperAdminDashboard() {
             <h2 className="text-2xl font-bold mb-6">⏰ Working Hours Configuration</h2>
             <WorkingHoursConfig />
           </div>
+
+          <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">🔐 Two-Factor Authentication</h2>
+            <TwoFactorSettings />
+          </div>
+        </div>
+      );
+      case 'global-hiring-applications': return <GlobalHiringApplicationsPanel accessToken={accessToken} />;
+      case 'billings-subscriptions': return (
+        <div className="p-8 space-y-8">
+          <LicenseManagement />
         </div>
       );
       default:
@@ -625,6 +643,148 @@ function PlaceholderView({ title }: { title: string }) {
   );
 }
 
+// ========== GLOBAL HIRING APPLICATIONS PANEL (SuperAdmin) ==========
+function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | null }) {
+  const [applications, setApplications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<any>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api('/care/global-applications', { token: accessToken });
+      setApplications(Array.isArray(data) ? data : []);
+    } catch {
+      setApplications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const updateStatus = async (id: string, status: string) => {
+    try {
+      await api(`/superadmin/public-job-application/${id}`, { method: 'PUT', body: { status }, token: accessToken });
+      toast.success('Status updated');
+      load();
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
+
+  const filtered = applications.filter((a) => {
+    const q = search.toLowerCase();
+    return !q || (a.fullName || '').toLowerCase().includes(q) || (a.email || '').toLowerCase().includes(q) || (a.roleTitle || '').toLowerCase().includes(q) || (a.companyName || '').toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Global Hiring Applications</h1>
+          <p className="text-gray-500 text-sm mt-1">Applications submitted via the public Blumebyte hiring portal</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={load}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+        </Button>
+      </div>
+
+      <div className="mb-4 relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input className="pl-9 w-72" placeholder="Search applicants, roles…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-gray-300" /></div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Applicant</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Submitted</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-16 text-gray-400">
+                      No applications found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-medium">{a.fullName}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{a.companyName}</TableCell>
+                      <TableCell className="text-sm">{a.roleTitle}</TableCell>
+                      <TableCell className="text-sm">{a.email}</TableCell>
+                      <TableCell className="text-sm">{a.phone}</TableCell>
+                      <TableCell className="text-sm text-gray-500">
+                        {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={a.status === 'reviewed' ? 'default' : a.status === 'archived' ? 'secondary' : 'outline'}>
+                          {a.status || 'pending'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => { setSelected(a); setDetailOpen(true); }}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updateStatus(a.id, 'reviewed')} title="Mark Reviewed">
+                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updateStatus(a.id, 'archived')} title="Archive">
+                            <Archive className="h-3.5 w-3.5 text-gray-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Application Details</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-4 py-2 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label className="text-xs text-gray-400">Applicant</Label><p className="font-medium">{selected.fullName}</p></div>
+                <div><Label className="text-xs text-gray-400">Email</Label><p>{selected.email}</p></div>
+                <div><Label className="text-xs text-gray-400">Phone</Label><p>{selected.phone}</p></div>
+                <div><Label className="text-xs text-gray-400">Submitted</Label><p>{selected.submittedAt ? new Date(selected.submittedAt).toLocaleString() : '—'}</p></div>
+                <div><Label className="text-xs text-gray-400">Company</Label><p>{selected.companyName}</p></div>
+                <div><Label className="text-xs text-gray-400">Role</Label><p>{selected.roleTitle}</p></div>
+              </div>
+              <div><Label className="text-xs text-gray-400">Qualifications</Label><p className="mt-1">{selected.qualification}</p></div>
+              <div><Label className="text-xs text-gray-400">CV / Cover Letter</Label><p className="mt-1 whitespace-pre-wrap bg-gray-50 rounded p-3">{selected.cvMessage}</p></div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // ========== DASHBOARD ==========
 function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   const { accessToken } = useAuth();
@@ -674,10 +834,10 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       const usersArr = Array.isArray(users) ? users : [];
       const leavesArr = Array.isArray(leaves) ? leaves : [];
       const attendanceArr = Array.isArray(attendance) ? attendance : [];
-      const workflowsData = workflows?.data || [];
-      const tasksData = tasks?.data || [];
-      const rulesData = rules?.data || [];
-      const templatesData = templates?.data || [];
+      const workflowsData = Array.isArray(workflows?.data) ? workflows.data : (Array.isArray(workflows) ? workflows : []);
+      const tasksData = Array.isArray(tasks?.data) ? tasks.data : (Array.isArray(tasks) ? tasks : []);
+      const rulesData = Array.isArray(rules?.data) ? rules.data : (Array.isArray(rules) ? rules : []);
+      const templatesData = Array.isArray(templates?.data) ? templates.data : (Array.isArray(templates) ? templates : []);
       
       setAllUsers(usersArr);
       setAllLeaves(leavesArr);
@@ -691,9 +851,9 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
         pendingLeaves: leavesArr.filter((l: any) => l.status === 'pending').length,
         announcements: Array.isArray(announcements) ? announcements.length : 0,
         activeEmployees: usersArr.filter((u: any) => u.status === 'active').length,
-        workflows: Array.isArray(workflowsData) ? workflowsData.filter((w: any) => w.status === 'active').length : 0,
-        scheduledTasks: Array.isArray(tasksData) ? tasksData.filter((t: any) => t.status === 'active').length : 0,
-        businessRules: Array.isArray(rulesData) ? rulesData.filter((r: any) => r.status === 'active').length : 0,
+        workflows: Array.isArray(workflowsData) ? workflowsData.filter((w: any) => w.enabled !== false || w.status === 'active').length : 0,
+        scheduledTasks: Array.isArray(tasksData) ? tasksData.filter((t: any) => t.enabled !== false || t.status === 'active').length : 0,
+        businessRules: Array.isArray(rulesData) ? rulesData.filter((r: any) => r.enabled !== false || r.status === 'active').length : 0,
         notificationTemplates: Array.isArray(templatesData) ? templatesData.length : 0,
         roleDistribution: {
           superadmin: usersArr.filter((u: any) => u.role === 'superadmin').length,
@@ -943,12 +1103,12 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
             ) : (
               <div className="space-y-2">
                 {recentLeaves.map((l, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                  <div key={idx} className="flex items-center justify-between p-2.5 bg-muted/60 rounded-lg border border-border">
                     <div>
                       <p className="text-sm font-medium">{l.employeeName || 'Employee'}</p>
-                      <p className="text-xs text-gray-500">{l.leaveType || l.type || 'Leave'} \u2022 {l.startDate || '\u2014'}</p>
+                      <p className="text-xs text-muted-foreground">{l.leaveType || l.type || 'Leave'} {'•'} {l.startDate || '—'}</p>
                     </div>
-                    <Badge className={l.status === 'approved' ? 'bg-green-100 text-green-800' : l.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}>{l.status}</Badge>
+                    <Badge className={l.status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : l.status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}>{l.status}</Badge>
                   </div>
                 ))}
               </div>
@@ -1613,6 +1773,7 @@ function PayrollView() {
   const [formData, setFormData] = useState<any>({});
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [calculating, setCalculating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1629,15 +1790,132 @@ function PayrollView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Auto-calculate tax + benefits dynamically on the client side
+  const handleAutoCalculate = async () => {
+    if (!formData.basicSalary || !formData.userId) {
+      toast.error('Select an employee and enter Basic Salary first');
+      return;
+    }
+    setCalculating(true);
+    try {
+      const basicSalary = parseFloat(formData.basicSalary || 0);
+      const userId = formData.userId;
+      const period = formData.period || '';
+
+      const [taxBrackets, benefitPlans, otList, expList] = await Promise.all([
+        api('/superadmin/tax-bracket', { token: accessToken }).catch(() => []),
+        api('/superadmin/benefit-plan', { token: accessToken }).catch(() => []),
+        api('/admin/overtime-requests', { token: accessToken }).catch(() => []),
+        api('/admin/expense-claims', { token: accessToken }).catch(() => []),
+      ]);
+
+      // Tax: progressive bracket calculation using minIncome/maxIncome/rate
+      let taxDeduction = 0;
+      const activeTaxes = Array.isArray(taxBrackets)
+        ? taxBrackets.filter((t: any) => t.status !== 'inactive')
+        : [];
+      // Sort ascending by minIncome for progressive calculation
+      activeTaxes.sort((a: any, b: any) => parseFloat(a.minIncome || 0) - parseFloat(b.minIncome || 0));
+      for (const bracket of activeTaxes) {
+        const min = parseFloat(bracket.minIncome || 0);
+        const max = parseFloat(bracket.maxIncome || 0) || Infinity;
+        const rate = parseFloat(bracket.rate || 0) / 100;
+        if (basicSalary > min) {
+          const taxable = Math.min(basicSalary, max) - min;
+          taxDeduction += taxable * rate;
+        }
+      }
+
+      // Benefits: employer contribution % of basic salary
+      let benefitAllowance = 0;
+      const activeBenefits = Array.isArray(benefitPlans)
+        ? benefitPlans.filter((b: any) => b.status !== 'inactive')
+        : [];
+      for (const benefit of activeBenefits) {
+        const contrib = parseFloat(benefit.employerContribution || 0);
+        benefitAllowance += basicSalary * (contrib / 100);
+      }
+
+      // OT bonus: approved overtime for this employee in the period
+      let otBonus = 0;
+      if (Array.isArray(otList)) {
+        const approvedOT = otList.filter((r: any) =>
+          r.userId === userId && r.status === 'approved' && (!period || r.date?.startsWith(period))
+        );
+        otBonus = approvedOT.reduce((s: number, r: any) => s + (parseFloat(r.rate || 0) * parseFloat(r.hours || 0)), 0);
+      }
+
+      // Expense reimbursement: approved expenses for this employee in the period
+      let expenseReimbursement = 0;
+      if (Array.isArray(expList)) {
+        const approvedExp = expList.filter((e: any) =>
+          e.userId === userId && (e.status === 'approved' || e.status === 'reimbursed') &&
+          (!period || e.date?.startsWith(period))
+        );
+        expenseReimbursement = approvedExp.reduce((s: number, e: any) => s + parseFloat(e.amount || 0), 0);
+      }
+
+      const totalAllowances = benefitAllowance + otBonus + expenseReimbursement;
+
+      setFormData((prev: any) => ({
+        ...prev,
+        deductions: taxDeduction.toFixed(2),
+        allowances: totalAllowances.toFixed(2),
+        taxDeduction: taxDeduction.toFixed(2),
+        benefitAllowance: benefitAllowance.toFixed(2),
+        otBonus: otBonus.toFixed(2),
+        expenseReimbursement: expenseReimbursement.toFixed(2),
+      }));
+      toast.success(`Calculated: Tax ${currencySymbol}${taxDeduction.toFixed(2)}, Benefits ${currencySymbol}${benefitAllowance.toFixed(2)}, OT ${currencySymbol}${otBonus.toFixed(2)}`);
+    } catch (e: any) { toast.error('Failed to auto-calculate: ' + e.message); }
+    setCalculating(false);
+  };
+
+  useEffect(() => { load(); }, [load]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
       if (editItem) {
-        await api(`/superadmin/payroll-run/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
+        const net = parseFloat(formData.basicSalary || 0) + parseFloat(formData.allowances || 0) - parseFloat(formData.deductions || 0);
+        await api(`/superadmin/payroll-run/${editItem.id}`, { method: 'PUT', body: { ...formData, netPay: net.toFixed(2) }, token: accessToken });
         toast.success('Payroll record updated');
       } else {
-        const net = parseFloat(formData.basicSalary || 0) + parseFloat(formData.allowances || 0) - parseFloat(formData.deductions || 0);
-        await api('/superadmin/payroll-run', { method: 'POST', body: { ...formData, netPay: net.toFixed(2) }, token: accessToken });
+        // Fetch approved OT and expenses for this employee to include in payroll
+        let otBonus = 0;
+        let expenseReimbursement = 0;
+        try {
+          const [otList, expList] = await Promise.all([
+            api('/admin/overtime-requests', { token: accessToken }).catch(() => []),
+            api('/admin/expense-claims', { token: accessToken }).catch(() => []),
+          ]);
+          const period = formData.period || '';
+          // Sum approved OT for this employee this period
+          const approvedOT = Array.isArray(otList) ? otList.filter((r: any) =>
+            r.userId === formData.userId && r.status === 'approved' &&
+            (!period || r.date?.startsWith(period))
+          ) : [];
+          otBonus = approvedOT.reduce((s: number, r: any) => s + (parseFloat(r.rate || 0) * parseFloat(r.hours || 0)), 0);
+          // Sum approved expenses for this employee this period
+          const approvedExp = Array.isArray(expList) ? expList.filter((e: any) =>
+            e.userId === formData.userId && (e.status === 'approved' || e.status === 'reimbursed') &&
+            (!period || e.date?.startsWith(period))
+          ) : [];
+          expenseReimbursement = approvedExp.reduce((s: number, e: any) => s + parseFloat(e.amount || 0), 0);
+        } catch { /* non-blocking */ }
+        const totalAllowances = parseFloat(formData.allowances || 0) + otBonus + expenseReimbursement;
+        const net = parseFloat(formData.basicSalary || 0) + totalAllowances - parseFloat(formData.deductions || 0);
+        await api('/superadmin/payroll-run', {
+          method: 'POST',
+          body: {
+            ...formData,
+            allowances: totalAllowances.toFixed(2),
+            otBonus: otBonus.toFixed(2),
+            expenseReimbursement: expenseReimbursement.toFixed(2),
+            netPay: net.toFixed(2),
+          },
+          token: accessToken,
+        });
         toast.success('Payroll record created');
       }
       setDialogOpen(false);
@@ -1748,6 +2026,13 @@ function PayrollView() {
               <div><Label>Allowances</Label><Input type="number" value={formData.allowances || ''} onChange={e => setFormData({ ...formData, allowances: e.target.value })} /></div>
               <div><Label>Deductions</Label><Input type="number" value={formData.deductions || ''} onChange={e => setFormData({ ...formData, deductions: e.target.value })} /></div>
             </div>
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={handleAutoCalculate} disabled={calculating}>
+              {calculating && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />}
+              ⚡ Auto-Calculate Tax + Benefits
+            </Button>
+            {(formData.taxDeduction || formData.benefitAllowance) && (
+              <p className="text-xs text-muted-foreground">Tax deducted: {currencySymbol}{formData.taxDeduction} · Employer benefits: {currencySymbol}{formData.benefitAllowance}</p>
+            )}
             <div>
               <Label>Status</Label>
               <NativeSelect value={formData.status || 'pending'} onChange={e => setFormData({ ...formData, status: e.target.value })}>
@@ -3615,7 +3900,7 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
-          <Button onClick={() => { setEditItem(null); setFormData({}); setOtherTexts({}); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Add {singularTitle}</Button>
+          <Button onClick={() => { setEditItem(null); setFormData(config.defaults || {}); setOtherTexts({}); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Add {singularTitle}</Button>
         </div>
       </div>
 

@@ -153,12 +153,36 @@
     background-color: rgba(255,255,255,0.3);
   }
 
+  /* Native <select> and <option> dark mode support */
+  .dark select {
+    color-scheme: dark;
+    background-color: var(--input-background);
+    color: var(--foreground);
+    border-color: var(--input);
+  }
+  .dark select option {
+    background-color: var(--input-background);
+    color: var(--foreground);
+  }
+
+  /* Radix UI portal (Select, Dialog, DropdownMenu, Popover) dark mode.
+     Portals render at document.body level, outside any .dark wrapper div,
+     so we target them directly via the html.dark selector. */
+  html.dark [data-radix-popper-content-wrapper],
+  html.dark [data-radix-select-viewport],
+  html.dark [role="listbox"],
+  html.dark [role="menu"],
+  html.dark [role="dialog"] {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+    border-color: var(--border);
+  }
+
   /* Fix date and time input icons visibility */
   input[type="date"],
   input[type="time"],
   input[type="datetime-local"],
   .date-time-input {
-    position: relative;
     color-scheme: light;
   }
 
@@ -170,18 +194,18 @@
     opacity: 1;
     display: block;
     background: transparent;
-    bottom: 0;
-    color: #3b82f6;
-    height: auto;
-    left: auto;
-    position: absolute;
-    right: 0.5rem;
-    top: 0;
-    width: auto;
+    position: static;
     filter: invert(47%) sepia(89%) saturate(2126%) hue-rotate(201deg) brightness(98%) contrast(94%);
   }
 
   /* Dark mode support for date/time inputs */
+  .dark input[type="date"],
+  .dark input[type="time"],
+  .dark input[type="datetime-local"] {
+    color-scheme: dark;
+    background-color: var(--input-background);
+    color: var(--foreground);
+  }
   .dark input[type="date"]::-webkit-calendar-picker-indicator,
   .dark input[type="time"]::-webkit-calendar-picker-indicator,
   .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
