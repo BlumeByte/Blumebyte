@@ -8287,8 +8287,7 @@ Current user question: ${message}`;
 app.get(`${PREFIX}/automation/workflows`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const profile = await getUserProfile(authUser.user.id);
-    const companyId = profile?.companyId;
+    const companyId = await getCompanyId(authUser.user.id);
     
     const workflows = await kv.getByPrefix('automation_workflow:');
     const filtered = companyId ? workflows.filter((w: any) => w.companyId === companyId) : [];
@@ -8303,6 +8302,7 @@ app.post(`${PREFIX}/automation/workflows`, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const companyId = await getCompanyId(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -8314,7 +8314,7 @@ app.post(`${PREFIX}/automation/workflows`, async (c) => {
     const workflow = {
       id,
       ...data,
-      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
+      companyId, // CRITICAL: Use resolveCompanyScope-based companyId for multi-tenant isolation
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -8380,11 +8380,10 @@ app.delete(`${PREFIX}/automation/workflows/:id`, async (c) => {
 app.get(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const profile = await getUserProfile(authUser.user.id);
-    const companyId = profile?.companyId;
+    const companyId = await getCompanyId(authUser.user.id);
     
     const tasks = await kv.getByPrefix('automation_task:');
-    const filtered = tasks.filter((t: any) => t.companyId === companyId || !t.companyId);
+    const filtered = companyId ? tasks.filter((t: any) => t.companyId === companyId || !t.companyId) : tasks.filter((t: any) => !t.companyId);
     
     return c.json({ data: filtered });
   } catch (e: any) {
@@ -8396,6 +8395,7 @@ app.post(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const companyId = await getCompanyId(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -8407,7 +8407,7 @@ app.post(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
     const task = {
       id,
       ...data,
-      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
+      companyId, // CRITICAL: Use resolveCompanyScope-based companyId for multi-tenant isolation
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -8473,11 +8473,10 @@ app.delete(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
 app.get(`${PREFIX}/automation/business-rules`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const profile = await getUserProfile(authUser.user.id);
-    const companyId = profile?.companyId;
+    const companyId = await getCompanyId(authUser.user.id);
     
     const rules = await kv.getByPrefix('automation_rule:');
-    const filtered = rules.filter((r: any) => r.companyId === companyId || !r.companyId);
+    const filtered = companyId ? rules.filter((r: any) => r.companyId === companyId || !r.companyId) : rules.filter((r: any) => !r.companyId);
     
     return c.json({ data: filtered });
   } catch (e: any) {
@@ -8489,6 +8488,7 @@ app.post(`${PREFIX}/automation/business-rules`, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const companyId = await getCompanyId(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -8500,7 +8500,7 @@ app.post(`${PREFIX}/automation/business-rules`, async (c) => {
     const rule = {
       id,
       ...data,
-      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
+      companyId, // CRITICAL: Use resolveCompanyScope-based companyId for multi-tenant isolation
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

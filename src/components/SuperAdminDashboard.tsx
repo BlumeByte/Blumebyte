@@ -110,6 +110,7 @@ const SIDEBAR_ITEMS = [
   { id: 'backup-restore', label: 'Backup & Restore', icon: Archive, group: 'system' },
   { id: 'billings-subscriptions', label: 'Billings & Subscriptions', icon: CreditCard, group: 'system' },
   { id: 'global-hiring-applications', label: 'Global Hiring Apps', icon: Briefcase, group: 'operations' },
+  { id: 'settings', label: 'Settings', icon: Settings, group: 'system' },
 ];
 
 const GROUPS = [
@@ -464,13 +465,13 @@ export function SuperAdminDashboard() {
       case 'surveys': return <div className="p-8"><SurveyBuilder /></div>;
       case 'engagement-analytics': return <div className="p-8"><EmployeeEngagementAnalytics /></div>;
       case 'usage-analytics': return <CompanyUsageAnalytics accessToken={accessToken} />;
-      case 'meetings-1on1': return <MeetingsPanel mode="admin" />;
+      case 'meetings-1on1': return <div className="p-8"><MeetingsPanel mode="admin" /></div>;
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;
       case 'recruitment': return <RecruitmentView />;
       case 'automation': return <div className="p-8"><AutomationModule companyId={user?.companyId || ''} /></div>;
       case 'profile-requests': return <ProfileChangeRequests />;
-      case 'billings-subscriptions': return (
+      case 'settings': return (
         <div className="p-8 space-y-8">
           <LicenseManagement />
           

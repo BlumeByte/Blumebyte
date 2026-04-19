@@ -16,15 +16,35 @@ export function useDarkMode() {
   return useContext(DarkModeContext);
 }
 
+function applyDarkMode(isDark: boolean) {
+  if (isDark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}
+
 export function DarkModeProvider({ children }: { children: React.ReactNode }) {
   const { accessToken } = useAuth();
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // Initialize from localStorage for instant application (avoids flash)
+    return localStorage.getItem('darkMode') === 'true';
+  });
   const [loading, setLoading] = useState(true);
+
+  // Apply dark mode immediately on mount from cached value. The dependency array
+  // is intentionally empty: this effect runs only once to avoid overwriting the
+  // freshly-loaded setting (managed by the other useEffect below).
+  useEffect(() => {
+    applyDarkMode(darkMode);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally runs once on mount
 
   useEffect(() => {
     if (!accessToken) {
       setLoading(false);
-      document.documentElement.classList.remove('dark');
+      setDarkMode(false);
+      applyDarkMode(false);
+      localStorage.removeItem('darkMode');
       return;
     }
 
@@ -33,20 +53,17 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
       .then((settings) => {
         const isDark = settings?.darkMode === true;
         setDarkMode(isDark);
-        
-        // Apply dark mode to HTML element for global application
+        applyDarkMode(isDark);
+        // Cache for next load
         if (isDark) {
-          document.documentElement.classList.add('dark');
-          document.body.classList.add('dark');
+          localStorage.setItem('darkMode', 'true');
         } else {
-          document.documentElement.classList.remove('dark');
-          document.body.classList.remove('dark');
+          localStorage.removeItem('darkMode');
         }
       })
       .catch((err) => {
         console.log('Error loading dark mode settings:', err);
-        document.documentElement.classList.remove('dark');
-        document.body.classList.remove('dark');
+        applyDarkMode(false);
       })
       .finally(() => {
         setLoading(false);
@@ -58,13 +75,11 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
         .then((settings) => {
           const isDark = settings?.darkMode === true;
           setDarkMode(isDark);
-          
+          applyDarkMode(isDark);
           if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.body.classList.add('dark');
+            localStorage.setItem('darkMode', 'true');
           } else {
-            document.documentElement.classList.remove('dark');
-            document.body.classList.remove('dark');
+            localStorage.removeItem('darkMode');
           }
         })
         .catch(console.log);
@@ -76,9 +91,7 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DarkModeContext.Provider value={{ darkMode, loading }}>
-      <div className={darkMode ? 'dark' : ''}>
-        {children}
-      </div>
+      {children}
     </DarkModeContext.Provider>
   );
 }

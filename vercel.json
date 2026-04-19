@@ -1,5 +1,7 @@
 {
   "outputDirectory": "dist",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
@@ -27,7 +29,7 @@
         },
         {
           "key": "X-Frame-Options",
-          "value": "DENY"
+          "value": "SAMEORIGIN"
         },
         {
           "key": "X-XSS-Protection",
