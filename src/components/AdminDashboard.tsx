@@ -2148,11 +2148,12 @@ function AdminSettings() {
 
 function AdminHiring() {
   const { accessToken } = useAuth();
+  const { branding } = useBranding();
   const [subTab, setSubTab] = useState<'postings' | 'applications'>('postings');
   const [postings, setPostings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({ status: 'open', type: 'full-time' });
+  const [formData, setFormData] = useState<any>({ status: 'open', type: 'full-time', visibilityType: 'internal_only' });
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -2177,10 +2178,16 @@ function AdminHiring() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Ensure roleTitle mirrors title for the public jobs endpoint compatibility
+      const payload = {
+        ...formData,
+        roleTitle: formData.roleTitle || formData.title || '',
+        companyName: formData.companyName || branding.companyName || '',
+      };
       if (editItem) {
-        await api(`/admin/job-postings/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
+        await api(`/admin/job-postings/${editItem.id}`, { method: 'PUT', body: payload, token: accessToken });
       } else {
-        await api('/admin/job-postings', { method: 'POST', body: formData, token: accessToken });
+        await api('/admin/job-postings', { method: 'POST', body: payload, token: accessToken });
       }
       toast.success(editItem ? 'Job posting updated' : 'Job posting created');
       setDialogOpen(false);
@@ -2197,7 +2204,7 @@ function AdminHiring() {
 
   const openNew = () => {
     setEditItem(null);
-    setFormData({ status: 'open', type: 'full-time' });
+    setFormData({ status: 'open', type: 'full-time', visibilityType: 'internal_only', companyName: branding.companyName || '' });
     setDialogOpen(true);
   };
 
@@ -2247,17 +2254,18 @@ function AdminHiring() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Job Title</TableHead><TableHead>Department</TableHead><TableHead>Type</TableHead>
-                    <TableHead>Location</TableHead><TableHead>Salary</TableHead><TableHead>Status</TableHead><TableHead className="w-28">Actions</TableHead>
+                    <TableHead>Location</TableHead><TableHead>Salary</TableHead><TableHead>Visibility</TableHead><TableHead>Status</TableHead><TableHead className="w-28">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {postings.map(p => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.title || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.department || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.type || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.location || '\u2014'}</TableCell>
-                      <TableCell className="text-sm">{p.salaryRange || '\u2014'}</TableCell>
+                      <TableCell className="font-medium">{p.title || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.department || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.type || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.location || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.salaryRange || '—'}</TableCell>
+                      <TableCell><Badge className={p.visibilityType === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-muted text-muted-foreground'}>{p.visibilityType === 'public_global' ? '🌍 Global' : 'Internal'}</Badge></TableCell>
                       <TableCell><Badge className={statusColor(p.status)}>{p.status}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -2288,7 +2296,7 @@ function AdminHiring() {
         <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editItem ? 'Edit' : 'Create'} Job Posting</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <div><Label className="text-xs">Job Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., Software Engineer" /></div>
+            <div><Label className="text-xs">Job Title / Role Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value, roleTitle: e.target.value })} placeholder="e.g., Software Engineer" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Department</Label>
                 <Select value={(() => {
@@ -2336,16 +2344,27 @@ function AdminHiring() {
             </div>
             <div><Label className="text-xs">Job Description</Label><Textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={3} placeholder="Detailed job description..." /></div>
             <div><Label className="text-xs">Requirements</Label><Textarea value={formData.requirements || ''} onChange={e => setFormData({ ...formData, requirements: e.target.value })} rows={2} placeholder="Required qualifications..." /></div>
-            <div><Label className="text-xs">Status</Label>
-              <Select value={formData.status || 'open'} onValueChange={v => setFormData({ ...formData, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Visibility</Label>
+                <Select value={formData.visibilityType || 'internal_only'} onValueChange={v => setFormData({ ...formData, visibilityType: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="internal_only">Internal Only</SelectItem>
+                    <SelectItem value="public_global">🌍 Global (public job board)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label className="text-xs">Status</Label>
+                <Select value={formData.status || 'open'} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -88,12 +88,22 @@ const resourcesMenu = [
 function DesktopDropdown({ label, content }: { label: string; content: typeof platformMenu }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleEnter = () => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    setOpen(true);
+  };
+
+  const handleLeave = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
+  };
 
   return (
     <div
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
     >
       <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors">
         {label}
@@ -101,35 +111,43 @@ function DesktopDropdown({ label, content }: { label: string; content: typeof pl
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-[600px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-6">
-          <div className="grid grid-cols-2 gap-6">
-            {content.map((section, i) => (
-              <div key={i}>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  {section.title}
-                </h3>
-                <ul className="space-y-2">
-                  {section.items.map((item, j) => (
-                    <li key={j}>
-                      <button
-                        onClick={() => { setOpen(false); navigate(item.path); }}
-                        className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-gray-50 transition-colors group"
-                      >
-                        <item.icon className="h-5 w-5 text-gray-400 group-hover:text-black mt-0.5 shrink-0" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 group-hover:text-black">{item.name}</div>
-                          {(item as any).description && (
-                            <div className="text-xs text-gray-500 mt-0.5">{(item as any).description}</div>
-                          )}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+        <>
+          {/* Invisible bridge so the pointer doesn't leave the component crossing the gap */}
+          <div className="absolute top-full left-0 right-0 h-2" onMouseEnter={handleEnter} />
+          <div
+            className="absolute top-full left-0 mt-2 w-[600px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-6"
+            onMouseEnter={handleEnter}
+            onMouseLeave={handleLeave}
+          >
+            <div className="grid grid-cols-2 gap-6">
+              {content.map((section, i) => (
+                <div key={i}>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                    {section.title}
+                  </h3>
+                  <ul className="space-y-2">
+                    {section.items.map((item, j) => (
+                      <li key={j}>
+                        <button
+                          onClick={() => { setOpen(false); navigate(item.path); }}
+                          className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-gray-50 transition-colors group"
+                        >
+                          <item.icon className="h-5 w-5 text-gray-400 group-hover:text-black mt-0.5 shrink-0" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-black">{item.name}</div>
+                            {(item as any).description && (
+                              <div className="text-xs text-gray-500 mt-0.5">{(item as any).description}</div>
+                            )}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
