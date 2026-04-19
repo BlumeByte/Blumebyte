@@ -132,6 +132,7 @@ type EntityConfig = {
   title: string;
   apiPrefix: string;
   fields: { key: string; label: string; type?: string; options?: string[]; relatedEntity?: string; defaultQuestions?: string[] }[];
+  defaults?: Record<string, any>;
 };
 
 const ENTITY_CONFIGS: Record<string, EntityConfig> = {
@@ -352,9 +353,10 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
       { key: 'qualifications', label: 'Qualifications' },
       { key: 'salaryRange', label: 'Salary Range' },
       { key: 'deadline', label: 'Application Deadline', type: 'date' },
-      { key: 'visibilityType', label: 'Visibility', type: 'select', options: ['internal_only', 'public_global'] },
+      { key: 'visibilityType', label: 'Visibility (set to "public_global" to appear on the public Hirings page)', type: 'select', options: ['internal_only', 'public_global'] },
       { key: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
     ],
+    defaults: { visibilityType: 'internal_only', status: 'active' },
   },
   disciplinary: {
     title: 'Disciplinary Cases',
@@ -3844,7 +3846,7 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
-          <Button onClick={() => { setEditItem(null); setFormData({}); setOtherTexts({}); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Add {singularTitle}</Button>
+          <Button onClick={() => { setEditItem(null); setFormData(config.defaults || {}); setOtherTexts({}); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Add {singularTitle}</Button>
         </div>
       </div>
 
