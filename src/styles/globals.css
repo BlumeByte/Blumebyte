@@ -183,7 +183,6 @@
   input[type="time"],
   input[type="datetime-local"],
   .date-time-input {
-    position: relative;
     color-scheme: light;
   }
 
@@ -195,14 +194,7 @@
     opacity: 1;
     display: block;
     background: transparent;
-    bottom: 0;
-    color: #3b82f6;
-    height: auto;
-    left: auto;
-    position: absolute;
-    right: 0.5rem;
-    top: 0;
-    width: auto;
+    position: static;
     filter: invert(47%) sepia(89%) saturate(2126%) hue-rotate(201deg) brightness(98%) contrast(94%);
   }
 

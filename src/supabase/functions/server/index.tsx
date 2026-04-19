@@ -3967,6 +3967,76 @@ makeCrud("superadmin/asset-category", "asset-category:", requireSuperAdmin);
 makeCrud("superadmin/paygrade", "paygrade:", requireSuperAdmin);
 makeCrud("superadmin/financial-year", "financial-year:", requireSuperAdmin);
 makeCrud("superadmin/leave-type", "leave-type:", requireSuperAdmin);
+// CUSTOM: Payroll run POST with employee notifications
+app.post(`${PREFIX}/superadmin/payroll-run`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    const id = body.id || crypto.randomUUID();
+    const companyId = body.companyId || body.company || (await getCompanyId(user.id));
+    const item = {
+      ...body,
+      id,
+      companyId,
+      company: companyId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`payroll-run:${id}`, item);
+    // Notify employee
+    if (item.userId) {
+      const statusLabel = item.status === 'paid' ? 'paid' : item.status === 'processing' ? 'being processed' : 'pending';
+      const nid = crypto.randomUUID();
+      await kv.set(`notification:${nid}`, {
+        id: nid,
+        userId: item.userId,
+        type: 'payroll',
+        title: `Payroll ${item.status === 'paid' ? 'Paid' : item.status === 'processing' ? 'Processing' : 'Pending'}`,
+        message: `Your payroll for ${item.period || 'this period'} (Net: ${item.netPay || 0}) is ${statusLabel}.`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    return c.json(item, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// CUSTOM: Payroll run PUT with employee notifications on status change
+app.put(`${PREFIX}/superadmin/payroll-run/:id`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const existing = await kv.get(`payroll-run:${id}`);
+    if (!existing) return c.json({ error: 'Not found' }, 404);
+    const updated = { ...existing, ...body, id, updatedAt: new Date().toISOString() };
+    await kv.set(`payroll-run:${id}`, updated);
+    // Notify on status change
+    if (body.status && body.status !== existing.status && updated.userId) {
+      const statusLabel = body.status === 'paid' ? 'paid' : body.status === 'processing' ? 'being processed' : 'pending';
+      const nid = crypto.randomUUID();
+      await kv.set(`notification:${nid}`, {
+        id: nid,
+        userId: updated.userId,
+        type: 'payroll',
+        title: `Payroll ${body.status === 'paid' ? 'Paid' : body.status === 'processing' ? 'Processing' : 'Status Updated'}`,
+        message: `Your payroll for ${updated.period || 'this period'} (Net: ${updated.netPay || 0}) is now ${statusLabel}.`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    return c.json(updated);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 makeCrud("superadmin/payroll-run", "payroll-run:", requireSuperAdmin);
 makeCrud("superadmin/tax-bracket", "tax-bracket:", requireSuperAdmin);
 makeCrud("superadmin/benefit-plan", "benefit-plan:", requireSuperAdmin);
@@ -8287,10 +8357,12 @@ Current user question: ${message}`;
 app.get(`${PREFIX}/automation/workflows`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const companyId = await getCompanyId(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     const workflows = await kv.getByPrefix('automation_workflow:');
-    const filtered = companyId ? workflows.filter((w: any) => w.companyId === companyId) : [];
+    const filtered = scope?.length
+      ? workflows.filter((w: any) => scope.includes(w.companyId) || !w.companyId)
+      : [];
     
     return c.json({ data: filtered });
   } catch (e: any) {
@@ -8473,10 +8545,12 @@ app.delete(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
 app.get(`${PREFIX}/automation/business-rules`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const companyId = await getCompanyId(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     const rules = await kv.getByPrefix('automation_rule:');
-    const filtered = companyId ? rules.filter((r: any) => r.companyId === companyId || !r.companyId) : rules.filter((r: any) => !r.companyId);
+    const filtered = scope?.length
+      ? rules.filter((r: any) => scope.includes(r.companyId) || !r.companyId)
+      : rules.filter((r: any) => !r.companyId);
     
     return c.json({ data: filtered });
   } catch (e: any) {

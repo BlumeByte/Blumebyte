@@ -1781,11 +1781,45 @@ function PayrollView() {
     setSaving(true);
     try {
       if (editItem) {
-        await api(`/superadmin/payroll-run/${editItem.id}`, { method: 'PUT', body: formData, token: accessToken });
+        const net = parseFloat(formData.basicSalary || 0) + parseFloat(formData.allowances || 0) - parseFloat(formData.deductions || 0);
+        await api(`/superadmin/payroll-run/${editItem.id}`, { method: 'PUT', body: { ...formData, netPay: net.toFixed(2) }, token: accessToken });
         toast.success('Payroll record updated');
       } else {
-        const net = parseFloat(formData.basicSalary || 0) + parseFloat(formData.allowances || 0) - parseFloat(formData.deductions || 0);
-        await api('/superadmin/payroll-run', { method: 'POST', body: { ...formData, netPay: net.toFixed(2) }, token: accessToken });
+        // Fetch approved OT and expenses for this employee to include in payroll
+        let otBonus = 0;
+        let expenseReimbursement = 0;
+        try {
+          const [otList, expList] = await Promise.all([
+            api('/admin/overtime-requests', { token: accessToken }).catch(() => []),
+            api('/admin/expense-claims', { token: accessToken }).catch(() => []),
+          ]);
+          const period = formData.period || '';
+          // Sum approved OT for this employee this period
+          const approvedOT = Array.isArray(otList) ? otList.filter((r: any) =>
+            r.userId === formData.userId && r.status === 'approved' &&
+            (!period || r.date?.startsWith(period))
+          ) : [];
+          otBonus = approvedOT.reduce((s: number, r: any) => s + (parseFloat(r.rate || 0) * parseFloat(r.hours || 0)), 0);
+          // Sum approved expenses for this employee this period
+          const approvedExp = Array.isArray(expList) ? expList.filter((e: any) =>
+            e.userId === formData.userId && (e.status === 'approved' || e.status === 'reimbursed') &&
+            (!period || e.date?.startsWith(period))
+          ) : [];
+          expenseReimbursement = approvedExp.reduce((s: number, e: any) => s + parseFloat(e.amount || 0), 0);
+        } catch { /* non-blocking */ }
+        const totalAllowances = parseFloat(formData.allowances || 0) + otBonus + expenseReimbursement;
+        const net = parseFloat(formData.basicSalary || 0) + totalAllowances - parseFloat(formData.deductions || 0);
+        await api('/superadmin/payroll-run', {
+          method: 'POST',
+          body: {
+            ...formData,
+            allowances: totalAllowances.toFixed(2),
+            otBonus: otBonus.toFixed(2),
+            expenseReimbursement: expenseReimbursement.toFixed(2),
+            netPay: net.toFixed(2),
+          },
+          token: accessToken,
+        });
         toast.success('Payroll record created');
       }
       setDialogOpen(false);
