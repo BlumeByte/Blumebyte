@@ -57,7 +57,8 @@ export function LoginPage() {
   useEffect(() => {
     if (!sessionLoading && user) {
       startTransition(() => {
-        navigate(`/${user.role}`, { replace: true });
+        const destination = user.role === 'ultimateadmin' ? '/customer-care' : `/${user.role}`;
+        navigate(destination, { replace: true });
       });
     }
   }, [user, sessionLoading, navigate]);

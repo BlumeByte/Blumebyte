@@ -41,7 +41,6 @@ const TICKET_PRIORITIES = ['low', 'medium', 'high', 'critical'];
 const ISSUE_TYPES = ['general', 'billing', 'license', 'technical', 'data', 'account', 'integration', 'other'];
 
 // ─── Session helpers ───────────────────────────────────────────────────────────
-function isSupportSessionActive() { return sessionStorage.getItem('ultimateadmin_support_session') === '1'; }
 function setSupportSession() { sessionStorage.setItem('ultimateadmin_support_session', '1'); }
 function clearSupportSession() { sessionStorage.removeItem('ultimateadmin_support_session'); }
 async function getSupportToken(): Promise<string | null> {
@@ -78,67 +77,48 @@ interface AuditLog {
   timestamp: string; description: string;
 }
 
-// ─── Login Screen ─────────────────────────────────────────────────────────────
-function SupportLogin({ onLogin }: { onLogin: (token: string) => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+// ─── Root Component ────────────────────────────────────────────────────────────
+export default function CustomerCareDashboard() {
+  const navigate = useNavigate();
+  // tri-state: null = verifying, true = authenticated, false = unauthenticated
+  const [authState, setAuthState] = useState<boolean | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      const token = data.session?.access_token;
-      if (!token) throw new Error('No session token');
-      const result = await api('/ultimateadmin/support/verify', { token });
-      if (!result?.allowed) {
-        await supabase.auth.signOut();
-        throw new Error('This account does not have Ultimateadmin Support access.');
-      }
-      setSupportSession();
-      onLogin(token);
-    } catch (e: any) {
-      toast.error(e.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    // Always check the current Supabase session first so that an already-authenticated
+    // ultimateadmin user is routed straight to the dashboard without seeing a login form.
+    getSupportToken().then(async (t) => {
+      if (!t) { clearSupportSession(); setAuthState(false); return; }
+      try {
+        const result = await api('/ultimateadmin/support/verify', { token: t });
+        if (result?.allowed) { setSupportSession(); setToken(t); setAuthState(true); }
+        else { clearSupportSession(); setAuthState(false); }
+      } catch { clearSupportSession(); setAuthState(false); }
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    clearSupportSession();
+    await supabase.auth.signOut();
+    navigate('/login');
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 to-slate-900 flex items-center justify-center px-4">
-      <Card className="w-full max-w-sm shadow-2xl">
-        <CardHeader className="text-center space-y-3 pb-4">
-          <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center mx-auto shadow-lg">
-            <Shield className="h-7 w-7 text-white" />
-          </div>
-          <div>
-            <CardTitle className="text-xl">Ultimateadmin Support</CardTitle>
-            <p className="text-sm text-gray-500 mt-1">Blumebyte Internal Access Only</p>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
-            </div>
-            <div className="space-y-1">
-              <Label>Password</Label>
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-            </div>
-            <Button type="submit" className="w-full bg-black hover:bg-gray-800" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
-              Sign In
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+  if (authState === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    );
+  }
 
+  if (!authState) {
+    // Not authenticated — redirect to global login page
+    navigate('/login', { replace: true });
+    return null;
+  }
+
+  return <SupportDashboard token={token!} onLogout={handleLogout} />;
+}
 // ─── Metrics Cards ────────────────────────────────────────────────────────────
 function MetricsCards({ metrics }: { metrics: Metrics }) {
   const cards = [
@@ -207,6 +187,12 @@ function TenantsPanel({ token }: { token: string }) {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh every 30 seconds so new users/tenants appear without manual reload
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const loadUsers = async (tenant: Tenant) => {
     setSelected(tenant);
@@ -854,8 +840,8 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
       <Card>
         <CardHeader><CardTitle className="text-base">SQL Setup</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm text-gray-600">Run this SQL in Supabase to grant Ultimateadmin Support access to a user:</p>
-          <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{`-- Grant ultimateadmin support access to a specific user
+          <p className="text-sm text-gray-600">Run this SQL in Supabase to grant Customer Care access to a user:</p>
+          <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{`-- Grant Customer Care (ultimateadmin) access to a specific user
 UPDATE auth.users
 SET raw_user_meta_data = 
   COALESCE(raw_user_meta_data, '{}'::jsonb) ||
@@ -902,6 +888,12 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Auto-refresh metrics and tenant list every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(loadData, 30_000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
   const sectionTitle = SIDEBAR_ITEMS.find(s => s.id === activeSection)?.label || 'Overview';
 
   return (
@@ -912,7 +904,7 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
             <Shield className="h-4 w-4 text-gray-900" />
           </div>
-          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Ultimateadmin<br />Support</span>}
+          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Customer Care</span>}
         </div>
 
         <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
@@ -1020,42 +1012,4 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
   );
 }
 
-// ─── Root Component ────────────────────────────────────────────────────────────
-export default function UltimateadminSupport() {
-  const navigate = useNavigate();
-  // tri-state: null = verifying, true = authenticated, false = unauthenticated
-  const [authState, setAuthState] = useState<boolean | null>(null);
-  const [token, setToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Always check the current Supabase session first so that an already-authenticated
-    // ultimateadmin user is routed straight to the dashboard without seeing the login form.
-    getSupportToken().then(async (t) => {
-      if (!t) { clearSupportSession(); setAuthState(false); return; }
-      try {
-        const result = await api('/ultimateadmin/support/verify', { token: t });
-        if (result?.allowed) { setSupportSession(); setToken(t); setAuthState(true); }
-        else { clearSupportSession(); setAuthState(false); }
-      } catch { clearSupportSession(); setAuthState(false); }
-    });
-  }, []);
-
-  const handleLogin = (t: string) => { setToken(t); setAuthState(true); };
-
-  const handleLogout = async () => {
-    clearSupportSession();
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
-  if (authState === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
-      </div>
-    );
-  }
-
-  if (!authState) return <SupportLogin onLogin={handleLogin} />;
-  return <SupportDashboard token={token!} onLogout={handleLogout} />;
-}
