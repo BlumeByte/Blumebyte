@@ -106,7 +106,7 @@ export function AuditLogsModule() {
 
   // Real-time updates
   useRealtimeRefresh({
-    channelName: 'audit-logs',
+    channelName: `audit-logs-${user?.id ?? 'anon'}`,
     onRefresh: fetchLogs,
     enabled: true,
   });

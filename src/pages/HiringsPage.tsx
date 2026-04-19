@@ -1,20 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import {
-  Search, MapPin, Briefcase, Building2, Clock, ChevronLeft,
-  Loader2, AlertCircle, RefreshCw, ArrowLeft, Calendar
+  Search, MapPin, Briefcase, Building2,
+  Loader2, AlertCircle, RefreshCw, Calendar
 } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { api } from '../lib/api-client';
+import { supabase } from '../lib/supabase';
+import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface PublicJob {
@@ -360,7 +358,6 @@ function JobCard({
 
 // ─── Main Hirings List Page ───────────────────────────────────────────────────
 export default function HiringsPage() {
-  const navigate = useNavigate();
   const [jobs, setJobs] = useState<PublicJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -370,21 +367,50 @@ export default function HiringsPage() {
   const [sortBy, setSortBy] = useState<'latest' | 'deadline' | 'alphabetical'>('latest');
   const [detailJob, setDetailJob] = useState<PublicJob | null>(null);
   const [applyJob, setApplyJob] = useState<PublicJob | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const fetchJobs = useCallback(async () => {
+    if (!mountedRef.current) return;
     setLoading(true);
     setError(null);
     try {
       const data = await api('/public/jobs');
-      setJobs(Array.isArray(data) ? data : []);
+      if (mountedRef.current) {
+        setJobs(Array.isArray(data) ? data : []);
+      }
     } catch (e: any) {
-      setError('Unable to load job openings');
+      if (!mountedRef.current) return;
+      // 404 or empty-result errors are treated as "no jobs", not a fatal error
+      if (e?.status === 404 || e?.status === 204) {
+        setJobs([]);
+      } else {
+        setError(e?.message || 'Unable to load job openings');
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
+
+  // ── Supabase Realtime: re-fetch when the hirings table changes ───────────────
+  useEffect(() => {
+    const channel = supabase
+      .channel('public:hirings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hirings' },
+        () => { fetchJobs(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchJobs]);
 
   // Unique locations for filter
   const locations = Array.from(new Set(jobs.map((j) => j.location).filter(Boolean))) as string[];
@@ -409,23 +435,8 @@ export default function HiringsPage() {
     });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Simple Nav */}
-      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <img src={logoImage} alt="Blumebyte" className="h-8 cursor-pointer" onClick={() => navigate('/')} />
-            <div className="flex gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Back to Home
-              </Button>
-              <Button size="sm" onClick={() => navigate('/login')} className="bg-black text-white hover:bg-gray-800">
-                Sign In
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <PublicNavbar />
 
       {/* Hero */}
       <section className="bg-gradient-to-br from-black to-gray-800 text-white py-16 px-4">
@@ -499,7 +510,7 @@ export default function HiringsPage() {
       </div>
 
       {/* Jobs Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 flex-1">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)}
@@ -515,8 +526,17 @@ export default function HiringsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 space-y-3">
             <Briefcase className="h-12 w-12 text-gray-300 mx-auto" />
-            <h3 className="text-lg font-semibold text-gray-600">No open positions available right now</h3>
-            <p className="text-sm text-gray-400">Check back later for new opportunities</p>
+            <h3 className="text-xl font-semibold text-gray-600">No Job Openings</h3>
+            <p className="text-sm text-gray-400">
+              {jobs.length === 0
+                ? 'There are currently no job openings. Check back later for new opportunities.'
+                : 'No jobs match your current filters. Try adjusting your search criteria.'}
+            </p>
+            {jobs.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); }}>
+                Clear Filters
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -545,10 +565,7 @@ export default function HiringsPage() {
         onClose={() => setApplyJob(null)}
       />
 
-      {/* Footer */}
-      <footer className="border-t bg-white py-6 text-center text-sm text-gray-400">
-        © {new Date().getFullYear()} Blumebyte HR. All rights reserved.
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

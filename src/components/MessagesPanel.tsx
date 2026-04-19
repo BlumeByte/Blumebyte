@@ -72,7 +72,7 @@ export function MessagesPanel() {
 
   // Subscribe to realtime updates for messages
   useRealtimeRefresh({
-    channelName: 'messages',
+    channelName: `messages-${user?.id ?? 'anon'}`,
     onRefresh: load,
     debounceMs: 500,
   });
