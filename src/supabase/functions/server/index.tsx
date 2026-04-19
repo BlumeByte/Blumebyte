@@ -9369,11 +9369,11 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
 
     // Rate limiting: max 5 submissions per email per hour
     const rateLimitKey = `rate-limit:apply:${email.toLowerCase()}`;
-    const rateData = await kv.get(rateLimitKey) || { count: 0, resetAt: Date.now() + 3600000 };
-    if (Date.now() > rateData.resetAt) {
-      rateData.count = 0;
-      rateData.resetAt = Date.now() + 3600000;
-    }
+    const stored = await kv.get(rateLimitKey);
+    const now = Date.now();
+    const rateData = stored && now <= stored.resetAt
+      ? stored
+      : { count: 0, resetAt: now + 3600000 };
     if (rateData.count >= 5) {
       return c.json({ error: 'Too many submissions. Please try again later.' }, 429);
     }

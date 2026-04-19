@@ -435,12 +435,13 @@ export default function HiringsPage() {
             Browse job openings from organizations hiring through Blumebyte HR
           </p>
           <div className="relative max-w-xl mx-auto mt-6">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" aria-hidden="true" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by job title or company…"
+              aria-label="Search jobs by title or company"
               className="w-full pl-10 pr-4 py-3 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm"
             />
           </div>
