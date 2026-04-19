@@ -38,6 +38,9 @@ import CompensationPage from './pages/CompensationPage';
 import ApplicantTrackingPage from './pages/ApplicantTrackingPage';
 import OnboardingPage from './pages/OnboardingPage';
 import EmployeeExperiencePage from './pages/EmployeeExperiencePage';
+import HiringsPage from './pages/HiringsPage';
+import HiringDetailPage from './pages/HiringDetailPage';
+import CareDashboard from './pages/CareDashboard';
 
 // PERFORMANCE: Lazy load heavy dashboard components
 const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard'));
@@ -177,6 +180,9 @@ const FeaturesPageWrapper = () => <FeaturesPage />;
 const IntegrationsPageWrapper = () => <IntegrationsPage />;
 const IndustryPageWrapper = () => <IndustryPage />;
 const ResourcesPageWrapper = () => <ResourcesPage />;
+const HiringsPageWrapper = () => <HiringsPage />;
+const HiringDetailPageWrapper = () => <HiringDetailPage />;
+const CareDashboardWrapper = () => <CareDashboard />;
 
 const NotificationsPageWrapper = () => (
   <ProtectedRoute allowedRoles={['superadmin', 'admin', 'manager', 'employee']}>
@@ -335,6 +341,18 @@ export const router = createBrowserRouter([
       {
         path: '/employee-experience',
         Component: EmployeeExperiencePageWrapper,
+      },
+      {
+        path: '/hirings',
+        Component: HiringsPageWrapper,
+      },
+      {
+        path: '/hirings/:jobId',
+        Component: HiringDetailPageWrapper,
+      },
+      {
+        path: '/care-dashboard',
+        Component: CareDashboardWrapper,
       },
       {
         path: '*',

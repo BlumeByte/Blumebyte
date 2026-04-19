@@ -9288,3 +9288,391 @@ app.notFound((c) => {
 
 // Server started with payment-before-registration flow - v2.1 (UPDATED)
 Deno.serve(app.fetch);
+// ============ PUBLIC HIRING ENDPOINTS (no auth required) ============
+
+// GET /public/jobs — list all active public_global job postings
+app.get(`${PREFIX}/public/jobs`, async (c) => {
+  try {
+    const all = await kv.getByPrefix("job-posting:");
+    const publicJobs = all.filter((j: any) =>
+      j.visibilityType === 'public_global' &&
+      (j.status === 'active' || j.status === 'open')
+    ).map((j: any) => ({
+      id: j.id,
+      companyName: j.companyName || j.company || '',
+      roleTitle: j.roleTitle || j.title || '',
+      employmentType: j.employmentType || j.employement_type || '',
+      location: j.location || '',
+      description: j.description || '',
+      requirements: j.requirements || '',
+      qualifications: j.qualifications || '',
+      deadline: j.deadline || null,
+      createdAt: j.createdAt || j.created_at || new Date().toISOString(),
+      visibilityType: j.visibilityType,
+      status: j.status,
+    }));
+    publicJobs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return c.json(publicJobs);
+  } catch (e: any) {
+    console.error('Public jobs error:', e);
+    return c.json([]);
+  }
+});
+
+// GET /public/jobs/:id — single public job detail
+app.get(`${PREFIX}/public/jobs/:id`, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const job = await kv.get(`job-posting:${id}`);
+    if (!job) return c.json({ error: 'Not found' }, 404);
+    if (job.visibilityType !== 'public_global') return c.json({ error: 'Not found' }, 404);
+    return c.json({
+      id: job.id,
+      companyName: job.companyName || job.company || '',
+      roleTitle: job.roleTitle || job.title || '',
+      employmentType: job.employmentType || '',
+      location: job.location || '',
+      description: job.description || '',
+      requirements: job.requirements || '',
+      qualifications: job.qualifications || '',
+      deadline: job.deadline || null,
+      createdAt: job.createdAt || new Date().toISOString(),
+    });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /public/job/apply — submit a public job application
+// Basic rate limiting via KV: max 5 submissions per email per hour
+app.post(`${PREFIX}/public/job/apply`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const { jobId, companyName, roleTitle, fullName, email, phone, qualification, cvMessage } = body;
+
+    // Server-side validation
+    if (!jobId || !fullName?.trim() || !email?.trim() || !phone?.trim() || !qualification?.trim() || !cvMessage?.trim()) {
+      return c.json({ error: 'All fields are required' }, 400);
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return c.json({ error: 'Invalid email format' }, 400);
+    }
+    if (cvMessage.length > 4000) {
+      return c.json({ error: 'CV message exceeds 4000 character limit' }, 400);
+    }
+
+    // Verify job exists and is public
+    const job = await kv.get(`job-posting:${jobId}`);
+    if (!job || job.visibilityType !== 'public_global' || (job.status !== 'active' && job.status !== 'open')) {
+      return c.json({ error: 'Job not found or no longer accepting applications' }, 404);
+    }
+
+    // Rate limiting: max 5 submissions per email per hour
+    const rateLimitKey = `rate-limit:apply:${email.toLowerCase()}`;
+    const rateData = await kv.get(rateLimitKey) || { count: 0, resetAt: Date.now() + 3600000 };
+    if (Date.now() > rateData.resetAt) {
+      rateData.count = 0;
+      rateData.resetAt = Date.now() + 3600000;
+    }
+    if (rateData.count >= 5) {
+      return c.json({ error: 'Too many submissions. Please try again later.' }, 429);
+    }
+    rateData.count++;
+    await kv.set(rateLimitKey, rateData);
+
+    const id = crypto.randomUUID();
+    const application = {
+      id,
+      jobId,
+      companyName: companyName || job.companyName || job.company || '',
+      roleTitle: roleTitle || job.roleTitle || job.title || '',
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      qualification: qualification.trim(),
+      cvMessage: cvMessage.trim(),
+      submittedAt: new Date().toISOString(),
+      status: 'pending',
+    };
+
+    await kv.set(`public-job-application:${id}`, application);
+
+    // Notify all platform developers/superadmins about new application
+    try {
+      const allEmployees = await kv.getByPrefix('employee:');
+      const devAccounts = allEmployees.filter((e: any) => e.role === 'developer' || e.isPlatformAdmin);
+      for (const dev of devAccounts) {
+        const notifId = crypto.randomUUID();
+        await kv.set(`notification:${notifId}`, {
+          id: notifId,
+          userId: dev.userId || dev.id,
+          type: 'global_application',
+          title: 'New Global Hiring Application',
+          message: `${fullName} applied for ${application.roleTitle} at ${application.companyName}`,
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    } catch (notifErr) {
+      console.error('Failed to create notifications:', notifErr);
+    }
+
+    return c.json({ success: true, id });
+  } catch (e: any) {
+    console.error('Public job apply error:', e);
+    return c.json({ error: e.message || 'Submission failed' }, 500);
+  }
+});
+
+// ============ CUSTOMER CARE / DEVELOPER ENDPOINTS ============
+
+// Helper: verify care account access
+async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDeveloper: boolean } | null> {
+  const token = extractUserToken(c);
+  if (!token) return null;
+  const sb = supabaseAdmin();
+  const { data, error } = await sb.auth.getUser(token);
+  if (error || !data?.user) return null;
+  const profile = await kv.get(`employee:${data.user.id}`);
+  const isDeveloper = profile?.role === 'developer' || profile?.isPlatformAdmin === true;
+  const isCare = profile?.role === 'care' || profile?.role === 'support';
+  if (!isDeveloper && !isCare) return null;
+  return { user: data.user, profile, isDeveloper };
+}
+
+// GET /care/verify-access — check if authenticated user can access care dashboard
+app.get(`${PREFIX}/care/verify-access`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ allowed: false }, 403);
+    return c.json({ allowed: true, role: access.isDeveloper ? 'developer' : 'care' });
+  } catch {
+    return c.json({ allowed: false }, 403);
+  }
+});
+
+// GET /care/profile — care account's own profile
+app.get(`${PREFIX}/care/profile`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({
+      id: access.user.id,
+      email: access.user.email,
+      name: access.profile?.name || access.user.email,
+      role: access.isDeveloper ? 'developer' : 'care',
+    });
+  } catch {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+});
+
+// GET /care/tenants — list all tenant companies
+app.get(`${PREFIX}/care/tenants`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+
+    const companies = await kv.getByPrefix('company:');
+    let allowed = companies;
+
+    // Non-developer care agents can only see their assigned tenants
+    if (!access.isDeveloper && access.profile?.assignedTenants?.length) {
+      allowed = companies.filter((co: any) => access.profile.assignedTenants.includes(co.id));
+    }
+
+    return c.json(allowed.map((co: any) => {
+      const stats = co.stats || {};
+      return {
+        id: co.id,
+        name: co.name,
+        email: co.email || '',
+        industry: co.industry || '',
+        status: co.status || 'active',
+        usedLicenses: stats.usedLicenses || co.usedLicenses || 0,
+        purchasedLicenses: co.subscription?.licenses || co.licenses || 0,
+        createdAt: co.createdAt || '',
+      };
+    }));
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /care/tenants/:id/users — list users for a tenant
+app.get(`${PREFIX}/care/tenants/:id/users`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    const tenantId = c.req.param('id');
+
+    const all = await kv.getByPrefix('employee:');
+    const users = all.filter((u: any) => u.companyId === tenantId || u.company === tenantId);
+    return c.json(users.map((u: any) => ({
+      id: u.id || u.userId,
+      name: u.name || '',
+      email: u.email || '',
+      role: u.role || 'employee',
+      status: u.status || 'active',
+    })));
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// DELETE /care/tenants/:id — delete a tenant (developer only)
+app.delete(`${PREFIX}/care/tenants/:id`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.isDeveloper) return c.json({ error: 'Forbidden: Developer only' }, 403);
+
+    const tenantId = c.req.param('id');
+    const sb = supabaseAdmin();
+
+    // Delete all KV data for tenant
+    const prefixes = [
+      'company:', 'branch:', 'department:', 'asset:', 'asset-category:', 'paygrade:',
+      'financial-year:', 'leave-type:', 'leave:', 'attendance:', 'announcement:',
+      'message:', 'notification:', 'job-posting:', 'job-application:', 'perf-review:',
+      'goal:', 'feedback:', 'meeting:', 'workflow:', 'disciplinary:', 'compliance:',
+      'training:', 'task:', 'onboard-checklist:', 'payroll-run:', 'tax-bracket:',
+      'benefit-plan:', 'subscription:', 'company_stats:',
+    ];
+
+    for (const prefix of prefixes) {
+      const items = await kv.getByPrefix(prefix);
+      const tenantItems = items.filter((item: any) =>
+        item.companyId === tenantId || item.company === tenantId
+      );
+      for (const item of tenantItems) {
+        await kv.del(`${prefix}${item.id}`);
+      }
+    }
+
+    // Delete company key itself
+    await kv.del(`company:${tenantId}`);
+
+    // Delete all users of this tenant from auth
+    const allEmps = await kv.getByPrefix('employee:');
+    const tenantUsers = allEmps.filter((u: any) => u.companyId === tenantId || u.company === tenantId);
+    for (const u of tenantUsers) {
+      const uid = u.id || u.userId;
+      try {
+        await sb.auth.admin.deleteUser(uid);
+        await kv.del(`employee:${uid}`);
+        await kv.del(`user_profile:${uid}`);
+      } catch (err) {
+        console.error(`Failed to delete user ${uid}:`, err);
+      }
+    }
+
+    return c.json({ success: true, message: `Tenant ${tenantId} deleted` });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /care/reset-password — generate a password reset link for a user
+app.post(`${PREFIX}/care/reset-password`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { email } = await c.req.json();
+    if (!email) return c.json({ error: 'Email required' }, 400);
+
+    const sb = supabaseAdmin();
+    const { data, error } = await sb.auth.admin.generateLink({
+      type: 'recovery',
+      email: email.toLowerCase(),
+    });
+
+    if (error) return c.json({ error: error.message }, 400);
+    return c.json({ success: true, resetLink: data?.properties?.action_link || 'Reset email sent to user.' });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// PUT /care/tenants/:id/license — update license count (developer only)
+app.put(`${PREFIX}/care/tenants/:id/license`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.isDeveloper) return c.json({ error: 'Forbidden: Developer only' }, 403);
+
+    const tenantId = c.req.param('id');
+    const { licenses } = await c.req.json();
+    if (!licenses || licenses < 0) return c.json({ error: 'Invalid license count' }, 400);
+
+    const company = await kv.get(`company:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+
+    const updated = { ...company, licenses, subscription: { ...(company.subscription || {}), licenses } };
+    await kv.set(`company:${tenantId}`, updated);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /care/global-applications — list all public job applications
+app.get(`${PREFIX}/care/global-applications`, async (c) => {
+  try {
+    const access = await verifyCareAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+
+    const apps = await kv.getByPrefix('public-job-application:');
+    apps.sort((a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    return c.json(apps);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+
+// SuperAdmin CRUD for public job applications (status updates, view, archive)
+app.get(`${PREFIX}/superadmin/public-job-applications`, async (c) => {
+  try {
+    await requireSuperAdmin(c);
+    const apps = await kv.getByPrefix('public-job-application:');
+    apps.sort((a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    return c.json(apps);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
+  try {
+    await requireSuperAdmin(c);
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const existing = await kv.get(`public-job-application:${id}`);
+    if (!existing) return c.json({ error: 'Not found' }, 404);
+    const updated = { ...existing, ...body, id };
+    await kv.set(`public-job-application:${id}`, updated);
+    return c.json(updated);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.delete(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
+  try {
+    await requireSuperAdmin(c);
+    const id = c.req.param('id');
+    await kv.del(`public-job-application:${id}`);
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+

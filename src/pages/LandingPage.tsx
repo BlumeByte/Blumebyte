@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, ChevronDown, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video, Menu, X, Briefcase as BriefcaseIcon } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { TechSliders3D } from '../components/TechSliders3D';
@@ -11,6 +11,7 @@ import { HeroUIUXAnimation } from '../components/HeroUIUXAnimation';
 export default function LandingPage() {
   const navigate = useNavigate();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const features = [
     {
@@ -266,19 +267,77 @@ export default function LandingPage() {
                 >
                   Pricing
                 </button>
+                <button 
+                  onClick={() => navigate('/hirings')}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors flex items-center gap-1"
+                >
+                  <BriefcaseIcon className="h-4 w-4" />
+                  Hirings
+                </button>
               </div>
             </div>
             
-            <div className="flex gap-3">
-              <Button variant="ghost" onClick={() => navigate('/login')}>
-                Sign In
-              </Button>
-              <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
-                Get Started
-              </Button>
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex gap-3">
+                <Button variant="ghost" onClick={() => navigate('/login')}>
+                  Sign In
+                </Button>
+                <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+                  Get Started
+                </Button>
+              </div>
+              {/* Mobile hamburger button */}
+              <button
+                className="md:hidden p-2 rounded-md text-gray-700 hover:text-black hover:bg-gray-100 transition-colors"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu Drawer */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t bg-white shadow-lg">
+            <div className="px-4 py-4 space-y-1">
+              <button
+                onClick={() => { navigate('/platform-overview'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
+              >
+                Our Platform
+              </button>
+              <button
+                onClick={() => { navigate('/pricing'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
+              >
+                Pricing
+              </button>
+              <button
+                onClick={() => { navigate('/resources'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
+              >
+                Resources
+              </button>
+              <button
+                onClick={() => { navigate('/hirings'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+              >
+                <BriefcaseIcon className="h-4 w-4" />
+                Hirings
+              </button>
+              <div className="border-t pt-3 mt-3 flex flex-col gap-2">
+                <Button variant="ghost" className="w-full justify-start" onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}>
+                  Sign In
+                </Button>
+                <Button className="w-full bg-black text-white hover:bg-gray-800" onClick={() => { navigate('/company-signup'); setMobileMenuOpen(false); }}>
+                  Get Started
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section with Background Image */}

@@ -109,6 +109,7 @@ const SIDEBAR_ITEMS = [
   { id: 'audit-logs', label: 'Audit Logs', icon: Shield, group: 'system' },
   { id: 'backup-restore', label: 'Backup & Restore', icon: Archive, group: 'system' },
   { id: 'billings-subscriptions', label: 'Billings & Subscriptions', icon: CreditCard, group: 'system' },
+  { id: 'global-hiring-applications', label: 'Global Hiring Apps', icon: Briefcase, group: 'operations' },
 ];
 
 const GROUPS = [
@@ -338,15 +339,18 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
     title: 'Job Postings',
     apiPrefix: '/superadmin/job-posting',
     fields: [
-      { key: 'title', label: 'Job Title' },
+      { key: 'roleTitle', label: 'Role Title' },
+      { key: 'title', label: 'Job Title (internal reference)' },
       { key: 'department', label: 'Department' },
       { key: 'location', label: 'Location' },
-      { key: 'type', label: 'Employment Type', type: 'select', options: ['full-time', 'part-time', 'contract', 'internship'] },
-      { key: 'salaryRange', label: 'Salary Range' },
+      { key: 'employmentType', label: 'Employment Type', type: 'select', options: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Remote', 'Hybrid'] },
       { key: 'description', label: 'Job Description' },
       { key: 'requirements', label: 'Requirements' },
-      { key: 'applicants', label: 'Number of Applicants' },
-      { key: 'status', label: 'Status', type: 'select', options: ['draft', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
+      { key: 'qualifications', label: 'Qualifications' },
+      { key: 'salaryRange', label: 'Salary Range' },
+      { key: 'deadline', label: 'Application Deadline', type: 'date' },
+      { key: 'visibilityType', label: 'Visibility', type: 'select', options: ['internal_only', 'public_global'] },
+      { key: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
     ],
   },
   disciplinary: {
@@ -493,6 +497,7 @@ export function SuperAdminDashboard() {
           </div>
         </div>
       );
+      case 'global-hiring-applications': return <GlobalHiringApplicationsPanel accessToken={accessToken} />;
       default:
         if (ENTITY_CONFIGS[activeSection]) {
           return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} />;
@@ -621,6 +626,148 @@ function PlaceholderView({ title }: { title: string }) {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-2">{title}</h1>
       <Card className="mt-6"><CardContent className="py-16 text-center"><FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">This module is under development</p></CardContent></Card>
+    </div>
+  );
+}
+
+// ========== GLOBAL HIRING APPLICATIONS PANEL (SuperAdmin) ==========
+function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | null }) {
+  const [applications, setApplications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<any>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api('/care/global-applications', { token: accessToken });
+      setApplications(Array.isArray(data) ? data : []);
+    } catch {
+      setApplications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const updateStatus = async (id: string, status: string) => {
+    try {
+      await api(`/superadmin/public-job-application/${id}`, { method: 'PUT', body: { status }, token: accessToken });
+      toast.success('Status updated');
+      load();
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
+
+  const filtered = applications.filter((a) => {
+    const q = search.toLowerCase();
+    return !q || (a.fullName || '').toLowerCase().includes(q) || (a.email || '').toLowerCase().includes(q) || (a.roleTitle || '').toLowerCase().includes(q) || (a.companyName || '').toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Global Hiring Applications</h1>
+          <p className="text-gray-500 text-sm mt-1">Applications submitted via the public Blumebyte hiring portal</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={load}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+        </Button>
+      </div>
+
+      <div className="mb-4 relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input className="pl-9 w-72" placeholder="Search applicants, roles…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-gray-300" /></div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Applicant</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Submitted</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-16 text-gray-400">
+                      No applications found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-medium">{a.fullName}</TableCell>
+                      <TableCell className="text-sm text-gray-500">{a.companyName}</TableCell>
+                      <TableCell className="text-sm">{a.roleTitle}</TableCell>
+                      <TableCell className="text-sm">{a.email}</TableCell>
+                      <TableCell className="text-sm">{a.phone}</TableCell>
+                      <TableCell className="text-sm text-gray-500">
+                        {a.submittedAt ? new Date(a.submittedAt).toLocaleDateString() : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={a.status === 'reviewed' ? 'default' : a.status === 'archived' ? 'secondary' : 'outline'}>
+                          {a.status || 'pending'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => { setSelected(a); setDetailOpen(true); }}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updateStatus(a.id, 'reviewed')} title="Mark Reviewed">
+                            <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updateStatus(a.id, 'archived')} title="Archive">
+                            <Archive className="h-3.5 w-3.5 text-gray-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Application Details</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-4 py-2 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label className="text-xs text-gray-400">Applicant</Label><p className="font-medium">{selected.fullName}</p></div>
+                <div><Label className="text-xs text-gray-400">Email</Label><p>{selected.email}</p></div>
+                <div><Label className="text-xs text-gray-400">Phone</Label><p>{selected.phone}</p></div>
+                <div><Label className="text-xs text-gray-400">Submitted</Label><p>{selected.submittedAt ? new Date(selected.submittedAt).toLocaleString() : '—'}</p></div>
+                <div><Label className="text-xs text-gray-400">Company</Label><p>{selected.companyName}</p></div>
+                <div><Label className="text-xs text-gray-400">Role</Label><p>{selected.roleTitle}</p></div>
+              </div>
+              <div><Label className="text-xs text-gray-400">Qualifications</Label><p className="mt-1">{selected.qualification}</p></div>
+              <div><Label className="text-xs text-gray-400">CV / Cover Letter</Label><p className="mt-1 whitespace-pre-wrap bg-gray-50 rounded p-3">{selected.cvMessage}</p></div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
