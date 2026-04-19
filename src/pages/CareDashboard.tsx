@@ -41,15 +41,21 @@ interface TenantUser {
 }
 
 // ─── Care Auth Context ────────────────────────────────────────────────────────
-// Use sessionStorage so the token is cleared when the tab/browser closes
-function getCareToken(): string | null {
-  return sessionStorage.getItem('care_token');
+// Store only a flag (not the token itself) to indicate care session is active.
+// The actual token is always fetched fresh from Supabase on each request.
+function isCareSessionActive(): boolean {
+  return sessionStorage.getItem('care_session') === '1';
 }
-function setCareToken(token: string) {
-  sessionStorage.setItem('care_token', token);
+function setCareSession() {
+  sessionStorage.setItem('care_session', '1');
 }
-function clearCareToken() {
-  sessionStorage.removeItem('care_token');
+function clearCareSession() {
+  sessionStorage.removeItem('care_session');
+}
+
+async function getCareToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token ?? null;
 }
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
@@ -76,7 +82,7 @@ function CareDashboardLogin({ onLogin }: { onLogin: () => void }) {
         throw new Error('This account does not have customer care access.');
       }
 
-      setCareToken(token);
+      setCareSession();
       onLogin();
     } catch (e: any) {
       toast.error(e.message || 'Login failed');
@@ -164,7 +170,7 @@ function TenantRow({
 export default function CareDashboard() {
   const navigate = useNavigate();
   // Tri-state: null = checking, false = not authenticated, true = authenticated
-  const [authenticated, setAuthenticated] = useState<boolean | null>(getCareToken() ? null : false);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(isCareSessionActive() ? null : false);
   const [careProfile, setCareProfile] = useState<any>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -185,11 +191,16 @@ export default function CareDashboard() {
   const [applications, setApplications] = useState<any[]>([]);
   const [appsLoading, setAppsLoading] = useState(false);
 
-  const token = getCareToken();
   const isDeveloper = careProfile?.role === 'developer';
 
   const loadProfile = useCallback(async () => {
+    if (!isCareSessionActive()) {
+      setAuthenticated(false);
+      return;
+    }
+    const token = await getCareToken();
     if (!token) {
+      clearCareSession();
       setAuthenticated(false);
       return;
     }
@@ -198,12 +209,14 @@ export default function CareDashboard() {
       setCareProfile(p);
       setAuthenticated(true);
     } catch {
-      clearCareToken();
+      clearCareSession();
+      await supabase.auth.signOut();
       setAuthenticated(false);
     }
-  }, [token]);
+  }, []);
 
   const loadTenants = useCallback(async () => {
+    const token = await getCareToken();
     if (!token) return;
     setLoading(true);
     try {
@@ -214,9 +227,10 @@ export default function CareDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   const loadApplications = useCallback(async () => {
+    const token = await getCareToken();
     if (!token) return;
     setAppsLoading(true);
     try {
@@ -227,7 +241,7 @@ export default function CareDashboard() {
     } finally {
       setAppsLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     // Always verify token on mount; also reload when authenticated flips to true after login
@@ -251,6 +265,7 @@ export default function CareDashboard() {
     setUsersDialogOpen(true);
     setUsersLoading(true);
     try {
+      const token = await getCareToken();
       const data = await api(`/care/tenants/${tenant.id}/users`, { token });
       setTenantUsers(Array.isArray(data) ? data : []);
     } catch {
@@ -270,6 +285,7 @@ export default function CareDashboard() {
   const doPasswordReset = async () => {
     if (!resetEmail || !resetTarget) return;
     try {
+      const token = await getCareToken();
       const result = await api('/care/reset-password', {
         method: 'POST',
         token,
@@ -285,6 +301,7 @@ export default function CareDashboard() {
   const handleDeleteTenant = async () => {
     if (!deleteTarget || !isDeveloper) return;
     try {
+      const token = await getCareToken();
       await api(`/care/tenants/${deleteTarget.id}`, { method: 'DELETE', token });
       toast.success(`Tenant "${deleteTarget.name}" deleted.`);
       setDeleteDialog(false);
@@ -297,6 +314,7 @@ export default function CareDashboard() {
 
   const handleUpdateLicense = async (tenantId: string, licenses: number) => {
     try {
+      const token = await getCareToken();
       await api(`/care/tenants/${tenantId}/license`, {
         method: 'PUT',
         token,
@@ -316,7 +334,7 @@ export default function CareDashboard() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    clearCareToken();
+    clearCareSession();
     setAuthenticated(false);
   };
 
