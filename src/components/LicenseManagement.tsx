@@ -552,10 +552,10 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             )}
 
             {licenseInfo.cardSaved && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-gray-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
                 <CheckCircle className="w-4 h-4 text-green-600" />
                 <div>
-                  <p className="font-medium text-gray-900">Auto-renewal enabled</p>
+                  <p className="font-medium text-foreground">Auto-renewal enabled</p>
                   <p className="text-xs">Card ending in {licenseInfo.cardLast4} • Expires {licenseInfo.cardExpiry}</p>
                 </div>
               </div>
@@ -733,7 +733,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           <Separator />
 
           {/* Cost Summary */}
-          <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+          <div className="space-y-3 bg-muted p-4 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Licenses</span>
               <span className="font-semibold">{additionalLicenses}</span>

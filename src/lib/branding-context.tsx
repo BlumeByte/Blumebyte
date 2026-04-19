@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { supabase } from './supabase';
 
 const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
 
@@ -32,8 +33,9 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 
   const fetchBranding = useCallback(async () => {
     try {
-      // CRITICAL FIX: Use authenticated endpoint to get company-scoped settings
-      const token = localStorage.getItem('auth-token');
+      // Get the current Supabase session token
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
       if (!token) {
         // If not logged in, use default branding
         setBranding(DEFAULT_BRANDING);
@@ -48,19 +50,19 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (res.ok) {
-        const data = await res.json();
+        const settings = await res.json();
         console.log('🎨 Branding data fetched from backend:', {
-          companyName: data.companyName,
-          primaryColor: data.primaryColor,
-          logoUrl: data.logoUrl,
-          hasData: !!data.companyName
+          companyName: settings.companyName,
+          primaryColor: settings.primaryColor,
+          logoUrl: settings.logoUrl,
+          hasData: !!settings.companyName
         });
         
         const updatedBranding = {
-          companyName: data.companyName || DEFAULT_BRANDING.companyName,
-          description: data.description || DEFAULT_BRANDING.description,
-          primaryColor: data.primaryColor || DEFAULT_BRANDING.primaryColor,
-          logoUrl: data.logoUrl || '',
+          companyName: settings.companyName || DEFAULT_BRANDING.companyName,
+          description: settings.description || DEFAULT_BRANDING.description,
+          primaryColor: settings.primaryColor || DEFAULT_BRANDING.primaryColor,
+          logoUrl: settings.logoUrl || '',
         };
         
         console.log('🎨 Setting branding to:', updatedBranding);
@@ -81,10 +83,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     // Fetch branding immediately on mount
     fetchBranding();
     
-    // Only poll if user is logged in
-    const token = localStorage.getItem('auth-token');
-    if (!token) return; // Don't poll if not logged in
-    
+    // Always set up polling - fetchBranding handles the case when not logged in
     // Poll every 30 seconds for branding updates (balance between freshness and performance)
     const iv = setInterval(fetchBranding, 30000);
     
@@ -106,10 +105,20 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener('storage', handleStorageChange);
     
+    // Listen for Supabase auth state changes to refresh branding on login/logout
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchBranding();
+      } else {
+        setBranding(DEFAULT_BRANDING);
+      }
+    });
+    
     return () => {
       clearInterval(iv);
       window.removeEventListener('branding-updated', handleBrandingUpdate);
       window.removeEventListener('storage', handleStorageChange);
+      subscription.unsubscribe();
     };
   }, [fetchBranding]);
 
