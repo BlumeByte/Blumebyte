@@ -451,6 +451,43 @@ function normalizeEmploymentType(raw: string): string {
   return map[raw.toLowerCase()] || raw;
 }
 
+// --- Active statuses for public job visibility ---
+const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+
+// --- Build a scope-based item filter for payroll calculation ---
+function makeScopeFilter(scope: string[] | null) {
+  return (item: any) => {
+    const co = item.company || item.companyId;
+    if (!co) return false;
+    return !scope?.length || scope.some((s: string) => s.toLowerCase() === co.toLowerCase());
+  };
+}
+
+// --- Progressive tax bracket calculation (for superadmin tax-bracket records) ---
+function calcProgressiveTax(basicSalary: number, brackets: any[]): number {
+  let tax = 0;
+  const sorted = [...brackets].sort((a, b) => parseFloat(a.minIncome || 0) - parseFloat(b.minIncome || 0));
+  for (const bracket of sorted) {
+    const min = parseFloat(bracket.minIncome || 0);
+    const max = parseFloat(bracket.maxIncome || 0) || Infinity;
+    const rate = parseFloat(bracket.rate || 0) / 100;
+    if (basicSalary > min) {
+      tax += (Math.min(basicSalary, max) - min) * rate;
+    }
+  }
+  return tax;
+}
+
+// --- Benefit plan allowance calculation (for superadmin benefit-plan records: always % of basic) ---
+function calcBenefitPlanAllowance(basicSalary: number, plans: any[], userId?: string): number {
+  let allowance = 0;
+  for (const plan of plans) {
+    if (userId && plan.eligibleUsers?.length && !plan.eligibleUsers.includes(userId)) continue;
+    allowance += basicSalary * (parseFloat(plan.employerContribution || 0) / 100);
+  }
+  return allowance;
+}
+
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
   // CRITICAL FIX: ALL roles including SuperAdmins are filtered by their company scope
@@ -4062,9 +4099,6 @@ makeCrud("superadmin/meeting", "meeting:", requireSuperAdmin);
 makeCrud("superadmin/workflow", "workflow:", requireSuperAdmin);
 
 // CUSTOM: superadmin/job-posting POST/PUT with auto-populated companyName
-// ACTIVE_STATUSES for public job visibility (also used in public/jobs endpoint)
-const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
-
 app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
@@ -4179,12 +4213,8 @@ app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
       kv.getByPrefix('expense:'),
     ]);
 
-    // Filter all sources by company scope (case-insensitive)
-    const scopeFilter = (item: any) => {
-      const co = item.company || item.companyId;
-      if (!co) return false;
-      return !scope?.length || scope.some((s: string) => s.toLowerCase() === co.toLowerCase());
-    };
+    // Filter all sources by company scope using shared helper
+    const scopeFilter = makeScopeFilter(scope);
     const taxConfigs = allTaxConfigs.filter(scopeFilter);
     const taxBrackets = allTaxBrackets.filter((t: any) => scopeFilter(t) && t.status !== 'inactive');
     const benefits = allBenefits.filter(scopeFilter);
@@ -4212,17 +4242,8 @@ app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
         }
       }
     }
-    // Calculate tax from superadmin-style tax-bracket records (progressive income brackets)
-    taxBrackets.sort((a: any, b: any) => parseFloat(a.minIncome || 0) - parseFloat(b.minIncome || 0));
-    for (const bracket of taxBrackets) {
-      const min = parseFloat(bracket.minIncome || 0);
-      const max = parseFloat(bracket.maxIncome || 0) || Infinity;
-      const rate = parseFloat(bracket.rate || 0) / 100;
-      if (basicSalary > min) {
-        const taxable = Math.min(basicSalary, max) - min;
-        taxDeduction += taxable * rate;
-      }
-    }
+    // Add superadmin-style progressive bracket tax using shared helper
+    taxDeduction += calcProgressiveTax(basicSalary, taxBrackets);
 
     // Calculate benefit allowance (employer contribution)
     let benefitAllowance = 0;
@@ -4235,11 +4256,8 @@ app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
         benefitAllowance += parseFloat(benefit.employerContribution || 0);
       }
     }
-    // Add superadmin-style benefit-plan contributions (always % of basic salary)
-    for (const plan of benefitPlans) {
-      if (userId && plan.eligibleUsers?.length && !plan.eligibleUsers.includes(userId)) continue;
-      benefitAllowance += basicSalary * (parseFloat(plan.employerContribution || 0) / 100);
-    }
+    // Add superadmin-style benefit-plan contributions using shared helper
+    benefitAllowance += calcBenefitPlanAllowance(basicSalary, benefitPlans, userId);
 
     // Calculate approved OT bonus
     let otBonus = 0;
@@ -4297,11 +4315,7 @@ app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
       kv.getByPrefix('expense:'),
     ]);
 
-    const scopeFilter = (item: any) => {
-      const co = item.company || item.companyId;
-      if (!co) return false;
-      return !scope?.length || scope.some((s: string) => s.toLowerCase() === co.toLowerCase());
-    };
+    const scopeFilter = makeScopeFilter(scope);
     const taxConfigs = allTaxConfigs.filter(scopeFilter);
     const taxBrackets = allTaxBrackets.filter((t: any) => scopeFilter(t) && t.status !== 'inactive');
     const benefits = allBenefits.filter(scopeFilter);
@@ -4323,15 +4337,7 @@ app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
         }
       }
     }
-    taxBrackets.sort((a: any, b: any) => parseFloat(a.minIncome || 0) - parseFloat(b.minIncome || 0));
-    for (const bracket of taxBrackets) {
-      const min = parseFloat(bracket.minIncome || 0);
-      const max = parseFloat(bracket.maxIncome || 0) || Infinity;
-      const rate = parseFloat(bracket.rate || 0) / 100;
-      if (basicSalary > min) {
-        taxDeduction += (Math.min(basicSalary, max) - min) * rate;
-      }
-    }
+    taxDeduction += calcProgressiveTax(basicSalary, taxBrackets);
 
     let benefitAllowance = 0;
     for (const benefit of benefits) {
@@ -4340,10 +4346,7 @@ app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
       if (benefit.contributionType === 'percentage') { benefitAllowance += basicSalary * (parseFloat(benefit.employerContribution || 0) / 100); }
       else { benefitAllowance += parseFloat(benefit.employerContribution || 0); }
     }
-    for (const plan of benefitPlans) {
-      if (userId && plan.eligibleUsers?.length && !plan.eligibleUsers.includes(userId)) continue;
-      benefitAllowance += basicSalary * (parseFloat(plan.employerContribution || 0) / 100);
-    }
+    benefitAllowance += calcBenefitPlanAllowance(basicSalary, benefitPlans, userId);
 
     let otBonus = 0;
     if (userId) {

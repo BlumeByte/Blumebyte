@@ -77,6 +77,9 @@ const TABS = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
+// Active statuses for public job posting visibility (mirrors server JOB_ACTIVE_STATUSES)
+const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+
 function copyToClipboard(text: string) {
   // Use fallback method for sandboxed environments
   const ta = document.createElement('textarea');
@@ -2191,8 +2194,7 @@ function AdminHiring() {
       };
       const employmentType = typeMap[rawType.toLowerCase()] || rawType;
       // Auto-activate status when visibility is set to public_global
-      const activeStatuses = new Set(['active', 'open', 'interviewing', 'offered']);
-      const status = (formData.visibilityType === 'public_global' && !activeStatuses.has(formData.status))
+      const status = (formData.visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(formData.status))
         ? 'open'
         : (formData.status || 'open');
       const payload = {

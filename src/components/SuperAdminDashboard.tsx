@@ -426,6 +426,9 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
+// Active statuses for public job posting visibility (mirrors server JOB_ACTIVE_STATUSES)
+const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+
 function copyToClipboard(text: string) {
   const ta = document.createElement('textarea');
   ta.value = text;
@@ -3678,8 +3681,7 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
       if (submitData.assignedBy === '__unassigned') { submitData.assignedBy = ''; submitData.assignedById = ''; }
       // Job posting: auto-activate when visibility is public_global so it appears on the hiring page
       if (entityKey === 'job-postings' && submitData.visibilityType === 'public_global') {
-        const activeStatuses = new Set(['active', 'open', 'interviewing', 'offered']);
-        if (!activeStatuses.has(submitData.status)) {
+        if (!JOB_ACTIVE_STATUSES.has(submitData.status)) {
           submitData.status = 'active';
         }
       }
