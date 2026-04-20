@@ -2183,10 +2183,24 @@ function AdminHiring() {
     setSaving(true);
     try {
       // Ensure roleTitle mirrors title for the public jobs endpoint compatibility
+      // Normalize employment type to Title Case for HiringsPage filter compatibility
+      const rawType = formData.employmentType || formData.type || '';
+      const typeMap: Record<string, string> = {
+        'full-time': 'Full Time', 'part-time': 'Part Time', 'contract': 'Contract', 'internship': 'Internship',
+        'remote': 'Remote', 'hybrid': 'Hybrid',
+      };
+      const employmentType = typeMap[rawType.toLowerCase()] || rawType;
+      // Auto-activate status when visibility is set to public_global
+      const activeStatuses = new Set(['active', 'open', 'interviewing', 'offered']);
+      const status = (formData.visibilityType === 'public_global' && !activeStatuses.has(formData.status))
+        ? 'open'
+        : (formData.status || 'open');
       const payload = {
         ...formData,
         roleTitle: formData.roleTitle || formData.title || '',
         companyName: formData.companyName || branding.companyName || '',
+        employmentType,
+        status,
       };
       if (editItem) {
         await api(`/admin/job-postings/${editItem.id}`, { method: 'PUT', body: payload, token: accessToken });
@@ -2208,7 +2222,7 @@ function AdminHiring() {
 
   const openNew = () => {
     setEditItem(null);
-    setFormData({ status: 'open', type: 'full-time', visibilityType: 'internal_only', companyName: branding.companyName || '' });
+    setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'internal_only', companyName: branding.companyName || '' });
     setDialogOpen(true);
   };
 
@@ -2331,13 +2345,15 @@ function AdminHiring() {
                 )}
               </div>
               <div><Label className="text-xs">Employment Type</Label>
-                <Select value={formData.type || 'full-time'} onValueChange={v => setFormData({ ...formData, type: v })}>
+                <Select value={formData.employmentType || formData.type || 'Full Time'} onValueChange={v => setFormData({ ...formData, employmentType: v, type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="full-time">Full-time</SelectItem>
-                    <SelectItem value="part-time">Part-time</SelectItem>
-                    <SelectItem value="contract">Contract</SelectItem>
-                    <SelectItem value="internship">Internship</SelectItem>
+                    <SelectItem value="Full Time">Full Time</SelectItem>
+                    <SelectItem value="Part Time">Part Time</SelectItem>
+                    <SelectItem value="Contract">Contract</SelectItem>
+                    <SelectItem value="Internship">Internship</SelectItem>
+                    <SelectItem value="Remote">Remote</SelectItem>
+                    <SelectItem value="Hybrid">Hybrid</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -437,6 +437,20 @@ function companyMatches(scope: string[], company: string | undefined | null): bo
   return scope.some(s => s.toLowerCase() === company.toLowerCase());
 }
 
+// --- Normalize employment type to Title Case for consistent filtering ---
+function normalizeEmploymentType(raw: string): string {
+  if (!raw) return '';
+  const map: Record<string, string> = {
+    'full-time': 'Full Time', 'full_time': 'Full Time', 'fulltime': 'Full Time', 'full time': 'Full Time',
+    'part-time': 'Part Time', 'part_time': 'Part Time', 'parttime': 'Part Time', 'part time': 'Part Time',
+    'contract': 'Contract',
+    'internship': 'Internship',
+    'remote': 'Remote',
+    'hybrid': 'Hybrid',
+  };
+  return map[raw.toLowerCase()] || raw;
+}
+
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
   // CRITICAL FIX: ALL roles including SuperAdmins are filtered by their company scope
@@ -4048,6 +4062,9 @@ makeCrud("superadmin/meeting", "meeting:", requireSuperAdmin);
 makeCrud("superadmin/workflow", "workflow:", requireSuperAdmin);
 
 // CUSTOM: superadmin/job-posting POST/PUT with auto-populated companyName
+// ACTIVE_STATUSES for public job visibility (also used in public/jobs endpoint)
+const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+
 app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
@@ -4057,12 +4074,21 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
     if (!companyId) return c.json({ error: 'User has no company assignment' }, 400);
     // Auto-populate companyName from company record if not provided
     const companyName = body.companyName || (await resolveCompanyName(companyId)) || '';
+    // Normalize employmentType: accept both 'type' and 'employmentType', normalize casing
+    const employmentType = normalizeEmploymentType(body.employmentType || body.type || '');
+    // Auto-activate status when visibility is set to public_global
+    let status = body.status || 'active';
+    if (body.visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
+      status = 'active';
+    }
     const item = {
       ...body,
       id,
       companyId,
       company: companyId,
       companyName,
+      employmentType,
+      status,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -4085,6 +4111,15 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
     const companyId = existing.companyId || body.companyId || (await getCompanyId(user.id));
     // Auto-populate companyName if not already set
     const companyName = body.companyName || existing.companyName || (companyId ? await resolveCompanyName(companyId) : '');
+    // Normalize employmentType
+    const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
+    const employmentType = normalizeEmploymentType(rawType);
+    // Auto-activate status when visibility is set to public_global
+    const visibilityType = body.visibilityType ?? existing.visibilityType;
+    let status = body.status ?? existing.status ?? 'active';
+    if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
+      status = 'active';
+    }
     const item = {
       ...existing,
       ...body,
@@ -4092,6 +4127,8 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
       companyId: companyId || existing.companyId,
       company: companyId || existing.companyId,
       companyName,
+      employmentType,
+      status,
       updatedAt: new Date().toISOString(),
     };
     await kv.set(`job-posting:${id}`, item);
@@ -4131,21 +4168,31 @@ app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
 
     const scope = await resolveCompanyScope(user.id);
 
-    // Fetch tax configurations and benefit plans
-    const [allTaxes, allBenefits, allOT, allExpenses] = await Promise.all([
+    // Fetch all tax and benefit sources: admin-created (tax-configuration/benefit)
+    // AND superadmin-created (tax-bracket/benefit-plan) — both are company-scoped
+    const [allTaxConfigs, allTaxBrackets, allBenefits, allBenefitPlans, allOT, allExpenses] = await Promise.all([
       kv.getByPrefix('tax-configuration:'),
+      kv.getByPrefix('tax-bracket:'),
       kv.getByPrefix('benefit:'),
+      kv.getByPrefix('benefit-plan:'),
       kv.getByPrefix('overtime:'),
       kv.getByPrefix('expense:'),
     ]);
 
-    // Filter by company scope
-    const taxes = allTaxes.filter((t: any) => !t.companyId || scope?.includes(t.companyId));
-    const benefits = allBenefits.filter((b: any) => !b.companyId || scope?.includes(b.companyId));
+    // Filter all sources by company scope (case-insensitive)
+    const scopeFilter = (item: any) => {
+      const co = item.company || item.companyId;
+      if (!co) return false;
+      return !scope?.length || scope.some((s: string) => s.toLowerCase() === co.toLowerCase());
+    };
+    const taxConfigs = allTaxConfigs.filter(scopeFilter);
+    const taxBrackets = allTaxBrackets.filter((t: any) => scopeFilter(t) && t.status !== 'inactive');
+    const benefits = allBenefits.filter(scopeFilter);
+    const benefitPlans = allBenefitPlans.filter((b: any) => scopeFilter(b) && b.status !== 'inactive');
 
-    // Calculate tax deduction
+    // Calculate tax deduction from admin-style tax-configuration records
     let taxDeduction = 0;
-    for (const tax of taxes) {
+    for (const tax of taxConfigs) {
       if (tax.enabled === false) continue;
       if (tax.applicableTo && tax.applicableTo !== 'all' && tax.applicableTo !== 'employees') continue;
       if (tax.type === 'percentage') {
@@ -4165,6 +4212,17 @@ app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
         }
       }
     }
+    // Calculate tax from superadmin-style tax-bracket records (progressive income brackets)
+    taxBrackets.sort((a: any, b: any) => parseFloat(a.minIncome || 0) - parseFloat(b.minIncome || 0));
+    for (const bracket of taxBrackets) {
+      const min = parseFloat(bracket.minIncome || 0);
+      const max = parseFloat(bracket.maxIncome || 0) || Infinity;
+      const rate = parseFloat(bracket.rate || 0) / 100;
+      if (basicSalary > min) {
+        const taxable = Math.min(basicSalary, max) - min;
+        taxDeduction += taxable * rate;
+      }
+    }
 
     // Calculate benefit allowance (employer contribution)
     let benefitAllowance = 0;
@@ -4176,6 +4234,11 @@ app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
       } else {
         benefitAllowance += parseFloat(benefit.employerContribution || 0);
       }
+    }
+    // Add superadmin-style benefit-plan contributions (always % of basic salary)
+    for (const plan of benefitPlans) {
+      if (userId && plan.eligibleUsers?.length && !plan.eligibleUsers.includes(userId)) continue;
+      benefitAllowance += basicSalary * (parseFloat(plan.employerContribution || 0) / 100);
     }
 
     // Calculate approved OT bonus
@@ -4223,16 +4286,29 @@ app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
     const { userId, basicSalary: baseSalaryStr, period } = await c.req.json();
     const basicSalary = parseFloat(baseSalaryStr || 0);
     const scope = await resolveCompanyScope(user.id);
-    const [allTaxes, allBenefits, allOT, allExpenses] = await Promise.all([
+
+    // Fetch all tax and benefit sources including both admin and superadmin stores
+    const [allTaxConfigs, allTaxBrackets, allBenefits, allBenefitPlans, allOT, allExpenses] = await Promise.all([
       kv.getByPrefix('tax-configuration:'),
+      kv.getByPrefix('tax-bracket:'),
       kv.getByPrefix('benefit:'),
+      kv.getByPrefix('benefit-plan:'),
       kv.getByPrefix('overtime:'),
       kv.getByPrefix('expense:'),
     ]);
-    const taxes = allTaxes.filter((t: any) => !t.companyId || scope?.includes(t.companyId));
-    const benefits = allBenefits.filter((b: any) => !b.companyId || scope?.includes(b.companyId));
+
+    const scopeFilter = (item: any) => {
+      const co = item.company || item.companyId;
+      if (!co) return false;
+      return !scope?.length || scope.some((s: string) => s.toLowerCase() === co.toLowerCase());
+    };
+    const taxConfigs = allTaxConfigs.filter(scopeFilter);
+    const taxBrackets = allTaxBrackets.filter((t: any) => scopeFilter(t) && t.status !== 'inactive');
+    const benefits = allBenefits.filter(scopeFilter);
+    const benefitPlans = allBenefitPlans.filter((b: any) => scopeFilter(b) && b.status !== 'inactive');
+
     let taxDeduction = 0;
-    for (const tax of taxes) {
+    for (const tax of taxConfigs) {
       if (tax.enabled === false) continue;
       if (tax.applicableTo && tax.applicableTo !== 'all' && tax.applicableTo !== 'employees') continue;
       if (tax.type === 'percentage') { taxDeduction += basicSalary * (parseFloat(tax.rate || 0) / 100); }
@@ -4247,6 +4323,16 @@ app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
         }
       }
     }
+    taxBrackets.sort((a: any, b: any) => parseFloat(a.minIncome || 0) - parseFloat(b.minIncome || 0));
+    for (const bracket of taxBrackets) {
+      const min = parseFloat(bracket.minIncome || 0);
+      const max = parseFloat(bracket.maxIncome || 0) || Infinity;
+      const rate = parseFloat(bracket.rate || 0) / 100;
+      if (basicSalary > min) {
+        taxDeduction += (Math.min(basicSalary, max) - min) * rate;
+      }
+    }
+
     let benefitAllowance = 0;
     for (const benefit of benefits) {
       if (benefit.enabled === false) continue;
@@ -4254,6 +4340,11 @@ app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
       if (benefit.contributionType === 'percentage') { benefitAllowance += basicSalary * (parseFloat(benefit.employerContribution || 0) / 100); }
       else { benefitAllowance += parseFloat(benefit.employerContribution || 0); }
     }
+    for (const plan of benefitPlans) {
+      if (userId && plan.eligibleUsers?.length && !plan.eligibleUsers.includes(userId)) continue;
+      benefitAllowance += basicSalary * (parseFloat(plan.employerContribution || 0) / 100);
+    }
+
     let otBonus = 0;
     if (userId) {
       const approvedOT = allOT.filter((r: any) => r.userId === userId && r.status === 'approved' && (!period || r.date?.startsWith(period)));
@@ -4283,7 +4374,11 @@ app.get(`${PREFIX}/leave-types`, async (c) => {
     if (!companyId) return c.json([]);
     
     const all = await kv.getByPrefix("leave-type:");
-    const filtered = all.filter((item: any) => item.companyId === companyId);
+    // Case-insensitive comparison to handle UUID variations; also check .company fallback
+    const filtered = all.filter((item: any) => {
+      const co = item.companyId || item.company;
+      return co && co.toLowerCase() === companyId.toLowerCase();
+    });
     return c.json(filtered);
   } catch (e: any) {
     console.log('Leave types fetch error:', e.message);
@@ -4299,13 +4394,87 @@ app.get(`${PREFIX}/holidays`, async (c) => {
     if (!companyId) return c.json([]);
     
     const all = await kv.getByPrefix("holiday:");
-    const filtered = all.filter((item: any) => item.companyId === companyId);
+    const filtered = all.filter((item: any) => {
+      const co = item.companyId || item.company;
+      return co && co.toLowerCase() === companyId.toLowerCase();
+    });
     return c.json(filtered);
   } catch (e: any) {
     console.log('Holidays fetch error:', e.message);
     return c.json([]);
   }
 });
+// CUSTOM: admin/job-postings POST/PUT with auto-populated companyName and status normalization
+app.post(`${PREFIX}/admin/job-postings`, async (c) => {
+  try {
+    const { user } = await requireAdminOrAbove(c);
+    const body = await c.req.json();
+    const id = body.id || crypto.randomUUID();
+    const companyId = body.companyId || body.company || (await getCompanyId(user.id));
+    if (!companyId) return c.json({ error: 'User has no company assignment' }, 400);
+    const companyName = body.companyName || (await resolveCompanyName(companyId)) || '';
+    const employmentType = normalizeEmploymentType(body.employmentType || body.type || '');
+    let status = body.status || 'open';
+    if (body.visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
+      status = 'open';
+    }
+    const item = {
+      ...body,
+      id,
+      companyId,
+      company: companyId,
+      companyName,
+      employmentType,
+      status,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`job-posting:${id}`, item);
+    await broadcastUpdate('job-posting', 'INSERT', id, item);
+    return c.json(item, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
+  try {
+    const { user } = await requireAdminOrAbove(c);
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const existing = await kv.get(`job-posting:${id}`) || {};
+    const companyId = existing.companyId || body.companyId || (await getCompanyId(user.id));
+    const companyName = body.companyName || existing.companyName || (companyId ? await resolveCompanyName(companyId) : '');
+    const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
+    const employmentType = normalizeEmploymentType(rawType);
+    const visibilityType = body.visibilityType ?? existing.visibilityType;
+    let status = body.status ?? existing.status ?? 'open';
+    if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
+      status = 'open';
+    }
+    const item = {
+      ...existing,
+      ...body,
+      id,
+      companyId: companyId || existing.companyId,
+      company: companyId || existing.companyId,
+      companyName,
+      employmentType,
+      status,
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`job-posting:${id}`, item);
+    await broadcastUpdate('job-posting', 'UPDATE', id, item);
+    return c.json(item);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 makeCrud("admin/job-postings", "job-posting:", requireAdminOrAbove);
 makeCrud("admin/workflows", "workflow:", requireAdminOrAbove);
 makeCrud("admin/performance-reviews", "perf-review:", requireAdminOrAbove);
@@ -9590,7 +9759,8 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
         id: j.id,
         companyName,
         roleTitle: j.roleTitle || j.title || '',
-        employmentType: j.employmentType || j.employment_type || '',
+        // Normalize employmentType: check all variants (employmentType, type, employment_type)
+        employmentType: normalizeEmploymentType(j.employmentType || j.type || j.employment_type || ''),
         location: j.location || '',
         description: j.description || '',
         requirements: j.requirements || '',

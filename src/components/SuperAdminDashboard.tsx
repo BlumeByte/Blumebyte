@@ -1790,7 +1790,7 @@ function PayrollView() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-calculate tax + benefits dynamically on the client side
+  // Auto-calculate tax + benefits dynamically using server-side calculate endpoint
   const handleAutoCalculate = async () => {
     if (!formData.basicSalary || !formData.userId) {
       toast.error('Select an employee and enter Basic Salary first');
@@ -1802,71 +1802,24 @@ function PayrollView() {
       const userId = formData.userId;
       const period = formData.period || '';
 
-      const [taxBrackets, benefitPlans, otList, expList] = await Promise.all([
-        api('/superadmin/tax-bracket', { token: accessToken }).catch(() => []),
-        api('/superadmin/benefit-plan', { token: accessToken }).catch(() => []),
-        api('/admin/overtime-requests', { token: accessToken }).catch(() => []),
-        api('/admin/expense-claims', { token: accessToken }).catch(() => []),
-      ]);
-
-      // Tax: progressive bracket calculation using minIncome/maxIncome/rate
-      let taxDeduction = 0;
-      const activeTaxes = Array.isArray(taxBrackets)
-        ? taxBrackets.filter((t: any) => t.status !== 'inactive')
-        : [];
-      // Sort ascending by minIncome for progressive calculation
-      activeTaxes.sort((a: any, b: any) => parseFloat(a.minIncome || 0) - parseFloat(b.minIncome || 0));
-      for (const bracket of activeTaxes) {
-        const min = parseFloat(bracket.minIncome || 0);
-        const max = parseFloat(bracket.maxIncome || 0) || Infinity;
-        const rate = parseFloat(bracket.rate || 0) / 100;
-        if (basicSalary > min) {
-          const taxable = Math.min(basicSalary, max) - min;
-          taxDeduction += taxable * rate;
-        }
-      }
-
-      // Benefits: employer contribution % of basic salary
-      let benefitAllowance = 0;
-      const activeBenefits = Array.isArray(benefitPlans)
-        ? benefitPlans.filter((b: any) => b.status !== 'inactive')
-        : [];
-      for (const benefit of activeBenefits) {
-        const contrib = parseFloat(benefit.employerContribution || 0);
-        benefitAllowance += basicSalary * (contrib / 100);
-      }
-
-      // OT bonus: approved overtime for this employee in the period
-      let otBonus = 0;
-      if (Array.isArray(otList)) {
-        const approvedOT = otList.filter((r: any) =>
-          r.userId === userId && r.status === 'approved' && (!period || r.date?.startsWith(period))
-        );
-        otBonus = approvedOT.reduce((s: number, r: any) => s + (parseFloat(r.rate || 0) * parseFloat(r.hours || 0)), 0);
-      }
-
-      // Expense reimbursement: approved expenses for this employee in the period
-      let expenseReimbursement = 0;
-      if (Array.isArray(expList)) {
-        const approvedExp = expList.filter((e: any) =>
-          e.userId === userId && (e.status === 'approved' || e.status === 'reimbursed') &&
-          (!period || e.date?.startsWith(period))
-        );
-        expenseReimbursement = approvedExp.reduce((s: number, e: any) => s + parseFloat(e.amount || 0), 0);
-      }
-
-      const totalAllowances = benefitAllowance + otBonus + expenseReimbursement;
+      // Use the server-side calculate endpoint which reads both tax-bracket and tax-configuration,
+      // as well as both benefit-plan and benefit KV stores for complete accuracy
+      const result = await api('/superadmin/payroll/calculate', {
+        method: 'POST',
+        body: { userId, basicSalary, period },
+        token: accessToken,
+      });
 
       setFormData((prev: any) => ({
         ...prev,
-        deductions: taxDeduction.toFixed(2),
-        allowances: totalAllowances.toFixed(2),
-        taxDeduction: taxDeduction.toFixed(2),
-        benefitAllowance: benefitAllowance.toFixed(2),
-        otBonus: otBonus.toFixed(2),
-        expenseReimbursement: expenseReimbursement.toFixed(2),
+        deductions: result.taxDeduction?.toFixed(2) ?? '0.00',
+        allowances: result.totalAllowances?.toFixed(2) ?? '0.00',
+        taxDeduction: result.taxDeduction?.toFixed(2) ?? '0.00',
+        benefitAllowance: result.benefitAllowance?.toFixed(2) ?? '0.00',
+        otBonus: result.otBonus?.toFixed(2) ?? '0.00',
+        expenseReimbursement: result.expenseReimbursement?.toFixed(2) ?? '0.00',
       }));
-      toast.success(`Calculated: Tax ${currencySymbol}${taxDeduction.toFixed(2)}, Benefits ${currencySymbol}${benefitAllowance.toFixed(2)}, OT ${currencySymbol}${otBonus.toFixed(2)}`);
+      toast.success(`Calculated: Tax ${currencySymbol}${result.taxDeduction?.toFixed(2)}, Benefits ${currencySymbol}${result.benefitAllowance?.toFixed(2)}, OT ${currencySymbol}${result.otBonus?.toFixed(2)}`);
     } catch (e: any) { toast.error('Failed to auto-calculate: ' + e.message); }
     setCalculating(false);
   };
@@ -3723,6 +3676,13 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
       // Clean up __unassigned for task fields
       if (submitData.assignedTo === '__unassigned') { submitData.assignedTo = ''; submitData.assignedToId = ''; submitData.assigneeId = ''; }
       if (submitData.assignedBy === '__unassigned') { submitData.assignedBy = ''; submitData.assignedById = ''; }
+      // Job posting: auto-activate when visibility is public_global so it appears on the hiring page
+      if (entityKey === 'job-postings' && submitData.visibilityType === 'public_global') {
+        const activeStatuses = new Set(['active', 'open', 'interviewing', 'offered']);
+        if (!activeStatuses.has(submitData.status)) {
+          submitData.status = 'active';
+        }
+      }
       // Validate meeting scheduling conflicts
       if (entityKey === 'meetings-1on1' && submitData.date && submitData.startTime && submitData.status === 'scheduled') {
         const meetDate = submitData.date;
