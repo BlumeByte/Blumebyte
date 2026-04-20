@@ -40,7 +40,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import EmployeeExperiencePage from './pages/EmployeeExperiencePage';
 import HiringsPage from './pages/HiringsPage';
 import HiringDetailPage from './pages/HiringDetailPage';
-import UltimateadminSupport from './pages/UltimateadminSupport';
+import CustomerCareDashboard from './pages/UltimateadminSupport';
 
 // PERFORMANCE: Lazy load heavy dashboard components
 const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard'));
@@ -182,7 +182,7 @@ const IndustryPageWrapper = () => <IndustryPage />;
 const ResourcesPageWrapper = () => <ResourcesPage />;
 const HiringsPageWrapper = () => <HiringsPage />;
 const HiringDetailPageWrapper = () => <HiringDetailPage />;
-const UltimateadminSupportWrapper = () => <UltimateadminSupport />;
+const CustomerCareDashboardWrapper = () => <CustomerCareDashboard />;
 
 const NotificationsPageWrapper = () => (
   <ProtectedRoute allowedRoles={['superadmin', 'admin', 'manager', 'employee']}>
@@ -352,15 +352,19 @@ export const router = createBrowserRouter([
       },
       {
         path: '/care-dashboard',
-        element: <Navigate to="/ultimateadmin/support" replace />,
+        element: <Navigate to="/customer-care" replace />,
       },
       {
         path: '/care',
-        element: <Navigate to="/ultimateadmin/support" replace />,
+        element: <Navigate to="/customer-care" replace />,
       },
       {
         path: '/ultimateadmin/support',
-        Component: UltimateadminSupportWrapper,
+        element: <Navigate to="/customer-care" replace />,
+      },
+      {
+        path: '/customer-care',
+        Component: CustomerCareDashboardWrapper,
       },
       {
         path: '*',
