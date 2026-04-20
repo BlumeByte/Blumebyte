@@ -12,6 +12,8 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
+const EMAIL_FROM = 'Blumebyte HR <noreply@blumebyte.com>';
+const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
 app.use("*", logger(console.log));
 app.use(
@@ -2486,7 +2488,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'Blumebyte HR <noreply@blumebyte.com>',
+            from: EMAIL_FROM,
             to: email,
             subject: `Welcome to ${company.name} - Your Account Details`,
             html: `
@@ -9232,7 +9234,7 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'Blumebyte HR <noreply@blumebyte.com>',
+            from: EMAIL_FROM,
             to: email,
             subject: 'Your Blumebyte Verification Code',
             html: `
@@ -9604,7 +9606,7 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     
     // Create reset link using the frontend origin or the configured FRONTEND_URL
     const requestOrigin = c.req.header('Origin') || c.req.header('Referer')?.split('/make-server-')[0];
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || requestOrigin || 'http://localhost:3000';
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || requestOrigin || FRONTEND_FALLBACK_URL;
     const resetLink = `${frontendUrl}/password-reset?token=${resetToken}`;
     
     console.log(`✅ Password reset token created for ${email}, expires at ${expiresAt.toISOString()}`);
@@ -9621,7 +9623,7 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'Blumebyte HR <noreply@blumebyte.com>',
+            from: EMAIL_FROM,
             to: employee.email,
             subject: 'Reset Your Blumebyte Password',
             html: `
