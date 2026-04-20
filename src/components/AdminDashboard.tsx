@@ -2347,7 +2347,7 @@ function AdminHiring() {
                 )}
               </div>
               <div><Label className="text-xs">Employment Type</Label>
-                <Select value={formData.employmentType || formData.type || 'Full Time'} onValueChange={v => setFormData({ ...formData, employmentType: v, type: v })}>
+                <Select value={formData.employmentType || formData.type || 'Full Time'} onValueChange={v => setFormData({ ...formData, employmentType: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Full Time">Full Time</SelectItem>
