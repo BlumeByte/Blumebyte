@@ -19,7 +19,7 @@ import {
   Star, Video, MapPin, Building2, Phone, Mail, Printer, ArrowUpDown, ArrowUp, ArrowDown,
   DollarSign, Download, ListTodo, ClipboardCheck, Target, AlertCircle, ChevronRight,
   GraduationCap, ClipboardList, RefreshCw, FileCheck, GitMerge, BarChart3, TrendingUp,
-  Shield, Scale, Eye, FileWarning, Ban, Gavel
+  Shield, Scale, Eye, FileWarning, Ban, Gavel, Settings
 } from 'lucide-react';
 import { Progress } from './ui/progress';
 import { MessagesPanel } from './MessagesPanel';
@@ -32,6 +32,7 @@ import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import { useCurrency } from '../lib/currency-context';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
+import { LanguageSelector } from './LanguageSelector';
 
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
@@ -92,6 +93,7 @@ export function EmployeeDashboard() {
             <TabsTrigger value="self-service"><Briefcase className="w-4 h-4 mr-1" />Jobs</TabsTrigger>
             <TabsTrigger value="my-profile"><User className="w-4 h-4 mr-1" />My Profile</TabsTrigger>
             <TabsTrigger value="announcements"><Megaphone className="w-4 h-4 mr-1" />News</TabsTrigger>
+            <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-1" />Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview"><EmpOverview onNavigate={setActiveTab} /></TabsContent>
@@ -110,6 +112,26 @@ export function EmployeeDashboard() {
           <TabsContent value="self-service"><SharedSelfServiceHub /></TabsContent>
           <TabsContent value="my-profile"><SharedMyProfile /></TabsContent>
           <TabsContent value="announcements"><EmpAnnouncements /></TabsContent>
+          <TabsContent value="settings">
+            <div className="max-w-xl space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    🌐 Display Language
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <LanguageSelector variant="card" />
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Powered by Google Translate. Translations are approximate — original English content is always authoritative.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
     </div>

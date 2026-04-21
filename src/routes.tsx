@@ -5,6 +5,7 @@ import { AuthProvider } from './lib/auth-context';
 import { BrandingProvider } from './lib/branding-context';
 import { CurrencyProvider } from './lib/currency-context';
 import { DarkModeProvider } from './lib/dark-mode-context';
+import { LanguageProvider } from './lib/language-context';
 import { Toaster } from './components/ui/sonner';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ScrollToTop } from './components/ScrollToTop';
@@ -72,15 +73,17 @@ function RootLayout() {
     <BrandingProvider>
       <AuthProvider>
         <CurrencyProvider>
-          <DarkModeProvider>
-            <ScrollToTop />
-            <Toaster richColors position="top-right" />
-            {/* PERFORMANCE: Lazy load EmployeeChat in Suspense to reduce initial load */}
-            <Suspense fallback={null}>
-              <EmployeeChat />
-            </Suspense>
-            <Outlet />
-          </DarkModeProvider>
+          <LanguageProvider>
+            <DarkModeProvider>
+              <ScrollToTop />
+              <Toaster richColors position="top-right" />
+              {/* PERFORMANCE: Lazy load EmployeeChat in Suspense to reduce initial load */}
+              <Suspense fallback={null}>
+                <EmployeeChat />
+              </Suspense>
+              <Outlet />
+            </DarkModeProvider>
+          </LanguageProvider>
         </CurrencyProvider>
       </AuthProvider>
     </BrandingProvider>

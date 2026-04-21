@@ -43,6 +43,7 @@ import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 import { TwoFactorSettings } from './TwoFactorSettings';
+import { LanguageSelector } from './LanguageSelector';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -2149,6 +2150,24 @@ function AdminSettings() {
 
       {/* 2FA Settings */}
       <TwoFactorSettings />
+
+      {/* Language Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            🌐 Display Language
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose the display language for your dashboard.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelector variant="card" />
+          <p className="text-xs text-muted-foreground mt-3">
+            Powered by Google Translate. Translations are approximate.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

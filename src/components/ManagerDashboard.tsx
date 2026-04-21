@@ -36,6 +36,7 @@ import { AnnouncementsViewer } from './AnnouncementsViewer';
 import { ManagerCrudPanel } from './ManagerCrudPanel';
 import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
 import { ManagerOvertimeExpenseApproval } from './ManagerOvertimeExpenseApproval';
+import { LanguageSelector } from './LanguageSelector';
 
 function TeamTab() {
   const { accessToken } = useAuth();
@@ -635,6 +636,14 @@ export function ManagerDashboard() {
             <User className="w-4 h-4 mr-2" />
             My Profile
           </Button>
+          <Button
+            variant={activeTab === 'settings' ? 'default' : 'ghost'}
+            className="w-full justify-start text-sm h-9"
+            onClick={() => setActiveTab('settings')}
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Settings
+          </Button>
         </nav>
 
         {/* Logout Button at Bottom */}
@@ -673,6 +682,7 @@ export function ManagerDashboard() {
             {activeTab === 'messages' && 'Messages'}
             {activeTab === 'self-service' && 'Self Service'}
             {activeTab === 'profile' && 'My Profile'}
+            {activeTab === 'settings' && 'Settings'}
           </h1>
           <div className="flex items-center gap-3">
             <NotificationsBell />
@@ -761,6 +771,7 @@ export function ManagerDashboard() {
           {activeTab === 'messages' && <MessagesPanel />}
           {activeTab === 'self-service' && <SharedSelfServiceHub onNavigate={handleNavigation} />}
           {activeTab === 'profile' && <SharedMyProfile />}
+          {activeTab === 'settings' && <ManagerSettingsView />}
         </main>
       </div>
 
@@ -772,3 +783,27 @@ export function ManagerDashboard() {
 }
 
 export default ManagerDashboard;
+
+function ManagerSettingsView() {
+  return (
+    <div className="p-6 max-w-xl space-y-6">
+      <h2 className="text-xl font-bold">Settings</h2>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            🌐 Display Language
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelector variant="card" />
+          <p className="text-xs text-muted-foreground mt-3">
+            Powered by Google Translate. Translations are approximate — original English content is always authoritative.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

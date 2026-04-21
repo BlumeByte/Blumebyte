@@ -9,6 +9,7 @@ import {
   Briefcase,
 } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { PublicLanguageButton } from './PublicLanguageButton';
 
 // ─── Desktop dropdown data ────────────────────────────────────────────────────
 const platformMenu = [
@@ -304,7 +305,8 @@ export function PublicFooter() {
   const navigate = useNavigate();
 
   return (
-    <footer className="border-t bg-gray-50">
+    <>
+      <footer className="border-t bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div className="md:col-span-1">
@@ -364,5 +366,7 @@ export function PublicFooter() {
         </div>
       </div>
     </footer>
+    <PublicLanguageButton />
+    </>
   );
 }
