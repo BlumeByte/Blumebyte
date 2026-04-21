@@ -369,7 +369,7 @@ function EmpOverview({ onNavigate }: { onNavigate: (tab: string) => void }) {
             ) : (
               <div className="space-y-3">
                 {reviews.slice(0, 5).map((r, i) => (
-                  <div key={r.id || i} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={r.id || i} className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{r.title || r.reviewType || r.period || 'Review'}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
@@ -406,7 +406,7 @@ function EmpOverview({ onNavigate }: { onNavigate: (tab: string) => void }) {
             ) : (
               <div className="space-y-3">
                 {meetings.slice(0, 5).map((m, i) => (
-                  <div key={m.id || i} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={m.id || i} className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{m.title || 'Meeting'}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{m.date} {m.startTime ? `at ${m.startTime}` : ''}{m.endTime ? ` - ${m.endTime}` : ''}</p>
@@ -634,7 +634,7 @@ function EmpProfile() {
           <CardContent>
             <div className="space-y-3">
               {pendingChanges.slice(0, 10).map(c => (
-                <div key={c.id} className="p-3 bg-gray-50 rounded-lg">
+                <div key={c.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-gray-500">{new Date(c.createdAt).toLocaleString()}</span>
                     <Badge className={statusColor(c.status)}>{c.status}</Badge>
@@ -1004,7 +1004,7 @@ function EmpTasks() {
               {detailTask.createdAt && <div><Label className="text-xs text-gray-500">Created</Label><p className="text-sm">{new Date(detailTask.createdAt).toLocaleDateString()}</p></div>}
               {detailTask.assignedByName && <div><Label className="text-xs text-gray-500">Assigned By</Label><p className="text-sm">{detailTask.assignedByName}</p></div>}
             </div>
-            {detailTask.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded">{detailTask.notes}</p></div>}
+            {detailTask.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded">{detailTask.notes}</p></div>}
           </div>)}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailTask(null)}>Close</Button>
@@ -1165,10 +1165,10 @@ function EmpReviews() {
               <div><Label className="text-xs text-gray-500">Date</Label><p className="text-sm">{selectedReview.createdAt ? new Date(selectedReview.createdAt).toLocaleDateString() : selectedReview.date||'—'}</p></div>
               {selectedReview.period && <div><Label className="text-xs text-gray-500">Period</Label><p className="text-sm">{selectedReview.period}</p></div>}
             </div>
-            {selectedReview.comments && <div><Label className="text-xs text-gray-500">Comments</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedReview.comments}</p></div>}
+            {selectedReview.comments && <div><Label className="text-xs text-gray-500">Comments</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">{selectedReview.comments}</p></div>}
             {selectedReview.publicNotes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-blue-50 rounded-lg">{selectedReview.publicNotes}</p></div>}
-            {selectedReview.goals?.length > 0 && (<div><Label className="text-xs text-gray-500 mb-2 block">Goals</Label><div className="space-y-2">{selectedReview.goals.map((g: any, gi: number) => (<div key={gi} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm"><Badge className={g.status === 'completed' ? 'bg-green-100 text-green-800' : g.status === 'in-progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}>{g.status||'pending'}</Badge><span className="flex-1">{g.description||g.title}</span></div>))}</div></div>)}
-            {selectedReview.actionItems?.length > 0 && (<div><Label className="text-xs text-gray-500 mb-2 block">Action Items</Label><div className="space-y-2">{selectedReview.actionItems.map((a: any, ai: number) => (<div key={ai} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm"><CheckCircle className={`w-4 h-4 ${a.completed ? 'text-green-500' : 'text-gray-300'}`} /><span className="flex-1">{a.description}</span>{a.dueDate && <span className="text-xs text-gray-400">{new Date(a.dueDate).toLocaleDateString()}</span>}</div>))}</div></div>)}
+            {selectedReview.goals?.length > 0 && (<div><Label className="text-xs text-gray-500 mb-2 block">Goals</Label><div className="space-y-2">{selectedReview.goals.map((g: any, gi: number) => (<div key={gi} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm"><Badge className={g.status === 'completed' ? 'bg-green-100 text-green-800' : g.status === 'in-progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}>{g.status||'pending'}</Badge><span className="flex-1">{g.description||g.title}</span></div>))}</div></div>)}
+            {selectedReview.actionItems?.length > 0 && (<div><Label className="text-xs text-gray-500 mb-2 block">Action Items</Label><div className="space-y-2">{selectedReview.actionItems.map((a: any, ai: number) => (<div key={ai} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm"><CheckCircle className={`w-4 h-4 ${a.completed ? 'text-green-500' : 'text-gray-300'}`} /><span className="flex-1">{a.description}</span>{a.dueDate && <span className="text-xs text-gray-400">{new Date(a.dueDate).toLocaleDateString()}</span>}</div>))}</div></div>)}
           </div>)}
           <DialogFooter><Button variant="outline" onClick={() => setSelectedReview(null)}>Close</Button></DialogFooter>
         </DialogContent>
@@ -1261,7 +1261,7 @@ function EmpTraining() {
                 <Label className="text-xs text-gray-500 mb-2 block">Assessment Questions</Label>
                 <div className="space-y-2">
                   {selectedProgram.assessmentQuestions.map((q: string, idx: number) => (
-                    <div key={idx} className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
+                    <div key={idx} className="flex items-start gap-2 p-2.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
                       <span className="text-xs text-gray-400 font-mono min-w-[24px]">Q{idx + 1}.</span>
                       <span className="text-sm">{q}</span>
                     </div>
@@ -1372,13 +1372,13 @@ function EmpQuestionnaires() {
                 </div>
               </div>
             )}
-            {selectedFeedback.comments && <div><Label className="text-xs text-gray-500">Comments</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedFeedback.comments}</p></div>}
+            {selectedFeedback.comments && <div><Label className="text-xs text-gray-500">Comments</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">{selectedFeedback.comments}</p></div>}
             {Array.isArray(selectedFeedback.customQuestions) && selectedFeedback.customQuestions.length > 0 && (
               <div>
                 <Label className="text-xs text-gray-500 mb-2 block">Custom Questions</Label>
                 <div className="space-y-2">
                   {selectedFeedback.customQuestions.map((q: string, idx: number) => (
-                    <div key={idx} className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
+                    <div key={idx} className="flex items-start gap-2 p-2.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
                       <span className="text-xs text-gray-400 font-mono min-w-[24px]">Q{idx + 1}.</span>
                       <span className="text-sm">{q}</span>
                     </div>
@@ -1489,7 +1489,7 @@ function EmpDisciplinary() {
               <Badge className={discStatusColor(selectedCase.status)}>{selectedCase.status || 'open'}</Badge>
               {(selectedCase.severity || selectedCase.type) && <Badge variant="outline" className={severityColor(selectedCase.severity || selectedCase.type)}>{selectedCase.severity || selectedCase.type}</Badge>}
             </div>
-            {selectedCase.description && <div><Label className="text-xs text-gray-500">Description</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedCase.description}</p></div>}
+            {selectedCase.description && <div><Label className="text-xs text-gray-500">Description</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">{selectedCase.description}</p></div>}
             <div className="grid grid-cols-2 gap-3">
               {(selectedCase.date || selectedCase.incidentDate) && <div><Label className="text-xs text-gray-500">Incident Date</Label><p className="text-sm">{new Date(selectedCase.date || selectedCase.incidentDate).toLocaleDateString()}</p></div>}
               {selectedCase.issuedBy && <div><Label className="text-xs text-gray-500">Issued By</Label><p className="text-sm">{selectedCase.issuedBy}</p></div>}
@@ -1498,7 +1498,7 @@ function EmpDisciplinary() {
             </div>
             {selectedCase.actionTaken && <div><Label className="text-xs text-gray-500">Action Taken</Label><p className="text-sm mt-1 p-3 bg-amber-50 rounded-lg border border-amber-100">{selectedCase.actionTaken}</p></div>}
             {selectedCase.resolution && <div><Label className="text-xs text-gray-500">Resolution</Label><p className="text-sm mt-1 p-3 bg-green-50 rounded-lg border border-green-100">{selectedCase.resolution}</p></div>}
-            {selectedCase.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedCase.notes}</p></div>}
+            {selectedCase.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">{selectedCase.notes}</p></div>}
             {selectedCase.followUpDate && <div><Label className="text-xs text-gray-500">Follow-up Date</Label><p className="text-sm">{new Date(selectedCase.followUpDate).toLocaleDateString()}</p></div>}
           </div>)}
           <DialogFooter><Button variant="outline" onClick={() => setSelectedCase(null)}>Close</Button></DialogFooter>
@@ -1631,7 +1631,7 @@ function EmpCompliance() {
               {selectedItem.category && <Badge variant="outline">{selectedItem.category}</Badge>}
               {checkOverdue(selectedItem) && <Badge className="bg-red-500 text-white">OVERDUE</Badge>}
             </div>
-            {selectedItem.description && <div><Label className="text-xs text-gray-500">Description</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedItem.description}</p></div>}
+            {selectedItem.description && <div><Label className="text-xs text-gray-500">Description</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">{selectedItem.description}</p></div>}
             <div className="grid grid-cols-2 gap-3">
               {selectedItem.dueDate && <div><Label className="text-xs text-gray-500">Due Date</Label><p className={`text-sm ${checkOverdue(selectedItem) ? 'text-red-600 font-medium' : ''}`}>{new Date(selectedItem.dueDate).toLocaleDateString()}</p></div>}
               {selectedItem.responsibleName && <div><Label className="text-xs text-gray-500">Assigned By</Label><p className="text-sm">{selectedItem.responsibleName}</p></div>}
@@ -1642,13 +1642,13 @@ function EmpCompliance() {
             </div>
             {selectedItem.requirement && <div><Label className="text-xs text-gray-500">Requirement</Label><p className="text-sm mt-1 p-3 bg-blue-50 rounded-lg border border-blue-100">{selectedItem.requirement}</p></div>}
             {selectedItem.actions && <div><Label className="text-xs text-gray-500">Required Actions</Label><p className="text-sm mt-1 p-3 bg-amber-50 rounded-lg border border-amber-100">{selectedItem.actions}</p></div>}
-            {selectedItem.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg">{selectedItem.notes}</p></div>}
+            {selectedItem.notes && <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">{selectedItem.notes}</p></div>}
             {Array.isArray(selectedItem.documents) && selectedItem.documents.length > 0 && (
               <div>
                 <Label className="text-xs text-gray-500 mb-2 block">Related Documents</Label>
                 <div className="space-y-1">
                   {selectedItem.documents.map((doc: any, idx: number) => (
-                    <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
                       <FileText className="w-3.5 h-3.5 text-gray-400" />
                       <span>{typeof doc === 'string' ? doc : doc.name || doc.title || `Document ${idx + 1}`}</span>
                     </div>
