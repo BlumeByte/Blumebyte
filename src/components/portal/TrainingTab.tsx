@@ -168,7 +168,7 @@ export function TrainingTab({ accessToken, availableTraining, enrollments, onRef
                 const currentProg = progressInput[enrollment.id] ?? enrollment.progress ?? 0;
                 const isActive = enrollment.status === 'enrolled' || enrollment.status === 'in-progress';
                 return (
-                  <div key={enrollment.id} className="p-3 rounded-xl border border-gray-100 bg-white hover:border-blue-100 transition-all">
+                  <div key={enrollment.id} className="p-3 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-100 transition-all">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm font-medium text-gray-900">{enrollment.trainingTitle}</p>
                       {getStatusBadge(enrollment.status)}
@@ -258,7 +258,7 @@ export function TrainingTab({ accessToken, availableTraining, enrollments, onRef
                 <div
                   key={program.id}
                   onClick={() => setSelectedProgram(program)}
-                  className="p-4 rounded-xl border border-gray-100 bg-white hover:border-purple-200 hover:shadow-sm transition-all cursor-pointer group"
+                  className="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-purple-200 hover:shadow-sm transition-all cursor-pointer group"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <h4 className="text-sm font-semibold text-gray-900 group-hover:text-purple-600 transition-colors flex-1 mr-2">{title}</h4>

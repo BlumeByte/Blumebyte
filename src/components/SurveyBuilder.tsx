@@ -242,7 +242,7 @@ export function SurveyBuilder() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'closed': return 'bg-gray-100 text-gray-600 border-gray-200';
+      case 'closed': return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600';
       default: return 'bg-amber-50 text-amber-700 border-amber-200';
     }
   };
@@ -470,24 +470,24 @@ export function SurveyBuilder() {
               </div>
 
               {formQuestions.length === 0 && (
-                <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                  <ClipboardList className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400">No questions yet</p>
-                  <p className="text-xs text-gray-300 mt-1">Use the buttons above to add questions</p>
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600">
+                  <ClipboardList className="w-8 h-8 text-gray-300 dark:text-gray-500 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400 dark:text-gray-400">No questions yet</p>
+                  <p className="text-xs text-gray-300 dark:text-gray-500 mt-1">Use the buttons above to add questions</p>
                 </div>
               )}
 
               <div className="space-y-3">
                 {formQuestions.map((q, idx) => (
-                  <div key={q.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                  <div key={q.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 space-y-2">
                     <div className="flex items-start gap-2">
                       <div className="flex flex-col items-center gap-0.5 mt-1">
-                        <button onClick={() => moveQuestion(idx, -1)} disabled={idx === 0} className="p-0.5 rounded hover:bg-gray-200 disabled:opacity-30">
-                          <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                        <button onClick={() => moveQuestion(idx, -1)} disabled={idx === 0} className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30">
+                          <ChevronUp className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
                         </button>
-                        <span className="text-[10px] text-gray-400 font-mono">{idx + 1}</span>
-                        <button onClick={() => moveQuestion(idx, 1)} disabled={idx === formQuestions.length - 1} className="p-0.5 rounded hover:bg-gray-200 disabled:opacity-30">
-                          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">{idx + 1}</span>
+                        <button onClick={() => moveQuestion(idx, 1)} disabled={idx === formQuestions.length - 1} className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30">
+                          <ChevronDown className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
                         </button>
                       </div>
                       <div className="flex-1 space-y-2">
@@ -599,8 +599,8 @@ export function SurveyBuilder() {
                 <div className="space-y-4">
                   {/* Summary per question */}
                   {responsesDialog.questions.map((q, qIdx) => (
-                    <div key={q.id} className="p-3 bg-gray-50 rounded-xl">
-                      <p className="text-sm font-medium text-gray-700 mb-2">
+                    <div key={q.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                         {qIdx + 1}. {q.text}
                         <Badge variant="outline" className="text-[10px] ml-2">{getQuestionTypeLabel(q.type)}</Badge>
                       </p>
@@ -613,14 +613,14 @@ export function SurveyBuilder() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                              <span className="text-lg font-bold text-gray-900">{avg}</span>
-                              <span className="text-xs text-gray-400">/ 5 ({values.length} responses)</span>
+                              <span className="text-lg font-bold text-gray-900 dark:text-gray-100">{avg}</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500">/ 5 ({values.length} responses)</span>
                             </div>
                             <div className="flex items-end gap-1 h-8">
                               {distribution.map((count, i) => (
                                 <div key={i} className="flex flex-col items-center flex-1">
-                                  <div className="w-full bg-purple-200 rounded-t" style={{ height: `${values.length ? (count / values.length) * 32 : 0}px` }} />
-                                  <span className="text-[9px] text-gray-400 mt-0.5">{i + 1}</span>
+                                  <div className="w-full bg-purple-200 dark:bg-purple-900 rounded-t" style={{ height: `${values.length ? (count / values.length) * 32 : 0}px` }} />
+                                  <span className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">{i + 1}</span>
                                 </div>
                               ))}
                             </div>
@@ -636,11 +636,11 @@ export function SurveyBuilder() {
                           <div className="space-y-1">
                             {(q.options || []).map(opt => (
                               <div key={opt} className="flex items-center gap-2">
-                                <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                                   <div className="bg-purple-500 h-full rounded-full" style={{ width: `${values.length ? ((counts[opt] || 0) / values.length) * 100 : 0}%` }} />
                                 </div>
-                                <span className="text-xs text-gray-600 w-24 truncate">{opt}</span>
-                                <span className="text-xs text-gray-400 w-8 text-right">{counts[opt] || 0}</span>
+                                <span className="text-xs text-gray-600 dark:text-gray-300 w-24 truncate">{opt}</span>
+                                <span className="text-xs text-gray-400 dark:text-gray-500 w-8 text-right">{counts[opt] || 0}</span>
                               </div>
                             ))}
                           </div>
@@ -650,9 +650,9 @@ export function SurveyBuilder() {
                       {q.type === 'text' && (
                         <div className="space-y-1 max-h-32 overflow-y-auto">
                           {responses.map((r, ri) => r.answers?.[q.id] && (
-                            <div key={ri} className="text-xs text-gray-600 bg-white p-2 rounded border border-gray-100">
+                            <div key={ri} className="text-xs text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900 p-2 rounded border border-gray-100 dark:border-gray-700">
                               "{r.answers[q.id]}"
-                              <span className="text-[10px] text-gray-300 ml-2">
+                              <span className="text-[10px] text-gray-300 dark:text-gray-500 ml-2">
                                 {r.anonymous ? 'Anonymous' : r.userName}
                               </span>
                             </div>

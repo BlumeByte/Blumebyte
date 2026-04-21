@@ -184,6 +184,7 @@
   input[type="datetime-local"],
   .date-time-input {
     color-scheme: light;
+    min-height: 2.25rem;
   }
 
   input[type="date"]::-webkit-calendar-picker-indicator,
@@ -191,11 +192,14 @@
   input[type="datetime-local"]::-webkit-calendar-picker-indicator,
   .date-time-input::-webkit-calendar-picker-indicator {
     cursor: pointer;
-    opacity: 1;
-    display: block;
+    opacity: 1 !important;
+    display: block !important;
+    visibility: visible !important;
     background: transparent;
     position: static;
     filter: invert(47%) sepia(89%) saturate(2126%) hue-rotate(201deg) brightness(98%) contrast(94%);
+    width: 16px;
+    height: 16px;
   }
 
   /* Dark mode support for date/time inputs */
@@ -210,6 +214,9 @@
   .dark input[type="time"]::-webkit-calendar-picker-indicator,
   .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     filter: invert(100%);
+    opacity: 1 !important;
+    display: block !important;
+    visibility: visible !important;
   }
 }
 
@@ -315,4 +322,189 @@ html {
     transform: translateY(100vh);
     opacity: 0;
   }
+}
+/* ============================================================
+   GLASSMORPHIC UTILITIES
+   Apply .glass on any card/panel for the glass effect.
+   .glass-dark is the dark-mode variant.
+   ============================================================ */
+.glass {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.glass-dark,
+.dark .glass {
+  background: rgba(26, 31, 38, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================================
+   DYNAMIC FLOW ANIMATIONS
+   ============================================================ */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+/* Utility animation classes */
+.animate-fade-in-up    { animation: fadeInUp    0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in-scale { animation: fadeInScale 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-in-left { animation: slideInLeft 0.4s  cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-in-right{ animation: slideInRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-float-slow    { animation: floatSlow   4s ease-in-out infinite; }
+.animate-pulse-soft    { animation: pulse-soft  2.5s ease-in-out infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.15) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Stagger helpers – add delay with nth-child or manually */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+
+/* Smooth hover lift for cards */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+.dark .hover-lift:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* ============================================================
+   DASHBOARD DARK MODE – hardcoded color overrides
+   These rules ensure elements using non-semantic Tailwind colors
+   (bg-white, bg-gray-*, text-gray-*) are correctly styled in dark mode.
+   ============================================================ */
+
+/* Background overrides */
+html.dark .bg-white                { background-color: var(--card) !important; }
+html.dark .bg-gray-50              { background-color: #1f2937 !important; }
+html.dark .bg-gray-100             { background-color: #374151 !important; }
+html.dark .bg-gray-200             { background-color: #4b5563 !important; }
+html.dark .bg-slate-50             { background-color: #1f2937 !important; }
+html.dark .bg-slate-100            { background-color: #374151 !important; }
+html.dark .bg-slate-200            { background-color: #4b5563 !important; }
+html.dark .bg-zinc-50              { background-color: #1f2937 !important; }
+html.dark .bg-zinc-100             { background-color: #374151 !important; }
+html.dark .bg-neutral-50           { background-color: #1f2937 !important; }
+html.dark .bg-neutral-100          { background-color: #374151 !important; }
+
+/* Border overrides */
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-slate-100,
+html.dark .border-slate-200        { border-color: #374151 !important; }
+
+/* Text overrides – gray-* should become light enough to read */
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-gray-700           { color: #e5e7eb !important; }
+html.dark .text-gray-600           { color: #d1d5db !important; }
+html.dark .text-gray-500           { color: #9ca3af !important; }
+html.dark .text-gray-400           { color: #6b7280 !important; }
+html.dark .text-gray-300           { color: #4b5563 !important; }
+html.dark .text-gray-200           { color: #374151 !important; }
+
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700          { color: #e5e7eb !important; }
+html.dark .text-slate-600          { color: #d1d5db !important; }
+html.dark .text-slate-500          { color: #9ca3af !important; }
+html.dark .text-slate-400          { color: #6b7280 !important; }
+
+/* SurveyBuilder / form labels that use text-gray-600/700 */
+html.dark label.text-gray-600,
+html.dark .text-xs.text-gray-600,
+html.dark .text-sm.text-gray-700   { color: #d1d5db !important; }
+
+/* Dashed empty-state boxes */
+html.dark .border-dashed.border-gray-200 { border-color: #374151 !important; }
+html.dark .bg-gray-50.rounded-xl         { background-color: #1f2937 !important; }
+
+/* Hover states */
+html.dark .hover\:bg-gray-100:hover  { background-color: #374151 !important; }
+html.dark .hover\:bg-gray-200:hover  { background-color: #4b5563 !important; }
+html.dark .hover\:bg-slate-100:hover { background-color: #374151 !important; }
+
+/* Inline badge-like elements (e.g. 'closed' status in SurveyBuilder) */
+html.dark .bg-gray-100.text-gray-600 {
+  background-color: #374151 !important;
+  color: #d1d5db !important;
+}
+
+/* Radix Popover/Calendar panel portaled at body root */
+html.dark [data-radix-popper-content-wrapper] .rdp,
+html.dark [data-radix-popper-content-wrapper] [class*="rdp"] {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
+
+/* react-day-picker calendar in dark mode */
+html.dark .rdp-root {
+  --rdp-background-color: var(--card);
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-color-dark: var(--primary);
+}
+html.dark .rdp {
+  background-color: var(--card);
+  color: var(--card-foreground);
+}
+
+/* Notification page & portal tabs */
+html.dark .bg-white.rounded,
+html.dark .bg-white.rounded-lg,
+html.dark .bg-white.rounded-xl,
+html.dark .bg-white.rounded-2xl     { background-color: var(--card) !important; }
+
+/* Cards rendered outside the usual .dark scope (portals) */
+html.dark [class*="card"],
+html.dark [class*="Card"] {
+  background-color: var(--card);
+  color: var(--card-foreground);
 }

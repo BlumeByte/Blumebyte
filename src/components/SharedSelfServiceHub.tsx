@@ -714,7 +714,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                     <p className="text-xs text-gray-500 mb-3">Answer the questions below to complete this training assessment.</p>
                     <div className="space-y-4">
                       {trainingDialog.assessmentQuestions.map((q: string, idx: number) => (
-                        <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                        <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                           <Label className="text-xs font-medium flex items-start gap-1.5">
                             <span className="text-gray-400 font-mono">Q{idx + 1}.</span>
                             <span>{q}</span>
@@ -776,7 +776,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                 {reviewDialog.createdAt && <div><Label className="text-xs text-gray-500">Date</Label><p className="text-sm">{new Date(reviewDialog.createdAt).toLocaleDateString()}</p></div>}
               </div>
               {reviewDialog.comments && (
-                <div><Label className="text-xs text-gray-500">Reviewer Comments</Label><p className="text-sm mt-1 p-3 bg-gray-50 rounded-lg whitespace-pre-wrap">{reviewDialog.comments}</p></div>
+                <div><Label className="text-xs text-gray-500">Reviewer Comments</Label><p className="text-sm mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg whitespace-pre-wrap">{reviewDialog.comments}</p></div>
               )}
               {reviewDialog.publicNotes && (
                 <div><Label className="text-xs text-gray-500">Notes</Label><p className="text-sm mt-1 p-3 bg-blue-50 rounded-lg whitespace-pre-wrap">{reviewDialog.publicNotes}</p></div>
@@ -786,7 +786,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                   <Label className="text-xs text-gray-500 mb-2 block">Goals</Label>
                   <div className="space-y-1.5">
                     {reviewDialog.goals.map((g: any, gi: number) => (
-                      <div key={gi} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
+                      <div key={gi} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
                         <Badge className={g.status === 'completed' ? 'bg-green-100 text-green-800' : g.status === 'in-progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}>{g.status || 'pending'}</Badge>
                         <span className="flex-1">{g.description || g.title}</span>
                       </div>
@@ -874,7 +874,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
                     <Label className="text-sm font-semibold mb-3 block">Answer the Questions Below</Label>
                     <div className="space-y-4">
                       {questionnaireDialog.customQuestions.map((q: string, idx: number) => (
-                        <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                        <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                           <Label className="text-xs font-medium flex items-start gap-1.5">
                             <span className="text-gray-400 font-mono">Q{idx + 1}.</span>
                             <span>{q}</span>
