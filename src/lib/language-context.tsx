@@ -79,6 +79,11 @@ export const LANGUAGES: Language[] = [
 
 const STORAGE_KEY = 'blumebyte_language';
 
+/** Time to wait (ms) before attempting to apply a saved language on first load.
+ *  Google Translate's widget needs a moment to inject its select element into the DOM
+ *  before we can programmatically trigger a translation. */
+const GOOGLE_TRANSLATE_INIT_DELAY_MS = 1500;
+
 interface LanguageContextType {
   selectedLanguage: Language;
   setLanguage: (code: string) => void;
@@ -95,25 +100,19 @@ export function useLanguage() {
   return useContext(LanguageContext);
 }
 
-// Programmatically trigger Google Translate to change language
+// Programmatically trigger Google Translate to change language.
+// NOTE: This function relies on Google Translate's DOM structure (the `.goog-te-combo` select element).
+// If Google Translate changes its internal implementation, the cookie-based fallback (page reload)
+// will still work correctly.
 function applyGoogleTranslate(langCode: string) {
   try {
     if (langCode === 'en') {
-      // Reset to original English
-      const iframe = document.querySelector<HTMLIFrameElement>('iframe.goog-te-menu-frame');
-      if (iframe) {
-        // Find the "Show original" option
-        const innerDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        const showOriginal = innerDoc?.querySelector<HTMLAnchorElement>('.goog-te-menu2-item-selected');
-        if (showOriginal) {
-          showOriginal.click();
-          return;
-        }
-      }
-      // Fallback: clear cookie and reload
+      // Reset to original English via cookie then reload
       document.cookie = 'googtrans=/en/en; path=/';
       document.cookie = `googtrans=/en/en; path=/; domain=${window.location.hostname}`;
       document.cookie = `googtrans=/en/en; domain=.${window.location.hostname}; path=/`;
+      window.location.reload();
+      return;
     }
 
     // Set cookie to trigger Google Translate
@@ -149,7 +148,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       // Give the widget time to load
       const timer = setTimeout(() => {
         applyGoogleTranslate(selectedLang.code);
-      }, 1500);
+      }, GOOGLE_TRANSLATE_INIT_DELAY_MS);
       return () => clearTimeout(timer);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
