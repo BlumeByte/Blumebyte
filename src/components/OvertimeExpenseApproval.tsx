@@ -162,7 +162,7 @@ export function OvertimeExpenseApproval() {
           <Clock className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">OT &amp; Expenses</h1>
+          <h1 className="text-2xl font-bold text-foreground">OT & Expenses</h1>
           <p className="text-sm text-muted-foreground">Manage overtime requests and expense claims</p>
         </div>
       </div>
