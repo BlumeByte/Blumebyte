@@ -398,15 +398,13 @@ export default function HiringsPage() {
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
-  // ── Supabase Realtime: re-fetch when the hirings table changes ───────────────
+  // ── Supabase Realtime: re-fetch when job postings change ───────────────────
   useEffect(() => {
     const channel = supabase
-      .channel('public:hirings')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'hirings' },
-        () => { fetchJobs(); }
-      )
+      .channel('realtime:job-posting')
+      .on('broadcast', { event: 'INSERT' }, () => { fetchJobs(); })
+      .on('broadcast', { event: 'UPDATE' }, () => { fetchJobs(); })
+      .on('broadcast', { event: 'DELETE' }, () => { fetchJobs(); })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

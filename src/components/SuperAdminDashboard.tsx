@@ -3707,7 +3707,8 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
       if (submitData.assignedTo === '__unassigned') { submitData.assignedTo = ''; submitData.assignedToId = ''; submitData.assigneeId = ''; }
       if (submitData.assignedBy === '__unassigned') { submitData.assignedBy = ''; submitData.assignedById = ''; }
       // Job posting: auto-activate when visibility is public_global so it appears on the hiring page
-      if (entityKey === 'job-postings' && submitData.visibilityType === 'public_global') {
+      // NOTE: entityKey is 'recruitment' for SuperAdmin and 'job-postings' for Admin
+      if ((entityKey === 'recruitment' || entityKey === 'job-postings') && submitData.visibilityType === 'public_global') {
         if (!JOB_ACTIVE_STATUSES.has(submitData.status)) {
           submitData.status = 'active';
         }
