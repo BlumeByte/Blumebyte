@@ -44,21 +44,28 @@ function RenderMessageContent({ content, onNavigate }: { content: string; onNavi
               </a>
             );
           }
-          // External link — only allow http/https URLs
+          // External link — only allow http/https URLs validated via URL constructor
           if (href.startsWith('https://') || href.startsWith('http://')) {
-            return (
-              <a
-                key={idx}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline font-medium"
-              >
-                {text}
-              </a>
-            );
+            try {
+              const parsed = new URL(href);
+              if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+                return (
+                  <a
+                    key={idx}
+                    href={parsed.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline font-medium"
+                  >
+                    {text}
+                  </a>
+                );
+              }
+            } catch {
+              // Invalid URL — fall through to plain text
+            }
           }
-          // Unsafe URL scheme — render as plain text
+          // Unsafe or invalid URL — render as plain text
           return <span key={idx}>{text}</span>;
         }
         return <span key={idx}>{part}</span>;

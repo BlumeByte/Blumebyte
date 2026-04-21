@@ -303,10 +303,17 @@ const requireManagerOrAbove = (c: any) => requireRole(c, ["superadmin", "admin",
 // --- Temp password generator ---
 function generateTempPassword(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const charLen = chars.length;
+  const maxUnbiased = 256 - (256 % charLen);
   let result = "Bb";
-  const randomBytes = new Uint8Array(8);
-  crypto.getRandomValues(randomBytes);
-  for (let i = 0; i < 8; i++) result += chars.charAt(randomBytes[i] % chars.length);
+  while (result.length < 10) {
+    const buf = new Uint8Array(16);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (result.length >= 10) break;
+      if (b < maxUnbiased) result += chars[b % charLen];
+    }
+  }
   return result + "!";
 }
 
@@ -3058,9 +3065,17 @@ app.post(`${PREFIX}/superadmin/approval/:requestId/:action`, async (c) => {
         
         // Generate temp password
         const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-        const randomBytes = new Uint8Array(12);
-        crypto.getRandomValues(randomBytes);
-        const tempPassword = Array.from(randomBytes, b => charset[b % charset.length]).join('');
+        const charLen = charset.length;
+        const maxUnbiased = 256 - (256 % charLen);
+        let tempPassword = '';
+        while (tempPassword.length < 12) {
+          const buf = new Uint8Array(16);
+          crypto.getRandomValues(buf);
+          for (const b of buf) {
+            if (tempPassword.length >= 12) break;
+            if (b < maxUnbiased) tempPassword += charset[b % charLen];
+          }
+        }
         
         const { data: authData, error: authError } = await sb.auth.admin.createUser({
           email,
@@ -9223,9 +9238,16 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
     }
 
     // Generate a 6-digit code
-    const codeArray = new Uint32Array(1);
-    crypto.getRandomValues(codeArray);
-    const code = (100000 + (codeArray[0] % 900000)).toString();
+    // Generate a 6-digit code using rejection sampling to avoid modulo bias
+    const codeMax = 900000;
+    const codeThreshold = Math.floor(0x100000000 / codeMax) * codeMax;
+    let codeVal: number;
+    do {
+      const codeArray = new Uint32Array(1);
+      crypto.getRandomValues(codeArray);
+      codeVal = codeArray[0];
+    } while (codeVal >= codeThreshold);
+    const code = (100000 + (codeVal % codeMax)).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Store the code in KV store

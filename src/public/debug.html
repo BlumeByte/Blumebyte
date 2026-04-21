@@ -192,7 +192,8 @@
     function addLog(message, type = 'log') {
       const timestamp = new Date().toLocaleTimeString();
       const output = document.getElementById('console-output');
-      const color = type === 'error' ? '#ff6b6b' : type === 'warn' ? '#f39c12' : '#4ecca3';
+      const colorMap = { error: '#ff6b6b', warn: '#f39c12', log: '#4ecca3' };
+      const color = colorMap[type] || '#4ecca3';
       output.innerHTML += `<span style="color:${color}">[${escapeHtml(timestamp)}] ${escapeHtml(message)}</span>\n`;
       output.scrollTop = output.scrollHeight;
     }
