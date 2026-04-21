@@ -9918,6 +9918,9 @@ const DEFAULT_NOTIF_PREFS = {
   inAppNotifications: true,
 };
 
+const EMAIL_PREF_KEYS = (Object.keys(DEFAULT_NOTIF_PREFS) as (keyof typeof DEFAULT_NOTIF_PREFS)[])
+  .filter(k => k !== 'inAppNotifications');
+
 // GET /notification-preferences — get current user's notification preferences
 app.get(`${PREFIX}/notification-preferences`, async (c) => {
   try {
@@ -9963,9 +9966,8 @@ async function sendEmailNotification(
     if (prefs) {
       // If a specific pref key is given, check it
       if (prefKey && prefs[prefKey] === false) return;
-      // If inAppNotifications is off AND all email prefs are off, skip
-      const emailKeys = ['emailOnNewHire','emailOnLeaveUpdate','emailOnPayslip','emailOnTaskAssignment','emailOnMeeting','emailOnAnnouncement','emailOnPerformanceReview'];
-      const allEmailOff = emailKeys.every(k => prefs[k] === false);
+      // If user explicitly has email prefs but all email ones are off, skip
+      const allEmailOff = EMAIL_PREF_KEYS.every(k => prefs[k] === false);
       if (allEmailOff) return;
     }
     // Default (no prefs stored): send email

@@ -30,6 +30,16 @@ const DEFAULT_PREFS: NotificationPrefs = {
   inAppNotifications: true,
 };
 
+const EMAIL_SETTINGS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
+  { key: 'emailOnLeaveUpdate', label: 'Leave Request Updates', description: 'Email when your leave request is approved or rejected' },
+  { key: 'emailOnPayslip', label: 'New Payslip', description: 'Email when a new payslip is generated for you' },
+  { key: 'emailOnTaskAssignment', label: 'Task Assignments', description: 'Email when you are assigned a new task' },
+  { key: 'emailOnMeeting', label: 'Meeting Invitations', description: 'Email when you are invited to a meeting' },
+  { key: 'emailOnAnnouncement', label: 'Company Announcements', description: 'Email for important company-wide announcements' },
+  { key: 'emailOnPerformanceReview', label: 'Performance Reviews', description: 'Email when a performance review is scheduled' },
+  { key: 'emailOnNewHire', label: 'New Team Members', description: 'Email when someone new joins your team' },
+];
+
 export function NotificationSettings() {
   const { accessToken } = useAuth();
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS);
@@ -77,15 +87,7 @@ export function NotificationSettings() {
     );
   }
 
-  const emailSettings: { key: keyof NotificationPrefs; label: string; description: string }[] = [
-    { key: 'emailOnLeaveUpdate', label: 'Leave Request Updates', description: 'Email when your leave request is approved or rejected' },
-    { key: 'emailOnPayslip', label: 'New Payslip', description: 'Email when a new payslip is generated for you' },
-    { key: 'emailOnTaskAssignment', label: 'Task Assignments', description: 'Email when you are assigned a new task' },
-    { key: 'emailOnMeeting', label: 'Meeting Invitations', description: 'Email when you are invited to a meeting' },
-    { key: 'emailOnAnnouncement', label: 'Company Announcements', description: 'Email for important company-wide announcements' },
-    { key: 'emailOnPerformanceReview', label: 'Performance Reviews', description: 'Email when a performance review is scheduled' },
-    { key: 'emailOnNewHire', label: 'New Team Members', description: 'Email when someone new joins your team' },
-  ];
+  const emailSettings = EMAIL_SETTINGS;
 
   return (
     <div className="space-y-4">
