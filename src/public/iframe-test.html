@@ -145,7 +145,12 @@
     const referrerEl = document.getElementById('referrer-status');
     if (document.referrer) {
       referrerEl.textContent = document.referrer;
-      if (document.referrer.includes('figma.com')) {
+      let isFigmaReferrer = false;
+      try {
+        const referrerHost = new URL(document.referrer).hostname;
+        isFigmaReferrer = referrerHost === 'figma.com' || referrerHost.endsWith('.figma.com');
+      } catch (_) {}
+      if (isFigmaReferrer) {
         referrerEl.classList.add('warning');
       } else {
         referrerEl.classList.add('success');

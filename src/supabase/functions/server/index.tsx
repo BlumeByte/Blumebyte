@@ -304,7 +304,9 @@ const requireManagerOrAbove = (c: any) => requireRole(c, ["superadmin", "admin",
 function generateTempPassword(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "Bb";
-  for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+  const randomBytes = new Uint8Array(8);
+  crypto.getRandomValues(randomBytes);
+  for (let i = 0; i < 8; i++) result += chars.charAt(randomBytes[i] % chars.length);
   return result + "!";
 }
 
@@ -394,7 +396,7 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
     return scope;
   }
   
-  console.log(`❌ resolveCompanyScope: No company scope found for user ${userId}. KV data:`, kvData);
+  console.log(`❌ resolveCompanyScope: No company scope found for user ${userId}.`);
   return null;
 }
 
@@ -2239,7 +2241,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     const userCompanyId = adminProfile?.companyId || adminProfile?.company;
     
     if (!userCompanyId) {
-      console.error('SuperAdmin has no companyId:', authUser.id, adminProfile);
+      console.error('SuperAdmin has no companyId:', authUser.id);
       return c.json({ error: "User not associated with a company. Please contact support." }, 400);
     }
     
@@ -2256,7 +2258,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     
     // ENHANCED: Better subscription validation with multiple format support
     console.log('=== SUBSCRIPTION DEBUG ===');
-    console.log('Company data:', JSON.stringify(company, null, 2));
+    console.log('Company subscription status check for company:', userCompanyId);
     
     // Check multiple subscription formats
     let subscription = null;
@@ -3055,9 +3057,10 @@ app.post(`${PREFIX}/superadmin/approval/:requestId/:action`, async (c) => {
         const sb = supabaseAdmin();
         
         // Generate temp password
-        const tempPassword = Array.from({ length: 12 }, () => 
-          'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 57)]
-        ).join('');
+        const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        const randomBytes = new Uint8Array(12);
+        crypto.getRandomValues(randomBytes);
+        const tempPassword = Array.from(randomBytes, b => charset[b % charset.length]).join('');
         
         const { data: authData, error: authError } = await sb.auth.admin.createUser({
           email,
@@ -6743,7 +6746,7 @@ app.post(`${PREFIX}/subscription/webhook`, async (c) => {
         
         await kv.set(`subscription:${pendingLicense.userId}`, subscription);
         await kv.del(`pending-license:${reference}`);
-        console.log('Licenses added via webhook:', subscription);
+        console.log('Licenses added via webhook for user:', pendingLicense.userId);
         return c.json({ status: 'success' });
       }
       
@@ -8594,7 +8597,7 @@ app.post(`${PREFIX}/ai-assistant`, async (c) => {
       return c.json({ error: 'Blumebyte is not configured. Please contact your administrator.' }, 500);
     }
     
-    console.log('AI Assistant: API key found, length:', apiKey.length);
+    console.log('AI Assistant: API key configured');
     
     // Build conversation context from history
     const conversationHistory = (history || []).map((msg: any) => ({
@@ -9220,7 +9223,9 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
     }
 
     // Generate a 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeArray = new Uint32Array(1);
+    crypto.getRandomValues(codeArray);
+    const code = (100000 + (codeArray[0] % 900000)).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Store the code in KV store

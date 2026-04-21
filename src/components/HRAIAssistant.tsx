@@ -44,18 +44,22 @@ function RenderMessageContent({ content, onNavigate }: { content: string; onNavi
               </a>
             );
           }
-          // External link
-          return (
-            <a
-              key={idx}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline font-medium"
-            >
-              {text}
-            </a>
-          );
+          // External link — only allow http/https URLs
+          if (href.startsWith('https://') || href.startsWith('http://')) {
+            return (
+              <a
+                key={idx}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline font-medium"
+              >
+                {text}
+              </a>
+            );
+          }
+          // Unsafe URL scheme — render as plain text
+          return <span key={idx}>{text}</span>;
         }
         return <span key={idx}>{part}</span>;
       })}
