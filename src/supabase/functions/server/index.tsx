@@ -12,6 +12,8 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
+const EMAIL_FROM = 'Blumebyte HR <noreply@blumebyte.com>';
+const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
 app.use("*", logger(console.log));
 app.use(
@@ -2486,7 +2488,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'Blumebyte HR <noreply@blumebyte.com>',
+            from: EMAIL_FROM,
             to: email,
             subject: `Welcome to ${company.name} - Your Account Details`,
             html: `
@@ -4115,6 +4117,8 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
     if (body.visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'active';
     }
+    // Explicitly set visibilityType (don't rely solely on ...body spread to avoid undefined overwrites)
+    const visibilityType = body.visibilityType || 'internal_only';
     const item = {
       ...body,
       id,
@@ -4122,6 +4126,7 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
       company: companyId,
       companyName,
       employmentType,
+      visibilityType,
       status,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -4148,8 +4153,9 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
     // Normalize employmentType
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
+    // Explicitly resolve visibilityType — prefer body value over existing, never allow undefined to overwrite
+    const visibilityType = body.visibilityType ?? existing.visibilityType ?? 'internal_only';
     // Auto-activate status when visibility is set to public_global
-    const visibilityType = body.visibilityType ?? existing.visibilityType;
     let status = body.status ?? existing.status ?? 'active';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'active';
@@ -4162,6 +4168,7 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
       company: companyId || existing.companyId,
       companyName,
       employmentType,
+      visibilityType,
       status,
       updatedAt: new Date().toISOString(),
     };
@@ -4417,8 +4424,9 @@ app.post(`${PREFIX}/admin/job-postings`, async (c) => {
     if (!companyId) return c.json({ error: 'User has no company assignment' }, 400);
     const companyName = body.companyName || (await resolveCompanyName(companyId)) || '';
     const employmentType = normalizeEmploymentType(body.employmentType || body.type || '');
+    const visibilityType = body.visibilityType || 'internal_only';
     let status = body.status || 'open';
-    if (body.visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
+    if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'open';
     }
     const item = {
@@ -4428,6 +4436,7 @@ app.post(`${PREFIX}/admin/job-postings`, async (c) => {
       company: companyId,
       companyName,
       employmentType,
+      visibilityType,
       status,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -4452,7 +4461,7 @@ app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
     const companyName = body.companyName || existing.companyName || (companyId ? await resolveCompanyName(companyId) : '');
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
-    const visibilityType = body.visibilityType ?? existing.visibilityType;
+    const visibilityType = body.visibilityType ?? existing.visibilityType ?? 'internal_only';
     let status = body.status ?? existing.status ?? 'open';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'open';
@@ -4465,6 +4474,7 @@ app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
       company: companyId || existing.companyId,
       companyName,
       employmentType,
+      visibilityType,
       status,
       updatedAt: new Date().toISOString(),
     };
@@ -9220,53 +9230,54 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
       attempts: 0,
     });
 
-    // Log the code prominently for development
-    console.log(`
-╔��═══════════════════════════════════════════╗
-║        2FA VERIFICATION CODE               ║
-║                                            ║
-║  Email: ${email.padEnd(37)}║
-║  Code:  ${code.padEnd(37)}║
-║  Valid for: 10 minutes                     ║
-╚════════════════════════════════════════════╝
-    `);
+    // Send 2FA code via email
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    let emailSent = false;
+    if (resendApiKey) {
+      try {
+        const emailRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: EMAIL_FROM,
+            to: email,
+            subject: 'Your Blumebyte Verification Code',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #000;">Blumebyte - Two-Factor Authentication</h2>
+                <p>Your verification code is:</p>
+                <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
+                  ${code}
+                </div>
+                <p>This code will expire in <strong>10 minutes</strong>.</p>
+                <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
+              </div>
+            `,
+          }),
+        });
+        if (emailRes.ok) {
+          emailSent = true;
+          console.log(`✅ 2FA code sent to ${email}`);
+        } else {
+          const errBody = await emailRes.text();
+          console.error(`Failed to send 2FA email: ${emailRes.status} ${errBody}`);
+        }
+      } catch (emailError) {
+        console.error('Error sending 2FA email:', emailError);
+      }
+    }
 
-    // TODO: Production email sending
-    // In production, integrate with an email service (SendGrid, AWS SES, Resend, etc.)
-    // Example integration:
-    // const emailApiKey = Deno.env.get('EMAIL_API_KEY');
-    // if (emailApiKey) {
-    //   await fetch('https://api.resend.com/emails', {
-    //     method: 'POST',
-    //     headers: {
-    //       'Authorization': `Bearer ${emailApiKey}`,
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify({
-    //       from: 'Blumebyte <noreply@blumebyte.com>',
-    //       to: email,
-    //       subject: 'Your 2FA Verification Code',
-    //       html: `
-    //         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    //           <h2 style="color: #2563eb;">Blumebyte - 2FA Verification</h2>
-    //           <p>Your verification code is:</p>
-    //           <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
-    //             ${code}
-    //           </div>
-    //           <p>This code will expire in 10 minutes.</p>
-    //           <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
-    //         </div>
-    //       `
-    //     }),
-    //   });
-    // }
+    if (!emailSent) {
+      // Fallback: log to console when email service is not configured
+      console.log(`\n2FA code for ${email}: ${code} (valid 10 minutes)\n`);
+    }
 
     return c.json({ 
       success: true, 
-      message: "Verification code generated successfully",
-      // DEVELOPMENT ONLY: Return code in response for testing (remove in production)
-      devCode: code,
-      note: "Check server console for the 2FA code. In production, configure EMAIL_API_KEY to send emails.",
+      message: "Verification code sent to your email.",
     });
   } catch (e: any) {
     console.error("2FA send code error:", e);
@@ -9601,24 +9612,65 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
       createdAt: new Date().toISOString(),
     });
     
-    // Create reset link - IMPORTANT: Use frontend URL, not backend URL
-    // In production, use your actual frontend domain (e.g., https://yourapp.vercel.app)
-    // For development in Figma Make, we need to construct the proper frontend URL
+    // Create reset link using the frontend origin or the configured FRONTEND_URL
     const requestOrigin = c.req.header('Origin') || c.req.header('Referer')?.split('/make-server-')[0];
-    const frontendUrl = requestOrigin || Deno.env.get('FRONTEND_URL') || 'http://localhost:3000';
+    const frontendUrl = Deno.env.get('FRONTEND_URL') || requestOrigin || FRONTEND_FALLBACK_URL;
     const resetLink = `${frontendUrl}/password-reset?token=${resetToken}`;
     
-    console.log(`✅ Password reset token created for ${email}`);
-    console.log(`🌐 Frontend URL detected: ${frontendUrl}`);
-    console.log(`🔗 Reset link: ${resetLink}`);
-    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+    console.log(`✅ Password reset token created for ${email}, expires at ${expiresAt.toISOString()}`);
     
-    // Log to console for development (in production, send via email service)
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`📨 PASSWORD RESET LINK FOR: ${email}`);
-    console.log(`${resetLink}`);
-    console.log(`Valid until: ${expiresAt.toLocaleString()}`);
-    console.log(`${'='.repeat(80)}\n`);
+    // Send password reset email via Resend
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    let emailSent = false;
+    if (resendApiKey) {
+      try {
+        const emailRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: EMAIL_FROM,
+            to: employee.email,
+            subject: 'Reset Your Blumebyte Password',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #000;">Password Reset Request</h2>
+                <p>Hello${employee.name ? ` ${employee.name}` : ''},</p>
+                <p>We received a request to reset the password for your Blumebyte account. Click the button below to set a new password:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${resetLink}" style="background-color: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-size: 16px; display: inline-block;">Reset Password</a>
+                </div>
+                <p style="color: #666; font-size: 14px;">This link will expire in <strong>1 hour</strong>.</p>
+                <p style="color: #666; font-size: 14px;">If you did not request a password reset, you can safely ignore this email. Your password will not change.</p>
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5;">
+                  <p style="color: #999; font-size: 12px;">If the button above does not work, copy and paste this link into your browser:<br/>${resetLink}</p>
+                </div>
+              </div>
+            `,
+          }),
+        });
+        if (emailRes.ok) {
+          emailSent = true;
+          console.log(`✅ Password reset email sent to ${employee.email}`);
+        } else {
+          const errBody = await emailRes.text();
+          console.error(`Failed to send password reset email: ${emailRes.status} ${errBody}`);
+        }
+      } catch (emailError) {
+        console.error('Error sending password reset email:', emailError);
+      }
+    }
+
+    if (!emailSent) {
+      // Fallback: log to console when email service is not configured
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`📨 PASSWORD RESET LINK FOR: ${email}`);
+      console.log(`${resetLink}`);
+      console.log(`Valid until: ${expiresAt.toLocaleString()}`);
+      console.log(`${'='.repeat(80)}\n`);
+    }
     
     // Log audit event
     await logAudit({
@@ -9632,10 +9684,7 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     
     return c.json({ 
       success: true, 
-      message: 'Password reset link generated. Check console logs for the link (in production, this would be sent via email).',
-      // Return link in development for easy access
-      resetLink: resetLink,
-      expiresAt: expiresAt.toISOString(),
+      message: 'If an account with that email exists, a password reset link has been sent.',
     });
   } catch (e: any) {
     console.error('Forgot password error:', e);

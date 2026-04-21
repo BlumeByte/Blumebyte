@@ -29,7 +29,6 @@ export function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [resetLink, setResetLink] = useState<string | null>(null);
   const [logoutReason, setLogoutReason] = useState<string | null>(null);
   // License checking temporarily deactivated
   /*
@@ -100,17 +99,12 @@ export function LoginPage() {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetLoading(true);
-    setResetLink(null);
     try {
-      const result = await api('/auth/forgot-password', {
+      await api('/auth/forgot-password', {
         method: 'POST',
         body: { email: resetEmail },
       });
       setResetSuccess(true);
-      // In development, the backend returns the reset link
-      if (result.resetLink) {
-        setResetLink(result.resetLink);
-      }
     } catch (error) {
       toast.error('Failed to send reset email. Please try again.');
     } finally {
@@ -286,32 +280,11 @@ export function LoginPage() {
           {resetSuccess ? (
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              <AlertTitle className="text-green-800">Password Reset Link Generated! 🔗</AlertTitle>
+              <AlertTitle className="text-green-800">Check Your Email</AlertTitle>
               <AlertDescription className="text-green-700">
-                <div className="space-y-3">
-                  {resetLink ? (
-                    <>
-                      <p className="font-medium">Click the link below to reset your password:</p>
-                      <a
-                        href={resetLink}
-                        className="block p-3 bg-white border border-green-300 rounded-lg text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors break-all"
-                      >
-                        {resetLink}
-                      </a>
-                      <p className="text-xs text-green-600">⏰ This link will expire in 1 hour</p>
-                      <p className="text-xs text-gray-600 italic">
-                        Note: In production, this link would be sent via email to {resetEmail}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p>Password reset link has been generated.</p>
-                      <p className="text-sm">Please check the console logs for the reset link.</p>
-                      <p className="text-xs text-gray-600 italic mt-2">
-                        (In production, this would be sent via email)
-                      </p>
-                    </>
-                  )}
+                <div className="space-y-2">
+                  <p>If an account with <strong>{resetEmail}</strong> exists, a password reset link has been sent to that address.</p>
+                  <p className="text-xs text-green-600">⏰ The link will expire in 1 hour. Please also check your spam folder.</p>
                 </div>
               </AlertDescription>
             </Alert>

@@ -5,6 +5,7 @@ import { ChevronDown, BarChart3, FileText, Clock, DollarSign, Trophy, Award, Use
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
+import { PublicLanguageButton } from './PublicLanguageButton';
 
 export function SharedNavigation() {
   const navigate = useNavigate();
@@ -171,6 +172,7 @@ export function SharedNavigation() {
   );
 
   return (
+    <>
     <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
@@ -365,5 +367,7 @@ export function SharedNavigation() {
         </div>
       </div>
     </nav>
+    <PublicLanguageButton />
+    </>
   );
 }

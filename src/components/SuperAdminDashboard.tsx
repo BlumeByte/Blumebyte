@@ -64,6 +64,7 @@ import { CompanySwitcher } from './CompanySwitcher';
 import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
 import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
+import { LanguageSelector } from './LanguageSelector';
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
@@ -498,6 +499,11 @@ export function SuperAdminDashboard() {
           </div>
           
           <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">🌐 Language</h2>
+            <LanguageSettingsCard />
+          </div>
+          
+          <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">⏰ Working Hours Configuration</h2>
             <WorkingHoursConfig />
           </div>
@@ -643,6 +649,27 @@ function PlaceholderView({ title }: { title: string }) {
       <h1 className="text-2xl font-bold mb-2">{title}</h1>
       <Card className="mt-6"><CardContent className="py-16 text-center"><FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">This module is under development</p></CardContent></Card>
     </div>
+  );
+}
+
+function LanguageSettingsCard() {
+  return (
+    <Card className="max-w-xl">
+      <CardHeader>
+        <CardTitle className="text-sm flex items-center gap-2">
+          🌐 Display Language
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <LanguageSelector variant="card" />
+        <p className="text-xs text-muted-foreground mt-3">
+          Powered by Google Translate. Translations are approximate — original English content is always authoritative.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -3680,7 +3707,8 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
       if (submitData.assignedTo === '__unassigned') { submitData.assignedTo = ''; submitData.assignedToId = ''; submitData.assigneeId = ''; }
       if (submitData.assignedBy === '__unassigned') { submitData.assignedBy = ''; submitData.assignedById = ''; }
       // Job posting: auto-activate when visibility is public_global so it appears on the hiring page
-      if (entityKey === 'job-postings' && submitData.visibilityType === 'public_global') {
+      // NOTE: entityKey is 'recruitment' for SuperAdmin and 'job-postings' for Admin
+      if ((entityKey === 'recruitment' || entityKey === 'job-postings') && submitData.visibilityType === 'public_global') {
         if (!JOB_ACTIVE_STATUSES.has(submitData.status)) {
           submitData.status = 'active';
         }
