@@ -511,17 +511,17 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Purchased</p>
-                <p className="text-2xl font-bold text-blue-600">{licenseInfo.purchasedLicenses || 0}</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{licenseInfo.purchasedLicenses || 0}</p>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Used</p>
-                <p className="text-2xl font-bold text-green-600">{licenseInfo.usedLicenses || 0}</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{licenseInfo.usedLicenses || 0}</p>
               </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <div className="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Available</p>
-                <p className="text-2xl font-bold text-purple-600">{licenseInfo.availableLicenses || 0}</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{licenseInfo.availableLicenses || 0}</p>
               </div>
             </div>
 
@@ -711,7 +711,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           </div>
 
           {/* Save Card for Auto-Renewal */}
-          <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
             <input
               type="checkbox"
               id="saveCard"

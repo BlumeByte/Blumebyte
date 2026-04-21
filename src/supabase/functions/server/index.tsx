@@ -4745,10 +4745,34 @@ app.get(`${PREFIX}/reports/users`, async (c) => {
     console.log(`✅ TENANT ISOLATION: User ${user.id} can see ${employees.length} employees after filtering`);
     
     const attendance = await kv.getByPrefix("attendance:");
+    // Flatten attendance: some records are stored as arrays (company-based) and some as objects (user-based)
+    const flatAttendance: any[] = [];
+    for (const entry of attendance) {
+      if (Array.isArray(entry)) {
+        for (const rec of entry) flatAttendance.push(rec);
+      } else if (entry && typeof entry === 'object' && (entry.userId || entry.clockIn)) {
+        flatAttendance.push(entry);
+      }
+    }
     const allowedUserIds = new Set(employees.map((e: any) => e.userId || e.id));
     const report = employees.map((e: any) => {
-      const empAtt = attendance.filter((a: any) => a.userId === (e.userId || e.id));
-      return { userId: e.userId || e.id, name: e.name, email: e.email, role: e.role, department: e.department, company: e.company, position: e.position, status: e.status, phone: e.phone, attendanceDays: empAtt.length, totalHoursWorked: empAtt.reduce((s: number, a: any) => s + (parseFloat(a.totalHours) || 0), 0).toFixed(1), joinDate: e.createdAt };
+      const empId = e.userId || e.id;
+      const empAtt = flatAttendance.filter((a: any) => a.userId === empId);
+      const totalHoursWorked = empAtt.reduce((s: number, a: any) => {
+        // Prefer explicit totalHours field
+        if (a.totalHours != null) return s + (parseFloat(a.totalHours) || 0);
+        // Fall back to regularMinutes + overtimeMinutes (auto-clock records)
+        const mins = (a.regularMinutes || 0) + (a.overtimeMinutes || 0);
+        if (mins > 0) return s + mins / 60;
+        // Fall back to hoursWorked (manual employee clock-out)
+        if (a.hoursWorked != null) return s + (parseFloat(a.hoursWorked) || 0);
+        // Last resort: compute from clockIn/clockOut timestamps
+        if (a.clockIn && a.clockOut) {
+          return s + (new Date(a.clockOut).getTime() - new Date(a.clockIn).getTime()) / 3600000;
+        }
+        return s;
+      }, 0);
+      return { userId: empId, name: e.name, email: e.email, role: e.role, department: e.department, company: e.company, position: e.position, status: e.status, phone: e.phone, attendanceDays: empAtt.length, totalHoursWorked: totalHoursWorked.toFixed(1), joinDate: e.createdAt };
     });
     
     console.log(`📤 Returning ${report.length} employee reports with company isolation enforced`);
@@ -5041,6 +5065,22 @@ app.delete(`${PREFIX}/training-programs/:id`, async (c) => {
   }
 });
 
+// ============ ADMIN TRAINING PROGRAMS (aliases for /training-programs) ============
+app.get(`${PREFIX}/admin/training-programs`, async (c) => {
+  try {
+    const { user, role } = await requireAdminOrAbove(c);
+    const allTrainings = await kv.getByPrefix("training:");
+    const employees = await kv.getByPrefix("employee:");
+    const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
+    const companyId = filteredEmployees.length > 0 ? filteredEmployees[0].companyId : null;
+    return c.json(allTrainings.filter((t: any) => !companyId || t.companyId === companyId));
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json([]);
+  }
+});
+
 // ============ AUTO-CLOCK SETTINGS ============
 app.get(`${PREFIX}/auto-clock-settings`, async (c) => {
   try {
@@ -5229,7 +5269,7 @@ app.post(`${PREFIX}/attendance/auto-clock-out`, async (c) => {
     const totalPausedMs = pauses.reduce((sum: number, p: any) => sum + ((p.resumedAt ? new Date(p.resumedAt).getTime() : now.getTime()) - new Date(p.pausedAt).getTime()), 0);
     const totalMinutes = Math.round((now.getTime() - new Date(existing.clockIn).getTime()) / 60000);
     const activeMinutes = totalMinutes - Math.round(totalPausedMs / 60000);
-    const updated = { ...existing, clockOut: now.toISOString(), isPaused: false, pauses, totalPausedMinutes: Math.round(totalPausedMs / 60000), status: "present", regularMinutes: Math.min(activeMinutes, 480), overtimeMinutes: Math.max(0, activeMinutes - 480), autoClocked: true, updatedAt: now.toISOString() };
+    const updated = { ...existing, clockOut: now.toISOString(), isPaused: false, pauses, totalPausedMinutes: Math.round(totalPausedMs / 60000), status: "present", regularMinutes: Math.min(activeMinutes, 480), overtimeMinutes: Math.max(0, activeMinutes - 480), totalHours: (activeMinutes / 60).toFixed(2), autoClocked: true, updatedAt: now.toISOString() };
     await kv.set(key, updated);
     return c.json(updated);
   } catch (e: any) {
@@ -9022,6 +9062,38 @@ app.put(`${PREFIX}/automation/business-rules/:id`, async (c) => {
     };
     
     await kv.set(`automation_rule:${id}`, updated);
+    
+    // If the rule was just enabled and has a "Send Notification" action, execute it now
+    if (updated.enabled && updated.action === 'Send Notification') {
+      try {
+        const companyId = updated.companyId || profile?.companyId;
+        if (companyId) {
+          const allEmployees = await kv.getByPrefix('employee:');
+          const companyEmployees = allEmployees.filter((e: any) =>
+            e.companyId === companyId || e.company === companyId
+          );
+          for (const emp of companyEmployees) {
+            const empId = emp.userId || emp.id;
+            if (!empId) continue;
+            const nid = crypto.randomUUID();
+            await kv.set(`notification:${nid}`, {
+              id: nid,
+              userId: empId,
+              type: 'business_rule',
+              title: updated.name || 'Business Rule Notification',
+              message: updated.description || `Business rule "${updated.name}" has been applied.`,
+              ruleId: id,
+              companyId,
+              read: false,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (_notifyErr) {
+        // Non-fatal: rule was saved, notification delivery failed silently
+      }
+    }
+    
     return c.json({ success: true, data: updated });
   } catch (e: any) {
     return handleError(e, c, 'update-business-rule');
