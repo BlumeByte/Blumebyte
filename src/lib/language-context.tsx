@@ -92,16 +92,22 @@ const GUARD_CLEAR_DELAY_MS = 3000;
  *  before we can programmatically trigger a translation. */
 const GOOGLE_TRANSLATE_INIT_DELAY_MS = 1500;
 
+/** Shorter delay used when re-applying translation after SPA navigation (widget already loaded). */
+const ROUTE_RETRANSLATE_DELAY_MS = 600;
+
 interface LanguageContextType {
   selectedLanguage: Language;
   setLanguage: (code: string) => void;
   languages: Language[];
+  /** Call this after a route change to re-apply the current translation to new DOM nodes. */
+  retranslate: () => void;
 }
 
 const LanguageContext = createContext<LanguageContextType>({
   selectedLanguage: LANGUAGES[0],
   setLanguage: () => {},
   languages: LANGUAGES,
+  retranslate: () => {},
 });
 
 export function useLanguage() {
@@ -150,8 +156,7 @@ function applyGoogleTranslate(langCode: string) {
 
     // 3. Last resort: reload so Google Translate picks up the cookie on next init.
     // Guard against an infinite reload loop: if we already reloaded once for this
-    // language and the widget still isn't present, don't reload again – the next
-    // useEffect retry (after GOOGLE_TRANSLATE_INIT_DELAY_MS) will try methods 1/2.
+    // language and the widget still isn't present, don't reload again.
     const guardValue = sessionStorage.getItem(RELOAD_GUARD_KEY);
     if (guardValue === langCode) {
       return;
@@ -170,15 +175,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   });
 
   // Apply saved language after Google Translate widget initialises.
-  // We always attempt to apply the translation; applyGoogleTranslate itself
-  // prevents reload loops via RELOAD_GUARD_KEY.
   useEffect(() => {
     if (selectedLang.code !== 'en') {
-      // Give the widget time to load, then apply.
       const timer = setTimeout(() => {
         applyGoogleTranslate(selectedLang.code);
-        // Clear the reload guard after the widget has had time to settle,
-        // so that future language changes can trigger a reload if needed.
         setTimeout(() => {
           sessionStorage.removeItem(RELOAD_GUARD_KEY);
         }, GUARD_CLEAR_DELAY_MS);
@@ -187,17 +187,61 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-apply translation whenever the URL path changes (SPA navigation).
+  // This ensures newly rendered dashboard/chat content gets translated too.
+  useEffect(() => {
+    if (selectedLang.code === 'en') return;
+
+    const onNavigate = () => {
+      const timer = setTimeout(() => {
+        applyGoogleTranslate(selectedLang.code);
+      }, ROUTE_RETRANSLATE_DELAY_MS);
+      return timer;
+    };
+
+    // Listen to popstate (back/forward navigation)
+    window.addEventListener('popstate', onNavigate);
+
+    // Patch history.pushState and replaceState to detect SPA route changes
+    const origPush = history.pushState.bind(history);
+    const origReplace = history.replaceState.bind(history);
+    let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+
+    history.pushState = (...args) => {
+      origPush(...args);
+      if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(() => applyGoogleTranslate(selectedLang.code), ROUTE_RETRANSLATE_DELAY_MS);
+    };
+    history.replaceState = (...args) => {
+      origReplace(...args);
+      if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(() => applyGoogleTranslate(selectedLang.code), ROUTE_RETRANSLATE_DELAY_MS);
+    };
+
+    return () => {
+      window.removeEventListener('popstate', onNavigate);
+      history.pushState = origPush;
+      history.replaceState = origReplace;
+      if (pendingTimer) clearTimeout(pendingTimer);
+    };
+  }, [selectedLang.code]);
+
+  const retranslate = useCallback(() => {
+    if (selectedLang.code !== 'en') {
+      setTimeout(() => applyGoogleTranslate(selectedLang.code), ROUTE_RETRANSLATE_DELAY_MS);
+    }
+  }, [selectedLang.code]);
+
   const setLanguage = useCallback((code: string) => {
     const lang = LANGUAGES.find(l => l.code === code) ?? LANGUAGES[0];
     setSelectedLang(lang);
     localStorage.setItem(STORAGE_KEY, code);
-    // Clear any previous reload guard so the new language can trigger a reload if needed.
     sessionStorage.removeItem(RELOAD_GUARD_KEY);
     applyGoogleTranslate(code);
   }, []);
 
   return (
-    <LanguageContext.Provider value={{ selectedLanguage: selectedLang, setLanguage, languages: LANGUAGES }}>
+    <LanguageContext.Provider value={{ selectedLanguage: selectedLang, setLanguage, languages: LANGUAGES, retranslate }}>
       {children}
     </LanguageContext.Provider>
   );

@@ -2463,12 +2463,22 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     for (const emp of companyEmps) {
       if ((emp.userId || emp.id) === userId) continue;
       const nid = crypto.randomUUID();
+      const newHireMsg = `${name} has joined the organization as ${role}${departments && departments.length > 0 ? " in " + departments.join(", ") : department ? " in " + department : ""}.`;
       await kv.set(`notification:${nid}`, {
         id: nid, userId: emp.userId || emp.id, type: "new-user",
         title: "New Team Member",
-        message: `${name} has joined the organization as ${role}${departments && departments.length > 0 ? " in " + departments.join(", ") : department ? " in " + department : ""}.`,
+        message: newHireMsg,
         read: false, createdAt: new Date().toISOString(),
       });
+      // Also send email notification
+      if (emp.email) {
+        sendEmailNotification(
+          emp.userId || emp.id, emp.email, emp.name || '',
+          `New Team Member: ${name} joined ${company.name || 'your organization'} — Blumebyte HR`,
+          `<p>${newHireMsg}</p>`,
+          'emailOnNewHire'
+        );
+      }
     }
     
     await logAudit({
@@ -4945,12 +4955,23 @@ app.put(`${PREFIX}/leave-requests/:leaveId`, async (c) => {
     // Notify employee of leave status change
     if (body.status && body.status !== existing.status && existing.userId) {
       const nid = crypto.randomUUID();
+      const leaveMsg = `Your ${existing.leaveType || ""} leave request has been ${body.status}`;
       await kv.set(`notification:${nid}`, {
         id: nid, userId: existing.userId, type: "leave-update",
         title: `Leave ${body.status === "approved" ? "Approved" : body.status === "rejected" ? "Rejected" : "Updated"}`,
-        message: `Your ${existing.leaveType || ""} leave request has been ${body.status}`,
+        message: leaveMsg,
         read: false, createdAt: new Date().toISOString(),
       });
+      // Also send email notification
+      const emp = await kv.get(`employee:${existing.userId}`) as any;
+      if (emp?.email) {
+        sendEmailNotification(
+          existing.userId, emp.email, emp.name || '',
+          `Leave Request ${body.status === 'approved' ? 'Approved' : body.status === 'rejected' ? 'Rejected' : 'Updated'} — Blumebyte HR`,
+          `<p>${leaveMsg}.</p><p style="color:#6b7280;font-size:14px;">Leave type: <strong>${existing.leaveType || 'Leave'}</strong><br/>Period: ${existing.startDate || ''} – ${existing.endDate || ''}</p>`,
+          'emailOnLeaveUpdate'
+        );
+      }
     }
     return c.json(updated);
   } catch (e: any) {
@@ -9884,7 +9905,104 @@ app.post(`${PREFIX}/auth/reset-password`, async (c) => {
   }
 });
 
-// ============ PUBLIC HIRING ENDPOINTS (no auth required) ============
+// ============ NOTIFICATION PREFERENCES ENDPOINTS ============
+
+const DEFAULT_NOTIF_PREFS = {
+  emailOnNewHire: true,
+  emailOnLeaveUpdate: true,
+  emailOnPayslip: true,
+  emailOnTaskAssignment: true,
+  emailOnMeeting: true,
+  emailOnAnnouncement: true,
+  emailOnPerformanceReview: true,
+  inAppNotifications: true,
+};
+
+// GET /notification-preferences — get current user's notification preferences
+app.get(`${PREFIX}/notification-preferences`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const stored = await kv.get(`notif-prefs:${user.id}`);
+    return c.json({ ...DEFAULT_NOTIF_PREFS, ...(stored || {}) });
+  } catch (e: any) {
+    return c.json(DEFAULT_NOTIF_PREFS);
+  }
+});
+
+// PUT /notification-preferences — update current user's notification preferences
+app.put(`${PREFIX}/notification-preferences`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const body = await c.req.json();
+    const prefs = { ...DEFAULT_NOTIF_PREFS, ...body };
+    await kv.set(`notif-prefs:${user.id}`, prefs);
+    return c.json({ success: true, prefs });
+  } catch (e: any) {
+    return c.json({ error: 'Failed to save preferences' }, 500);
+  }
+});
+
+// Helper: send email notification to a user if they have the pref enabled
+async function sendEmailNotification(
+  recipientId: string,
+  recipientEmail: string,
+  recipientName: string,
+  subject: string,
+  htmlBody: string,
+  prefKey?: string
+) {
+  try {
+    if (!recipientEmail) return;
+
+    // Check user's notification preferences
+    const prefs = await kv.get(`notif-prefs:${recipientId}`);
+
+    // If user has explicitly set preferences, check the specific pref key
+    if (prefs) {
+      // If a specific pref key is given, check it
+      if (prefKey && prefs[prefKey] === false) return;
+      // If inAppNotifications is off AND all email prefs are off, skip
+      const emailKeys = ['emailOnNewHire','emailOnLeaveUpdate','emailOnPayslip','emailOnTaskAssignment','emailOnMeeting','emailOnAnnouncement','emailOnPerformanceReview'];
+      const allEmailOff = emailKeys.every(k => prefs[k] === false);
+      if (allEmailOff) return;
+    }
+    // Default (no prefs stored): send email
+
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) return;
+
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: recipientEmail,
+        subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #000; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+              <h2 style="color: #fff; margin: 0; font-size: 18px;">Blumebyte HR</h2>
+            </div>
+            <div style="padding: 24px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+              <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
+              ${htmlBody}
+              <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
+                You received this email because you have email notifications enabled in your Blumebyte account settings.
+                You can turn off email notifications in your dashboard under Settings → Notification Settings.
+              </p>
+            </div>
+          </div>
+        `,
+      }),
+    });
+  } catch {
+    // Silently fail — email is a best-effort enhancement
+  }
+}
+
+
 
 // GET /public/jobs — list all active public_global job postings
 app.get(`${PREFIX}/public/jobs`, async (c) => {

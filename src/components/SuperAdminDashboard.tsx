@@ -65,6 +65,7 @@ import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
 import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { LanguageSelector } from './LanguageSelector';
+import { NotificationSettings } from './NotificationSettings';
 import { supabase } from '../lib/supabase';
 
 const SIDEBAR_ITEMS = [
@@ -653,22 +654,25 @@ function PlaceholderView({ title }: { title: string }) {
 
 function LanguageSettingsCard() {
   return (
-    <Card className="max-w-xl">
-      <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
-          🌐 Display Language
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <LanguageSelector variant="card" />
-        <p className="text-xs text-muted-foreground mt-3">
-          Powered by Google Translate. Translations are approximate — original English content is always authoritative.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="max-w-xl space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            🌐 Display Language
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelector variant="card" />
+          <p className="text-xs text-muted-foreground mt-3">
+            Powered by Google Translate. Translations are approximate — original English content is always authoritative.
+          </p>
+        </CardContent>
+      </Card>
+      <NotificationSettings />
+    </div>
   );
 }
 
