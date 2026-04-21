@@ -96,7 +96,7 @@ export function SharedNavigation() {
       onMouseEnter={() => handleMouseEnter(menu)}
       onMouseLeave={handleMouseLeave}
     >
-      <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors">
+      <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-mint-black transition-colors">
         {menu}
         <ChevronDown className="h-4 w-4" />
       </button>
@@ -107,7 +107,7 @@ export function SharedNavigation() {
           <div className="absolute top-full left-0 right-0 h-2" />
           
           <div 
-            className={`absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-6 ${
+            className={`absolute top-full left-0 mt-2 glass-dropdown rounded-lg z-50 p-6 ${
               menu === 'Resources' || menu === 'Solutions' ? 'w-[350px]' : 'w-[600px]'
             }`}
             onMouseEnter={() => handleMouseEnter(menu)}
@@ -145,11 +145,11 @@ export function SharedNavigation() {
                               window.open('https://www.youtube.com/@BlumeByte', '_blank');
                             }
                           }}
-                          className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-gray-50 transition-colors group"
+                          className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-mint-green-light/40 transition-colors group"
                         >
-                          <item.icon className="h-5 w-5 text-gray-400 group-hover:text-black mt-0.5 shrink-0" />
+                          <item.icon className="h-5 w-5 text-mint-green/60 group-hover:text-mint-black mt-0.5 shrink-0" />
                           <div>
-                            <div className="text-sm font-medium text-gray-900 group-hover:text-black">
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-mint-black">
                               {item.name}
                             </div>
                             {item.description && (
@@ -173,7 +173,7 @@ export function SharedNavigation() {
 
   return (
     <>
-    <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
+    <nav className="glass-nav sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-8">
@@ -186,13 +186,13 @@ export function SharedNavigation() {
               <DropdownMenu menu="Resources" content={resourcesMenu} />
               <button 
                 onClick={() => navigate('/pricing')}
-                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors"
+                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-mint-black transition-colors"
               >
                 Pricing
               </button>
               <button 
                 onClick={() => navigate('/hirings')}
-                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors flex items-center gap-1"
+                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-mint-black transition-colors flex items-center gap-1"
               >
                 <Briefcase className="h-4 w-4" />
                 Hirings
@@ -205,7 +205,7 @@ export function SharedNavigation() {
             <Button variant="ghost" onClick={() => navigate('/login')}>
               Sign In
             </Button>
-            <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+            <Button onClick={() => navigate('/company-signup')} className="bg-mint-black text-white hover:bg-[#1a3525]">
               Get Started
             </Button>
           </div>
@@ -256,7 +256,7 @@ export function SharedNavigation() {
                                     navigate(routeMap[item.name] || '/platform-overview');
                                     setMobileMenuOpen(false);
                                   }}
-                                  className="flex items-start gap-2 w-full text-left p-2 rounded-md hover:bg-gray-50"
+                                  className="flex items-start gap-2 w-full text-left p-2 rounded-md hover:bg-mint-green-light/30"
                                 >
                                   <item.icon className="h-4 w-4 text-gray-400 mt-0.5" />
                                   <div>
@@ -283,7 +283,7 @@ export function SharedNavigation() {
                               navigate(`/industry/${item.name.toLowerCase()}`);
                               setMobileMenuOpen(false);
                             }}
-                            className="flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-gray-50"
+                            className="flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-mint-green-light/30"
                           >
                             <item.icon className="h-4 w-4 text-gray-400" />
                             <span className="text-sm font-medium">{item.name}</span>
@@ -304,7 +304,7 @@ export function SharedNavigation() {
                               window.open('https://www.youtube.com/@BlumeByte', '_blank');
                               setMobileMenuOpen(false);
                             }}
-                            className="flex items-start gap-2 w-full text-left p-2 rounded-md hover:bg-gray-50"
+                            className="flex items-start gap-2 w-full text-left p-2 rounded-md hover:bg-mint-green-light/30"
                           >
                             <item.icon className="h-4 w-4 text-gray-400 mt-0.5" />
                             <div>
@@ -323,7 +323,7 @@ export function SharedNavigation() {
                     navigate('/pricing');
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 rounded-md"
+                  className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-mint-green-light/30 rounded-md"
                 >
                   Pricing
                 </button>
@@ -333,7 +333,7 @@ export function SharedNavigation() {
                     navigate('/hirings');
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 rounded-md flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 text-sm font-medium hover:bg-mint-green-light/30 rounded-md flex items-center gap-2"
                 >
                   <Briefcase className="h-4 w-4 text-gray-500" />
                   Hirings
@@ -352,7 +352,7 @@ export function SharedNavigation() {
                     Sign In
                   </Button>
                   <Button 
-                    className="w-full bg-black text-white hover:bg-gray-800"
+                    className="w-full bg-mint-black text-white hover:bg-[#1a3525]"
                     onClick={() => {
                       navigate('/company-signup');
                       setMobileMenuOpen(false);

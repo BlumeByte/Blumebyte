@@ -103,7 +103,7 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       <PublicNavbar />
 
       {/* Hero Section with Background Image */}
@@ -137,10 +137,10 @@ export default function LandingPage() {
                 Starting at just $5 per employee/month
               </p>
               <div className="flex gap-4 pt-4">
-                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-lg px-8">
+                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-mint-white text-mint-black hover:bg-mint-green-light text-lg px-8">
                   Get Started Now
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white text-white hover:bg-white hover:text-black text-lg px-8">
+                <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white text-white hover:bg-white hover:text-mint-black text-lg px-8">
                   View Pricing
                 </Button>
               </div>
@@ -158,9 +158,9 @@ export default function LandingPage() {
       <TechSliders3D />
 
       {/* Features Section */}
-      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 bg-gray-50">
+      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-black">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-mint-black">
             Everything you need to manage your team
           </h2>
           <p className="text-lg text-gray-600">
@@ -169,12 +169,12 @@ export default function LandingPage() {
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <Card key={index} className="border-2 hover:border-black transition-all hover:shadow-lg bg-white">
+            <Card key={index} className="glass-public hover-lift border hover:border-mint-green transition-all">
               <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-black flex items-center justify-center mb-4">
+                <div className="h-12 w-12 rounded-lg bg-mint-black flex items-center justify-center mb-4">
                   <feature.icon className="h-6 w-6 text-white" />
                 </div>
-                <CardTitle>{feature.title}</CardTitle>
+                <CardTitle className="text-mint-black">{feature.title}</CardTitle>
                 <CardDescription>{feature.description}</CardDescription>
               </CardHeader>
             </Card>
@@ -185,7 +185,7 @@ export default function LandingPage() {
       {/* Platform Overview Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-black">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-mint-black">
             A Complete HR Platform
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -194,30 +194,30 @@ export default function LandingPage() {
         </div>
         
         <div className="grid md:grid-cols-3 gap-8">
-          <Card className="border-2 border-gray-200 hover:border-black transition-all">
+          <Card className="glass-public hover-lift border hover:border-mint-green transition-all">
             <CardHeader>
-              <UserCheck className="h-10 w-10 text-black mb-4" />
-              <CardTitle>Hire & Onboard</CardTitle>
+              <UserCheck className="h-10 w-10 text-mint-green mb-4" />
+              <CardTitle className="text-mint-black">Hire & Onboard</CardTitle>
               <CardDescription className="text-sm">
                 Attract top talent with our applicant tracking system and create seamless onboarding experiences
               </CardDescription>
             </CardHeader>
           </Card>
           
-          <Card className="border-2 border-gray-200 hover:border-black transition-all">
+          <Card className="glass-public hover-lift border hover:border-mint-green transition-all">
             <CardHeader>
-              <Growth className="h-10 w-10 text-black mb-4" />
-              <CardTitle>Grow & Develop</CardTitle>
+              <Growth className="h-10 w-10 text-mint-green mb-4" />
+              <CardTitle className="text-mint-black">Grow & Develop</CardTitle>
               <CardDescription className="text-sm">
                 Foster employee growth with performance management, training, and development tools
               </CardDescription>
             </CardHeader>
           </Card>
           
-          <Card className="border-2 border-gray-200 hover:border-black transition-all">
+          <Card className="glass-public hover-lift border hover:border-mint-green transition-all">
             <CardHeader>
-              <BarChart3 className="h-10 w-10 text-black mb-4" />
-              <CardTitle>Analyze & Optimize</CardTitle>
+              <BarChart3 className="h-10 w-10 text-mint-green mb-4" />
+              <CardTitle className="text-mint-black">Analyze & Optimize</CardTitle>
               <CardDescription className="text-sm">
                 Make data-driven decisions with comprehensive HR analytics and reporting
               </CardDescription>
@@ -227,10 +227,10 @@ export default function LandingPage() {
       </section>
 
       {/* Industry Solutions */}
-      <section className="bg-gray-50 py-20">
+      <section className="section-mint py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-black">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-mint-black">
               Built for Your Industry
             </h2>
             <p className="text-lg text-gray-600">
@@ -249,10 +249,10 @@ export default function LandingPage() {
             ].map((industry, idx) => (
               <button
                 key={idx}
-                className="flex flex-col items-center justify-center p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-black transition-all group"
+                className="flex flex-col items-center justify-center p-6 glass-public rounded-lg hover:border-mint-green transition-all group"
               >
-                <industry.icon className="h-8 w-8 text-gray-400 group-hover:text-black mb-3" />
-                <span className="text-sm font-medium text-gray-700 group-hover:text-black">
+                <industry.icon className="h-8 w-8 text-mint-green/60 group-hover:text-mint-green mb-3 transition-colors" />
+                <span className="text-sm font-medium text-gray-700 group-hover:text-mint-black transition-colors">
                   {industry.name}
                 </span>
               </button>
@@ -264,7 +264,7 @@ export default function LandingPage() {
       {/* Pricing Section */}
       <section id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-black">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-mint-black">
             Simple, transparent pricing
           </h2>
           <p className="text-lg text-gray-600">
@@ -275,20 +275,20 @@ export default function LandingPage() {
           {pricingPlans.map((plan, index) => (
             <Card
               key={index}
-              className={`relative border-2 transition-all hover:shadow-xl bg-white ${
-                plan.popular ? 'border-black shadow-lg scale-105' : 'border-gray-200'
+              className={`glass-public hover-lift relative border transition-all hover:shadow-xl ${
+                plan.popular ? 'border-mint-green shadow-lg scale-105' : 'border-mint-green/20'
               }`}
             >
               {plan.popular && plan.savings && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-black text-white text-sm font-medium rounded-full">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-mint-black text-white text-sm font-medium rounded-full">
                   {plan.savings}
                 </div>
               )}
               <CardHeader>
-                <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                <CardTitle className="text-2xl text-mint-black">{plan.name}</CardTitle>
                 <CardDescription className="text-sm">{plan.billingCycle}</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold text-black">{plan.price}</span>
+                  <span className="text-4xl font-bold text-mint-black">{plan.price}</span>
                   <span className="text-gray-600 text-sm">{plan.period}</span>
                 </div>
               </CardHeader>
@@ -296,7 +296,7 @@ export default function LandingPage() {
                 <ul className="space-y-3 mb-6">
                   {plan.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-black shrink-0 mt-0.5" />
+                      <CheckCircle2 className="h-5 w-5 text-mint-green shrink-0 mt-0.5" />
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}
@@ -313,7 +313,7 @@ export default function LandingPage() {
                   <Button
                     className={`w-full ${
                       plan.popular
-                        ? 'bg-black text-white hover:bg-gray-800'
+                        ? 'bg-mint-black text-white hover:bg-[#1a3525]'
                         : ''
                     }`}
                     variant={plan.popular ? 'default' : 'outline'}
@@ -329,10 +329,10 @@ export default function LandingPage() {
       </section>
 
       {/* Why Blumebyte Section */}
-      <section className="bg-gray-50 py-20">
+      <section className="section-mint py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-black">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-mint-black">
               Why Companies Choose Blumebyte
             </h2>
             <p className="text-lg text-gray-600">
@@ -341,30 +341,30 @@ export default function LandingPage() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="border-2 border-gray-200 bg-white">
+            <Card className="glass-public hover-lift border border-mint-green/20">
               <CardHeader>
-                <Trophy className="h-10 w-10 text-black mb-4" />
-                <CardTitle>Award-Winning Support</CardTitle>
+                <Trophy className="h-10 w-10 text-mint-green mb-4" />
+                <CardTitle className="text-mint-black">Award-Winning Support</CardTitle>
                 <CardDescription>
                   24/7 customer support with industry-leading response times and satisfaction rates
                 </CardDescription>
               </CardHeader>
             </Card>
             
-            <Card className="border-2 border-gray-200 bg-white">
+            <Card className="glass-public hover-lift border border-mint-green/20">
               <CardHeader>
-                <Shield className="h-10 w-10 text-black mb-4" />
-                <CardTitle>Enterprise Security</CardTitle>
+                <Shield className="h-10 w-10 text-mint-green mb-4" />
+                <CardTitle className="text-mint-black">Enterprise Security</CardTitle>
                 <CardDescription>
                   Bank-level encryption, 2FA, and compliance with global data protection standards
                 </CardDescription>
               </CardHeader>
             </Card>
             
-            <Card className="border-2 border-gray-200 bg-white">
+            <Card className="glass-public hover-lift border border-mint-green/20">
               <CardHeader>
-                <Zap className="h-10 w-10 text-black mb-4" />
-                <CardTitle>Easy Implementation</CardTitle>
+                <Zap className="h-10 w-10 text-mint-green mb-4" />
+                <CardTitle className="text-mint-black">Easy Implementation</CardTitle>
                 <CardDescription>
                   Get up and running in days, not months, with guided onboarding and migration support
                 </CardDescription>
@@ -376,7 +376,7 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <Card className="bg-black border-0 text-white">
+        <Card className="bg-mint-black border-0 text-white">
           <CardContent className="p-12 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Ready to transform your HR operations?
@@ -389,7 +389,7 @@ export default function LandingPage() {
                 size="lg"
                 variant="secondary"
                 onClick={() => navigate('/company-signup')}
-                className="text-lg px-8 bg-white text-black hover:bg-gray-100"
+                className="text-lg px-8 bg-mint-white text-mint-black hover:bg-mint-green-light"
               >
                 Get Started Today
               </Button>
@@ -397,7 +397,7 @@ export default function LandingPage() {
                 size="lg"
                 variant="outline"
                 onClick={() => window.open('https://blumebyte.com/contact/', '_blank')}
-                className="text-lg px-8 border-white text-white hover:bg-white hover:text-black"
+                className="text-lg px-8 border-white text-white hover:bg-white hover:text-mint-black"
               >
                 Contact Sales
               </Button>
