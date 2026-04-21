@@ -1,7 +1,15 @@
 {
   "outputDirectory": "dist",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run vercel-build",
+  "installCommand": "bash vercel-install.sh",
   "devCommand": "npm run dev",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
+  "build": {
+    "env": {
+      "NODE_ENV": "production",
+      "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+    }
+  },
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
@@ -29,7 +37,7 @@
         },
         {
           "key": "X-Frame-Options",
-          "value": "SAMEORIGIN"
+          "value": "DENY"
         },
         {
           "key": "X-XSS-Protection",
