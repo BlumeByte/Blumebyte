@@ -78,10 +78,14 @@ export const LANGUAGES: Language[] = [
 ];
 
 const STORAGE_KEY = 'blumebyte_language';
-/** sessionStorage key set to '1' after a reload has been triggered for a language.
+/** sessionStorage key set to the language code after a reload has been triggered.
  *  Prevents the infinite-reload loop that happens when Google Translate's widget
  *  is not yet available on the first render after a reload. */
 const RELOAD_GUARD_KEY = 'blumebyte_lang_reloaded';
+/** Time (ms) to wait before clearing the reload guard.
+ *  Must be long enough for Google Translate to finish applying the translation
+ *  from the cookie so that the guard doesn't block future language changes. */
+const GUARD_CLEAR_DELAY_MS = 3000;
 
 /** Time to wait (ms) before attempting to apply a saved language on first load.
  *  Google Translate's widget needs a moment to inject its select element into the DOM
@@ -169,7 +173,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         // Give the widget a moment to finish, then clear.
         const clearTimer = setTimeout(() => {
           sessionStorage.removeItem(RELOAD_GUARD_KEY);
-        }, 3000);
+        }, GUARD_CLEAR_DELAY_MS);
         return () => clearTimeout(clearTimer);
       }
       // Give the widget time to load, then apply.
