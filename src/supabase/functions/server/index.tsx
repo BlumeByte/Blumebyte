@@ -2463,12 +2463,22 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     for (const emp of companyEmps) {
       if ((emp.userId || emp.id) === userId) continue;
       const nid = crypto.randomUUID();
+      const newHireMsg = `${name} has joined the organization as ${role}${departments && departments.length > 0 ? " in " + departments.join(", ") : department ? " in " + department : ""}.`;
       await kv.set(`notification:${nid}`, {
         id: nid, userId: emp.userId || emp.id, type: "new-user",
         title: "New Team Member",
-        message: `${name} has joined the organization as ${role}${departments && departments.length > 0 ? " in " + departments.join(", ") : department ? " in " + department : ""}.`,
+        message: newHireMsg,
         read: false, createdAt: new Date().toISOString(),
       });
+      // Also send email notification
+      if (emp.email) {
+        sendEmailNotification(
+          emp.userId || emp.id, emp.email, emp.name || '',
+          `New Team Member: ${name} joined ${company.name || 'your organization'} — Blumebyte HR`,
+          `<p>${newHireMsg}</p>`,
+          'emailOnNewHire'
+        );
+      }
     }
     
     await logAudit({
@@ -4745,10 +4755,34 @@ app.get(`${PREFIX}/reports/users`, async (c) => {
     console.log(`✅ TENANT ISOLATION: User ${user.id} can see ${employees.length} employees after filtering`);
     
     const attendance = await kv.getByPrefix("attendance:");
+    // Flatten attendance: some records are stored as arrays (company-based) and some as objects (user-based)
+    const flatAttendance: any[] = [];
+    for (const entry of attendance) {
+      if (Array.isArray(entry)) {
+        for (const rec of entry) flatAttendance.push(rec);
+      } else if (entry && typeof entry === 'object' && (entry.userId || entry.clockIn)) {
+        flatAttendance.push(entry);
+      }
+    }
     const allowedUserIds = new Set(employees.map((e: any) => e.userId || e.id));
     const report = employees.map((e: any) => {
-      const empAtt = attendance.filter((a: any) => a.userId === (e.userId || e.id));
-      return { userId: e.userId || e.id, name: e.name, email: e.email, role: e.role, department: e.department, company: e.company, position: e.position, status: e.status, phone: e.phone, attendanceDays: empAtt.length, totalHoursWorked: empAtt.reduce((s: number, a: any) => s + (parseFloat(a.totalHours) || 0), 0).toFixed(1), joinDate: e.createdAt };
+      const empId = e.userId || e.id;
+      const empAtt = flatAttendance.filter((a: any) => a.userId === empId);
+      const totalHoursWorked = empAtt.reduce((s: number, a: any) => {
+        // Prefer explicit totalHours field
+        if (a.totalHours != null) return s + (parseFloat(a.totalHours) || 0);
+        // Fall back to regularMinutes + overtimeMinutes (auto-clock records)
+        const mins = (a.regularMinutes || 0) + (a.overtimeMinutes || 0);
+        if (mins > 0) return s + mins / 60;
+        // Fall back to hoursWorked (manual employee clock-out)
+        if (a.hoursWorked != null) return s + (parseFloat(a.hoursWorked) || 0);
+        // Last resort: compute from clockIn/clockOut timestamps
+        if (a.clockIn && a.clockOut) {
+          return s + (new Date(a.clockOut).getTime() - new Date(a.clockIn).getTime()) / 3600000;
+        }
+        return s;
+      }, 0);
+      return { userId: empId, name: e.name, email: e.email, role: e.role, department: e.department, company: e.company, position: e.position, status: e.status, phone: e.phone, attendanceDays: empAtt.length, totalHoursWorked: totalHoursWorked.toFixed(1), joinDate: e.createdAt };
     });
     
     console.log(`📤 Returning ${report.length} employee reports with company isolation enforced`);
@@ -4921,12 +4955,23 @@ app.put(`${PREFIX}/leave-requests/:leaveId`, async (c) => {
     // Notify employee of leave status change
     if (body.status && body.status !== existing.status && existing.userId) {
       const nid = crypto.randomUUID();
+      const leaveMsg = `Your ${existing.leaveType || ""} leave request has been ${body.status}`;
       await kv.set(`notification:${nid}`, {
         id: nid, userId: existing.userId, type: "leave-update",
         title: `Leave ${body.status === "approved" ? "Approved" : body.status === "rejected" ? "Rejected" : "Updated"}`,
-        message: `Your ${existing.leaveType || ""} leave request has been ${body.status}`,
+        message: leaveMsg,
         read: false, createdAt: new Date().toISOString(),
       });
+      // Also send email notification
+      const emp = await kv.get(`employee:${existing.userId}`) as any;
+      if (emp?.email) {
+        sendEmailNotification(
+          existing.userId, emp.email, emp.name || '',
+          `Leave Request ${body.status === 'approved' ? 'Approved' : body.status === 'rejected' ? 'Rejected' : 'Updated'} — Blumebyte HR`,
+          `<p>${leaveMsg}.</p><p style="color:#6b7280;font-size:14px;">Leave type: <strong>${existing.leaveType || 'Leave'}</strong><br/>Period: ${existing.startDate || ''} – ${existing.endDate || ''}</p>`,
+          'emailOnLeaveUpdate'
+        );
+      }
     }
     return c.json(updated);
   } catch (e: any) {
@@ -5038,6 +5083,22 @@ app.delete(`${PREFIX}/training-programs/:id`, async (c) => {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
     return c.json({ error: e.message }, 500);
+  }
+});
+
+// ============ ADMIN TRAINING PROGRAMS (aliases for /training-programs) ============
+app.get(`${PREFIX}/admin/training-programs`, async (c) => {
+  try {
+    const { user, role } = await requireAdminOrAbove(c);
+    const allTrainings = await kv.getByPrefix("training:");
+    const employees = await kv.getByPrefix("employee:");
+    const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
+    const companyId = filteredEmployees.length > 0 ? filteredEmployees[0].companyId : null;
+    return c.json(allTrainings.filter((t: any) => !companyId || t.companyId === companyId));
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
+    if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
+    return c.json([]);
   }
 });
 
@@ -5229,7 +5290,7 @@ app.post(`${PREFIX}/attendance/auto-clock-out`, async (c) => {
     const totalPausedMs = pauses.reduce((sum: number, p: any) => sum + ((p.resumedAt ? new Date(p.resumedAt).getTime() : now.getTime()) - new Date(p.pausedAt).getTime()), 0);
     const totalMinutes = Math.round((now.getTime() - new Date(existing.clockIn).getTime()) / 60000);
     const activeMinutes = totalMinutes - Math.round(totalPausedMs / 60000);
-    const updated = { ...existing, clockOut: now.toISOString(), isPaused: false, pauses, totalPausedMinutes: Math.round(totalPausedMs / 60000), status: "present", regularMinutes: Math.min(activeMinutes, 480), overtimeMinutes: Math.max(0, activeMinutes - 480), autoClocked: true, updatedAt: now.toISOString() };
+    const updated = { ...existing, clockOut: now.toISOString(), isPaused: false, pauses, totalPausedMinutes: Math.round(totalPausedMs / 60000), status: "present", regularMinutes: Math.min(activeMinutes, 480), overtimeMinutes: Math.max(0, activeMinutes - 480), totalHours: (activeMinutes / 60).toFixed(2), autoClocked: true, updatedAt: now.toISOString() };
     await kv.set(key, updated);
     return c.json(updated);
   } catch (e: any) {
@@ -9022,6 +9083,38 @@ app.put(`${PREFIX}/automation/business-rules/:id`, async (c) => {
     };
     
     await kv.set(`automation_rule:${id}`, updated);
+    
+    // If the rule was just enabled and has a "Send Notification" action, execute it now
+    if (updated.enabled && updated.action === 'Send Notification') {
+      try {
+        const companyId = updated.companyId || profile?.companyId;
+        if (companyId) {
+          const allEmployees = await kv.getByPrefix('employee:');
+          const companyEmployees = allEmployees.filter((e: any) =>
+            e.companyId === companyId || e.company === companyId
+          );
+          for (const emp of companyEmployees) {
+            const empId = emp.userId || emp.id;
+            if (!empId) continue;
+            const nid = crypto.randomUUID();
+            await kv.set(`notification:${nid}`, {
+              id: nid,
+              userId: empId,
+              type: 'business_rule',
+              title: updated.name || 'Business Rule Notification',
+              message: updated.description || `Business rule "${updated.name}" has been applied.`,
+              ruleId: id,
+              companyId,
+              read: false,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (_notifyErr) {
+        // Non-fatal: rule was saved, notification delivery failed silently
+      }
+    }
+    
     return c.json({ success: true, data: updated });
   } catch (e: any) {
     return handleError(e, c, 'update-business-rule');
@@ -9812,7 +9905,106 @@ app.post(`${PREFIX}/auth/reset-password`, async (c) => {
   }
 });
 
-// ============ PUBLIC HIRING ENDPOINTS (no auth required) ============
+// ============ NOTIFICATION PREFERENCES ENDPOINTS ============
+
+const DEFAULT_NOTIF_PREFS = {
+  emailOnNewHire: true,
+  emailOnLeaveUpdate: true,
+  emailOnPayslip: true,
+  emailOnTaskAssignment: true,
+  emailOnMeeting: true,
+  emailOnAnnouncement: true,
+  emailOnPerformanceReview: true,
+  inAppNotifications: true,
+};
+
+const EMAIL_PREF_KEYS = (Object.keys(DEFAULT_NOTIF_PREFS) as (keyof typeof DEFAULT_NOTIF_PREFS)[])
+  .filter(k => k !== 'inAppNotifications');
+
+// GET /notification-preferences — get current user's notification preferences
+app.get(`${PREFIX}/notification-preferences`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const stored = await kv.get(`notif-prefs:${user.id}`);
+    return c.json({ ...DEFAULT_NOTIF_PREFS, ...(stored || {}) });
+  } catch (e: any) {
+    return c.json(DEFAULT_NOTIF_PREFS);
+  }
+});
+
+// PUT /notification-preferences — update current user's notification preferences
+app.put(`${PREFIX}/notification-preferences`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const body = await c.req.json();
+    const prefs = { ...DEFAULT_NOTIF_PREFS, ...body };
+    await kv.set(`notif-prefs:${user.id}`, prefs);
+    return c.json({ success: true, prefs });
+  } catch (e: any) {
+    return c.json({ error: 'Failed to save preferences' }, 500);
+  }
+});
+
+// Helper: send email notification to a user if they have the pref enabled
+async function sendEmailNotification(
+  recipientId: string,
+  recipientEmail: string,
+  recipientName: string,
+  subject: string,
+  htmlBody: string,
+  prefKey?: string
+) {
+  try {
+    if (!recipientEmail) return;
+
+    // Check user's notification preferences
+    const prefs = await kv.get(`notif-prefs:${recipientId}`);
+
+    // If user has explicitly set preferences, check the specific pref key
+    if (prefs) {
+      // If a specific pref key is given, check it
+      if (prefKey && prefs[prefKey] === false) return;
+      // If user explicitly has email prefs but all email ones are off, skip
+      const allEmailOff = EMAIL_PREF_KEYS.every(k => prefs[k] === false);
+      if (allEmailOff) return;
+    }
+    // Default (no prefs stored): send email
+
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) return;
+
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: recipientEmail,
+        subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #000; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+              <h2 style="color: #fff; margin: 0; font-size: 18px;">Blumebyte HR</h2>
+            </div>
+            <div style="padding: 24px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+              <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
+              ${htmlBody}
+              <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
+                You received this email because you have email notifications enabled in your Blumebyte account settings.
+                You can turn off email notifications in your dashboard under Settings → Notification Settings.
+              </p>
+            </div>
+          </div>
+        `,
+      }),
+    });
+  } catch {
+    // Silently fail — email is a best-effort enhancement
+  }
+}
+
+
 
 // GET /public/jobs — list all active public_global job postings
 app.get(`${PREFIX}/public/jobs`, async (c) => {

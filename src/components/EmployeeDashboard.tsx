@@ -33,6 +33,7 @@ import { useCurrency } from '../lib/currency-context';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { LanguageSelector } from './LanguageSelector';
+import { NotificationSettings } from './NotificationSettings';
 
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
@@ -130,6 +131,7 @@ export function EmployeeDashboard() {
                   </p>
                 </CardContent>
               </Card>
+              <NotificationSettings />
             </div>
           </TabsContent>
         </Tabs>

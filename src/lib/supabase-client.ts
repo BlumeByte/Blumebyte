@@ -1,12 +1,2 @@
-import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
-
-const supabaseUrl = `https://${projectId}.supabase.co`;
-
-export const supabase = createClient(supabaseUrl, publicAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionUrl: true,
-  },
-});
+// Re-export the singleton Supabase client to avoid multiple GoTrueClient instances
+export { supabase } from './supabase.ts';

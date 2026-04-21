@@ -1,6 +1,7 @@
 import React, { useState, useEffect, startTransition } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth-context';
+import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -100,10 +101,17 @@ export function LoginPage() {
     e.preventDefault();
     setResetLoading(true);
     try {
-      await api('/auth/forgot-password', {
-        method: 'POST',
-        body: { email: resetEmail },
+      // Use Supabase Auth's built-in reset email (uses project's configured email provider)
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/password-reset`,
       });
+      if (error) {
+        // Fall back to custom server endpoint if Supabase auth fails
+        await api('/auth/forgot-password', {
+          method: 'POST',
+          body: { email: resetEmail },
+        });
+      }
       setResetSuccess(true);
     } catch (error) {
       toast.error('Failed to send reset email. Please try again.');

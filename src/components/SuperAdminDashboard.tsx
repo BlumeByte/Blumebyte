@@ -65,8 +65,8 @@ import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
 import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { LanguageSelector } from './LanguageSelector';
-import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { NotificationSettings } from './NotificationSettings';
+import { supabase } from '../lib/supabase';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -654,22 +654,25 @@ function PlaceholderView({ title }: { title: string }) {
 
 function LanguageSettingsCard() {
   return (
-    <Card className="max-w-xl">
-      <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
-          🌐 Display Language
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <LanguageSelector variant="card" />
-        <p className="text-xs text-muted-foreground mt-3">
-          Powered by Google Translate. Translations are approximate — original English content is always authoritative.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="max-w-xl space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            🌐 Display Language
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelector variant="card" />
+          <p className="text-xs text-muted-foreground mt-3">
+            Powered by Google Translate. Translations are approximate — original English content is always authoritative.
+          </p>
+        </CardContent>
+      </Card>
+      <NotificationSettings />
+    </div>
   );
 }
 
@@ -1230,6 +1233,7 @@ function TimeOffCalendarView() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
   useEffect(() => {
     Promise.all([
@@ -1292,16 +1296,20 @@ function TimeOffCalendarView() {
   const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
 
-  const statusColors: Record<string, string> = { approved: 'bg-green-200', pending: 'bg-amber-200', rejected: 'bg-red-200' };
+  const statusColors: Record<string, string> = {
+    approved: 'bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100',
+    pending: 'bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100',
+    rejected: 'bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100',
+  };
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Time Off & Events Calendar</h1>
+        <h1 className="text-2xl font-bold text-foreground">Time Off & Events Calendar</h1>
         <div className="flex items-center gap-2">
           <Badge variant="outline">{leaves.length} leave requests</Badge>
-          <Badge variant="outline" className="bg-blue-50">{meetings.length} meetings</Badge>
-          <Badge className="bg-amber-100 text-amber-800">{leaves.filter(l => l.status === 'pending').length} pending leaves</Badge>
+          <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">{meetings.length} meetings</Badge>
+          <Badge className="bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">{leaves.filter(l => l.status === 'pending').length} pending leaves</Badge>
         </div>
       </div>
 
@@ -1309,7 +1317,7 @@ function TimeOffCalendarView() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <Button variant="outline" size="sm" onClick={prevMonth}><ChevronLeft className="w-4 h-4" /></Button>
-            <h2 className="text-lg font-semibold">{monthName}</h2>
+            <h2 className="text-lg font-semibold text-foreground">{monthName}</h2>
             <Button variant="outline" size="sm" onClick={nextMonth}><ChevronRight className="w-4 h-4" /></Button>
           </div>
         </CardHeader>
@@ -1317,11 +1325,11 @@ function TimeOffCalendarView() {
           {loading ? (
             <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
           ) : (
-            <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                <div key={d} className="bg-gray-50 p-2 text-center text-xs font-semibold text-gray-500">{d}</div>
+                <div key={d} className="bg-gray-50 dark:bg-gray-800 p-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">{d}</div>
               ))}
-              {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} className="bg-white p-2 min-h-[80px]" />)}
+              {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} className="bg-card p-2 min-h-[80px]" />)}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
                 const dayLeaves = getLeaveForDate(day);
@@ -1333,20 +1341,30 @@ function TimeOffCalendarView() {
                 ];
                 return (
                   <div key={day} className={`bg-card p-2 min-h-[80px] ${isToday ? 'ring-2 ring-blue-500 ring-inset' : ''}`}>
-                    <span className={`text-sm ${isToday ? 'font-bold text-blue-600' : 'text-foreground'}`}>{day}</span>
+                    <span className={`text-sm font-medium ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-foreground'}`}>{day}</span>
                     <div className="mt-1 space-y-0.5">
                       {allEvents.slice(0, 3).map((event, idx) => (
                         event.type === 'leave' ? (
-                          <div key={`leave-${idx}`} className={`text-[10px] px-1 py-0.5 rounded truncate ${statusColors[event.status] || 'bg-gray-200'}`} title={`${event.employeeName} - ${event.leaveType}`}>
+                          <div
+                            key={`leave-${idx}`}
+                            className={`text-[10px] px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity ${statusColors[event.status] || 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}
+                            title={`${event.employeeName} - ${event.leaveType}`}
+                            onClick={() => setSelectedEvent(event)}
+                          >
                             {event.employeeName?.split(' ')[0] || 'Leave'}
                           </div>
                         ) : (
-                          <div key={`meeting-${idx}`} className="text-[10px] px-1 py-0.5 rounded truncate bg-blue-200" title={`Meeting: ${event.title || ''} - ${event.organizerName} & ${event.participantName}`}>
+                          <div
+                            key={`meeting-${idx}`}
+                            className="text-[10px] px-1 py-0.5 rounded truncate bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100 cursor-pointer hover:opacity-80 transition-opacity"
+                            title={`Meeting: ${event.title || ''} - ${event.organizerName} & ${event.participantName}`}
+                            onClick={() => setSelectedEvent(event)}
+                          >
                             📅 {event.startTime || 'Meeting'}
                           </div>
                         )
                       ))}
-                      {allEvents.length > 3 && <div className="text-[10px] text-gray-400">+{allEvents.length - 3} more</div>}
+                      {allEvents.length > 3 && <div className="text-[10px] text-gray-400 dark:text-gray-500">+{allEvents.length - 3} more</div>}
                     </div>
                   </div>
                 );
@@ -1357,11 +1375,46 @@ function TimeOffCalendarView() {
       </Card>
 
       <div className="flex items-center gap-4 mt-4">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-green-200" /><span className="text-xs text-gray-500">Approved Leave</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-200" /><span className="text-xs text-gray-500">Pending Leave</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-200" /><span className="text-xs text-gray-500">Rejected Leave</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-200" /><span className="text-xs text-gray-500">Scheduled Meeting</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-green-200 dark:bg-green-800" /><span className="text-xs text-gray-500 dark:text-gray-400">Approved Leave</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-200 dark:bg-amber-800" /><span className="text-xs text-gray-500 dark:text-gray-400">Pending Leave</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-200 dark:bg-red-800" /><span className="text-xs text-gray-500 dark:text-gray-400">Rejected Leave</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-200 dark:bg-blue-800" /><span className="text-xs text-gray-500 dark:text-gray-400">Scheduled Meeting</span></div>
       </div>
+
+      {/* Event Preview Dialog */}
+      {selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedEvent(null)}>
+          <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">
+                {selectedEvent.type === 'leave' ? '🏖️ Leave Request' : '📅 Meeting'}
+              </h3>
+              <button onClick={() => setSelectedEvent(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                ✕
+              </button>
+            </div>
+            {selectedEvent.type === 'leave' ? (
+              <div className="space-y-2 text-sm text-foreground">
+                <div><span className="text-muted-foreground">Employee:</span> <span className="font-medium">{selectedEvent.employeeName || 'Unknown'}</span></div>
+                <div><span className="text-muted-foreground">Leave Type:</span> <span className="font-medium">{selectedEvent.leaveType || selectedEvent.type || 'N/A'}</span></div>
+                <div><span className="text-muted-foreground">Start Date:</span> <span className="font-medium">{selectedEvent.startDate || 'N/A'}</span></div>
+                <div><span className="text-muted-foreground">End Date:</span> <span className="font-medium">{selectedEvent.endDate || 'N/A'}</span></div>
+                {selectedEvent.reason && <div><span className="text-muted-foreground">Reason:</span> <span className="font-medium">{selectedEvent.reason}</span></div>}
+                <div><span className="text-muted-foreground">Status:</span> <Badge variant="outline" className="ml-1">{selectedEvent.status}</Badge></div>
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm text-foreground">
+                <div><span className="text-muted-foreground">Title:</span> <span className="font-medium">{selectedEvent.title || 'Meeting'}</span></div>
+                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{selectedEvent.date || 'N/A'}</span></div>
+                <div><span className="text-muted-foreground">Time:</span> <span className="font-medium">{selectedEvent.startTime || 'N/A'}{selectedEvent.endTime ? ` - ${selectedEvent.endTime}` : ''}</span></div>
+                <div><span className="text-muted-foreground">Organizer:</span> <span className="font-medium">{selectedEvent.organizerName || 'N/A'}</span></div>
+                <div><span className="text-muted-foreground">Participant:</span> <span className="font-medium">{selectedEvent.participantName || 'N/A'}</span></div>
+                {selectedEvent.description && <div><span className="text-muted-foreground">Notes:</span> <span className="font-medium">{selectedEvent.description}</span></div>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1404,11 +1457,9 @@ function AttendanceView() {
   
   // Real-time subscription for instant attendance updates
   useEffect(() => {
-    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
     const channel = supabase.channel('attendance-changes');
     
     channel.on('broadcast', { event: 'data-changed' }, () => {
-      console.log('📅 Attendance: Real-time update received, reloading data...');
       load();
     });
     
@@ -2369,11 +2420,9 @@ function LeaveManagementView() {
   
   // Real-time subscription for instant leave updates
   useEffect(() => {
-    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
     const channel = supabase.channel('leave-changes');
     
     channel.on('broadcast', { event: 'data-changed' }, () => {
-      console.log('🏖️ Leave Management: Real-time update received, reloading data...');
       load();
     });
     

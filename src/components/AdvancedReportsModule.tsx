@@ -44,8 +44,7 @@ import { toast } from 'sonner@2.0.3';
 import { Alert, AlertDescription } from './ui/alert';
 import { exportToCSV, exportToPDF } from './ListControls';
 import { format } from 'date-fns';
-import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { supabase } from '../lib/supabase';
 import { useCurrency } from '../lib/currency-context';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
@@ -95,16 +94,6 @@ export function AdvancedReportsModule() {
       const departmentsList = Array.isArray(refData.departments) ? refData.departments : [];
       const assetsList = Array.isArray(refData.assets) ? refData.assets : [];
 
-      console.log('Advanced Reports Data Loaded:', {
-        employees: Array.isArray(employees) ? employees.length : 0,
-        attendance: Array.isArray(attendance) ? attendance.length : 0,
-        leaves: Array.isArray(leaves) ? leaves.length : 0,
-        payroll: Array.isArray(payroll) ? payroll.length : 0,
-        performance: Array.isArray(performance) ? performance.length : 0,
-        companies: companiesList.length,
-        departments: departmentsList.length,
-      });
-
       setReportData({
         employees: Array.isArray(employees) ? employees : [],
         attendance: Array.isArray(attendance) ? attendance : [],
@@ -133,11 +122,9 @@ export function AdvancedReportsModule() {
   // Real-time subscription to Supabase broadcasts for instant updates
   useEffect(() => {
     if (!accessToken) return;
-    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
     const channel = supabase.channel('advanced-reports-changes');
     
     channel.on('broadcast', { event: 'data-changed' }, () => {
-      console.log('📊 Advanced Reports: Real-time update received, reloading data...');
       fetchReportData();
     });
     

@@ -17,8 +17,7 @@ import {
 } from 'recharts';
 import { useBranding } from '../lib/branding-context';
 import { ClientOnlyChart } from './ClientOnlyChart';
-import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { supabase } from '../lib/supabase';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'];
 
@@ -61,26 +60,13 @@ export function ReportsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('📊 Loading Reports & Analytics data...');
       const [u, a, d, l, profile] = await Promise.all([
-        api('/reports/users', { token: accessToken }).catch((e) => { console.error('❌ /reports/users failed:', e); return []; }),
-        api('/reports/attendance', { token: accessToken }).catch((e) => { console.error('❌ /reports/attendance failed:', e); return []; }),
-        api('/admin/departments', { token: accessToken }).catch((e) => { console.error('❌ /admin/departments failed:', e); return []; }),
-        api('/leave-requests', { token: accessToken }).catch((e) => { console.error('❌ /leave-requests failed:', e); return []; }),
-        api('/profile', { token: accessToken }).catch((e) => { console.error('❌ /profile failed:', e); return null; }),
+        api('/reports/users', { token: accessToken }).catch(() => []),
+        api('/reports/attendance', { token: accessToken }).catch(() => []),
+        api('/admin/departments', { token: accessToken }).catch(() => []),
+        api('/leave-requests', { token: accessToken }).catch(() => []),
+        api('/profile', { token: accessToken }).catch(() => null),
       ]);
-      
-      // TENANT ISOLATION CHECK: Log company scope
-      const userCompanies = profile?.assignedCompanies || (profile?.companyId ? [profile.companyId] : []);
-      console.log('🔒 TENANT ISOLATION: Reports filtered for companies:', userCompanies);
-      console.log('📊 Report Data Loaded:', {
-        users: u?.length || 0,
-        attendance: a?.length || 0,
-        departments: d?.length || 0,
-        leaves: l?.length || 0,
-        userRole: user?.role,
-        profile: profile ? 'loaded' : 'missing',
-      });
       
       const myDept = profile?.department || '';
       const myDepts = profile?.departments || (profile?.department ? [profile.department] : []);
@@ -97,7 +83,7 @@ export function ReportsPanel() {
       setDepartmentsData(Array.isArray(d) ? (isManager ? d.filter(dept => myDepts.includes(dept.name)) : d) : []);
       setLeavesData(Array.isArray(l) ? (isManager ? l.filter(lv => myDepts.includes(lv.department)) : l) : []);
     } catch (e) { 
-      console.error('❌ Error loading reports:', e);
+      console.error('Error loading reports:', e);
     }
     setLoading(false);
   }, [accessToken, user?.role]);
@@ -106,11 +92,9 @@ export function ReportsPanel() {
   
   // Real-time subscription to Supabase broadcasts for instant updates
   useEffect(() => {
-    const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
     const channel = supabase.channel('reports-changes');
     
     channel.on('broadcast', { event: 'data-changed' }, () => {
-      console.log('📊 Reports: Real-time update received, reloading data...');
       load();
     });
     
@@ -242,15 +226,6 @@ export function ReportsPanel() {
           <h2 className="text-lg font-semibold">Reports & Analytics</h2>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={async () => {
-            try {
-              const data = await api('/debug/tenant-data', { token: accessToken });
-              console.log('🐛 DEBUG TENANT DATA:', data);
-              alert('Debug data logged to console. Press F12 to view.');
-            } catch (e) {
-              console.error('Debug failed:', e);
-            }
-          }}>🐛 Debug</Button>
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
         </div>
       </div>

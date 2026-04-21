@@ -115,8 +115,8 @@ export function GlobalCurrencySettings() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-        <p className="text-sm text-blue-800">
+      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
           <strong>🏢 Tenant-Specific Currency</strong>
           <br />
           This currency will be used across all modules and users <strong>in your company only</strong>. Other companies will see their own currency settings.
@@ -125,16 +125,16 @@ export function GlobalCurrencySettings() {
 
       <div className="space-y-4">
         {/* Custom Currency Toggle */}
-        <div className="flex items-center space-x-2 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+        <div className="flex items-center space-x-2 p-4 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
           <Checkbox
             id="custom-currency"
             checked={useCustomCurrency}
             onCheckedChange={(checked) => setUseCustomCurrency(checked as boolean)}
           />
           <Label htmlFor="custom-currency" className="cursor-pointer flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-600" />
+            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             <span className="font-medium">Use Custom Currency</span>
-            <span className="text-xs text-gray-500">(if your currency isn't listed)</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">(if your currency isn't listed)</span>
           </Label>
         </div>
 
@@ -157,10 +157,10 @@ export function GlobalCurrencySettings() {
           </div>
         ) : (
           // Custom Currency Input
-          <div className="space-y-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
             <div className="flex items-start gap-2 mb-4">
               <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-600 dark:text-gray-400">
                 Enter your custom currency details. Example: Code: "BTC", Symbol: "₿" or Code: "FCFA", Symbol: "₣"
               </p>
             </div>
@@ -174,7 +174,7 @@ export function GlobalCurrencySettings() {
                   onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
                   maxLength={5}
                 />
-                <p className="text-xs text-gray-500">Max 5 characters</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Max 5 characters</p>
               </div>
 
               <div className="space-y-2">
@@ -185,13 +185,13 @@ export function GlobalCurrencySettings() {
                   onChange={(e) => setCustomSymbol(e.target.value)}
                   maxLength={5}
                 />
-                <p className="text-xs text-gray-500">Special symbol or letters</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Special symbol or letters</p>
               </div>
             </div>
 
             {customCode && customSymbol && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded">
-                <p className="text-sm text-green-800">
+              <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded">
+                <p className="text-sm text-green-800 dark:text-green-200">
                   Preview: <strong>{customSymbol} 1,000.00 {customCode}</strong>
                 </p>
               </div>
@@ -201,22 +201,22 @@ export function GlobalCurrencySettings() {
 
         {/* Selected Currency Preview */}
         {!useCustomCurrency && selectedCurrency && (
-          <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-4 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-5 h-5 text-green-600" />
-              <span className="font-semibold text-green-800">Selected Currency</span>
+              <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <span className="font-semibold text-green-800 dark:text-green-200">Selected Currency</span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="text-gray-600">Code:</span>{' '}
+                <span className="text-gray-600 dark:text-gray-400">Code:</span>{' '}
                 <span className="font-medium">{selectedCurrency.code}</span>
               </div>
               <div>
-                <span className="text-gray-600">Symbol:</span>{' '}
+                <span className="text-gray-600 dark:text-gray-400">Symbol:</span>{' '}
                 <span className="font-medium text-lg">{selectedCurrency.symbol}</span>
               </div>
             </div>
-            <p className="text-xs text-gray-600 mt-2">
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
               {selectedCurrency.name}
             </p>
           </div>
@@ -243,8 +243,8 @@ export function GlobalCurrencySettings() {
         </Button>
 
         {/* Multi-Tenant Info */}
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-          <p className="text-xs text-amber-800">
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+          <p className="text-xs text-amber-800 dark:text-amber-200">
             <strong>🔒 Multi-Tenant Isolation:</strong> This currency change only affects users in your company. 
             Other tenants maintain their own currency settings.
           </p>

@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { api } from '../lib/api-client';
+import { supabase } from '../lib/supabase';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { toast } from 'sonner';
@@ -30,45 +31,61 @@ export function PasswordReset() {
   const [tokenValid, setTokenValid] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [error, setError] = useState('');
+  // Whether we're using Supabase Auth recovery (from email link) vs custom token
+  const [isSupabaseRecovery, setIsSupabaseRecovery] = useState(false);
 
   useEffect(() => {
-    // Set page title
     document.title = 'Reset Password - Blumebyte';
-    
-    if (!token) {
-      setError('Invalid or missing reset token');
-      setValidating(false);
-      return;
-    }
 
-    // Validate token
-    const validateToken = async () => {
-      try {
-        const result = await api('/auth/validate-reset-token', {
-          method: 'POST',
-          body: JSON.stringify({ token }),
-        });
-        
-        if (result.valid) {
-          setTokenValid(true);
-        } else {
-          setError(result.error || 'This password reset link has expired or is invalid');
-        }
-      } catch (err) {
-        setError('Failed to validate reset link. Please request a new one.');
-      } finally {
+    // Listen for Supabase PASSWORD_RECOVERY event (from the reset email link)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setIsSupabaseRecovery(true);
+        setTokenValid(true);
         setValidating(false);
       }
-    };
+    });
 
-    validateToken();
+    // Also check if we already have an active recovery session (page refresh case)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user && window.location.hash.includes('type=recovery')) {
+        setIsSupabaseRecovery(true);
+        setTokenValid(true);
+        setValidating(false);
+      } else if (!token && !window.location.hash.includes('access_token')) {
+        // No Supabase recovery hash and no custom token
+        setError('Invalid or missing reset token');
+        setValidating(false);
+      } else if (token) {
+        // Validate custom token
+        const validateToken = async () => {
+          try {
+            const result = await api('/auth/validate-reset-token', {
+              method: 'POST',
+              body: JSON.stringify({ token }),
+            });
+            if (result.valid) {
+              setTokenValid(true);
+            } else {
+              setError(result.error || 'This password reset link has expired or is invalid');
+            }
+          } catch (err) {
+            setError('Failed to validate reset link. Please request a new one.');
+          } finally {
+            setValidating(false);
+          }
+        };
+        validateToken();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (password.length < 8) {
       setError('Password must be at least 8 characters long');
       return;
@@ -81,15 +98,21 @@ export function PasswordReset() {
 
     setLoading(true);
     try {
-      await api('/auth/reset-password', {
-        method: 'POST',
-        body: JSON.stringify({ token, newPassword: password }),
-      });
+      if (isSupabaseRecovery) {
+        // Use Supabase Auth to update the password (recovery session is active)
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) throw updateError;
+      } else {
+        // Use the custom token-based API endpoint
+        await api('/auth/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ token, newPassword: password }),
+        });
+      }
       
       setResetSuccess(true);
       toast.success('Password reset successfully!');
       
-      // Redirect to login after 3 seconds
       setTimeout(() => {
         startTransition(() => {
           navigate('/login');
@@ -241,3 +264,4 @@ export function PasswordReset() {
 }
 
 export default PasswordReset;
+

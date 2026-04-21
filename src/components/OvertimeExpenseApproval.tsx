@@ -156,6 +156,17 @@ export function OvertimeExpenseApproval() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      {/* Page Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+          <Clock className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">OT & Expenses</h1>
+          <p className="text-sm text-muted-foreground">Manage overtime requests and expense claims</p>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setActiveTab('overtime'); setStatusFilter('pending'); }}>
