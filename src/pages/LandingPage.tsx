@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, TrendingUp, Star, Sparkles, Building2, Heart, Briefcase, GraduationCap, Award, Target, TrendingUp as Growth, Book, Calendar, DollarSign, FileCheck, Globe, UserCheck, Trophy, Video, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Sparkles, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { TechSliders3D } from '../components/TechSliders3D';
 import { HeroUIUXAnimation } from '../components/HeroUIUXAnimation';
