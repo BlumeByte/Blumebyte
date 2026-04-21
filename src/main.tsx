@@ -6,9 +6,19 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 // ── IFRAME DETECTION & ADAPTATION ──────────────────────────────────
 const isInIframe = window.self !== window.top;
+
+function isFigmaOrigin(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'figma.com' || hostname.endsWith('.figma.com');
+  } catch {
+    return false;
+  }
+}
+
 const isFigmaPreview = isInIframe && (
-  document.referrer.includes('figma.com') || 
-  window.location.ancestorOrigins?.[0]?.includes('figma.com')
+  isFigmaOrigin(document.referrer) ||
+  isFigmaOrigin(window.location.ancestorOrigins?.[0] ?? '')
 );
 
 if (isFigmaPreview) {

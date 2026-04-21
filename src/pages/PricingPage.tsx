@@ -112,14 +112,14 @@ export default function PricingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       {/* Navigation */}
       <SharedNavigation />
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center max-w-3xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 text-black">
+          <h1 className="text-4xl md:text-5xl font-bold mb-6 text-mint-black">
             Simple, Transparent Pricing
           </h1>
           <p className="text-xl text-gray-600 mb-8">
@@ -134,20 +134,20 @@ export default function PricingPage() {
           {pricingPlans.map((plan, index) => (
             <Card
               key={index}
-              className={`relative border-2 transition-all hover:shadow-xl bg-white ${
-                plan.popular ? 'border-black shadow-lg scale-105' : 'border-gray-200'
+              className={`glass-public hover-lift relative border transition-all hover:shadow-xl ${
+                plan.popular ? 'border-mint-green shadow-lg scale-105' : 'border-mint-green/20'
               }`}
             >
               {plan.popular && plan.savings && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-black text-white text-sm font-medium rounded-full">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-mint-black text-white text-sm font-medium rounded-full">
                   {plan.savings}
                 </div>
               )}
               <CardHeader>
-                <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                <CardTitle className="text-2xl text-mint-black">{plan.name}</CardTitle>
                 <CardDescription className="text-sm">{plan.description}</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold text-black">{plan.price}</span>
+                  <span className="text-4xl font-bold text-mint-black">{plan.price}</span>
                   <span className="text-gray-600 text-sm">{plan.period}</span>
                 </div>
                 <p className="text-sm text-gray-600 mt-2">{plan.billingCycle}</p>
@@ -156,7 +156,7 @@ export default function PricingPage() {
                 <ul className="space-y-3 mb-6">
                   {plan.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-black shrink-0 mt-0.5" />
+                      <CheckCircle2 className="h-5 w-5 text-mint-green shrink-0 mt-0.5" />
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}
@@ -173,7 +173,7 @@ export default function PricingPage() {
                   <Button
                     className={`w-full ${
                       plan.popular
-                        ? 'bg-black text-white hover:bg-gray-800'
+                        ? 'bg-mint-black text-white hover:bg-[#1a3525]'
                         : ''
                     }`}
                     variant={plan.popular ? 'default' : 'outline'}
@@ -189,15 +189,15 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="bg-gray-50 py-20">
+      <section className="section-mint py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4 text-black">Frequently Asked Questions</h2>
+            <h2 className="text-3xl font-bold mb-4 text-mint-black">Frequently Asked Questions</h2>
             <p className="text-lg text-gray-600">Everything you need to know about pricing</p>
           </div>
           <div className="space-y-6">
             {faqs.map((faq, index) => (
-              <Card key={index} className="border-2 border-gray-200 bg-white">
+              <Card key={index} className="glass-public hover-lift border border-mint-green/20">
                 <CardHeader>
                   <CardTitle className="text-lg">{faq.question}</CardTitle>
                   <CardDescription>{faq.answer}</CardDescription>
@@ -210,17 +210,17 @@ export default function PricingPage() {
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <Card className="bg-black text-white border-0">
+        <Card className="bg-mint-black text-white border-0">
           <CardContent className="p-12 text-center">
             <h2 className="text-3xl font-bold mb-4">Still have questions?</h2>
             <p className="text-lg text-gray-300 mb-8">
               Our team is here to help you find the perfect plan for your business
             </p>
             <div className="flex gap-4 justify-center">
-              <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
+              <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-mint-white text-mint-black hover:bg-mint-green-light">
                 Start Free Trial
               </Button>
-              <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="border-white text-white hover:bg-white hover:text-black">
+              <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="border-white text-white hover:bg-white hover:text-mint-black">
                 Contact Sales
               </Button>
             </div>
@@ -229,7 +229,7 @@ export default function PricingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-white py-8">
+      <footer className="border-t border-mint-green/15 bg-mint-white/80 backdrop-blur-sm py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-sm text-gray-600">© 2026 Blumebyte. All rights reserved.</p>
         </div>

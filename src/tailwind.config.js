@@ -8,7 +8,14 @@ export default {
     "!./supabase/**",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'mint-black': '#0f1f17',
+        'mint-white': '#f0fdf8',
+        'mint-green': '#10b981',
+        'mint-green-light': '#d1fae5',
+      },
+    },
   },
   plugins: [],
 };

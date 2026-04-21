@@ -109,9 +109,10 @@ export function useLanguage() {
 }
 
 // Programmatically trigger Google Translate to change language.
-// NOTE: This function relies on Google Translate's DOM structure (the `.goog-te-combo` select element).
-// If Google Translate changes its internal implementation, the cookie-based fallback (page reload)
-// will still work correctly.
+// Priority order:
+//   1. window.doGTranslate  – Google Translate's own internal API (most reliable)
+//   2. .goog-te-combo select – DOM manipulation fallback
+//   3. cookie + page reload  – last resort; guarded to prevent infinite loops
 function applyGoogleTranslate(langCode: string) {
   try {
     if (langCode === 'en') {
@@ -124,28 +125,35 @@ function applyGoogleTranslate(langCode: string) {
       return;
     }
 
-    // Set cookie so Google Translate picks up the language on next load.
+    // Set cookie so Google Translate picks up the language on any future reload.
     const value = `/en/${langCode}`;
     document.cookie = `googtrans=${value}; path=/`;
     document.cookie = `googtrans=${value}; path=/; domain=${window.location.hostname}`;
     document.cookie = `googtrans=${value}; domain=.${window.location.hostname}; path=/`;
 
-    // Try to use the Google Translate select element without a page reload.
-    const select = document.querySelector<HTMLSelectElement>('.goog-te-combo');
-    if (select) {
-      select.value = langCode;
-      select.dispatchEvent(new Event('change'));
-      // Successfully applied without reload – clear any reload guard.
+    // 1. Use Google Translate's own internal API if available (most reliable).
+    const w = window as any;
+    if (typeof w.doGTranslate === 'function') {
+      w.doGTranslate(`en|${langCode}`);
       sessionStorage.removeItem(RELOAD_GUARD_KEY);
       return;
     }
 
-    // Fallback: reload so Google Translate picks up the cookie.
+    // 2. Fall back to manipulating the hidden select element.
+    const select = document.querySelector<HTMLSelectElement>('.goog-te-combo');
+    if (select) {
+      select.value = langCode;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      sessionStorage.removeItem(RELOAD_GUARD_KEY);
+      return;
+    }
+
+    // 3. Last resort: reload so Google Translate picks up the cookie on next init.
     // Guard against an infinite reload loop: if we already reloaded once for this
-    // language and the widget still isn't present, don't reload again.
+    // language and the widget still isn't present, don't reload again – the next
+    // useEffect retry (after GOOGLE_TRANSLATE_INIT_DELAY_MS) will try methods 1/2.
     const guardValue = sessionStorage.getItem(RELOAD_GUARD_KEY);
     if (guardValue === langCode) {
-      // Already reloaded once – widget will translate via cookie on its own.
       return;
     }
     sessionStorage.setItem(RELOAD_GUARD_KEY, langCode);
@@ -162,23 +170,18 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   });
 
   // Apply saved language after Google Translate widget initialises.
-  // Only attempt this on a fresh page load – if we already reloaded once for this
-  // language (RELOAD_GUARD_KEY is set to the same code), the cookie has been sent
-  // and Google Translate will handle the translation automatically.
+  // We always attempt to apply the translation; applyGoogleTranslate itself
+  // prevents reload loops via RELOAD_GUARD_KEY.
   useEffect(() => {
     if (selectedLang.code !== 'en') {
-      const alreadyReloaded = sessionStorage.getItem(RELOAD_GUARD_KEY) === selectedLang.code;
-      if (alreadyReloaded) {
-        // Widget will apply via cookie; clear the guard so future selections work.
-        // Give the widget a moment to finish, then clear.
-        const clearTimer = setTimeout(() => {
-          sessionStorage.removeItem(RELOAD_GUARD_KEY);
-        }, GUARD_CLEAR_DELAY_MS);
-        return () => clearTimeout(clearTimer);
-      }
       // Give the widget time to load, then apply.
       const timer = setTimeout(() => {
         applyGoogleTranslate(selectedLang.code);
+        // Clear the reload guard after the widget has had time to settle,
+        // so that future language changes can trigger a reload if needed.
+        setTimeout(() => {
+          sessionStorage.removeItem(RELOAD_GUARD_KEY);
+        }, GUARD_CLEAR_DELAY_MS);
       }, GOOGLE_TRANSLATE_INIT_DELAY_MS);
       return () => clearTimeout(timer);
     }

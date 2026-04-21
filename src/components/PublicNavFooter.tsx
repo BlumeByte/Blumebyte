@@ -106,7 +106,7 @@ function DesktopDropdown({ label, content }: { label: string; content: typeof pl
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
     >
-      <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors">
+      <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-mint-black transition-colors">
         {label}
         <ChevronDown className="h-4 w-4" />
       </button>
@@ -115,8 +115,8 @@ function DesktopDropdown({ label, content }: { label: string; content: typeof pl
         <>
           {/* Invisible bridge so the pointer doesn't leave the component crossing the gap */}
           <div className="absolute top-full left-0 right-0 h-2" onMouseEnter={handleEnter} />
-          <div
-            className="absolute top-full left-0 mt-2 w-[600px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-6"
+      <div
+            className="absolute top-full left-0 mt-2 w-[600px] glass-dropdown rounded-lg z-50 p-6"
             onMouseEnter={handleEnter}
             onMouseLeave={handleLeave}
           >
@@ -131,11 +131,11 @@ function DesktopDropdown({ label, content }: { label: string; content: typeof pl
                       <li key={j}>
                         <button
                           onClick={() => { setOpen(false); navigate(item.path); }}
-                          className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-gray-50 transition-colors group"
+                          className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-mint-green-light/40 transition-colors group"
                         >
-                          <item.icon className="h-5 w-5 text-gray-400 group-hover:text-black mt-0.5 shrink-0" />
+                          <item.icon className="h-5 w-5 text-mint-green/60 group-hover:text-mint-black mt-0.5 shrink-0" />
                           <div>
-                            <div className="text-sm font-medium text-gray-900 group-hover:text-black">{item.name}</div>
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-mint-black">{item.name}</div>
                             {(item as any).description && (
                               <div className="text-xs text-gray-500 mt-0.5">{(item as any).description}</div>
                             )}
@@ -169,7 +169,7 @@ function MobileSection({
   return (
     <div>
       <button
-        className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors"
         onClick={() => setOpen((v) => !v)}
       >
         {label}
@@ -186,7 +186,7 @@ function MobileSection({
                 <button
                   key={j}
                   onClick={() => onNavigate(item.path)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors"
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   {item.name}
@@ -208,7 +208,7 @@ export function PublicNavbar() {
   const go = (path: string) => { navigate(path); setMobileOpen(false); };
 
   return (
-    <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
+    <nav className="glass-nav sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo + desktop nav */}
@@ -225,13 +225,13 @@ export function PublicNavbar() {
               <DesktopDropdown label="Resources" content={resourcesMenu} />
               <button
                 onClick={() => navigate('/pricing')}
-                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors"
+                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-mint-black transition-colors"
               >
                 Pricing
               </button>
               <button
                 onClick={() => navigate('/hirings')}
-                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-black transition-colors flex items-center gap-1"
+                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-mint-black transition-colors flex items-center gap-1"
               >
                 <Briefcase className="h-4 w-4" />
                 Hirings
@@ -243,12 +243,12 @@ export function PublicNavbar() {
           <div className="flex items-center gap-2">
             <div className="hidden md:flex gap-3">
               <Button variant="ghost" onClick={() => navigate('/login')}>Sign In</Button>
-              <Button onClick={() => navigate('/company-signup')} className="bg-black text-white hover:bg-gray-800">
+              <Button onClick={() => navigate('/company-signup')} className="bg-mint-black text-white hover:bg-[#1a3525]">
                 Get Started
               </Button>
             </div>
             <button
-              className="md:hidden p-2 rounded-md text-gray-700 hover:text-black hover:bg-gray-100 transition-colors"
+              className="md:hidden p-2 rounded-md text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 transition-colors"
               onClick={() => setMobileOpen((v) => !v)}
               aria-label="Toggle menu"
             >
@@ -260,20 +260,20 @@ export function PublicNavbar() {
 
       {/* Mobile menu drawer – full-width below the nav bar */}
       {mobileOpen && (
-        <div className="md:hidden border-t bg-white shadow-lg w-full">
+        <div className="md:hidden border-t border-mint-green/20 bg-mint-white/90 backdrop-blur-xl shadow-lg w-full">
           <div className="px-4 py-3 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <MobileSection label="Our Platform" content={platformMenu} onNavigate={go} />
             <MobileSection label="Solutions" content={solutionsMenu} onNavigate={go} />
             <MobileSection label="Resources" content={resourcesMenu} onNavigate={go} />
             <button
               onClick={() => go('/pricing')}
-              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
+              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors"
             >
               Pricing
             </button>
             <button
               onClick={() => go('/hirings')}
-              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-black hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors flex items-center gap-2"
             >
               <Briefcase className="h-4 w-4" />
               Hirings
@@ -287,7 +287,7 @@ export function PublicNavbar() {
                 Sign In
               </Button>
               <Button
-                className="w-full bg-black text-white hover:bg-gray-800"
+                className="w-full bg-mint-black text-white hover:bg-[#1a3525]"
                 onClick={() => go('/company-signup')}
               >
                 Get Started
@@ -306,7 +306,7 @@ export function PublicFooter() {
 
   return (
     <>
-      <footer className="border-t bg-gray-50">
+      <footer className="border-t border-mint-green/20 bg-mint-white/80 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div className="md:col-span-1">
@@ -317,37 +317,37 @@ export function PublicFooter() {
           </div>
 
           <div>
-            <h3 className="font-semibold text-black mb-4 text-sm uppercase tracking-wide">Platform</h3>
+            <h3 className="font-semibold text-mint-black mb-4 text-sm uppercase tracking-wide">Platform</h3>
             <ul className="space-y-3 text-sm text-gray-600">
-              <li><button onClick={() => navigate('/platform-overview')} className="hover:text-black transition-colors">Overview</button></li>
-              <li><button onClick={() => navigate('/features')} className="hover:text-black transition-colors">Features</button></li>
-              <li><button onClick={() => navigate('/integrations')} className="hover:text-black transition-colors">Integrations</button></li>
-              <li><button onClick={() => navigate('/pricing')} className="hover:text-black transition-colors">Pricing</button></li>
-              <li><button onClick={() => navigate('/hirings')} className="hover:text-black transition-colors">Hirings</button></li>
+              <li><button onClick={() => navigate('/platform-overview')} className="hover:text-mint-black transition-colors">Overview</button></li>
+              <li><button onClick={() => navigate('/features')} className="hover:text-mint-black transition-colors">Features</button></li>
+              <li><button onClick={() => navigate('/integrations')} className="hover:text-mint-black transition-colors">Integrations</button></li>
+              <li><button onClick={() => navigate('/pricing')} className="hover:text-mint-black transition-colors">Pricing</button></li>
+              <li><button onClick={() => navigate('/hirings')} className="hover:text-mint-black transition-colors">Hirings</button></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold text-black mb-4 text-sm uppercase tracking-wide">Resources</h3>
+            <h3 className="font-semibold text-mint-black mb-4 text-sm uppercase tracking-wide">Resources</h3>
             <ul className="space-y-3 text-sm text-gray-600">
-              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Tutorials</button></li>
-              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Webinars</button></li>
-              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Documentation</button></li>
-              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-black transition-colors">Support</button></li>
+              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-mint-black transition-colors">Tutorials</button></li>
+              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-mint-black transition-colors">Webinars</button></li>
+              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-mint-black transition-colors">Documentation</button></li>
+              <li><button onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')} className="hover:text-mint-black transition-colors">Support</button></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold text-black mb-4 text-sm uppercase tracking-wide">Legal</h3>
+            <h3 className="font-semibold text-mint-black mb-4 text-sm uppercase tracking-wide">Legal</h3>
             <ul className="space-y-3 text-sm text-gray-600">
-              <li><button onClick={() => navigate('/privacy-policy')} className="hover:text-black transition-colors">Privacy Policy</button></li>
-              <li><button onClick={() => navigate('/terms-conditions')} className="hover:text-black transition-colors">Terms of Service</button></li>
-              <li><button onClick={() => navigate('/security-policy')} className="hover:text-black transition-colors">Security</button></li>
+              <li><button onClick={() => navigate('/privacy-policy')} className="hover:text-mint-black transition-colors">Privacy Policy</button></li>
+              <li><button onClick={() => navigate('/terms-conditions')} className="hover:text-mint-black transition-colors">Terms of Service</button></li>
+              <li><button onClick={() => navigate('/security-policy')} className="hover:text-mint-black transition-colors">Security</button></li>
             </ul>
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="border-t border-mint-green/15 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-gray-500">
             © {new Date().getFullYear()} Blumebyte. All rights reserved.
           </p>
@@ -355,7 +355,7 @@ export function PublicFooter() {
             <span className="text-xs text-gray-500 uppercase tracking-wide">Follow us</span>
             <button
               onClick={() => window.open('https://www.youtube.com/@BlumeByte', '_blank')}
-              className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-red-600 hover:border-red-600 transition-all duration-200"
+              className="p-2 rounded-lg glass-public border-mint-green/20 text-gray-600 hover:text-red-600 hover:border-red-600 transition-all duration-200"
               aria-label="YouTube"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
