@@ -18,6 +18,7 @@ echo "📦 Installing dependencies..."
 npm install \
   --legacy-peer-deps \
   --ignore-scripts \
+  --include=dev \
   --no-audit \
   --no-fund \
   --prefer-offline=false \
