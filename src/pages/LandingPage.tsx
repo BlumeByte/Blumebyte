@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Sparkles, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Sparkles, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
@@ -60,15 +60,6 @@ export default function LandingPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
-  const prev = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    goTo((slide - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
-  };
-  const next = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    goTo((slide + 1) % HERO_SLIDES.length);
-  };
-
   const features = [
     { icon: Users, title: 'Employee Management', description: 'Manage your workforce with ease. Track attendance, performance, and more.' },
     { icon: Clock, title: 'Time & Attendance', description: 'Clock in/out tracking with real-time monitoring and reports.' },
@@ -114,22 +105,6 @@ export default function LandingPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/70 to-black/50" />
           </div>
         ))}
-
-        {/* Prev / Next arrows */}
-        <button
-          onClick={prev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-          aria-label="Previous slide"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <button
-          onClick={next}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-          aria-label="Next slide"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
 
         {/* Slide indicators */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
