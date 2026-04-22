@@ -276,7 +276,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
       const expectedPrice = licenses * pricePerLicense;
       
-      if (amount !== expectedPrice) {
+      if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
+        console.error(`purchase-licenses: amount mismatch — received ${amount}, expected ${expectedPrice} (${licenses} licenses × $${pricePerLicense}/${plan})`);
         return c.json({ error: 'Invalid amount for the selected plan' }, 400);
       }
       
@@ -938,7 +939,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
       const expectedPrice = licenses * pricePerLicense;
       
-      if (amount !== expectedPrice) {
+      if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
+        console.error(`purchase-licenses: amount mismatch — received ${amount}, expected ${expectedPrice} (${licenses} licenses × $${pricePerLicense}/${plan})`);
         return c.json({ error: 'Invalid amount for the selected plan' }, 400);
       }
       

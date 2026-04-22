@@ -28,8 +28,8 @@ function RenderMessageContent({ content, onNavigate }: { content: string; onNavi
         const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         if (linkMatch) {
           const [, text, href] = linkMatch;
-          // Internal link (starts with /)
-          if (href.startsWith('/')) {
+          // Internal link (starts with / but NOT // which would be a protocol-relative external URL)
+          if (href.startsWith('/') && !href.startsWith('//')) {
             return (
               <a
                 key={idx}

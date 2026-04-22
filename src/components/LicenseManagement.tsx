@@ -374,17 +374,19 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       setLoading(true);
       
       const pricePerUser = selectedPlan === 'monthly' ? 6 : 60;
-      const totalAmount = additionalLicenses * pricePerUser;
+      // Ensure additionalLicenses is a valid integer (guard against NaN from bad input)
+      const safeLicenses = Number.isFinite(additionalLicenses) ? Math.max(2, Math.round(additionalLicenses)) : 2;
+      const totalAmount = safeLicenses * pricePerUser;
 
       console.log('Frontend: Initiating license purchase');
-      console.log('- Licenses:', additionalLicenses, '| Plan:', selectedPlan, '| USD:', totalAmount);
+      console.log('- Licenses:', safeLicenses, '| Plan:', selectedPlan, '| USD:', totalAmount);
 
       const endpoint = selectedUserIds.length > 0 
         ? '/subscription/purchase-licenses-with-selection'
         : '/subscription/purchase-licenses';
 
       const payload = {
-        licenses: additionalLicenses,
+        licenses: safeLicenses,
         plan: selectedPlan,
         amount: totalAmount,
         saveCard,

@@ -140,13 +140,23 @@ async function broadcastUpdate(channelName: string, eventType: string, key: stri
   try {
     const sb = supabaseAdmin();
     const channel = sb.channel(`realtime:${channelName}`);
-    
+
+    // Subscribe first — required before sending broadcasts from the server side
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('subscribe timeout')), 4000);
+      channel.subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') { clearTimeout(timer); resolve(); }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { clearTimeout(timer); reject(new Error(`channel ${status}`)); }
+      });
+    });
+
     await channel.send({
       type: 'broadcast',
       event: eventType,
       payload: { type: eventType, key, payload: data },
     });
-    
+
+    sb.removeChannel(channel);
     console.log(`✅ Broadcast sent: ${channelName} → ${eventType} → ${key}`);
     return true;
   } catch (error) {
@@ -2914,7 +2924,7 @@ app.post(`${PREFIX}/admin/request-user-create`, async (c) => {
     }
     
     const { userData, reason } = await c.req.json();
-    const requestId = `approval_req:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `approval_req:${crypto.randomUUID()}`;
     
     // CRITICAL FIX: Add company scope to approval requests
     const adminProfile = await kv.get(`employee:${adminUser.id}`);
@@ -2951,7 +2961,7 @@ app.post(`${PREFIX}/admin/request-user-update`, async (c) => {
     }
     
     const { userId, updates, reason } = await c.req.json();
-    const requestId = `approval_req:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `approval_req:${crypto.randomUUID()}`;
     
     const existingUser = await kv.get(`employee:${userId}`);
     if (!existingUser) return c.json({ error: 'User not found' }, 404);
@@ -2994,7 +3004,7 @@ app.post(`${PREFIX}/manager/request-user-update`, async (c) => {
     }
     
     const { userId, updates, reason } = await c.req.json();
-    const requestId = `approval_req:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `approval_req:${crypto.randomUUID()}`;
     
     const existingUser = await kv.get(`employee:${userId}`);
     if (!existingUser) return c.json({ error: 'User not found' }, 404);
@@ -5034,7 +5044,7 @@ app.post(`${PREFIX}/training-programs`, async (c) => {
     const userProfile = await kv.get(`user_profile:${user.id}`);
     const companyId = userProfile?.companyId;
     
-    const id = `training_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    const id = `training_${crypto.randomUUID()}`;
     const training = {
       ...body,
       id,
@@ -6565,9 +6575,11 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
     
-    // Validate pricing
-    const expectedPrice = plan === 'monthly' ? userCount * 5 : userCount * 4 * 12;
-    if (amount !== expectedPrice) {
+    // Validate pricing — $6/user/month or $60/user/year (matches LicenseManagement & PricingPage)
+    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const expectedPrice = userCount * pricePerUser;
+    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
+      console.error(`subscription/initialize: amount mismatch — received ${amount}, expected ${expectedPrice} (${userCount} users × $${pricePerUser}/${plan})`);
       return c.json({ error: 'Invalid amount for the selected plan' }, 400);
     }
     
@@ -9548,7 +9560,7 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
     }
 
     // Generate company ID
-    const companyId = `company_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const companyId = `company_${crypto.randomUUID()}`;
 
     console.log(`Creating company for OAuth user: ${email}, Company: ${companyName}`);
 
@@ -9946,6 +9958,7 @@ app.put(`${PREFIX}/notification-preferences`, async (c) => {
     await kv.set(`notif-prefs:${user.id}`, prefs);
     return c.json({ success: true, prefs });
   } catch (e: any) {
+    console.error('notification-preferences PUT error:', e?.message || e);
     return c.json({ error: 'Failed to save preferences' }, 500);
   }
 });
