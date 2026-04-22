@@ -10,10 +10,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        'mint-black': '#0f1f17',
-        'mint-white': '#f0fdf8',
-        'mint-green': '#10b981',
-        'mint-green-light': '#d1fae5',
+        'mint-black': '#111111',
+        'mint-white': '#fafafa',
+        'mint-green': '#111111',
+        'mint-green-light': '#f3f4f6',
       },
     },
   },
