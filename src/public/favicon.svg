@@ -1,23 +1,27 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background with gradient for better visibility -->
-  <rect width="64" height="64" rx="12" fill="url(#grad1)"/>
-  <defs>
-    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#000000;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  
-  <!-- Blumebyte Logo - Modern B design in white -->
-  <!-- Left curved section -->
-  <path d="M12 16C12 14.3431 13.3431 13 15 13H23C23 13 23 38.5 15 38.5C13.3431 38.5 12 37.1569 12 35.5V16Z" fill="white"/>
-  
-  <!-- Top right curve of B -->
-  <path d="M25 13H35C39.4183 13 43 16.5817 43 21C43 25.4183 39.4183 29 35 29H25V13Z" fill="white"/>
-  
-  <!-- Bottom right curve of B -->
-  <path d="M25 31H37C41.4183 31 45 34.5817 45 39C45 43.4183 41.4183 47 37 47H25V31Z" fill="white"/>
-  
-  <!-- Small decorative arc on left section -->
-  <path d="M15.5 18C15.5 18 19 20 19 24C19 28 15.5 30 15.5 30" stroke="#000000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- White background -->
+  <rect width="64" height="64" fill="white"/>
+
+  <!-- Letter B: left vertical stem -->
+  <rect x="8" y="8" width="12" height="48" rx="2" fill="black"/>
+
+  <!-- Letter B: top bowl -->
+  <path d="M20 8 H38 C47 8 52 14 52 22 C52 30 47 33 38 33 H20 Z" fill="black"/>
+
+  <!-- Letter B: bottom bowl (wider) -->
+  <path d="M20 33 H40 C50 33 56 39 56 48 C56 57 50 62 40 62 H20 Z" fill="black"/>
+
+  <!-- White cut-out inside top bowl -->
+  <path d="M21 13 H37 C44 13 47 17 47 22 C47 27 44 28 37 28 H21 Z" fill="white"/>
+
+  <!-- White cut-out inside bottom bowl -->
+  <path d="M21 38 H39 C47 38 51 42 51 48 C51 54 47 57 39 57 H21 Z" fill="white"/>
+
+  <!-- Leaf / plant growing inside the left stem area -->
+  <!-- Stem line -->
+  <line x1="14" y1="52" x2="14" y2="24" stroke="black" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Left leaf -->
+  <path d="M14 36 C10 30 8 24 12 20 C14 22 16 28 14 36 Z" fill="black"/>
+  <!-- Right leaf -->
+  <path d="M14 30 C18 24 22 22 22 18 C18 20 14 24 14 30 Z" fill="black"/>
 </svg>

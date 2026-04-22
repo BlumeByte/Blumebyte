@@ -104,7 +104,7 @@ export default function ResourcesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       {/* Navigation */}
       <SharedNavigation />
 
@@ -144,7 +144,7 @@ export default function ResourcesPage() {
           {resources.map((resource, index) => (
             <Card 
               key={index} 
-              className="border-2 border-gray-200 hover:border-black transition-all hover:shadow-lg cursor-pointer group"
+              className="glass-public hover-lift border-gray-200 hover:border-black transition-all hover:shadow-lg cursor-pointer group"
               onClick={openYouTube}
             >
               <CardHeader>

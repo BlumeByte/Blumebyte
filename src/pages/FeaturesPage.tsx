@@ -134,7 +134,7 @@ export default function FeaturesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       {/* Navigation */}
       <SharedNavigation />
 
@@ -182,7 +182,7 @@ export default function FeaturesPage() {
               </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {category.features.map((feature, featureIdx) => (
-                  <Card key={featureIdx} className="border-2 border-gray-200 hover:border-black transition-all">
+                  <Card key={featureIdx} className="glass-public hover-lift border-gray-200 hover:border-black transition-all">
                     <CardHeader>
                       <feature.icon className="h-8 w-8 text-black mb-3" />
                       <CardTitle className="text-lg">{feature.name}</CardTitle>

@@ -433,7 +433,7 @@ export default function HiringsPage() {
     });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen public-page-bg flex flex-col">
       <PublicNavbar />
 
       {/* Hero */}

@@ -4,8 +4,6 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Sparkles, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
-import { TechSliders3D } from '../components/TechSliders3D';
-import { HeroUIUXAnimation } from '../components/HeroUIUXAnimation';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
 // 4 HR-themed hero images
@@ -104,7 +102,7 @@ export default function LandingPage() {
       <PublicNavbar />
 
       {/* ── HERO: Auto-sliding images with glassmorphism overlay ── */}
-      <section className="relative overflow-hidden min-h-[700px]">
+      <section className="relative overflow-hidden min-h-[60vh] sm:min-h-[70vh] md:min-h-[80vh] flex items-center">
         {/* Slide images */}
         {HERO_SLIDES.map((s, i) => (
           <div
@@ -145,59 +143,49 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Left: Glassmorphism text card */}
-            <div className={`space-y-6 transition-opacity duration-500 ${animating ? 'opacity-0' : 'opacity-100'}`}>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium border border-white/25">
-                <Sparkles className="h-4 w-4 text-white" />
-                AI-Powered HR Management
-              </div>
-              {/* Glassmorphism headline card */}
-              <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
-                <h1 className="text-4xl sm:text-5xl md:text-5xl font-bold leading-tight text-white mb-4">
-                  {currentSlide.headline}
-                </h1>
-                <p className="text-lg text-gray-200">{currentSlide.sub}</p>
-              </div>
-              <p className="text-xl font-semibold text-gray-200">Starting at just $5 per employee/month</p>
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Button
-                  size="lg"
-                  onClick={() => navigate('/company-signup')}
-                  className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-semibold"
-                >
-                  Get Started Now
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => navigate('/pricing')}
-                  className="border-white/50 text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
-                >
-                  View Pricing
-                </Button>
-              </div>
-              {/* Trust badges */}
-              <div className="flex flex-wrap gap-4 pt-2">
-                {['🔒 SOC 2 Compliant', '⚡ 99.9% Uptime', '🌍 Multi-tenant', '🤖 AI-Powered'].map(badge => (
-                  <span key={badge} className="text-xs text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1 rounded-full">
-                    {badge}
-                  </span>
-                ))}
-              </div>
+        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
+          {/* Centered full-width hero content */}
+          <div className={`space-y-6 text-center transition-opacity duration-500 ${animating ? 'opacity-0' : 'opacity-100'}`}>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium border border-white/25">
+              <Sparkles className="h-4 w-4 text-white" />
+              AI-Powered HR Management
             </div>
-
-            {/* Right: HR Animation */}
-            <div className="hidden lg:flex items-center justify-center h-[600px]">
-              <HeroUIUXAnimation />
+            {/* Glassmorphism headline card */}
+            <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white mb-4">
+                {currentSlide.headline}
+              </h1>
+              <p className="text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto">{currentSlide.sub}</p>
+            </div>
+            <p className="text-xl font-semibold text-gray-200">Starting at just $5 per employee/month</p>
+            <div className="flex flex-wrap gap-4 justify-center pt-2">
+              <Button
+                size="lg"
+                onClick={() => navigate('/company-signup')}
+                className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-semibold"
+              >
+                Get Started Now
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate('/pricing')}
+                className="border-white/50 text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
+              >
+                View Pricing
+              </Button>
+            </div>
+            {/* Trust badges */}
+            <div className="flex flex-wrap gap-4 justify-center pt-2">
+              {['🔒 SOC 2 Compliant', '⚡ 99.9% Uptime', '🌍 Multi-tenant', '🤖 AI-Powered'].map(badge => (
+                <span key={badge} className="text-xs text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1 rounded-full">
+                  {badge}
+                </span>
+              ))}
             </div>
           </div>
         </div>
       </section>
-
-      {/* 3D Interactive Tech Sliders */}
-      <TechSliders3D />
 
       {/* Features */}
       <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">

@@ -167,7 +167,7 @@ export default function IndustryPage() {
   const Icon = currentIndustry.icon;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       {/* Navigation */}
       <SharedNavigation />
 
@@ -206,7 +206,7 @@ export default function IndustryPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="grid md:grid-cols-3 gap-8">
           {currentIndustry.stats.map((stat: any, index: number) => (
-            <Card key={index} className="border-2 border-gray-200 text-center">
+            <Card key={index} className="glass-public hover-lift border-gray-200 text-center">
               <CardHeader>
                 <div className="text-4xl font-bold text-black mb-2">{stat.value}</div>
                 <CardTitle className="text-lg">{stat.label}</CardTitle>
@@ -256,7 +256,7 @@ export default function IndustryPage() {
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
-          <Card className="border-2 border-gray-200">
+          <Card className="glass-public hover-lift border-gray-200">
             <CardHeader>
               <Users className="h-10 w-10 text-black mb-4" />
               <CardTitle>Employee Management</CardTitle>
@@ -265,7 +265,7 @@ export default function IndustryPage() {
               </CardDescription>
             </CardHeader>
           </Card>
-          <Card className="border-2 border-gray-200">
+          <Card className="glass-public hover-lift border-gray-200">
             <CardHeader>
               <BarChart3 className="h-10 w-10 text-black mb-4" />
               <CardTitle>Analytics & Reports</CardTitle>
@@ -274,7 +274,7 @@ export default function IndustryPage() {
               </CardDescription>
             </CardHeader>
           </Card>
-          <Card className="border-2 border-gray-200">
+          <Card className="glass-public hover-lift border-gray-200">
             <CardHeader>
               <Shield className="h-10 w-10 text-black mb-4" />
               <CardTitle>Compliance Ready</CardTitle>

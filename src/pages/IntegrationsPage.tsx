@@ -116,7 +116,7 @@ export default function IntegrationsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       {/* Navigation */}
       <SharedNavigation />
 
@@ -159,7 +159,7 @@ export default function IntegrationsPage() {
         </div>
         <div className="grid md:grid-cols-4 gap-8">
           {benefits.map((benefit, index) => (
-            <Card key={index} className="border-2 border-gray-200 text-center">
+            <Card key={index} className="glass-public hover-lift border-gray-200 text-center">
               <CardHeader>
                 <div className="mx-auto h-12 w-12 rounded-lg bg-black flex items-center justify-center mb-4">
                   <benefit.icon className="h-6 w-6 text-white" />
@@ -184,7 +184,7 @@ export default function IntegrationsPage() {
                 </div>
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {category.integrations.map((integration, integrationIdx) => (
-                    <Card key={integrationIdx} className="border-2 border-gray-200 hover:border-black transition-all bg-white">
+                    <Card key={integrationIdx} className="glass-public hover-lift border-gray-200 hover:border-black transition-all">
                       <CardHeader>
                         <div className="flex items-start justify-between mb-3">
                           <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
@@ -239,7 +239,7 @@ export default function IntegrationsPage() {
               View API Documentation
             </Button>
           </div>
-          <Card className="border-2 border-gray-200">
+          <Card className="glass-public hover-lift border-gray-200">
             <CardHeader>
               <CardTitle>Enterprise Integrations</CardTitle>
               <CardDescription>Need help with a specific integration? Our team can help.</CardDescription>
