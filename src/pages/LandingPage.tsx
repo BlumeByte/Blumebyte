@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Sparkles, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Sparkles, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
-import { TechSliders3D } from '../components/TechSliders3D';
-import { HeroUIUXAnimation } from '../components/HeroUIUXAnimation';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
 // 4 HR-themed hero images
@@ -32,6 +30,9 @@ const HERO_SLIDES = [
   },
 ];
 
+/** Duration (ms) of the text fade-out/in between hero slides */
+const SLIDE_FADE_MS = 400;
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [slide, setSlide] = useState(0);
@@ -44,25 +45,20 @@ export default function LandingPage() {
     setTimeout(() => {
       setSlide(idx);
       setAnimating(false);
-    }, 350);
+    }, SLIDE_FADE_MS);
   };
 
-  // Auto-advance every 5 s
+  // Auto-advance every 5 s — goes through the fade animation so text fades too
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      setSlide(prev => (prev + 1) % HERO_SLIDES.length);
+      setAnimating(true);
+      setTimeout(() => {
+        setSlide(prev => (prev + 1) % HERO_SLIDES.length);
+        setAnimating(false);
+      }, SLIDE_FADE_MS);
     }, 5000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
-
-  const prev = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    goTo((slide - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
-  };
-  const next = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    goTo((slide + 1) % HERO_SLIDES.length);
-  };
 
   const features = [
     { icon: Users, title: 'Employee Management', description: 'Manage your workforce with ease. Track attendance, performance, and more.' },
@@ -97,7 +93,7 @@ export default function LandingPage() {
       <PublicNavbar />
 
       {/* ── HERO: Auto-sliding images with glassmorphism overlay ── */}
-      <section className="relative overflow-hidden min-h-[700px]">
+      <section className="relative overflow-hidden min-h-[60vh] sm:min-h-[70vh] md:min-h-[80vh] flex items-center">
         {/* Slide images */}
         {HERO_SLIDES.map((s, i) => (
           <div
@@ -109,22 +105,6 @@ export default function LandingPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/70 to-black/50" />
           </div>
         ))}
-
-        {/* Prev / Next arrows */}
-        <button
-          onClick={prev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-          aria-label="Previous slide"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <button
-          onClick={next}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-          aria-label="Next slide"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
 
         {/* Slide indicators */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
@@ -138,59 +118,49 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Left: Glassmorphism text card */}
-            <div className={`space-y-6 transition-all duration-500 ${animating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium border border-white/25">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
-                AI-Powered HR Management
-              </div>
-              {/* Glassmorphism headline card */}
-              <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
-                <h1 className="text-4xl sm:text-5xl md:text-5xl font-bold leading-tight text-white mb-4">
-                  {currentSlide.headline}
-                </h1>
-                <p className="text-lg text-gray-200">{currentSlide.sub}</p>
-              </div>
-              <p className="text-xl font-semibold text-emerald-300">Starting at just $5 per employee/month</p>
-              <div className="flex flex-wrap gap-4 pt-2">
-                <Button
-                  size="lg"
-                  onClick={() => navigate('/company-signup')}
-                  className="bg-white text-black hover:bg-emerald-50 text-base px-8 shadow-lg font-semibold"
-                >
-                  Get Started Now
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => navigate('/pricing')}
-                  className="border-white/50 text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
-                >
-                  View Pricing
-                </Button>
-              </div>
-              {/* Trust badges */}
-              <div className="flex flex-wrap gap-4 pt-2">
-                {['🔒 SOC 2 Compliant', '⚡ 99.9% Uptime', '🌍 Multi-tenant', '🤖 AI-Powered'].map(badge => (
-                  <span key={badge} className="text-xs text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1 rounded-full">
-                    {badge}
-                  </span>
-                ))}
-              </div>
+        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
+          {/* Centered full-width hero content */}
+          <div className={`space-y-6 text-center transition-opacity duration-500 ${animating ? 'opacity-0' : 'opacity-100'}`}>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium border border-white/25">
+              <Sparkles className="h-4 w-4 text-white" />
+              AI-Powered HR Management
             </div>
-
-            {/* Right: HR Animation */}
-            <div className="hidden lg:flex items-center justify-center h-[600px]">
-              <HeroUIUXAnimation />
+            {/* Glassmorphism headline card */}
+            <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white mb-4">
+                {currentSlide.headline}
+              </h1>
+              <p className="text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto">{currentSlide.sub}</p>
+            </div>
+            <p className="text-xl font-semibold text-gray-200">Starting at just $5 per employee/month</p>
+            <div className="flex flex-wrap gap-4 justify-center pt-2">
+              <Button
+                size="lg"
+                onClick={() => navigate('/company-signup')}
+                className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-semibold"
+              >
+                Get Started Now
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate('/pricing')}
+                className="border-white/50 text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
+              >
+                View Pricing
+              </Button>
+            </div>
+            {/* Trust badges */}
+            <div className="flex flex-wrap gap-4 justify-center pt-2">
+              {['🔒 SOC 2 Compliant', '⚡ 99.9% Uptime', '🌍 Multi-tenant', '🤖 AI-Powered'].map(badge => (
+                <span key={badge} className="text-xs text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1 rounded-full">
+                  {badge}
+                </span>
+              ))}
             </div>
           </div>
         </div>
       </section>
-
-      {/* 3D Interactive Tech Sliders */}
-      <TechSliders3D />
 
       {/* Features */}
       <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -337,14 +307,14 @@ export default function LandingPage() {
         {/* Glassmorphism CTA with dark background */}
         <div className="relative overflow-hidden rounded-2xl bg-mint-black shadow-2xl">
           {/* Subtle green glow */}
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/30 via-transparent to-emerald-800/20" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/10" />
           <div className="relative z-10 p-12 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Ready to transform your HR operations?</h2>
             <p className="text-lg mb-8 text-gray-300 max-w-2xl mx-auto">
               Join hundreds of companies already using Blumebyte to streamline their HR processes
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Button size="lg" onClick={() => navigate('/company-signup')} className="text-lg px-8 bg-white text-black hover:bg-emerald-50 font-semibold shadow-lg">
+              <Button size="lg" onClick={() => navigate('/company-signup')} className="text-lg px-8 bg-white text-black hover:bg-gray-100 font-semibold shadow-lg">
                 Get Started Today
               </Button>
               <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="text-lg px-8 border-white/50 text-white hover:bg-white/15 font-semibold">

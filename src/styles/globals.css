@@ -5,17 +5,17 @@
 :root {
   --font-size: 14px;
   --background: #f8fafc;
-  /* Mint brand palette */
-  --mint-black: #0f1f17;
-  --mint-white: #f0fdf8;
-  --mint-green: #10b981;
-  --mint-green-light: #d1fae5;
+  /* Black & white brand palette */
+  --mint-black: #111111;
+  --mint-white: #fafafa;
+  --mint-green: #111111;
+  --mint-green-light: #f3f4f6;
   --foreground: oklch(0.145 0 0);
   --card: #ffffff;
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #3b82f6;
+  --primary: #111111;
   --primary-foreground: #ffffff;
   --secondary: oklch(0.95 0.0058 264.53);
   --secondary-foreground: #030213;
@@ -55,8 +55,8 @@
   --card-foreground: #e5e7eb;
   --popover: #1a1f26;
   --popover-foreground: #e5e7eb;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
+  --primary: #f9fafb;
+  --primary-foreground: #111111;
   --secondary: #374151;
   --secondary-foreground: #e5e7eb;
   --muted: #374151;
@@ -361,49 +361,46 @@ html {
    Apply these classes on public-facing pages only.
    ============================================================ */
 
-/* Mint gradient background for all public pages */
+/* Clean white background for all public pages */
 .public-page-bg {
-  background:
-    radial-gradient(ellipse 80% 50% at 10% 0%, rgba(16, 185, 129, 0.13) 0%, transparent 55%),
-    radial-gradient(ellipse 60% 60% at 90% 100%, rgba(5, 150, 105, 0.09) 0%, transparent 55%),
-    linear-gradient(160deg, #f0fdf8 0%, #ecfdf5 45%, #f7fefb 70%, #f0fdf8 100%);
+  background: linear-gradient(160deg, #ffffff 0%, #f9fafb 50%, #ffffff 100%);
 }
 
 /* Frosted-glass card for public sections */
 .glass-public {
-  background: rgba(240, 253, 248, 0.62);
+  background: rgba(255, 255, 255, 0.80);
   backdrop-filter: blur(12px) saturate(150%);
   -webkit-backdrop-filter: blur(12px) saturate(150%);
-  border: 1px solid rgba(16, 185, 129, 0.20);
-  box-shadow: 0 4px 24px rgba(15, 31, 23, 0.07), 0 1px 4px rgba(15, 31, 23, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07), 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 /* Override shadcn Card's bg-card when glass-public is present */
 .glass-public[class*="bg-"],
 .glass-public {
-  background: rgba(240, 253, 248, 0.62) !important;
+  background: rgba(255, 255, 255, 0.80) !important;
 }
 
 /* Glass sticky navbar for public pages */
 .glass-nav {
-  background: rgba(240, 253, 248, 0.86);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(18px) saturate(170%);
   -webkit-backdrop-filter: blur(18px) saturate(170%);
-  border-bottom: 1px solid rgba(16, 185, 129, 0.22);
-  box-shadow: 0 1px 16px rgba(15, 31, 23, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 1px 16px rgba(0, 0, 0, 0.06);
 }
 
 /* Glass dropdown panel */
 .glass-dropdown {
-  background: rgba(240, 253, 248, 0.94);
+  background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(20px) saturate(170%);
   -webkit-backdrop-filter: blur(20px) saturate(170%);
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  box-shadow: 0 8px 32px rgba(15, 31, 23, 0.12), 0 2px 8px rgba(15, 31, 23, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-/* Subtle glass tint for alternating sections on public pages */
+/* Subtle tint for alternating sections on public pages */
 .section-mint {
-  background: rgba(209, 250, 229, 0.28);
+  background: rgba(0, 0, 0, 0.03);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }

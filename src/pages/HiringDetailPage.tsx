@@ -122,7 +122,7 @@ export default function HiringDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen public-page-bg">
       {/* Nav */}
       <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -2181,7 +2181,7 @@ function AdminHiring() {
   const [postings, setPostings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({ status: 'open', type: 'full-time', visibilityType: 'internal_only' });
+  const [formData, setFormData] = useState<any>({ status: 'open', employmentType: 'Full Time', visibilityType: 'internal_only' });
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);

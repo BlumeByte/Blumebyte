@@ -90,6 +90,13 @@ export async function api(path: string, options: RequestInit & { token?: string 
   return data;
 }
 
+// Invalidate a specific cache entry (e.g., after a realtime event so the next
+// fetch always hits the server rather than a stale cached response).
+export function invalidateCache(path: string, token?: string | null) {
+  const cacheKey = `${path}:${token || 'anon'}`;
+  requestCache.delete(cacheKey);
+}
+
 // File upload helper function
 export async function apiUpload(path: string, formData: FormData, token?: string | null) {
   const res = await fetch(`${BASE}${path}`, {

@@ -10,7 +10,7 @@ import {
   Search, MapPin, Briefcase, Building2,
   Loader2, AlertCircle, RefreshCw, Calendar
 } from 'lucide-react';
-import { api } from '../lib/api-client';
+import { api, invalidateCache } from '../lib/api-client';
 import { supabase } from '../lib/supabase';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
@@ -385,12 +385,7 @@ export default function HiringsPage() {
       }
     } catch (e: any) {
       if (!mountedRef.current) return;
-      // 404 or empty-result errors are treated as "no jobs", not a fatal error
-      if (e?.status === 404 || e?.status === 204) {
-        setJobs([]);
-      } else {
-        setError(e?.message || 'Unable to load job openings');
-      }
+      setError(e?.message || 'Unable to load job openings');
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -400,11 +395,16 @@ export default function HiringsPage() {
 
   // ── Supabase Realtime: re-fetch when job postings change ───────────────────
   useEffect(() => {
+    const refetch = () => {
+      // Bust the cache so the next fetch always gets fresh data from the server
+      invalidateCache('/public/jobs');
+      fetchJobs();
+    };
     const channel = supabase
       .channel('realtime:job-posting')
-      .on('broadcast', { event: 'INSERT' }, () => { fetchJobs(); })
-      .on('broadcast', { event: 'UPDATE' }, () => { fetchJobs(); })
-      .on('broadcast', { event: 'DELETE' }, () => { fetchJobs(); })
+      .on('broadcast', { event: 'INSERT' }, refetch)
+      .on('broadcast', { event: 'UPDATE' }, refetch)
+      .on('broadcast', { event: 'DELETE' }, refetch)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -433,7 +433,7 @@ export default function HiringsPage() {
     });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen public-page-bg flex flex-col">
       <PublicNavbar />
 
       {/* Hero */}

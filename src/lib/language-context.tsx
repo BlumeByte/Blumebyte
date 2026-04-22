@@ -87,13 +87,48 @@ const RELOAD_GUARD_KEY = 'blumebyte_lang_reloaded';
  *  from the cookie so that the guard doesn't block future language changes. */
 const GUARD_CLEAR_DELAY_MS = 3000;
 
-/** Time to wait (ms) before attempting to apply a saved language on first load.
- *  Google Translate's widget needs a moment to inject its select element into the DOM
- *  before we can programmatically trigger a translation. */
-const GOOGLE_TRANSLATE_INIT_DELAY_MS = 1500;
+/** How often (ms) to poll for the Google Translate widget becoming ready. */
+const POLL_INTERVAL_MS = 200;
+/**
+ * Maximum time (ms) to poll for the Google Translate widget before giving up.
+ * 8 seconds covers slow network conditions where the translate.google.com script
+ * can take several seconds to load and initialise, while still being short enough
+ * to attempt a reload fallback within a reasonable user-facing timeout.
+ */
+const POLL_MAX_MS = 8_000;
 
 /** Shorter delay used when re-applying translation after SPA navigation (widget already loaded). */
 const ROUTE_RETRANSLATE_DELAY_MS = 600;
+
+/**
+ * Poll until the Google Translate widget is ready (doGTranslate or .goog-te-combo present),
+ * then call `onReady`. If the widget does not appear within POLL_MAX_MS, call `onTimeout`.
+ * Returns a cancel function to stop polling (e.g. on component unmount).
+ */
+function whenWidgetReady(onReady: () => void, onTimeout?: () => void): () => void {
+  const deadline = Date.now() + POLL_MAX_MS;
+  let timerId: ReturnType<typeof setTimeout> | null = null;
+  let cancelled = false;
+
+  const check = () => {
+    if (cancelled) return;
+    const w = window as Window & { doGTranslate?: unknown };
+    if (typeof w.doGTranslate === 'function' || !!document.querySelector('.goog-te-combo')) {
+      onReady();
+    } else if (Date.now() < deadline) {
+      timerId = setTimeout(check, POLL_INTERVAL_MS);
+    } else {
+      onTimeout?.();
+    }
+  };
+
+  check();
+
+  return () => {
+    cancelled = true;
+    if (timerId !== null) clearTimeout(timerId);
+  };
+}
 
 interface LanguageContextType {
   selectedLanguage: Language;
@@ -138,7 +173,7 @@ function applyGoogleTranslate(langCode: string) {
     document.cookie = `googtrans=${value}; domain=.${window.location.hostname}; path=/`;
 
     // 1. Use Google Translate's own internal API if available (most reliable).
-    const w = window as any;
+    const w = window as Window & { doGTranslate?: (lang: string) => void };
     if (typeof w.doGTranslate === 'function') {
       w.doGTranslate(`en|${langCode}`);
       sessionStorage.removeItem(RELOAD_GUARD_KEY);
@@ -149,7 +184,10 @@ function applyGoogleTranslate(langCode: string) {
     const select = document.querySelector<HTMLSelectElement>('.goog-te-combo');
     if (select) {
       select.value = langCode;
+      // Fire both 'change' and 'input': older Google Translate versions listen
+      // for 'change' while some newer builds also require 'input'.
       select.dispatchEvent(new Event('change', { bubbles: true }));
+      select.dispatchEvent(new Event('input', { bubbles: true }));
       sessionStorage.removeItem(RELOAD_GUARD_KEY);
       return;
     }
@@ -174,18 +212,34 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     return LANGUAGES.find(l => l.code === saved) ?? LANGUAGES[0];
   });
 
-  // Apply saved language after Google Translate widget initialises.
+  // Apply (or re-apply) translation after React renders.  Runs on initial
+  // mount (to restore a saved non-English preference) and re-runs whenever
+  // selectedLang.code changes so user-initiated language selections are
+  // translated after React has finished committing the new DOM, preventing
+  // React's reconciliation from overwriting the translation.
   useEffect(() => {
-    if (selectedLang.code !== 'en') {
-      const timer = setTimeout(() => {
-        applyGoogleTranslate(selectedLang.code);
-        setTimeout(() => {
-          sessionStorage.removeItem(RELOAD_GUARD_KEY);
-        }, GUARD_CLEAR_DELAY_MS);
-      }, GOOGLE_TRANSLATE_INIT_DELAY_MS);
-      return () => clearTimeout(timer);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selectedLang.code === 'en') return;
+
+    const langCode = selectedLang.code;
+
+    const cancel = whenWidgetReady(
+      () => {
+        // Widget is ready – apply translation and clear the reload guard.
+        applyGoogleTranslate(langCode);
+        setTimeout(() => sessionStorage.removeItem(RELOAD_GUARD_KEY), GUARD_CLEAR_DELAY_MS);
+      },
+      () => {
+        // Widget never appeared – fall back to a reload (guarded to prevent loops).
+        const guard = sessionStorage.getItem(RELOAD_GUARD_KEY);
+        if (guard !== langCode) {
+          sessionStorage.setItem(RELOAD_GUARD_KEY, langCode);
+          window.location.reload();
+        }
+      },
+    );
+
+    return cancel;
+  }, [selectedLang.code]); // re-run whenever the selected language changes
 
   // Re-apply translation whenever the URL path changes (SPA navigation).
   // This ensures newly rendered dashboard/chat content gets translated too.
@@ -237,7 +291,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setSelectedLang(lang);
     localStorage.setItem(STORAGE_KEY, code);
     sessionStorage.removeItem(RELOAD_GUARD_KEY);
-    applyGoogleTranslate(code);
+    // Translation is applied by the useEffect above, which fires after React
+    // has finished rendering.  Calling applyGoogleTranslate here (before the
+    // render commits) caused React reconciliation to immediately overwrite the
+    // translation, making language changes appear to have no effect.
   }, []);
 
   return (

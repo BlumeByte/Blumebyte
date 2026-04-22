@@ -61,12 +61,8 @@ const Slider3D: React.FC<Slider3DProps> = ({ title, description, icon: Icon, col
         {/* Icon and Title */}
         <div className="flex items-center gap-4 mb-6">
           <motion.div
-            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileHover={{ scale: 1.1 }}
             className={`w-16 h-16 rounded-xl ${color} flex items-center justify-center shadow-md`}
-            style={{
-              transform: `perspective(1000px) rotateY(${(value - 50) / 5}deg)`,
-              transition: 'transform 0.3s ease',
-            }}
           >
             <Icon className="w-8 h-8 text-white" />
           </motion.div>
@@ -76,57 +72,31 @@ const Slider3D: React.FC<Slider3DProps> = ({ title, description, icon: Icon, col
           </div>
         </div>
 
-        {/* 3D Slider Track */}
+        {/* Slider Track */}
         <div className="relative mb-4">
           <div
             ref={sliderRef}
             onClick={handleClick}
             onMouseMove={handleMouseMove}
-            className="relative h-16 bg-gradient-to-b from-gray-100 to-gray-200 rounded-xl cursor-pointer overflow-hidden shadow-inner"
-            style={{
-              transform: 'perspective(800px) rotateX(5deg)',
-              transformStyle: 'preserve-3d',
-            }}
+            className="relative h-12 bg-gray-100 rounded-xl cursor-pointer overflow-hidden shadow-inner"
           >
             {/* Progress Fill with 3D effect */}
             <motion.div
-              className={`absolute top-0 left-0 h-full ${color} rounded-xl shadow-lg`}
+              className={`absolute top-0 left-0 h-full ${color} rounded-xl`}
               style={{
                 width: `${value}%`,
                 background: 'linear-gradient(135deg, #1f2937 0%, #000000 100%)',
               }}
-              animate={{
-                boxShadow: isDragging
-                  ? '0 10px 30px rgba(0,0,0,0.3), inset 0 -2px 10px rgba(0,0,0,0.2)'
-                  : '0 4px 15px rgba(0,0,0,0.2), inset 0 -2px 5px rgba(0,0,0,0.1)',
-              }}
-              transition={{ duration: 0.2 }}
             >
-              {/* Shine effect */}
-              <div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                style={{
-                  transform: 'skewX(-20deg)',
-                  left: '-100%',
-                  animation: 'shine 2s infinite',
-                }}
-              />
             </motion.div>
 
             {/* Draggable Handle */}
             <motion.div
-              className="absolute top-1/2 -translate-y-1/2 w-8 h-12 bg-white rounded-lg shadow-xl cursor-grab active:cursor-grabbing border-2 border-gray-300"
-              style={{
-                left: `calc(${value}% - 16px)`,
-              }}
+              className="absolute top-1/2 -translate-y-1/2 w-8 h-10 bg-white rounded-lg shadow-md cursor-grab active:cursor-grabbing border-2 border-gray-300"
+              style={{ left: `calc(${value}% - 16px)` }}
               onMouseDown={handleMouseDown}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              animate={{
-                boxShadow: isDragging
-                  ? '0 8px 25px rgba(0,0,0,0.3)'
-                  : '0 4px 15px rgba(0,0,0,0.2)',
-              }}
             >
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
                 <div className="w-1 h-1 rounded-full bg-gray-400" />
@@ -134,17 +104,6 @@ const Slider3D: React.FC<Slider3DProps> = ({ title, description, icon: Icon, col
                 <div className="w-1 h-1 rounded-full bg-gray-400" />
               </div>
             </motion.div>
-
-            {/* Grid lines for depth */}
-            <div className="absolute inset-0 pointer-events-none">
-              {[...Array(10)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute h-full w-px bg-gray-300/20"
-                  style={{ left: `${(i + 1) * 10}%` }}
-                />
-              ))}
-            </div>
           </div>
         </div>
 
@@ -153,7 +112,7 @@ const Slider3D: React.FC<Slider3DProps> = ({ title, description, icon: Icon, col
           <span className="text-sm font-medium text-gray-500">Performance</span>
           <motion.span
             key={value}
-            initial={{ scale: 1.2, color: '#3b82f6' }}
+            initial={{ scale: 1.2, color: '#111111' }}
             animate={{ scale: 1, color: '#111827' }}
             className="text-3xl font-bold"
           >
@@ -179,16 +138,6 @@ const Slider3D: React.FC<Slider3DProps> = ({ title, description, icon: Icon, col
         </div>
       </div>
 
-      <style>{`
-        @keyframes shine {
-          0% {
-            left: -100%;
-          }
-          100% {
-            left: 200%;
-          }
-        }
-      `}</style>
     </motion.div>
   );
 };
@@ -272,33 +221,11 @@ export function TechSliders3D() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative py-24 bg-gradient-to-br from-gray-50 via-white to-blue-50 overflow-hidden">
-      {/* Animated Background Elements */}
+    <section className="relative py-24 bg-gray-50 overflow-hidden">
+      {/* Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
-        <motion.div
-          className="absolute bottom-20 right-10 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-gray-200/40 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-gray-200/30 rounded-full blur-3xl" />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -317,7 +244,7 @@ export function TechSliders3D() {
             transition={{ duration: 0.5, type: 'spring' }}
             className="inline-block mb-4"
           >
-            <div className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full text-white font-semibold text-sm shadow-lg">
+            <div className="px-6 py-2 bg-black rounded-full text-white font-semibold text-sm shadow-lg">
               Interactive HR Metrics
             </div>
           </motion.div>
@@ -325,7 +252,7 @@ export function TechSliders3D() {
             Control Your HR Performance
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Experience real-time HR analytics with our interactive 3D controls. Adjust metrics and see instant insights across all your workforce management areas.
+            Experience real-time HR analytics with our interactive controls. Adjust metrics and see instant insights across all your workforce management areas.
           </p>
         </motion.div>
 
@@ -367,7 +294,7 @@ export function TechSliders3D() {
             whileTap={{ scale: 0.95 }}
             className="inline-block"
           >
-            <button className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300" onClick={() => navigate('/features')}>
+            <button className="px-8 py-4 bg-black text-white font-semibold rounded-xl shadow-lg hover:bg-gray-800 transition-all duration-300" onClick={() => navigate('/features')}>
               Explore All Features →
             </button>
           </motion.div>

@@ -18,7 +18,7 @@ export default function PerformanceManagementPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       <SharedNavigation />
       <section className="relative overflow-hidden">
         {/* Background Image */}
@@ -54,7 +54,7 @@ export default function PerformanceManagementPage() {
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <Card key={index} className="border-2 border-gray-200">
+            <Card key={index} className="glass-public hover-lift border-gray-200">
               <CardHeader>
                 <feature.icon className="h-10 w-10 text-black mb-4" />
                 <CardTitle>{feature.title}</CardTitle>

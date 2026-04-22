@@ -67,7 +67,7 @@ export default function PlatformOverview() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen public-page-bg">
       {/* Navigation */}
       <SharedNavigation />
 
@@ -118,7 +118,7 @@ export default function PlatformOverview() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {modules.map((module, index) => (
-            <Card key={index} className="border-2 border-gray-200 hover:border-black transition-all hover:shadow-lg">
+            <Card key={index} className="glass-public hover-lift border-gray-200 hover:border-black transition-all hover:shadow-lg">
               <CardHeader>
                 <div className="h-12 w-12 rounded-lg bg-black flex items-center justify-center mb-4">
                   <module.icon className="h-6 w-6 text-white" />
@@ -151,7 +151,7 @@ export default function PlatformOverview() {
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="border-2 border-gray-200 bg-white">
+            <Card className="glass-public hover-lift border-gray-200">
               <CardHeader>
                 <Zap className="h-10 w-10 text-black mb-4" />
                 <CardTitle>Fast Implementation</CardTitle>
@@ -160,7 +160,7 @@ export default function PlatformOverview() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            <Card className="border-2 border-gray-200 bg-white">
+            <Card className="glass-public hover-lift border-gray-200">
               <CardHeader>
                 <Shield className="h-10 w-10 text-black mb-4" />
                 <CardTitle>Enterprise Security</CardTitle>
@@ -169,7 +169,7 @@ export default function PlatformOverview() {
                 </CardDescription>
               </CardHeader>
             </Card>
-            <Card className="border-2 border-gray-200 bg-white">
+            <Card className="glass-public hover-lift border-gray-200">
               <CardHeader>
                 <Users className="h-10 w-10 text-black mb-4" />
                 <CardTitle>24/7 Support</CardTitle>
