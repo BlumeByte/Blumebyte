@@ -80,7 +80,13 @@ export function NotificationSettings() {
       });
       toast.success('Notification preferences saved');
     } catch (e: any) {
-      toast.error(e?.message === 'Not authenticated' ? 'Please sign in again to save preferences' : 'Failed to save preferences');
+      // Log the real error for debugging while showing a user-friendly message
+      console.error('NotificationSettings save error:', e?.message || e);
+      if (!e?.message || e.message === 'Not authenticated' || e.status === 401) {
+        toast.error('Please sign in again to save preferences');
+      } else {
+        toast.error('Failed to save preferences. Please try again.');
+      }
     } finally {
       setSaving(false);
     }

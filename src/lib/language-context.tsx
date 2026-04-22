@@ -111,17 +111,21 @@ export function useLanguage() {
 
 /** Set the googtrans cookie on all relevant scopes for the current hostname. */
 function setGoogTransCookie(value: string) {
-  document.cookie = `googtrans=${value}; path=/`;
-  document.cookie = `googtrans=${value}; path=/; domain=${window.location.hostname}`;
-  document.cookie = `googtrans=${value}; domain=.${window.location.hostname}; path=/`;
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  const base = `${value}; path=/; SameSite=Lax${secure}`;
+  document.cookie = `googtrans=${base}`;
+  document.cookie = `googtrans=${base}; domain=${window.location.hostname}`;
+  document.cookie = `googtrans=${base}; domain=.${window.location.hostname}`;
 }
 
 /** Clear the googtrans cookie from all relevant scopes. */
 function clearGoogTransCookie() {
   const expired = 'expires=Thu, 01 Jan 1970 00:00:00 UTC';
-  document.cookie = `googtrans=; ${expired}; path=/`;
-  document.cookie = `googtrans=; ${expired}; path=/; domain=${window.location.hostname}`;
-  document.cookie = `googtrans=; ${expired}; domain=.${window.location.hostname}; path=/`;
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  const base = `; path=/; SameSite=Lax; ${expired}${secure}`;
+  document.cookie = `googtrans=${base}`;
+  document.cookie = `googtrans=${base}; domain=${window.location.hostname}`;
+  document.cookie = `googtrans=${base}; domain=.${window.location.hostname}`;
 }
 
 /**
