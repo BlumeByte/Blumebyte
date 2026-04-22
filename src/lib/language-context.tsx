@@ -184,7 +184,9 @@ function applyGoogleTranslate(langCode: string) {
     const select = document.querySelector<HTMLSelectElement>('.goog-te-combo');
     if (select) {
       select.value = langCode;
+      // Fire both 'change' and 'input' for broader Google Translate version compatibility.
       select.dispatchEvent(new Event('change', { bubbles: true }));
+      select.dispatchEvent(new Event('input', { bubbles: true }));
       sessionStorage.removeItem(RELOAD_GUARD_KEY);
       return;
     }
@@ -209,10 +211,18 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     return LANGUAGES.find(l => l.code === saved) ?? LANGUAGES[0];
   });
 
-  // Apply saved language once the Google Translate widget becomes ready.
-  // Uses polling instead of a fixed delay so translation fires as soon as the
-  // widget is available – even on slow connections – and retries via reload if
-  // the widget never appears within POLL_MAX_MS.
+  // Apply (or re-apply) translation after React renders, both on the initial
+  // mount (to restore a saved non-English preference) and on every subsequent
+  // language change triggered by the user.
+  //
+  // Using [selectedLang.code] instead of [] ensures this effect re-fires
+  // whenever the user picks a new language, which was the primary reason
+  // translation appeared to do nothing after a user selection.
+  //
+  // Running inside useEffect also guarantees applyGoogleTranslate is called
+  // AFTER React has finished updating the DOM, so React reconciliation can no
+  // longer overwrite the translation (which happened when the call was made
+  // synchronously inside setLanguage before the render committed).
   useEffect(() => {
     if (selectedLang.code === 'en') return;
 
@@ -235,7 +245,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     );
 
     return cancel;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedLang.code]); // re-run on every language change, not just mount
 
   // Re-apply translation whenever the URL path changes (SPA navigation).
   // This ensures newly rendered dashboard/chat content gets translated too.
@@ -287,7 +297,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setSelectedLang(lang);
     localStorage.setItem(STORAGE_KEY, code);
     sessionStorage.removeItem(RELOAD_GUARD_KEY);
-    applyGoogleTranslate(code);
+    // Translation is applied by the useEffect above, which fires after React
+    // has finished rendering.  Calling applyGoogleTranslate here (before the
+    // render commits) caused React reconciliation to immediately overwrite the
+    // translation, making language changes appear to have no effect.
   }, []);
 
   return (
