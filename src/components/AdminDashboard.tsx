@@ -2181,7 +2181,7 @@ function AdminHiring() {
   const [postings, setPostings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global' });
+  const [formData, setFormData] = useState<any>({ status: 'open', employmentType: 'Full Time', visibilityType: 'internal_only' });
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -2245,7 +2245,7 @@ function AdminHiring() {
 
   const openNew = () => {
     setEditItem(null);
-    setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global', companyName: branding.companyName || '' });
+    setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'internal_only', companyName: branding.companyName || '' });
     setDialogOpen(true);
   };
 

@@ -10013,8 +10013,9 @@ async function sendEmailNotification(
 app.get(`${PREFIX}/public/jobs`, async (c) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
-    // Include all non-draft, non-closed, non-filled public_global postings
-    // Case-insensitive check: accept 'public_global' or 'public' as visibility values
+    // Accept both 'public_global' (canonical value used by all POST/PUT handlers)
+    // and 'public' (legacy alias that some older records may have stored).
+    // Both checks are case-insensitive to handle any capitalisation drift.
     const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
     const eligible = all.filter((j: any) => {
       const vt = (j.visibilityType || '').toLowerCase();
