@@ -18,6 +18,7 @@ function figmaAssetResolver() {
 
   export default defineConfig({
     base: process.env.VITE_GITHUB_PAGES ? '/Blumebyte/' : '/',
+    publicDir: path.resolve(__dirname, 'src/public'),
     plugins: [react(), tailwindcss(), figmaAssetResolver()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],

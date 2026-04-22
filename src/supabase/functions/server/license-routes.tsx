@@ -273,7 +273,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Validate pricing
-      const pricePerLicense = plan === 'monthly' ? 5 : 48;
+      const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
       const expectedPrice = licenses * pricePerLicense;
       
       if (amount !== expectedPrice) {
@@ -642,7 +642,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Calculate renewal amount
-      const pricePerLicense = subscription.plan === 'monthly' ? 5 : 48;
+      const pricePerLicense = subscription.plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr
       const amount = subscription.purchasedLicenses * pricePerLicense;
       
       // Convert USD to GHS for Paystack
@@ -935,7 +935,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Validate pricing
-      const pricePerLicense = plan === 'monthly' ? 5 : 48;
+      const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
       const expectedPrice = licenses * pricePerLicense;
       
       if (amount !== expectedPrice) {

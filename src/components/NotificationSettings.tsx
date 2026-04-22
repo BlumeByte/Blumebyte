@@ -41,21 +41,28 @@ const EMAIL_SETTINGS: { key: keyof NotificationPrefs; label: string; description
 ];
 
 export function NotificationSettings() {
-  const { accessToken } = useAuth();
+  const { getToken } = useAuth();
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api('/notification-preferences', { token: accessToken })
-      .then((data) => {
-        if (data && typeof data === 'object') {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken();
+        const data = await api('/notification-preferences', { token });
+        if (!cancelled && data && typeof data === 'object') {
           setPrefs({ ...DEFAULT_PREFS, ...data });
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [accessToken]);
+      } catch {
+        // Silently fail - use defaults
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
 
   const toggle = (key: keyof NotificationPrefs) => {
     setPrefs(prev => ({ ...prev, [key]: !prev[key] }));
@@ -64,14 +71,22 @@ export function NotificationSettings() {
   const save = async () => {
     setSaving(true);
     try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
       await api('/notification-preferences', {
         method: 'PUT',
-        token: accessToken,
+        token,
         body: prefs,
       });
       toast.success('Notification preferences saved');
-    } catch {
-      toast.error('Failed to save preferences');
+    } catch (e: any) {
+      // Log the real error for debugging while showing a user-friendly message
+      console.error('NotificationSettings save error:', e?.message || e);
+      if (!e?.message || e.message === 'Not authenticated' || e.status === 401) {
+        toast.error('Please sign in again to save preferences');
+      } else {
+        toast.error('Failed to save preferences. Please try again.');
+      }
     } finally {
       setSaving(false);
     }
