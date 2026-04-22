@@ -4135,9 +4135,12 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
     const body = await c.req.json();
     const id = body.id || crypto.randomUUID();
     const companyId = body.companyId || body.company || (await getCompanyId(user.id));
-    if (!companyId) return c.json({ error: 'User has no company assignment' }, 400);
+    // SuperAdmins may not have a company scope; allow creation with just companyName
+    if (!companyId) {
+      console.log(`SuperAdmin ${user.id} has no company scope — creating job posting with companyName only`);
+    }
     // Auto-populate companyName from company record if not provided
-    const companyName = body.companyName || (await resolveCompanyName(companyId)) || '';
+    const companyName = body.companyName || (companyId ? await resolveCompanyName(companyId) : '') || '';
     // Normalize employmentType: accept both 'type' and 'employmentType', normalize casing
     const employmentType = normalizeEmploymentType(body.employmentType || body.type || '');
     // Auto-activate status when visibility is set to public_global
@@ -4147,11 +4150,9 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
     }
     // Explicitly set visibilityType (don't rely solely on ...body spread to avoid undefined overwrites)
     const visibilityType = body.visibilityType || 'internal_only';
-    const item = {
+    const item: any = {
       ...body,
       id,
-      companyId,
-      company: companyId,
       companyName,
       employmentType,
       visibilityType,
@@ -4159,6 +4160,8 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    // Only set companyId/company when we actually have a value (avoid null polluting the record)
+    if (companyId) { item.companyId = companyId; item.company = companyId; }
     await kv.set(`job-posting:${id}`, item);
     await broadcastUpdate('job-posting', 'INSERT', id, item);
     return c.json(item, 201);
@@ -10011,18 +10014,22 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
     // Include all non-draft, non-closed, non-filled public_global postings
+    // Case-insensitive check: accept 'public_global' or 'public' as visibility values
     const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
-    const eligible = all.filter((j: any) =>
-      j.visibilityType === 'public_global' &&
-      ACTIVE_STATUSES.has(j.status)
-    );
+    const eligible = all.filter((j: any) => {
+      const vt = (j.visibilityType || '').toLowerCase();
+      return (vt === 'public_global' || vt === 'public') && ACTIVE_STATUSES.has((j.status || '').toLowerCase());
+    });
 
-    // Build public job objects, backfilling companyName from company record if absent
-    const publicJobs = await Promise.all(eligible.map(async (j: any) => {
+    console.log(`Public jobs: ${all.length} total job-postings, ${eligible.length} eligible public ones`);
+
+    // Build public job objects using Promise.allSettled so one bad company-name
+    // lookup never wipes the entire result set.
+    const settled = await Promise.allSettled(eligible.map(async (j: any) => {
       let companyName = j.companyName || '';
       // If companyName missing but we have a companyId, look it up
       if (!companyName && j.companyId) {
-        companyName = await resolveCompanyName(j.companyId);
+        try { companyName = await resolveCompanyName(j.companyId); } catch (_) { /* ignore */ }
       }
       // If still missing, use raw company field (might be UUID or name)
       if (!companyName) companyName = typeof j.company === 'string' && !j.company.includes('-') ? j.company : '';
@@ -10043,11 +10050,17 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
         status: j.status,
       };
     }));
+
+    const publicJobs = settled
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .map(r => r.value);
+
     publicJobs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    console.log(`Public jobs: returning ${publicJobs.length} jobs`);
     return c.json(publicJobs);
   } catch (e: any) {
     console.error('Public jobs error:', e);
-    return c.json([]);
+    return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
   }
 });
 
