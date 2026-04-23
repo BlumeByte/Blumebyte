@@ -220,7 +220,7 @@ export default function PricingPage() {
               <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-mint-white text-mint-black hover:bg-mint-green-light">
                 Start Free Trial
               </Button>
-              <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="border-white text-white hover:bg-white hover:text-mint-black">
+              <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="border-white bg-transparent text-white hover:bg-white hover:text-mint-black">
                 Contact Sales
               </Button>
             </div>

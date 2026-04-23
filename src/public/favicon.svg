@@ -1,27 +1,31 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- White background -->
-  <rect width="64" height="64" fill="white"/>
+  <!-- Black background -->
+  <rect width="64" height="64" fill="black"/>
 
-  <!-- Letter B: left vertical stem -->
-  <rect x="8" y="8" width="12" height="48" rx="2" fill="black"/>
+  <!-- Left vertical stem of B (white) -->
+  <rect x="7" y="7" width="11" height="50" rx="2" fill="white"/>
 
-  <!-- Letter B: top bowl -->
-  <path d="M20 8 H38 C47 8 52 14 52 22 C52 30 47 33 38 33 H20 Z" fill="black"/>
+  <!-- Top bowl of B (white outer) -->
+  <path d="M18 7 H38 C49 7 55 14 55 24 C55 34 49 37 38 37 H18 Z" fill="white"/>
+  <!-- Top bowl inner cut-out (black) — creates the letter B space -->
+  <path d="M18 14 H36 C44 14 48 18 48 24 C48 30 44 30 36 30 H18 Z" fill="black"/>
 
-  <!-- Letter B: bottom bowl (wider) -->
-  <path d="M20 33 H40 C50 33 56 39 56 48 C56 57 50 62 40 62 H20 Z" fill="black"/>
+  <!-- Bottom bowl of B (white outer, slightly wider) -->
+  <path d="M18 37 H40 C52 37 58 44 58 52 C58 60 52 57 40 57 H18 Z" fill="white"/>
+  <!-- Bottom bowl inner cut-out (black) -->
+  <path d="M18 43 H38 C47 43 51 47 51 52 C51 57 47 57 38 57 H18 Z" fill="black"/>
 
-  <!-- White cut-out inside top bowl -->
-  <path d="M21 13 H37 C44 13 47 17 47 22 C47 27 44 28 37 28 H21 Z" fill="white"/>
+  <!-- Leaf shape inside top bowl -->
+  <!-- Leaf stem -->
+  <line x1="36" y1="30" x2="36" y2="16" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Left leaf lobe -->
+  <path d="M36 26 C31 21 29 15 32 12 C34 14 36 20 36 26 Z" fill="white"/>
+  <!-- Right leaf lobe -->
+  <path d="M36 22 C41 17 44 13 41 10 C38 12 36 17 36 22 Z" fill="white"/>
+  <!-- Leaf vein (black line on white leaf) -->
+  <line x1="36" y1="25" x2="32" y2="18" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
+  <line x1="36" y1="21" x2="40" y2="15" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
 
-  <!-- White cut-out inside bottom bowl -->
-  <path d="M21 38 H39 C47 38 51 42 51 48 C51 54 47 57 39 57 H21 Z" fill="white"/>
-
-  <!-- Leaf / plant growing inside the left stem area -->
-  <!-- Stem line -->
-  <line x1="14" y1="52" x2="14" y2="24" stroke="black" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- Left leaf -->
-  <path d="M14 36 C10 30 8 24 12 20 C14 22 16 28 14 36 Z" fill="black"/>
-  <!-- Right leaf -->
-  <path d="M14 30 C18 24 22 22 22 18 C18 20 14 24 14 30 Z" fill="black"/>
+  <!-- Arch / seedling shape inside bottom bowl (white) -->
+  <path d="M26 57 C26 48 30 43 36 43 C42 43 46 48 46 57 Z" fill="white"/>
 </svg>

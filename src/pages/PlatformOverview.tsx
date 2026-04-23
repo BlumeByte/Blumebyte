@@ -97,7 +97,7 @@ export default function PlatformOverview() {
               <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
                 Get Started Now
               </Button>
-              <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white text-white hover:bg-white hover:text-black">
+              <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white bg-transparent text-white hover:bg-white hover:text-black">
                 View Pricing
               </Button>
             </div>
