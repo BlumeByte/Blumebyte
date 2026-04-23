@@ -2,30 +2,19 @@
   <!-- Black background -->
   <rect width="64" height="64" fill="black"/>
 
-  <!-- Left vertical stem of B (white) -->
-  <rect x="7" y="7" width="11" height="50" rx="2" fill="white"/>
+  <!-- Left vertical stem of B -->
+  <rect x="7" y="6" width="10" height="52" rx="2" fill="white"/>
 
-  <!-- Top bowl of B (white outer) -->
-  <path d="M18 7 H38 C49 7 55 14 55 24 C55 34 49 37 38 37 H18 Z" fill="white"/>
-  <!-- Top bowl inner cut-out (black) — creates the letter B space -->
-  <path d="M18 14 H36 C44 14 48 18 48 24 C48 30 44 30 36 30 H18 Z" fill="black"/>
+  <!-- Top bowl: large leaf shape filling the upper B bowl -->
+  <!-- Outer leaf/bowl: starts at stem top, sweeps right to ~x=54 at midpoint, returns to stem at y=33 -->
+  <path d="M17 6 C17 6 44 6 54 18 C60 26 54 33 17 33 Z" fill="white"/>
+  <!-- Two curved black vein lines on the leaf -->
+  <path d="M24 12 C34 16 44 20 52 26" stroke="black" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+  <path d="M22 20 C31 24 40 27 50 30" stroke="black" stroke-width="1.8" stroke-linecap="round" fill="none"/>
 
-  <!-- Bottom bowl of B (white outer, slightly wider) -->
-  <path d="M18 37 H40 C52 37 58 44 58 52 C58 55 52 57 40 57 H18 Z" fill="white"/>
-  <!-- Bottom bowl inner cut-out (black) -->
-  <path d="M18 43 H38 C47 43 51 47 51 52 C51 57 47 57 38 57 H18 Z" fill="black"/>
-
-  <!-- Leaf shape inside top bowl -->
-  <!-- Leaf stem -->
-  <line x1="36" y1="30" x2="36" y2="16" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
-  <!-- Left leaf lobe -->
-  <path d="M36 26 C31 21 29 15 32 12 C34 14 36 20 36 26 Z" fill="white"/>
-  <!-- Right leaf lobe -->
-  <path d="M36 22 C41 17 44 13 41 10 C38 12 36 17 36 22 Z" fill="white"/>
-  <!-- Leaf vein (black line on white leaf) -->
-  <line x1="36" y1="25" x2="32" y2="18" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
-  <line x1="36" y1="21" x2="40" y2="15" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
-
-  <!-- Arch / seedling shape inside bottom bowl (white) -->
-  <path d="M26 57 C26 48 30 43 36 43 C42 43 46 48 46 57 Z" fill="white"/>
+  <!-- Bottom bowl: solid white arch with black inner cutout -->
+  <!-- Outer arch -->
+  <path d="M17 33 H40 C52 33 58 40 58 47 C58 54 52 58 40 58 H17 Z" fill="white"/>
+  <!-- Inner black cutout to make it hollow like a bowl -->
+  <path d="M17 39 H38 C47 39 51 43 51 47 C51 51 47 53 38 53 H17 Z" fill="black"/>
 </svg>
