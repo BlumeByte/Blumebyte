@@ -385,7 +385,8 @@ export default function HiringsPage() {
       }
     } catch (e: any) {
       if (!mountedRef.current) return;
-      setError(e?.message || 'Unable to load job openings');
+      console.error('Failed to load public jobs:', e?.message);
+      setError('Unable to load job openings. Please try again later.');
     } finally {
       if (mountedRef.current) setLoading(false);
     }

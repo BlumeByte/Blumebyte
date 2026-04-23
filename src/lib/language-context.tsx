@@ -84,35 +84,42 @@ const SKIP_TAGS = new Set([
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'IFRAME', 'OBJECT', 'CODE', 'PRE',
 ]);
 
-/** Separator used when batching multiple strings into a single API call. */
-const BATCH_SEP = '\n⚡\n';
-
-/** Maximum characters per API request (conservative to stay within URL limits). */
-const MAX_BATCH_CHARS = 1500;
+/** Max concurrent translation requests sent to the GTX API at one time. */
+const TRANSLATION_CONCURRENCY = 20;
 
 /** Debounce delay (ms) before re-translating after DOM mutations from React renders. */
 const OBSERVE_DEBOUNCE_MS = 400;
 
 /**
  * Delay before restarting the MutationObserver after we finish applying translations.
- * Even though the observer is disconnected during our writes, we wait one macrotask
- * to ensure any synchronously-queued microtask records have been fully flushed before
- * we reconnect, preventing false triggers from our own DOM mutations.
+ * One macrotask is enough to flush any synchronously-queued mutation records created
+ * by our own text-node writes before the observer reconnects.
  */
 const OBSERVER_RESTART_DELAY_MS = 0;
 
 // ---------- module-level translation state ----------
 
-/** Per-language translation cache: lang -> (original -> translated). */
+/** Per-language translation cache: lang -> (original English text -> translated text). */
 const translationCache = new Map<string, Map<string, string>>();
 
-/** Remembers the original English text of every node we have translated. */
+/**
+ * Stores the original English text for every text node we have translated.
+ * Used to restore the page to English and to correctly source text for
+ * re-translation (rather than accidentally re-translating already-translated content).
+ */
 const originalNodes = new Map<Text, string>();
+
+/**
+ * Stores the last translated value written to each node.
+ * When a node's current textContent differs from this value, React has
+ * updated it with new English text and we must refresh the stored original.
+ */
+const translatedNodes = new Map<Text, string>();
 
 let currentLang = 'en';
 let mutationObserver: MutationObserver | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-/** Set to false on LanguageProvider unmount to prevent post-unmount observer restarts. */
+/** Set to false when LanguageProvider unmounts to prevent post-unmount side-effects. */
 let isProviderMounted = false;
 
 // ---------- helpers ----------
@@ -136,70 +143,82 @@ function getTextNodes(root: Node): Text[] {
   return nodes;
 }
 
-/** Translate an array of strings to the target language using the free GTX endpoint. */
+/**
+ * For a given text node, return the English source string to translate.
+ *
+ * Logic:
+ * - New node (not yet seen) → current content is English; store it.
+ * - Previously translated AND current content matches the stored translation
+ *   → node still shows our translation; use the stored English original.
+ * - Previously translated BUT current content differs from the stored translation
+ *   → React updated the node with new English text; refresh stored original.
+ * - Previously seen but not yet translated → use stored original.
+ */
+function getSourceText(node: Text): string {
+  const currentText = node.textContent ?? '';
+  const storedOriginal = originalNodes.get(node);
+  const storedTranslation = translatedNodes.get(node);
+
+  if (storedOriginal === undefined) {
+    // First time seeing this node — current content is English.
+    originalNodes.set(node, currentText);
+    return currentText;
+  }
+
+  if (storedTranslation !== undefined && currentText !== storedTranslation) {
+    // Node was previously translated, but now its content differs from what we
+    // wrote — React updated it with new English text.
+    originalNodes.set(node, currentText);
+    translatedNodes.delete(node);
+    return currentText;
+  }
+
+  // Either the node is still showing our translation, or it was never translated.
+  // Either way, the stored original is the correct English source.
+  return storedOriginal;
+}
+
+/**
+ * Translate an array of English strings to `targetLang` using the free GTX endpoint.
+ * Each string is translated with an individual request (no batch-separator heuristics)
+ * to ensure reliable results. Requests for the same language are deduplicated and
+ * cached across calls.
+ */
 async function translateTexts(texts: string[], targetLang: string): Promise<string[]> {
   if (!texts.length) return [];
 
   const langCache = translationCache.get(targetLang) ?? new Map<string, string>();
   translationCache.set(targetLang, langCache);
 
-  const results: string[] = Array(texts.length).fill('');
-  const todo: Array<{ idx: number; text: string }> = [];
+  // Deduplicate — only fetch each unique, non-empty string once per language.
+  const unique = [...new Set(texts.filter(t => t.trim()))];
+  const uncached = unique.filter(t => !langCache.has(t));
 
-  texts.forEach((t, i) => {
-    const cached = langCache.get(t);
-    if (cached !== undefined) {
-      results[i] = cached;
-    } else {
-      todo.push({ idx: i, text: t });
-    }
-  });
-
-  if (!todo.length) return results;
-
-  // Partition into size-limited batches
-  const batches: typeof todo[] = [];
-  let cur: typeof todo = [];
-  let size = 0;
-  for (const item of todo) {
-    if (size + item.text.length > MAX_BATCH_CHARS && cur.length > 0) {
-      batches.push(cur);
-      cur = [];
-      size = 0;
-    }
-    cur.push(item);
-    size += item.text.length;
+  // Translate uncached strings in parallel batches.
+  for (let i = 0; i < uncached.length; i += TRANSLATION_CONCURRENCY) {
+    const batch = uncached.slice(i, i + TRANSLATION_CONCURRENCY);
+    await Promise.allSettled(
+      batch.map(async text => {
+        try {
+          const url =
+            `https://translate.googleapis.com/translate_a/single` +
+            `?client=gtx&sl=en&tl=${encodeURIComponent(targetLang)}&dt=t` +
+            `&q=${encodeURIComponent(text)}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json() as [Array<[string, ...unknown[]]>, ...unknown[]];
+          const translated = data[0].map(p => p[0]).join('');
+          if (translated) langCache.set(text, translated);
+        } catch (err) {
+          // Log so developers can diagnose failures; leave text untranslated so it
+          // will be retried on the next translation pass.
+          console.warn(`[translation] Failed to translate "${text.slice(0, 40)}…" → ${targetLang}:`, err);
+        }
+      }),
+    );
   }
-  if (cur.length) batches.push(cur);
 
-  await Promise.all(
-    batches.map(async batch => {
-      const combined = batch.map(b => b.text).join(BATCH_SEP);
-      try {
-        const url =
-          `https://translate.googleapis.com/translate_a/single` +
-          `?client=gtx&sl=en&tl=${encodeURIComponent(targetLang)}&dt=t` +
-          `&q=${encodeURIComponent(combined)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json() as [Array<[string, ...unknown[]]>, ...unknown[]];
-        const full = data[0].map(p => p[0]).join('');
-        const parts = full.split(BATCH_SEP);
-        batch.forEach((item, i) => {
-          const translated = (parts[i] ?? '').trim() || item.text;
-          results[item.idx] = translated;
-          langCache.set(item.text, translated);
-        });
-      } catch {
-        // On error fall back to original text
-        batch.forEach(item => {
-          results[item.idx] = item.text;
-        });
-      }
-    }),
-  );
-
-  return results;
+  return texts.map(t => (t.trim() ? (langCache.get(t) ?? t) : t));
 }
 
 /** Apply translation of `langCode` to all current text nodes in the document. */
@@ -209,20 +228,16 @@ async function applyTranslation(langCode: string) {
     return;
   }
 
-  // Disconnect observer while we mutate the DOM to avoid feedback loops
+  // Disconnect observer while we mutate the DOM to avoid feedback loops.
   stopObserver();
 
   const nodes = getTextNodes(document.body);
-  const texts = nodes.map(n => n.textContent ?? '');
-
-  // Record originals so we can restore English later
-  nodes.forEach((node, i) => {
-    if (!originalNodes.has(node)) originalNodes.set(node, texts[i]);
-  });
+  // Determine the correct English source text for each node (handles React updates).
+  const texts = nodes.map(node => getSourceText(node));
 
   const translated = await translateTexts(texts, langCode);
 
-  // Language may have changed while we awaited – abort if so
+  // Language may have changed while we were awaiting — abort if so.
   if (currentLang !== langCode) {
     if (isProviderMounted) startObserver();
     return;
@@ -230,25 +245,41 @@ async function applyTranslation(langCode: string) {
 
   nodes.forEach((node, i) => {
     const t = translated[i];
-    if (t && t !== node.textContent) node.textContent = t;
+    if (t && t !== node.textContent) {
+      node.textContent = t;
+      translatedNodes.set(node, t);
+    }
   });
+
+  if (!isProviderMounted) return;
 
   // Reconnect observer after one macrotask so any synchronously queued microtask
   // mutation records from our own writes are flushed before the observer starts.
-  // Guard against unmount that occurred while we were awaiting the API response.
-  if (isProviderMounted) setTimeout(startObserver, OBSERVER_RESTART_DELAY_MS);
+  setTimeout(startObserver, OBSERVER_RESTART_DELAY_MS);
+
+  // Schedule one follow-up pass after the debounce window to catch content that
+  // loaded asynchronously (e.g. data fetches) during the initial translation,
+  // but only if there are actually untranslated nodes in the DOM.
+  setTimeout(() => {
+    if (currentLang !== langCode || !isProviderMounted) return;
+    const hasUntranslated = getTextNodes(document.body).some(
+      n => !translatedNodes.has(n),
+    );
+    if (hasUntranslated) applyTranslation(langCode);
+  }, OBSERVE_DEBOUNCE_MS);
 }
 
-/** Restore all nodes to their original English text. */
+/** Restore all nodes to their original English text and clear translation state. */
 function restoreOriginal() {
   originalNodes.forEach((original, node) => {
-    if (node.isConnected) node.textContent = original;
+    if (node.isConnected) {
+      node.textContent = original;
+    }
+    // Always remove from both maps — disconnected nodes are stale and should not
+    // accumulate, which would cause unbounded memory growth in long-running SPAs.
+    originalNodes.delete(node);
+    translatedNodes.delete(node);
   });
-  // Clear the map so stale (disconnected) nodes don't accumulate. On the next
-  // non-English translation pass, originals will be recorded fresh from whatever
-  // English text is then in the DOM, which is correct because React always renders
-  // English strings into text nodes.
-  originalNodes.clear();
 }
 
 /** Start a MutationObserver that schedules re-translation on DOM changes. */
@@ -259,10 +290,16 @@ function startObserver() {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => applyTranslation(currentLang), OBSERVE_DEBOUNCE_MS);
   });
-  mutationObserver.observe(document.body, { childList: true, subtree: true });
+  mutationObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    // Also observe text-node value changes so React's in-place text updates
+    // (e.g. dynamic counters, updated labels) are caught and re-translated.
+    characterData: true,
+  });
 }
 
-/** Stop the MutationObserver. */
+/** Stop the MutationObserver and cancel any pending debounce. */
 function stopObserver() {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
@@ -301,7 +338,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     return LANGUAGES.find(l => l.code === saved) ?? LANGUAGES[0];
   });
 
-  // Apply / remove translation whenever the selected language changes
+  // Apply / remove translation whenever the selected language changes.
   useEffect(() => {
     currentLang = selectedLang.code;
 
@@ -309,7 +346,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       stopObserver();
       restoreOriginal();
     } else {
-      // Translate after the current render cycle so React's DOM is fully committed
+      // Translate after the current render cycle so React's DOM is fully committed.
       const timer = setTimeout(() => {
         applyTranslation(selectedLang.code);
       }, 0);
@@ -317,8 +354,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedLang.code]);
 
-  // Clean up observer on unmount and prevent any pending async applyTranslation
-  // from restarting the observer after the provider is gone.
+  // Set the mounted flag and clean up observer on unmount.
   useEffect(() => {
     isProviderMounted = true;
     return () => {
@@ -345,4 +381,5 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     </LanguageContext.Provider>
   );
 }
+
 
