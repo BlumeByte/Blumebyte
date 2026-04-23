@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
+import { useLanguage } from '../lib/language-context';
 
 interface ChatMessage {
   id: string;
@@ -92,6 +93,7 @@ export function HomepageChatAgent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { retranslate } = useLanguage();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,7 +101,8 @@ export function HomepageChatAgent() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+    retranslate();
+  }, [messages, retranslate]);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
