@@ -17,6 +17,9 @@ interface Message {
   timestamp: Date;
 }
 
+// Allowlist for safe internal paths: must start with / and contain only URL-safe characters (no fragment hashes)
+const INTERNAL_PATH_PATTERN = /^\/[\w\-./?\=&%+]*$/;
+
 // Renders markdown-style links [text](url) as clickable in-app navigation links
 function RenderMessageContent({ content, onNavigate }: { content: string; onNavigate: (path: string) => void }) {
   // Split content by markdown link pattern [text](url)
@@ -30,13 +33,15 @@ function RenderMessageContent({ content, onNavigate }: { content: string; onNavi
           const [, text, href] = linkMatch;
           // Internal link (starts with / but NOT // which would be a protocol-relative external URL)
           if (href.startsWith('/') && !href.startsWith('//')) {
+            // Validate internal path — only allow URL-safe characters to prevent XSS via crafted hrefs
+            const safeInternalPath = INTERNAL_PATH_PATTERN.test(href) ? href : '/';
             return (
               <a
                 key={idx}
-                href={href}
+                href={safeInternalPath}
                 onClick={(e) => {
                   e.preventDefault();
-                  onNavigate(href);
+                  onNavigate(safeInternalPath);
                 }}
                 className="text-blue-600 hover:text-blue-800 underline font-medium cursor-pointer"
               >
