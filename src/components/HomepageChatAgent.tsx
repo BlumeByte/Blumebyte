@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
+import { useLanguage } from '../lib/language-context';
 
 interface ChatMessage {
   id: string;
@@ -92,6 +93,7 @@ export function HomepageChatAgent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { retranslate } = useLanguage();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,7 +101,8 @@ export function HomepageChatAgent() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+    retranslate();
+  }, [messages, retranslate]);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -207,7 +210,7 @@ export function HomepageChatAgent() {
             <Button
               onClick={() => setIsOpen(true)}
               size="lg"
-              className="h-14 w-14 rounded-full shadow-lg bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              className="h-14 w-14 rounded-full shadow-lg bg-[#7C5A1A] hover:bg-[#5c4112]"
             >
               <MessageCircle className="h-6 w-6" />
             </Button>
@@ -226,7 +229,7 @@ export function HomepageChatAgent() {
             className="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-3rem)]"
           >
             <Card className="shadow-2xl border-2">
-              <CardHeader className="bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-t-lg">
+              <CardHeader className="bg-[#7C5A1A] text-white rounded-t-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bot className="h-5 w-5" />
@@ -257,7 +260,7 @@ export function HomepageChatAgent() {
                         }`}
                       >
                         {msg.isBot && (
-                          <Avatar className="h-8 w-8 mt-1 bg-gradient-to-br from-blue-600 to-purple-600">
+                          <Avatar className="h-8 w-8 mt-1 bg-[#7C5A1A]">
                             <AvatarFallback className="text-white text-xs bg-transparent">
                               <Bot className="h-4 w-4" />
                             </AvatarFallback>
@@ -272,7 +275,7 @@ export function HomepageChatAgent() {
                             className={`rounded-lg p-3 ${
                               msg.isBot
                                 ? 'bg-gray-100 text-gray-900'
-                                : 'bg-gradient-to-br from-blue-600 to-purple-600 text-white'
+                                : 'bg-[#7C5A1A] text-white'
                             }`}
                           >
                             <p className="text-sm whitespace-pre-wrap break-words">
@@ -290,7 +293,7 @@ export function HomepageChatAgent() {
                                         href={link.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                                        className="flex items-center gap-1 text-xs text-[#7C5A1A] hover:text-[#5c4112] hover:underline cursor-pointer"
                                       >
                                         <ExternalLink className="h-3 w-3" />
                                         {link.text}
@@ -318,7 +321,7 @@ export function HomepageChatAgent() {
                                         }
                                         setIsOpen(false);
                                       }}
-                                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                                      className="flex items-center gap-1 text-xs text-[#7C5A1A] hover:text-[#5c4112] hover:underline cursor-pointer"
                                     >
                                       <ExternalLink className="h-3 w-3" />
                                       {link.text}
@@ -340,7 +343,7 @@ export function HomepageChatAgent() {
                     
                     {isTyping && (
                       <div className="flex gap-2">
-                        <Avatar className="h-8 w-8 mt-1 bg-gradient-to-br from-blue-600 to-purple-600">
+                        <Avatar className="h-8 w-8 mt-1 bg-[#7C5A1A]">
                           <AvatarFallback className="text-white text-xs bg-transparent">
                             <Bot className="h-4 w-4" />
                           </AvatarFallback>
@@ -393,7 +396,7 @@ export function HomepageChatAgent() {
                       onClick={() => handleSendMessage()}
                       disabled={!input.trim() || isTyping}
                       size="sm"
-                      className="bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      className="bg-[#7C5A1A] hover:bg-[#5c4112]"
                     >
                       {isTyping ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -403,7 +406,7 @@ export function HomepageChatAgent() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2 text-center">
-                    Need more help? <a href="https://blumebyte.com/contact/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Contact our team</a>
+                    Need more help? <a href="https://blumebyte.com/contact/" target="_blank" rel="noopener noreferrer" className="text-[#7C5A1A] hover:underline">Contact our team</a>
                   </p>
                 </div>
               </CardContent>

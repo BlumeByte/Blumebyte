@@ -30,12 +30,13 @@ interface LicenseManagementProps {
 }
 
 export function LicenseManagement({ onClose, requiredLicenses }: LicenseManagementProps) {
+  const MIN_LICENSES = 2; // Minimum purchase quantity enforced by the server
   const { branding } = useBranding();
   const { accessToken, getToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [fetchingLicenses, setFetchingLicenses] = useState(true);
   const [licenseInfo, setLicenseInfo] = useState<any>(null);
-  const [additionalLicenses, setAdditionalLicenses] = useState(Math.max(2, requiredLicenses || 2));
+  const [additionalLicenses, setAdditionalLicenses] = useState(Math.max(MIN_LICENSES, requiredLicenses || MIN_LICENSES));
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
   const [saveCard, setSaveCard] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -240,7 +241,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       // If there are existing users, auto-sync the license count
       if (currentUsers > 0) {
         // Set to current users or minimum of 2, whichever is higher
-        const syncedCount = Math.max(2, currentUsers, requiredLicenses || 0);
+        const syncedCount = Math.max(MIN_LICENSES, currentUsers, requiredLicenses || 0);
         setAdditionalLicenses(syncedCount);
         setAutoSyncedLicenses(true);
         
@@ -297,8 +298,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   };
 
   const handlePurchaseLicenses = async () => {
-    if (additionalLicenses < 2) {
-      toast.error('Minimum purchase is 2 licenses');
+    if (additionalLicenses < MIN_LICENSES) {
+      toast.error(`Minimum purchase is ${MIN_LICENSES} licenses`);
       return;
     }
 
@@ -374,17 +375,19 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       setLoading(true);
       
       const pricePerUser = selectedPlan === 'monthly' ? 6 : 60;
-      const totalAmount = additionalLicenses * pricePerUser;
+      // Ensure additionalLicenses is a valid integer (guard against NaN from bad input)
+      const safeLicenses = Number.isFinite(additionalLicenses) ? Math.max(MIN_LICENSES, Math.round(additionalLicenses)) : MIN_LICENSES;
+      const totalAmount = safeLicenses * pricePerUser;
 
       console.log('Frontend: Initiating license purchase');
-      console.log('- Licenses:', additionalLicenses, '| Plan:', selectedPlan, '| USD:', totalAmount);
+      console.log('- Licenses:', safeLicenses, '| Plan:', selectedPlan, '| USD:', totalAmount);
 
       const endpoint = selectedUserIds.length > 0 
         ? '/subscription/purchase-licenses-with-selection'
         : '/subscription/purchase-licenses';
 
       const payload = {
-        licenses: additionalLicenses,
+        licenses: safeLicenses,
         plan: selectedPlan,
         amount: totalAmount,
         saveCard,
@@ -612,16 +615,16 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setAdditionalLicenses(Math.max(2, additionalLicenses - 1))}
-                disabled={additionalLicenses <= 2}
+                onClick={() => setAdditionalLicenses(Math.max(MIN_LICENSES, additionalLicenses - 1))}
+                disabled={additionalLicenses <= MIN_LICENSES}
               >
                 -
               </Button>
               <Input
                 type="number"
-                min="2"
+                min={String(MIN_LICENSES)}
                 value={additionalLicenses}
-                onChange={(e) => setAdditionalLicenses(Math.max(2, parseInt(e.target.value) || 2))}
+                onChange={(e) => setAdditionalLicenses(Math.max(MIN_LICENSES, parseInt(e.target.value) || MIN_LICENSES))}
                 className="text-center"
               />
               <Button

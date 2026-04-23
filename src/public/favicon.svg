@@ -1,27 +1,20 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- White background -->
-  <rect width="64" height="64" fill="white"/>
+  <!-- Black background -->
+  <rect width="64" height="64" fill="black"/>
 
-  <!-- Letter B: left vertical stem -->
-  <rect x="8" y="8" width="12" height="48" rx="2" fill="black"/>
+  <!-- Left vertical stem of B -->
+  <rect x="7" y="6" width="10" height="52" rx="2" fill="white"/>
 
-  <!-- Letter B: top bowl -->
-  <path d="M20 8 H38 C47 8 52 14 52 22 C52 30 47 33 38 33 H20 Z" fill="black"/>
+  <!-- Top bowl: large leaf shape filling the upper B bowl -->
+  <!-- Outer leaf/bowl: starts at stem top, sweeps right to ~x=54 at midpoint, returns to stem at y=33 -->
+  <path d="M17 6 C17 6 44 6 54 18 C60 26 54 33 17 33 Z" fill="white"/>
+  <!-- Two curved black vein lines on the leaf -->
+  <path d="M24 12 C34 16 44 20 52 26" stroke="black" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+  <path d="M22 20 C31 24 40 27 50 30" stroke="black" stroke-width="1.8" stroke-linecap="round" fill="none"/>
 
-  <!-- Letter B: bottom bowl (wider) -->
-  <path d="M20 33 H40 C50 33 56 39 56 48 C56 57 50 62 40 62 H20 Z" fill="black"/>
-
-  <!-- White cut-out inside top bowl -->
-  <path d="M21 13 H37 C44 13 47 17 47 22 C47 27 44 28 37 28 H21 Z" fill="white"/>
-
-  <!-- White cut-out inside bottom bowl -->
-  <path d="M21 38 H39 C47 38 51 42 51 48 C51 54 47 57 39 57 H21 Z" fill="white"/>
-
-  <!-- Leaf / plant growing inside the left stem area -->
-  <!-- Stem line -->
-  <line x1="14" y1="52" x2="14" y2="24" stroke="black" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- Left leaf -->
-  <path d="M14 36 C10 30 8 24 12 20 C14 22 16 28 14 36 Z" fill="black"/>
-  <!-- Right leaf -->
-  <path d="M14 30 C18 24 22 22 22 18 C18 20 14 24 14 30 Z" fill="black"/>
+  <!-- Bottom bowl: solid white arch with black inner cutout -->
+  <!-- Outer arch -->
+  <path d="M17 33 H40 C52 33 58 40 58 47 C58 54 52 58 40 58 H17 Z" fill="white"/>
+  <!-- Inner black cutout to make it hollow like a bowl -->
+  <path d="M17 39 H38 C47 39 51 43 51 47 C51 51 47 53 38 53 H17 Z" fill="black"/>
 </svg>

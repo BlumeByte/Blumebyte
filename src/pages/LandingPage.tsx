@@ -145,7 +145,7 @@ export default function LandingPage() {
                 size="lg"
                 variant="outline"
                 onClick={() => navigate('/pricing')}
-                className="border-white/50 text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
+                className="border-white/50 bg-transparent text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
               >
                 View Pricing
               </Button>
@@ -317,7 +317,7 @@ export default function LandingPage() {
               <Button size="lg" onClick={() => navigate('/company-signup')} className="text-lg px-8 bg-white text-black hover:bg-gray-100 font-semibold shadow-lg">
                 Get Started Today
               </Button>
-              <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="text-lg px-8 border-white/50 text-white hover:bg-white/15 font-semibold">
+              <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="text-lg px-8 border-white/50 bg-transparent text-white hover:bg-white/15 font-semibold">
                 Contact Sales
               </Button>
             </div>
