@@ -11,7 +11,7 @@
   <path d="M18 14 H36 C44 14 48 18 48 24 C48 30 44 30 36 30 H18 Z" fill="black"/>
 
   <!-- Bottom bowl of B (white outer, slightly wider) -->
-  <path d="M18 37 H40 C52 37 58 44 58 52 C58 60 52 57 40 57 H18 Z" fill="white"/>
+  <path d="M18 37 H40 C52 37 58 44 58 52 C58 55 52 57 40 57 H18 Z" fill="white"/>
   <!-- Bottom bowl inner cut-out (black) -->
   <path d="M18 43 H38 C47 43 51 47 51 52 C51 57 47 57 38 57 H18 Z" fill="black"/>
 
