@@ -24,30 +24,7 @@
     <!-- Paystack Inline Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
 
-    <style>
-      /* Hide the Google Translate toolbar and badge */
-      .goog-te-banner-frame.skiptranslate { display: none !important; }
-      iframe.skiptranslate { display: none !important; }
-      .goog-te-gadget { display: none !important; }
-      .goog-te-gadget-icon { display: none !important; }
-      body { top: 0px !important; }
-      /* Prevent Google Translate from adding a top bar */
-      body.translated-ltr, body.translated-rtl { margin-top: 0 !important; }
-      .VIpgJd-ZVi9od-aZ2wEe-wOHMyf { display: none !important; }
-      .VIpgJd-ZVi9od-aZ2wEe-OiiCO { display: none !important; }
-      /* Hide the Google Translate widget container while keeping it rendered so the
-         widget can initialise its internal select/iframe elements. */
-      #google_translate_element { position: absolute; top: -9999px; left: -9999px; visibility: hidden; }
-    </style>
-    <script>
-      function googleTranslateElementInit() {
-        new google.translate.TranslateElement(
-          { pageLanguage: 'en', autoDisplay: false },
-          'google_translate_element'
-        );
-      }
-    </script>
-    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
+
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.blumebyte.com/" />
@@ -62,8 +39,6 @@
     <meta name="twitter:image" content="https://www.blumebyte.com/og-image.png" />
   </head>
   <body>
-    <!-- Google Translate Widget (hidden – triggered programmatically) -->
-    <div id="google_translate_element"></div>
     <div id="root"></div>
     <script type="module" src="/main.tsx"></script>
   </body>

@@ -78,23 +78,194 @@ export const LANGUAGES: Language[] = [
 ];
 
 const STORAGE_KEY = 'blumebyte_language';
-/** sessionStorage key set to the language code after a reload has been triggered.
- *  Prevents the infinite-reload loop that happens when Google Translate's widget
- *  is not yet available on the first render after a reload. */
-const RELOAD_GUARD_KEY = 'blumebyte_lang_reloaded';
-/** Time (ms) to wait before clearing the reload guard.
- *  Must be long enough for Google Translate to finish applying the translation
- *  from the cookie so that the guard doesn't block future language changes. */
-const GUARD_CLEAR_DELAY_MS = 3000;
 
-/** Shorter delay used when re-applying translation after SPA navigation (widget already loaded). */
-const ROUTE_RETRANSLATE_DELAY_MS = 600;
+/** Tags whose text content must not be translated. */
+const SKIP_TAGS = new Set([
+  'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'IFRAME', 'OBJECT', 'CODE', 'PRE',
+]);
+
+/** Separator used when batching multiple strings into a single API call. */
+const BATCH_SEP = '\n⚡\n';
+
+/** Maximum characters per API request (conservative to stay within URL limits). */
+const MAX_BATCH_CHARS = 1500;
+
+/** Debounce delay (ms) before re-translating after DOM mutations from React renders. */
+const OBSERVE_DEBOUNCE_MS = 400;
+
+// ---------- module-level translation state ----------
+
+/** Per-language translation cache: lang -> (original -> translated). */
+const translationCache = new Map<string, Map<string, string>>();
+
+/** Remembers the original English text of every node we have translated. */
+const originalNodes = new Map<Text, string>();
+
+let currentLang = 'en';
+let mutationObserver: MutationObserver | null = null;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ---------- helpers ----------
+
+/** Walk the DOM and collect all translatable text nodes. */
+function getTextNodes(root: Node): Text[] {
+  const nodes: Text[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      if (SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+      if (parent.closest('[translate="no"], .notranslate')) return NodeFilter.FILTER_REJECT;
+      const text = node.textContent?.trim();
+      if (!text) return NodeFilter.FILTER_SKIP;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  let n: Node | null;
+  while ((n = walker.nextNode())) nodes.push(n as Text);
+  return nodes;
+}
+
+/** Translate an array of strings to the target language using the free GTX endpoint. */
+async function translateTexts(texts: string[], targetLang: string): Promise<string[]> {
+  if (!texts.length) return [];
+
+  const langCache = translationCache.get(targetLang) ?? new Map<string, string>();
+  translationCache.set(targetLang, langCache);
+
+  const results: string[] = Array(texts.length).fill('');
+  const todo: Array<{ idx: number; text: string }> = [];
+
+  texts.forEach((t, i) => {
+    const cached = langCache.get(t);
+    if (cached !== undefined) {
+      results[i] = cached;
+    } else {
+      todo.push({ idx: i, text: t });
+    }
+  });
+
+  if (!todo.length) return results;
+
+  // Partition into size-limited batches
+  const batches: typeof todo[] = [];
+  let cur: typeof todo = [];
+  let size = 0;
+  for (const item of todo) {
+    if (size + item.text.length > MAX_BATCH_CHARS && cur.length > 0) {
+      batches.push(cur);
+      cur = [];
+      size = 0;
+    }
+    cur.push(item);
+    size += item.text.length;
+  }
+  if (cur.length) batches.push(cur);
+
+  await Promise.all(
+    batches.map(async batch => {
+      const combined = batch.map(b => b.text).join(BATCH_SEP);
+      try {
+        const url =
+          `https://translate.googleapis.com/translate_a/single` +
+          `?client=gtx&sl=en&tl=${encodeURIComponent(targetLang)}&dt=t` +
+          `&q=${encodeURIComponent(combined)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json() as [[string, string][], ...unknown[]];
+        const full = (data[0] as [string][]).map(p => p[0]).join('');
+        const parts = full.split(BATCH_SEP);
+        batch.forEach((item, i) => {
+          const translated = (parts[i] ?? '').trim() || item.text;
+          results[item.idx] = translated;
+          langCache.set(item.text, translated);
+        });
+      } catch {
+        // On error fall back to original text
+        batch.forEach(item => {
+          results[item.idx] = item.text;
+        });
+      }
+    }),
+  );
+
+  return results;
+}
+
+/** Apply translation of `langCode` to all current text nodes in the document. */
+async function applyTranslation(langCode: string) {
+  if (langCode === 'en') {
+    restoreOriginal();
+    return;
+  }
+
+  // Disconnect observer while we mutate the DOM to avoid feedback loops
+  stopObserver();
+
+  const nodes = getTextNodes(document.body);
+  const texts = nodes.map(n => n.textContent ?? '');
+
+  // Record originals so we can restore English later
+  nodes.forEach((node, i) => {
+    if (!originalNodes.has(node)) originalNodes.set(node, texts[i]);
+  });
+
+  const translated = await translateTexts(texts, langCode);
+
+  // Language may have changed while we awaited – abort if so
+  if (currentLang !== langCode) {
+    startObserver();
+    return;
+  }
+
+  nodes.forEach((node, i) => {
+    const t = translated[i];
+    if (t && t !== node.textContent) node.textContent = t;
+  });
+
+  // Short delay before reconnecting so any microtask mutations from our own
+  // writes have been processed by the observer's internal queue.
+  setTimeout(startObserver, 100);
+}
+
+/** Restore all nodes to their original English text. */
+function restoreOriginal() {
+  originalNodes.forEach((original, node) => {
+    if (node.isConnected) node.textContent = original;
+  });
+  originalNodes.clear();
+}
+
+/** Start a MutationObserver that schedules re-translation on DOM changes. */
+function startObserver() {
+  if (mutationObserver) return;
+  mutationObserver = new MutationObserver(() => {
+    if (currentLang === 'en') return;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => applyTranslation(currentLang), OBSERVE_DEBOUNCE_MS);
+  });
+  mutationObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+/** Stop the MutationObserver. */
+function stopObserver() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+    mutationObserver = null;
+  }
+}
+
+// ---------- React context ----------
 
 interface LanguageContextType {
   selectedLanguage: Language;
   setLanguage: (code: string) => void;
   languages: Language[];
-  /** Call this after a route change to re-apply the current translation to new DOM nodes. */
+  /** Call this after new content is added to trigger immediate re-translation. */
   retranslate: () => void;
 }
 
@@ -109,142 +280,43 @@ export function useLanguage() {
   return useContext(LanguageContext);
 }
 
-/** Set the googtrans cookie on all relevant scopes for the current hostname. */
-function setGoogTransCookie(value: string) {
-  const secure = location.protocol === 'https:' ? '; Secure' : '';
-  const base = `${value}; path=/; SameSite=Lax${secure}`;
-  document.cookie = `googtrans=${base}`;
-  document.cookie = `googtrans=${base}; domain=${window.location.hostname}`;
-  document.cookie = `googtrans=${base}; domain=.${window.location.hostname}`;
-}
-
-/** Clear the googtrans cookie from all relevant scopes. */
-function clearGoogTransCookie() {
-  const expired = 'expires=Thu, 01 Jan 1970 00:00:00 UTC';
-  const secure = location.protocol === 'https:' ? '; Secure' : '';
-  const base = `; path=/; SameSite=Lax; ${expired}${secure}`;
-  document.cookie = `googtrans=${base}`;
-  document.cookie = `googtrans=${base}; domain=${window.location.hostname}`;
-  document.cookie = `googtrans=${base}; domain=.${window.location.hostname}`;
-}
-
-/**
- * Attempt to call Google Translate's in-page API without reloading.
- * Used as a best-effort re-translation after SPA navigation — not relied on
- * for the initial language switch (which always goes through a full reload).
- */
-function tryApplyGoogleTranslateInPage(langCode: string) {
-  try {
-    const w = window as Window & { doGTranslate?: (lang: string) => void };
-    if (typeof w.doGTranslate === 'function') {
-      w.doGTranslate(`en|${langCode}`);
-      return;
-    }
-    const select = document.querySelector<HTMLSelectElement>('.goog-te-combo');
-    if (select) {
-      select.value = langCode;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-      select.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-  } catch {
-    // Silently fail - translation is an enhancement, not a requirement
-  }
-}
-
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [selectedLang, setSelectedLang] = useState<Language>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return LANGUAGES.find(l => l.code === saved) ?? LANGUAGES[0];
   });
 
-  // Apply translation after React renders.
-  // Strategy: always use cookie + full-page reload so that Google Translate can
-  // initialise properly and apply its MutationObserver for dynamic SPA content.
-  // A sessionStorage guard (RELOAD_GUARD_KEY) prevents infinite reload loops.
+  // Apply / remove translation whenever the selected language changes
   useEffect(() => {
+    currentLang = selectedLang.code;
+
     if (selectedLang.code === 'en') {
-      // Switching back to English: clear cookie and reload once.
-      clearGoogTransCookie();
-      const guard = sessionStorage.getItem(RELOAD_GUARD_KEY);
-      if (guard !== 'en') {
-        sessionStorage.setItem(RELOAD_GUARD_KEY, 'en');
-        window.location.reload();
-      } else {
-        // Already reloaded for English – clear guard and stay.
-        setTimeout(() => sessionStorage.removeItem(RELOAD_GUARD_KEY), GUARD_CLEAR_DELAY_MS);
-      }
-      return;
-    }
-
-    const langCode = selectedLang.code;
-    const guard = sessionStorage.getItem(RELOAD_GUARD_KEY);
-
-    if (guard === langCode) {
-      // We are in the post-reload render for this language.
-      // Google Translate is reading the cookie and will translate the page.
-      // Clear the guard after a delay to allow future language switches.
-      const timer = setTimeout(() => sessionStorage.removeItem(RELOAD_GUARD_KEY), GUARD_CLEAR_DELAY_MS);
+      stopObserver();
+      restoreOriginal();
+    } else {
+      // Translate after the current render cycle so React's DOM is fully committed
+      const timer = setTimeout(() => {
+        applyTranslation(selectedLang.code).then(() => {
+          startObserver();
+        });
+      }, 0);
       return () => clearTimeout(timer);
     }
-
-    // First render for this language: set cookie and reload.
-    setGoogTransCookie(`/en/${langCode}`);
-    sessionStorage.setItem(RELOAD_GUARD_KEY, langCode);
-    window.location.reload();
-  }, [selectedLang.code]); // re-run whenever the selected language changes
-
-  // Re-apply translation whenever the URL path changes (SPA navigation).
-  // After a language reload, Google Translate's MutationObserver handles most
-  // dynamic content automatically. This is a best-effort supplement for any
-  // content that GT's observer might miss.
-  useEffect(() => {
-    if (selectedLang.code === 'en') return;
-
-    const retranslateAfterDelay = () => {
-      setTimeout(() => tryApplyGoogleTranslateInPage(selectedLang.code), ROUTE_RETRANSLATE_DELAY_MS);
-    };
-
-    // Listen to popstate (back/forward navigation)
-    window.addEventListener('popstate', retranslateAfterDelay);
-
-    // Patch history.pushState and replaceState to detect SPA route changes
-    const origPush = history.pushState.bind(history);
-    const origReplace = history.replaceState.bind(history);
-    let pendingTimer: ReturnType<typeof setTimeout> | null = null;
-
-    history.pushState = (...args) => {
-      origPush(...args);
-      if (pendingTimer) clearTimeout(pendingTimer);
-      pendingTimer = setTimeout(() => tryApplyGoogleTranslateInPage(selectedLang.code), ROUTE_RETRANSLATE_DELAY_MS);
-    };
-    history.replaceState = (...args) => {
-      origReplace(...args);
-      if (pendingTimer) clearTimeout(pendingTimer);
-      pendingTimer = setTimeout(() => tryApplyGoogleTranslateInPage(selectedLang.code), ROUTE_RETRANSLATE_DELAY_MS);
-    };
-
-    return () => {
-      window.removeEventListener('popstate', retranslateAfterDelay);
-      history.pushState = origPush;
-      history.replaceState = origReplace;
-      if (pendingTimer) clearTimeout(pendingTimer);
-    };
   }, [selectedLang.code]);
+
+  // Clean up observer on unmount
+  useEffect(() => () => stopObserver(), []);
 
   const retranslate = useCallback(() => {
-    if (selectedLang.code !== 'en') {
-      setTimeout(() => tryApplyGoogleTranslateInPage(selectedLang.code), ROUTE_RETRANSLATE_DELAY_MS);
+    if (currentLang !== 'en') {
+      applyTranslation(currentLang);
     }
-  }, [selectedLang.code]);
+  }, []);
 
   const setLanguage = useCallback((code: string) => {
     const lang = LANGUAGES.find(l => l.code === code) ?? LANGUAGES[0];
     setSelectedLang(lang);
     localStorage.setItem(STORAGE_KEY, code);
-    // Clear any existing reload guard so the useEffect below can decide whether
-    // a new reload is needed for the newly selected language.
-    sessionStorage.removeItem(RELOAD_GUARD_KEY);
-    // Translation is applied by the useEffect above via cookie + page reload.
   }, []);
 
   return (
@@ -253,3 +325,4 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     </LanguageContext.Provider>
   );
 }
+
