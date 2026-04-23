@@ -93,6 +93,14 @@ const MAX_BATCH_CHARS = 1500;
 /** Debounce delay (ms) before re-translating after DOM mutations from React renders. */
 const OBSERVE_DEBOUNCE_MS = 400;
 
+/**
+ * Delay before restarting the MutationObserver after we finish applying translations.
+ * Even though the observer is disconnected during our writes, we wait one macrotask
+ * to ensure any synchronously-queued microtask records have been fully flushed before
+ * we reconnect, preventing false triggers from our own DOM mutations.
+ */
+const OBSERVER_RESTART_DELAY_MS = 0;
+
 // ---------- module-level translation state ----------
 
 /** Per-language translation cache: lang -> (original -> translated). */
@@ -104,6 +112,8 @@ const originalNodes = new Map<Text, string>();
 let currentLang = 'en';
 let mutationObserver: MutationObserver | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+/** Set to false on LanguageProvider unmount to prevent post-unmount observer restarts. */
+let isProviderMounted = false;
 
 // ---------- helpers ----------
 
@@ -172,8 +182,8 @@ async function translateTexts(texts: string[], targetLang: string): Promise<stri
           `&q=${encodeURIComponent(combined)}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json() as [[string, string][], ...unknown[]];
-        const full = (data[0] as [string][]).map(p => p[0]).join('');
+        const data = await res.json() as [Array<[string, ...unknown[]]>, ...unknown[]];
+        const full = data[0].map(p => p[0]).join('');
         const parts = full.split(BATCH_SEP);
         batch.forEach((item, i) => {
           const translated = (parts[i] ?? '').trim() || item.text;
@@ -214,7 +224,7 @@ async function applyTranslation(langCode: string) {
 
   // Language may have changed while we awaited – abort if so
   if (currentLang !== langCode) {
-    startObserver();
+    if (isProviderMounted) startObserver();
     return;
   }
 
@@ -223,9 +233,10 @@ async function applyTranslation(langCode: string) {
     if (t && t !== node.textContent) node.textContent = t;
   });
 
-  // Short delay before reconnecting so any microtask mutations from our own
-  // writes have been processed by the observer's internal queue.
-  setTimeout(startObserver, 100);
+  // Reconnect observer after one macrotask so any synchronously queued microtask
+  // mutation records from our own writes are flushed before the observer starts.
+  // Guard against unmount that occurred while we were awaiting the API response.
+  if (isProviderMounted) setTimeout(startObserver, OBSERVER_RESTART_DELAY_MS);
 }
 
 /** Restore all nodes to their original English text. */
@@ -233,6 +244,10 @@ function restoreOriginal() {
   originalNodes.forEach((original, node) => {
     if (node.isConnected) node.textContent = original;
   });
+  // Clear the map so stale (disconnected) nodes don't accumulate. On the next
+  // non-English translation pass, originals will be recorded fresh from whatever
+  // English text is then in the DOM, which is correct because React always renders
+  // English strings into text nodes.
   originalNodes.clear();
 }
 
@@ -296,16 +311,21 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     } else {
       // Translate after the current render cycle so React's DOM is fully committed
       const timer = setTimeout(() => {
-        applyTranslation(selectedLang.code).then(() => {
-          startObserver();
-        });
+        applyTranslation(selectedLang.code);
       }, 0);
       return () => clearTimeout(timer);
     }
   }, [selectedLang.code]);
 
-  // Clean up observer on unmount
-  useEffect(() => () => stopObserver(), []);
+  // Clean up observer on unmount and prevent any pending async applyTranslation
+  // from restarting the observer after the provider is gone.
+  useEffect(() => {
+    isProviderMounted = true;
+    return () => {
+      isProviderMounted = false;
+      stopObserver();
+    };
+  }, []);
 
   const retranslate = useCallback(() => {
     if (currentLang !== 'en') {
