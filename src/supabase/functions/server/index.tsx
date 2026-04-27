@@ -4194,10 +4194,10 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
     // Normalize employmentType
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
-    // Explicitly resolve visibilityType — prefer body value over existing, never allow undefined to overwrite
-    const visibilityType = body.visibilityType ?? existing.visibilityType ?? 'internal_only';
+    // Explicitly resolve visibilityType — prefer body value over existing, never allow undefined or empty string to overwrite
+    const visibilityType = body.visibilityType || existing.visibilityType || 'internal_only';
     // Auto-activate status when visibility is set to public_global
-    let status = body.status ?? existing.status ?? 'active';
+    let status = body.status || existing.status || 'active';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'active';
     }
@@ -4502,8 +4502,8 @@ app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
     const companyName = body.companyName || existing.companyName || (companyId ? await resolveCompanyName(companyId) : '');
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
-    const visibilityType = body.visibilityType ?? existing.visibilityType ?? 'internal_only';
-    let status = body.status ?? existing.status ?? 'open';
+    const visibilityType = body.visibilityType || existing.visibilityType || 'internal_only';
+    let status = body.status || existing.status || 'open';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'open';
     }

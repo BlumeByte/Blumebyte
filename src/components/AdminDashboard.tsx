@@ -2301,7 +2301,7 @@ function AdminHiring() {
                 <TableBody>
                   {postings.map(p => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.title || '—'}</TableCell>
+                      <TableCell className="font-medium">{p.title || p.roleTitle || '—'}</TableCell>
                       <TableCell className="text-sm">{p.department || '—'}</TableCell>
                       <TableCell className="text-sm">{p.type || '—'}</TableCell>
                       <TableCell className="text-sm">{p.location || '—'}</TableCell>
@@ -2337,7 +2337,7 @@ function AdminHiring() {
         <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editItem ? 'Edit' : 'Create'} Job Posting</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <div><Label className="text-xs">Job Title / Role Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value, roleTitle: e.target.value })} placeholder="e.g., Software Engineer" /></div>
+            <div><Label className="text-xs">Job Title / Role Title</Label><Input value={formData.title || formData.roleTitle || ''} onChange={e => setFormData({ ...formData, title: e.target.value, roleTitle: e.target.value })} placeholder="e.g., Software Engineer" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Department</Label>
                 <Select value={(() => {
@@ -2401,7 +2401,10 @@ function AdminHiring() {
                 <Select value={formData.status || 'open'} onValueChange={v => setFormData({ ...formData, status: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="interviewing">Interviewing</SelectItem>
+                    <SelectItem value="offered">Offered</SelectItem>
                     <SelectItem value="draft">Draft</SelectItem>
                     <SelectItem value="paused">Paused</SelectItem>
                     <SelectItem value="closed">Closed</SelectItem>
