@@ -552,7 +552,13 @@ export function SuperAdminDashboard() {
       );
       default:
         if (ENTITY_CONFIGS[activeSection]) {
-          return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} />;
+          // When a specific company is selected (not 'all'), filter the companies list to
+          // show only that company so the view reflects the selected context.
+          const companyFilterFn =
+            activeSection === 'companies' && selectedCompanyId && selectedCompanyId !== 'all'
+              ? (item: any) => item.id === selectedCompanyId
+              : undefined;
+          return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} filterFn={companyFilterFn} />;
         }
         return <PlaceholderView title={SIDEBAR_ITEMS.find(i => i.id === activeSection)?.label || 'Coming Soon'} />;
     }
@@ -862,6 +868,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   // Auto-fix missing assignedCompanies on component mount
   useEffect(() => {
     const fixCompanyScope = async () => {
+      if (!accessToken) { setScopeFixed(true); return; } // not yet authenticated
       try {
         console.log('🔧 Attempting to fix company scope...');
         const result = await api('/superadmin/fix-company-scope', { 
@@ -882,6 +889,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   }, [accessToken, scopeFixed]);
 
   const loadDashboardData = useCallback(() => {
+    if (!accessToken) return; // skip until auth is ready
     const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.log(`Dashboard fetch ${path} failed:`, e); return null; });
     Promise.all([
       safeFetch('/users'),
@@ -3711,7 +3719,7 @@ function UserManagementView() {
 }
 
 // ========== GENERIC ENTITY CRUD ==========
-function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityConfig }) {
+function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config: EntityConfig; filterFn?: (item: any) => boolean }) {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
   const [items, setItems] = useState<any[]>([]);
@@ -3917,6 +3925,7 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
 
   const filtered = items
     .filter(item => {
+      if (filterFn && !filterFn(item)) return false;
       if (statusFilter !== 'all' && item.status !== statusFilter) return false;
       if (!search) return true;
       const s = search.toLowerCase();

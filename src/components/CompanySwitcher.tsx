@@ -41,6 +41,7 @@ export function CompanySwitcher({
   }, [accessToken]);
 
   const loadCompanies = async () => {
+    if (!accessToken) return; // wait for auth to be ready
     try {
       setLoading(true);
       const data = await api('/superadmin/company', { token: accessToken });

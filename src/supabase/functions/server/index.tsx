@@ -5422,13 +5422,35 @@ app.post(`${PREFIX}/attendance/clock-in`, async (c) => {
     if (existing?.clockIn) {
       return c.json({ error: "Already clocked in today" }, 400);
     }
+
+    // Detect late arrival using the company's auto-clock schedule
+    let status = "present";
+    try {
+      const companyId = kvData?.companyId || kvData?.company;
+      if (companyId) {
+        const autoSettings = await kv.get(`auto-clock-settings:${companyId}`);
+        if (autoSettings?.clockInTime) {
+          const [schHour, schMin] = autoSettings.clockInTime.split(':').map(Number);
+          // Grace period before marking as late (default 15 minutes)
+          const gracePeriodMinutes = Number(autoSettings.lateGracePeriod ?? 15);
+          const thresholdMinutes = schHour * 60 + schMin + gracePeriodMinutes;
+          const clockInMinutes = now.getHours() * 60 + now.getMinutes();
+          if (clockInMinutes > thresholdMinutes) {
+            status = "late";
+          }
+        }
+      }
+    } catch (_) {
+      // If schedule lookup fails, keep status as 'present'
+    }
+
     const record = {
       userId: user.id,
       employeeName: kvData?.name || user.user_metadata?.name || "",
       date: today,
       clockIn: now.toISOString(),
       clockOut: null,
-      status: "present",
+      status,
       isWeekend: [0, 6].includes(now.getDay()),
       regularMinutes: 0,
       overtimeMinutes: 0,
@@ -5471,7 +5493,8 @@ app.post(`${PREFIX}/attendance/clock-out`, async (c) => {
       isPaused: false,
       pauses,
       totalPausedMinutes: Math.round(totalPausedMs / 60000),
-      status: "present",
+      // Mark overtime if the employee worked more than 8 hours active time
+      status: Math.max(0, activeMinutes - 480) > 0 ? "overtime" : "present",
       regularMinutes: Math.min(activeMinutes, 480),
       overtimeMinutes: Math.max(0, activeMinutes - 480),
       updatedAt: now.toISOString(),
@@ -6658,6 +6681,38 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     });
   } catch (e: any) {
     console.error('Error initializing payment:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /subscription/all-users — return all active users for the superadmin's company.
+// Called by LicenseManagement when the purchase count is less than current active users,
+// so the superadmin can pick which users keep their license active.
+app.get(`${PREFIX}/subscription/all-users`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const companyId = await getCompanyId(user.id);
+    const allEmployees = await kv.getByPrefix('employee:');
+    const companyUsers = companyId
+      ? allEmployees.filter((u: any) =>
+          u.id !== user.id && // exclude the superadmin themselves
+          (u.companyId === companyId || u.company === companyId)
+        )
+      : allEmployees.filter((u: any) => u.id !== user.id);
+
+    const users = companyUsers.map((u: any) => ({
+      id: u.id,
+      name: u.name || u.email || u.id,
+      email: u.email || '',
+      role: u.role || 'employee',
+      status: u.status || 'active',
+      department: u.department || '',
+    }));
+
+    return c.json({ users });
+  } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
