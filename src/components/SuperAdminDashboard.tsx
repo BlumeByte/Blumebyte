@@ -66,7 +66,7 @@ import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
-import { supabase } from '../lib/supabase';
+import { useDarkMode } from '../lib/dark-mode-context';import { supabase } from '../lib/supabase';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -443,6 +443,7 @@ function copyToClipboard(text: string) {
 export function SuperAdminDashboard() {
   const { user, accessToken, logout } = useAuth();
   const { branding } = useBranding();
+  const { darkMode, toggleUserDarkMode } = useDarkMode();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
@@ -482,6 +483,27 @@ export function SuperAdminDashboard() {
       case 'settings': return (
         <div className="p-8 space-y-8">
           <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">🌙 Appearance</h2>
+            <Card className="max-w-md">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Dark Mode</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Switch between light and dark interface</p>
+                  </div>
+                  <button
+                    aria-label={darkMode ? 'Disable dark mode' : 'Enable dark mode'}
+                    onClick={toggleUserDarkMode}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">🎨 Company Branding</h2>
             <CompanyBrandingSettings />
           </div>
@@ -511,6 +533,13 @@ export function SuperAdminDashboard() {
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">🔐 Two-Factor Authentication</h2>
             <TwoFactorSettings />
+          </div>
+
+          <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">🔔 Notification Preferences</h2>
+            <div className="max-w-xl">
+              <NotificationSettings />
+            </div>
           </div>
         </div>
       );

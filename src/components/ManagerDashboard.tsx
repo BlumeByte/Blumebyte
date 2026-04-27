@@ -37,7 +37,8 @@ import { ManagerCrudPanel } from './ManagerCrudPanel';
 import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
 import { ManagerOvertimeExpenseApproval } from './ManagerOvertimeExpenseApproval';
 import { LanguageSelector } from './LanguageSelector';
-
+import { useDarkMode } from '../lib/dark-mode-context';
+import { NotificationSettings } from './NotificationSettings';
 function TeamTab() {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
@@ -785,9 +786,33 @@ export function ManagerDashboard() {
 export default ManagerDashboard;
 
 function ManagerSettingsView() {
+  const { darkMode, toggleUserDarkMode } = useDarkMode();
   return (
     <div className="p-6 max-w-xl space-y-6">
       <h2 className="text-xl font-bold">Settings</h2>
+      {/* Appearance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            🌙 Appearance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Dark Mode</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Switch between light and dark interface</p>
+            </div>
+            <button
+              aria-label={darkMode ? 'Disable dark mode' : 'Enable dark mode'}
+              onClick={toggleUserDarkMode}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="text-sm flex items-center gap-2">
@@ -804,6 +829,7 @@ function ManagerSettingsView() {
           </p>
         </CardContent>
       </Card>
+      <NotificationSettings />
     </div>
   );
 }

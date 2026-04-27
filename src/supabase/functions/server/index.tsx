@@ -6664,6 +6664,166 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
   }
 });
 
+// POST /subscription/purchase-licenses — alias for /subscription/initialize used by LicenseManagement.
+// Accepts { licenses, plan, amount, saveCard } and delegates to the same Paystack flow.
+app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    const { licenses, plan, amount } = body;
+
+    if (!licenses || !plan || !amount) {
+      return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+    }
+    if (!['monthly', 'yearly'].includes(plan)) {
+      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
+    }
+
+    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const expectedPrice = licenses * pricePerUser;
+    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
+      console.error(`purchase-licenses: amount mismatch — received ${amount}, expected ${expectedPrice}`);
+      return c.json({ error: 'Invalid amount for the selected plan' }, 400);
+    }
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment gateway not configured' }, 500);
+    }
+
+    const reference = `SUB_${user.id}_${Date.now()}`;
+    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: user.email,
+        amount: amount * 100,
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          userId: user.id,
+          plan,
+          userCount: licenses,
+          custom_fields: [
+            { display_name: 'Subscription Plan', variable_name: 'plan', value: plan },
+            { display_name: 'User Count', variable_name: 'user_count', value: String(licenses) },
+          ],
+        },
+      }),
+    });
+
+    const paystackData = await paystackResponse.json();
+    if (!paystackData.status) {
+      console.error('Paystack initialization failed:', paystackData);
+      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
+    }
+
+    await kv.set(`pending-subscription:${reference}`, {
+      userId: user.id,
+      plan,
+      userCount: licenses,
+      amount,
+      reference,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
+      authorization_url: paystackData.data.authorization_url,
+      access_code: paystackData.data.access_code,
+      reference: paystackData.data.reference,
+    });
+  } catch (e: any) {
+    console.error('Error in purchase-licenses:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /subscription/purchase-licenses-with-selection — same as purchase-licenses but
+// with explicit user IDs to activate after payment.
+app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    const { licenses, plan, amount, selectedUserIds } = body;
+
+    if (!licenses || !plan || !amount) {
+      return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+    }
+    if (!['monthly', 'yearly'].includes(plan)) {
+      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
+    }
+
+    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const expectedPrice = licenses * pricePerUser;
+    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
+      return c.json({ error: 'Invalid amount for the selected plan' }, 400);
+    }
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment gateway not configured' }, 500);
+    }
+
+    const reference = `SUB_${user.id}_${Date.now()}`;
+    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: user.email,
+        amount: amount * 100,
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          userId: user.id,
+          plan,
+          userCount: licenses,
+          selectedUserIds: selectedUserIds || [],
+        },
+      }),
+    });
+
+    const paystackData = await paystackResponse.json();
+    if (!paystackData.status) {
+      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
+    }
+
+    await kv.set(`pending-subscription:${reference}`, {
+      userId: user.id,
+      plan,
+      userCount: licenses,
+      amount,
+      reference,
+      selectedUserIds: selectedUserIds || [],
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
+      authorization_url: paystackData.data.authorization_url,
+      access_code: paystackData.data.access_code,
+      reference: paystackData.data.reference,
+    });
+  } catch (e: any) {
+    console.error('Error in purchase-licenses-with-selection:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Verify Paystack payment
 app.post(`${PREFIX}/subscription/verify`, async (c) => {
   try {

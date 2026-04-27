@@ -45,7 +45,7 @@ import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 import { TwoFactorSettings } from './TwoFactorSettings';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
-
+import { useDarkMode } from '../lib/dark-mode-context';
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'employees', label: 'Employees', icon: Users },
@@ -2021,6 +2021,7 @@ function PendingApprovalsPanel() {
 
 function AdminSettings() {
   const { accessToken } = useAuth();
+  const { darkMode, toggleUserDarkMode } = useDarkMode();
   const [loading, setLoading] = useState(true);
 
   // Auto-clock settings
@@ -2051,6 +2052,30 @@ function AdminSettings() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Company Branding has been moved to SuperAdmin only */}
+
+      {/* Appearance / Dark Mode */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            🌙 Appearance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Dark Mode</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Switch between light and dark interface</p>
+            </div>
+            <button
+              aria-label={darkMode ? 'Disable dark mode' : 'Enable dark mode'}
+              onClick={toggleUserDarkMode}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Billing & Subscription */}
       <Card>

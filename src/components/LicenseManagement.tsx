@@ -281,9 +281,13 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       
       if (response.ok) {
         const result = await response.json();
-        toast.success(
-          `License sync complete! Activated: ${result.activatedCount}, Deactivated: ${result.deactivatedCount}`
-        );
+        if (result.activatedCount > 0 || result.deactivatedCount > 0) {
+          toast.success(
+            `License sync complete! Activated: ${result.activatedCount}, Deactivated: ${result.deactivatedCount}`
+          );
+        } else {
+          toast.success('All licenses are up to date — no changes needed.');
+        }
         fetchLicenseInfo(); // Refresh license info
       } else {
         const error = await response.json();
@@ -884,7 +888,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             )}
             <Button
               onClick={handlePurchaseLicenses}
-              disabled={loading || additionalLicenses < 1}
+              disabled={loading || additionalLicenses < MIN_LICENSES}
               style={brandGradientStyle(branding?.primaryColor || '#1d4ed8')}
               className="text-white flex-1"
             >
