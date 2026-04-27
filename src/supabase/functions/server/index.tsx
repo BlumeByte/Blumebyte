@@ -4190,20 +4190,27 @@ app.get(`${PREFIX}/superadmin/job-posting`, async (c) => {
     if (strict.length > 0) {
       return c.json(strict);
     }
-    // Fallback: if strict filter returned nothing (e.g. scope/name mismatch),
-    // return postings whose companyName is in the user's scope, plus any unscoped
-    // postings (created without a companyId, typically by this same SuperAdmin).
+    // Fallback: if strict filter returned nothing (e.g. scope stores company names but
+    // items were saved with UUIDs), include postings whose companyName is in the
+    // user's scope, plus unscoped postings (no companyId/company field).
+    // Items that have a companyId/company but whose companyName is empty or doesn't
+    // match are excluded — we can't verify they belong to this company without a
+    // DB lookup, and the strict filter would have caught them if they did match.
     const scope = await resolveCompanyScope(user.id);
     if (!scope || scope.length === 0) {
-      // No scope at all — only return items that were created without a company
-      // constraint so we never leak cross-company data.
+      // No scope at all — only return unscoped items to avoid cross-company leakage.
       return c.json(all.filter((item: any) => !item.companyId && !item.company));
     }
     const scopeSet = new Set(scope.map((s: string) => s.toLowerCase()));
     const fallback = all.filter((item: any) => {
-      if (!item.companyId && !item.company) return true; // unscoped postings
-      const cn = (item.companyName || '').toLowerCase();
-      return cn && scopeSet.has(cn);
+      // Unscoped postings (no company assigned) — belong to no tenant, safe to show
+      if (!item.companyId && !item.company) return true;
+      // Try UUID/company field match first
+      const idField = (item.companyId || item.company || '').toLowerCase();
+      if (idField && scopeSet.has(idField)) return true;
+      // Try human-readable name match (separate check)
+      const nameField = (item.companyName || '').toLowerCase();
+      return nameField && scopeSet.has(nameField);
     });
     return c.json(fallback);
   } catch (e: any) {
@@ -4540,13 +4547,20 @@ app.get(`${PREFIX}/admin/job-postings`, async (c) => {
     if (strict.length > 0) {
       return c.json(strict);
     }
-    // Fallback: filter by companyId from the user's scope when strict filter is empty
+    // Fallback: when strict scope/UUID filter returns nothing (e.g. scope holds company
+    // names but items were stored with UUIDs), also try matching by companyName.
+    // We deliberately keep companyId/company checks separate from companyName to avoid
+    // false positives when a UUID string happens to equal a company name substring.
     const scope = await resolveCompanyScope(user.id);
     if (!scope || scope.length === 0) return c.json([]);
     const scopeSet = new Set(scope.map((s: string) => s.toLowerCase()));
     const fallback = all.filter((item: any) => {
-      const co = (item.companyId || item.company || item.companyName || '').toLowerCase();
-      return co && scopeSet.has(co);
+      // Try UUID/company field match first
+      const idField = (item.companyId || item.company || '').toLowerCase();
+      if (idField && scopeSet.has(idField)) return true;
+      // Try human-readable name match (separate check to avoid UUID/name confusion)
+      const nameField = (item.companyName || '').toLowerCase();
+      return nameField && scopeSet.has(nameField);
     });
     return c.json(fallback);
   } catch (e: any) {
