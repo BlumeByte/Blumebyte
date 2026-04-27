@@ -6665,7 +6665,7 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
 });
 
 // POST /subscription/purchase-licenses — alias for /subscription/initialize used by LicenseManagement.
-// Accepts { licenses, plan, amount, saveCard } and delegates to the same Paystack flow.
+// Accepts { licenses, plan, amount } and delegates to the same Paystack flow.
 app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);

@@ -66,7 +66,8 @@ import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
-import { useDarkMode } from '../lib/dark-mode-context';import { supabase } from '../lib/supabase';
+import { useDarkMode } from '../lib/dark-mode-context';
+import { supabase } from '../lib/supabase';
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
