@@ -3595,7 +3595,7 @@ function UserManagementView() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Company</TableHead><TableHead>Department</TableHead><TableHead className="w-28">Actions</TableHead></TableRow>
+                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Company</TableHead><TableHead>Department</TableHead><TableHead>Managed By</TableHead><TableHead className="w-28">Actions</TableHead></TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(u => (
@@ -3617,6 +3617,9 @@ function UserManagementView() {
                       ) : (
                         u.department || '\u2014'
                       )}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {u.managingAdminId ? (users.find(a => a.userId === u.managingAdminId)?.name || u.managingAdminId) : '\u2014'}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -3689,6 +3692,13 @@ function UserManagementView() {
                 />
                 
                 <div><Label>Position</Label><Input value={formData.position || ''} onChange={e => setFormData({ ...formData, position: e.target.value })} /></div>
+                <div>
+                  <Label>Managed By (Admin)</Label>
+                  <NativeSelect value={formData.managingAdminId || ''} onChange={e => setFormData({ ...formData, managingAdminId: e.target.value || undefined })}>
+                    <option value="">— None —</option>
+                    {users.filter(u => u.role === 'admin').map(u => <option key={u.userId} value={u.userId}>{u.name} ({u.email})</option>)}
+                  </NativeSelect>
+                </div>
                 <div>
                   <Label>Grade/Level</Label>
                   <Select value={formData.grade || ''} onValueChange={v => setFormData({ ...formData, grade: v })}>

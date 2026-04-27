@@ -2656,9 +2656,10 @@ app.get(`${PREFIX}/users`, async (c) => {
     
     console.log(`✅ /users: User ${user.id} (${role}) accessing ${filtered.length} users in companies: ${scope.join(', ')}`);
     
-    // Admin cannot see superadmins
+    // Admin cannot see superadmins; admin only sees users they manage (or untagged users for backward compat)
     if (role === "admin") {
       filtered = filtered.filter((e: any) => e.role !== "superadmin");
+      filtered = filtered.filter((e: any) => !e.managingAdminId || e.managingAdminId === user.id);
     }
     // Manager can only see employees and other managers
     if (role === "manager") {
@@ -8031,7 +8032,17 @@ app.post(`${PREFIX}/employee/expense-claim`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`expense:${id}`, claim);
-    
+
+    // Trigger workflow notifications for expense type
+    if (companyId) {
+      await triggerWorkflowNotifications(
+        companyId,
+        'expense',
+        'Expense Claim Submitted',
+        `${kvData?.name || 'An employee'} submitted an expense claim: ${title} (${currency || 'NGN'} ${amount})`
+      );
+    }
+
     const allEmps = await kv.getByPrefix('employee:');
     const hrStaff = allEmps.filter((e: any) => ['superadmin', 'admin'].includes(e.role) && (e.companyId === companyId || e.company === companyId));
     for (const hr of hrStaff) {
