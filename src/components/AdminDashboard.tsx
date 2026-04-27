@@ -1311,11 +1311,15 @@ function AdminAttendance() {
     })
     .sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
 
-  const todayRecords = records.filter(r => r.date === new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const todayRecords = records.filter(r => r.date === today);
+  // "Present Today" and "Clocked Out" are date-scoped (today only)
   const presentToday = todayRecords.filter(r => r.clockIn).length;
   const clockedOutToday = todayRecords.filter(r => r.clockOut).length;
-  const currentlyWorking = todayRecords.filter(r => r.clockIn && !r.clockOut && !r.isPaused).length;
-  const pausedToday = todayRecords.filter(r => r.isPaused).length;
+  // "Currently Working" and "Paused" are live states — include any open session regardless of date
+  // (an employee who clocked in yesterday and never clocked out is still "Working")
+  const currentlyWorking = records.filter(r => r.clockIn && !r.clockOut && !r.isPaused).length;
+  const pausedToday = records.filter(r => r.isPaused).length;
 
   const formatTime = (iso: string | null) => {
     if (!iso) return '—';

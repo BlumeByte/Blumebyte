@@ -618,6 +618,45 @@ async function isItemInUserCompany(userId: string, itemCompanyId: string | undef
   return companyMatches(userScope, itemCompanyId);
 }
 
+// --- Workflow trigger helper ---
+// Fires notifications to the approvers configured in the admin's Workflows & Approvals setup.
+// workflowType matches the `type` field on workflow: KV entries ('leave','expense','overtime', etc.)
+async function triggerWorkflowNotifications(
+  companyId: string,
+  workflowType: string,
+  notificationTitle: string,
+  notificationMessage: string
+) {
+  try {
+    const allWorkflows = await kv.getByPrefix('workflow:');
+    const matchingWorkflows = allWorkflows.filter(
+      (w: any) =>
+        w.status === 'active' &&
+        w.type === workflowType &&
+        (w.companyId === companyId || w.company === companyId)
+    );
+
+    for (const wf of matchingWorkflows) {
+      const approverIds: string[] = [wf.approver1Id, wf.approver2Id].filter(Boolean);
+      for (const approverId of approverIds) {
+        const nid = crypto.randomUUID();
+        await kv.set(`notification:${nid}`, {
+          id: nid,
+          userId: approverId,
+          type: `workflow-${workflowType}`,
+          title: notificationTitle,
+          message: notificationMessage,
+          workflowId: wf.id,
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+  } catch (e) {
+    console.error('triggerWorkflowNotifications error:', e);
+  }
+}
+
 // --- Generic CRUD factory ---
 function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise<any>) {
   // List
@@ -4930,6 +4969,17 @@ app.post(`${PREFIX}/leave-requests`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`leave:${id}`, leave);
+    // Trigger workflow notifications for leave type
+    if (companyId) {
+      const empName = kvData?.name || user.user_metadata?.name || 'An employee';
+      const leaveType = body.leaveType || 'leave';
+      await triggerWorkflowNotifications(
+        companyId,
+        'leave',
+        'Leave Request Submitted',
+        `${empName} submitted a ${leaveType} request from ${body.startDate || ''} to ${body.endDate || ''}`
+      );
+    }
     return c.json(leave, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -5103,11 +5153,12 @@ app.delete(`${PREFIX}/training-programs/:id`, async (c) => {
 app.get(`${PREFIX}/admin/training-programs`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
+    const scope = await resolveCompanyScope(user.id);
     const allTrainings = await kv.getByPrefix("training:");
-    const employees = await kv.getByPrefix("employee:");
-    const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
-    const companyId = filteredEmployees.length > 0 ? filteredEmployees[0].companyId : null;
-    return c.json(allTrainings.filter((t: any) => !companyId || t.companyId === companyId));
+    const filtered = allTrainings.filter((t: any) =>
+      scope && companyMatches(scope, t.companyId || t.company)
+    );
+    return c.json(filtered);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
@@ -7917,6 +7968,22 @@ app.post(`${PREFIX}/employee/overtime-request`, async (c) => {
     };
     await kv.set(`overtime:${id}`, request);
     
+    // Trigger workflow notifications for overtime type
+    if (companyId) {
+      await triggerWorkflowNotifications(
+        companyId,
+        'expense', // workflows typed as 'expense' in admin config cover OT too; also check 'overtime'
+        'Overtime Request Submitted',
+        `${kvData?.name || 'An employee'} submitted an overtime request for ${hours}h on ${date}`
+      );
+      await triggerWorkflowNotifications(
+        companyId,
+        'overtime',
+        'Overtime Request Submitted',
+        `${kvData?.name || 'An employee'} submitted an overtime request for ${hours}h on ${date}`
+      );
+    }
+
     const allEmps = await kv.getByPrefix('employee:');
     const managers = allEmps.filter((e: any) => ['superadmin', 'admin', 'manager'].includes(e.role) && (e.companyId === companyId || e.company === companyId));
     for (const mgr of managers) {
@@ -8202,10 +8269,11 @@ app.get(`${PREFIX}/employee/team-calendar`, async (c) => {
 
 app.get(`${PREFIX}/admin/overtime-requests`, async (c) => {
   try {
-    const { user, role, kvData } = await requireAdminOrAbove(c);
-    const companyId = kvData?.companyId || kvData?.company;
+    const { user, role } = await requireAdminOrAbove(c);
+    const scope = await resolveCompanyScope(user.id);
     const all = await kv.getByPrefix('overtime:');
-    const companyRequests = all.filter((r: any) => r.companyId === companyId)
+    const companyRequests = all
+      .filter((r: any) => scope && companyMatches(scope, r.companyId || r.company))
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return c.json(companyRequests);
   } catch (e: any) {
@@ -8235,10 +8303,11 @@ app.put(`${PREFIX}/admin/overtime-requests/:id`, async (c) => {
 
 app.get(`${PREFIX}/admin/expense-claims`, async (c) => {
   try {
-    const { user, role, kvData } = await requireAdminOrAbove(c);
-    const companyId = kvData?.companyId || kvData?.company;
+    const { user, role } = await requireAdminOrAbove(c);
+    const scope = await resolveCompanyScope(user.id);
     const all = await kv.getByPrefix('expense:');
-    const companyClaims = all.filter((r: any) => r.companyId === companyId)
+    const companyClaims = all
+      .filter((r: any) => scope && companyMatches(scope, r.companyId || r.company))
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return c.json(companyClaims);
   } catch (e: any) {
