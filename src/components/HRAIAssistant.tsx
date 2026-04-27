@@ -17,29 +17,11 @@ interface Message {
   timestamp: Date;
 }
 
+// Allowlist for safe internal paths: must start with / and contain only URL-safe characters (no fragment hashes)
+const INTERNAL_PATH_PATTERN = /^\/[\w\-./?\=&%+]*$/;
+
 // Renders markdown-style links [text](url) as clickable in-app navigation links
 function RenderMessageContent({ content, onNavigate }: { content: string; onNavigate: (path: string) => void }) {
-  const sanitizeHref = (rawHref: string): string | null => {
-    const trimmed = rawHref.trim();
-
-    // Allow only in-app absolute paths like "/dashboard", but not protocol-relative URLs ("//evil.com")
-    if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-      return trimmed;
-    }
-
-    // Allow only explicit http(s) external links
-    try {
-      const parsed = new URL(trimmed);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        return parsed.toString();
-      }
-    } catch {
-      // Invalid URL -> unsafe
-    }
-
-    return null;
-  };
-
   // Split content by markdown link pattern [text](url)
   const parts = content.split(/(\[[^\]]+\]\([^)]+\))/g);
   
@@ -49,20 +31,17 @@ function RenderMessageContent({ content, onNavigate }: { content: string; onNavi
         const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         if (linkMatch) {
           const [, text, href] = linkMatch;
-          const safeHref = sanitizeHref(href);
-          if (!safeHref) {
-            return <span key={idx}>{part}</span>;
-          }
-
           // Internal link (starts with / but NOT // which would be a protocol-relative external URL)
-          if (safeHref.startsWith('/') && !safeHref.startsWith('//')) {
+          if (href.startsWith('/') && !href.startsWith('//')) {
+            // Validate internal path — only allow URL-safe characters to prevent XSS via crafted hrefs
+            const safeInternalPath = INTERNAL_PATH_PATTERN.test(href) ? href : '/';
             return (
               <a
                 key={idx}
-                href={safeHref}
+                href={safeInternalPath}
                 onClick={(e) => {
                   e.preventDefault();
-                  onNavigate(safeHref);
+                  onNavigate(safeInternalPath);
                 }}
                 className="text-blue-600 hover:text-blue-800 underline font-medium cursor-pointer"
               >

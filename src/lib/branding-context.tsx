@@ -68,7 +68,10 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         console.log('🎨 Setting branding to:', updatedBranding);
         setBranding(updatedBranding);
       } else {
-        console.warn('❌ Branding fetch failed with status:', res.status);
+        // 401/403 are expected on public pages (user not logged in) — don't warn about them
+        if (res.status !== 401 && res.status !== 403) {
+          console.warn('❌ Branding fetch failed with status:', res.status);
+        }
         // On error, use default branding
         setBranding(DEFAULT_BRANDING);
       }

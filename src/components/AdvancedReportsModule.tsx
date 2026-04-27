@@ -175,7 +175,7 @@ export function AdvancedReportsModule() {
       ? ((filteredAttendance.filter((a) => a.status === 'present').length / filteredAttendance.length) * 100).toFixed(1)
       : '0',
     pendingLeaves: (reportData.leaves || []).filter((l) => l.status === 'pending').length,
-    totalPayroll: filteredPayroll.reduce((sum, p) => sum + (p.netPay || 0), 0),
+    totalPayroll: filteredPayroll.reduce((sum, p) => sum + parseFloat(p.netPay || 0), 0),
   };
 
   // Department distribution
@@ -427,7 +427,7 @@ export function AdvancedReportsModule() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {currencySymbol}{overviewMetrics.totalPayroll.toLocaleString()}
+              {currencySymbol}{overviewMetrics.totalPayroll.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">Period total</p>
           </CardContent>

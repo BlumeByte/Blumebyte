@@ -45,11 +45,10 @@ import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 import { TwoFactorSettings } from './TwoFactorSettings';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
-
+import { useDarkMode } from '../lib/dark-mode-context';
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'employees', label: 'Employees', icon: Users },
-  { id: 'users', label: 'Users', icon: UserPlus },
   { id: 'departments', label: 'Departments', icon: FolderTree },
   { id: 'leave', label: 'Leave Mgmt', icon: CalendarDays },
   { id: 'assets', label: 'Assets', icon: Briefcase },
@@ -183,7 +182,6 @@ export function AdminDashboard() {
           
           {activeTab === 'overview' && <AdminOverview setTab={setActiveTab} />}
           {activeTab === 'employees' && <AdminEmployees />}
-          {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'departments' && <AdminDepartments />}
           {activeTab === 'leave' && <AdminLeave />}
           {activeTab === 'assets' && <AdminAssets />}
@@ -273,7 +271,6 @@ function AdminOverview({ setTab }: { setTab: (t: string) => void }) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: 'Add Employee', icon: UserPlus, tab: 'employees', color: 'bg-blue-500 hover:bg-blue-600' },
-            { label: 'Add User', icon: UserCog, tab: 'users', color: 'bg-purple-500 hover:bg-purple-600' },
             { label: 'Workflows', icon: GitMerge, tab: 'workflows', color: 'bg-indigo-500 hover:bg-indigo-600' },
             { label: 'Reports', icon: BarChart3, tab: 'reports', color: 'bg-green-500 hover:bg-green-600' },
             { label: 'Training', icon: GraduationCap, tab: 'training', color: 'bg-amber-500 hover:bg-amber-600' },
@@ -300,7 +297,7 @@ function AdminOverview({ setTab }: { setTab: (t: string) => void }) {
 }
 
 function AdminEmployees() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -318,6 +315,24 @@ function AdminEmployees() {
   const [contractFiles, setContractFiles] = useState<any[]>([]);
   const [uploadingContract, setUploadingContract] = useState(false);
   const contractUploadRef = useRef<HTMLInputElement>(null);
+  const isSuperAdminEmp = user?.role === 'superadmin';
+
+  const allowedCompanies = isSuperAdminEmp
+    ? companies
+    : companies.filter(c => {
+        const adminAssigned = (user as any)?.assignedCompanies || [];
+        const adminCompanyId = (user as any)?.companyId || (user as any)?.company;
+        return adminAssigned.includes(c.id) || adminAssigned.includes(c.name) || c.id === adminCompanyId || c.name === adminCompanyId;
+      });
+
+  const allowedDepartments = isSuperAdminEmp
+    ? departmentsList
+    : departmentsList.filter(d => {
+        const adminDepts = (user as any)?.departments || (user as any)?.assignedDepartments || [];
+        const adminDept = (user as any)?.department || '';
+        const deptName = typeof d === 'string' ? d : d.name || d.id || '';
+        return adminDepts.includes(deptName) || deptName === adminDept || adminDepts.length === 0;
+      });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -507,7 +522,7 @@ function AdminEmployees() {
                   <div><Label className="text-xs">Company</Label>
                     <Select value={formData.companyId || ''} onValueChange={v => setFormData({ ...formData, companyId: v })}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>{companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{allowedCompanies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -515,7 +530,7 @@ function AdminEmployees() {
                     <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
                       <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
                       <SelectContent>
-                        {departmentsList.filter(d => d.status === 'active').map(d => (
+                        {allowedDepartments.filter(d => d.status === 'active').map(d => (
                           <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -587,6 +602,23 @@ function AdminUsers() {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [initialDepartment, setInitialDepartment] = useState('');
   const isSuperAdmin = user?.role === 'superadmin';
+
+  const allowedCompanies = isSuperAdmin
+    ? companies
+    : companies.filter(c => {
+        const adminAssigned = (user as any)?.assignedCompanies || [];
+        const adminCompanyId = (user as any)?.companyId || (user as any)?.company;
+        return adminAssigned.includes(c.id) || adminAssigned.includes(c.name) || c.id === adminCompanyId || c.name === adminCompanyId;
+      });
+
+  const allowedDepartments = isSuperAdmin
+    ? departmentsList
+    : departmentsList.filter(d => {
+        const adminDepts = (user as any)?.departments || (user as any)?.assignedDepartments || [];
+        const adminDept = (user as any)?.department || '';
+        const deptName = typeof d === 'string' ? d : d.name || d.id || '';
+        return adminDepts.includes(deptName) || deptName === adminDept || adminDepts.length === 0;
+      });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -747,7 +779,7 @@ function AdminUsers() {
                   <div><Label className="text-xs">Company</Label>
                     <Select value={formData.companyId || ''} onValueChange={v => setFormData({ ...formData, companyId: v })}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>{companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{allowedCompanies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -755,7 +787,7 @@ function AdminUsers() {
                     <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
                       <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
                       <SelectContent>
-                        {departmentsList.filter(d => d.status === 'active').map(d => (
+                        {allowedDepartments.filter(d => d.status === 'active').map(d => (
                           <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1311,11 +1343,15 @@ function AdminAttendance() {
     })
     .sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
 
-  const todayRecords = records.filter(r => r.date === new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const todayRecords = records.filter(r => r.date === today);
+  // "Present Today" and "Clocked Out" are date-scoped (today only)
   const presentToday = todayRecords.filter(r => r.clockIn).length;
   const clockedOutToday = todayRecords.filter(r => r.clockOut).length;
-  const currentlyWorking = todayRecords.filter(r => r.clockIn && !r.clockOut && !r.isPaused).length;
-  const pausedToday = todayRecords.filter(r => r.isPaused).length;
+  // "Currently Working" and "Paused" are live states — include any open session regardless of date
+  // (an employee who clocked in yesterday and never clocked out is still "Working")
+  const currentlyWorking = records.filter(r => r.clockIn && !r.clockOut && !r.isPaused).length;
+  const pausedToday = records.filter(r => r.isPaused).length;
 
   const formatTime = (iso: string | null) => {
     if (!iso) return '—';
@@ -2021,6 +2057,7 @@ function PendingApprovalsPanel() {
 
 function AdminSettings() {
   const { accessToken } = useAuth();
+  const { darkMode, toggleUserDarkMode } = useDarkMode();
   const [loading, setLoading] = useState(true);
 
   // Auto-clock settings
@@ -2051,6 +2088,30 @@ function AdminSettings() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Company Branding has been moved to SuperAdmin only */}
+
+      {/* Appearance / Dark Mode */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            🌙 Appearance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Dark Mode</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Switch between light and dark interface</p>
+            </div>
+            <button
+              aria-label={darkMode ? 'Disable dark mode' : 'Enable dark mode'}
+              onClick={toggleUserDarkMode}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Billing & Subscription */}
       <Card>
@@ -2301,7 +2362,7 @@ function AdminHiring() {
                 <TableBody>
                   {postings.map(p => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.title || '—'}</TableCell>
+                      <TableCell className="font-medium">{p.title || p.roleTitle || '—'}</TableCell>
                       <TableCell className="text-sm">{p.department || '—'}</TableCell>
                       <TableCell className="text-sm">{p.type || '—'}</TableCell>
                       <TableCell className="text-sm">{p.location || '—'}</TableCell>
@@ -2337,7 +2398,7 @@ function AdminHiring() {
         <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editItem ? 'Edit' : 'Create'} Job Posting</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <div><Label className="text-xs">Job Title / Role Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value, roleTitle: e.target.value })} placeholder="e.g., Software Engineer" /></div>
+            <div><Label className="text-xs">Job Title / Role Title</Label><Input value={formData.title || formData.roleTitle || ''} onChange={e => setFormData({ ...formData, title: e.target.value, roleTitle: e.target.value })} placeholder="e.g., Software Engineer" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Department</Label>
                 <Select value={(() => {
@@ -2401,7 +2462,10 @@ function AdminHiring() {
                 <Select value={formData.status || 'open'} onValueChange={v => setFormData({ ...formData, status: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="interviewing">Interviewing</SelectItem>
+                    <SelectItem value="offered">Offered</SelectItem>
                     <SelectItem value="draft">Draft</SelectItem>
                     <SelectItem value="paused">Paused</SelectItem>
                     <SelectItem value="closed">Closed</SelectItem>

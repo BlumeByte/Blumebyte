@@ -34,11 +34,12 @@ import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
-
+import { useDarkMode } from '../lib/dark-mode-context';
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
   const { branding } = useBranding();
   const { currencySymbol } = useCurrency();
+  const { darkMode, toggleUserDarkMode } = useDarkMode();
   const [activeTab, setActiveTab] = useState('overview');
 
   // Poll batch auto-clockout every 60s for all accounts
@@ -115,6 +116,29 @@ export function EmployeeDashboard() {
           <TabsContent value="announcements"><EmpAnnouncements /></TabsContent>
           <TabsContent value="settings">
             <div className="max-w-xl space-y-6">
+              {/* Dark Mode Toggle */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    🌙 Appearance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Dark Mode</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Switch between light and dark interface</p>
+                    </div>
+                    <button
+                      aria-label={darkMode ? 'Disable dark mode' : 'Enable dark mode'}
+                      onClick={toggleUserDarkMode}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">

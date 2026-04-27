@@ -66,6 +66,7 @@ import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
+import { useDarkMode } from '../lib/dark-mode-context';
 import { supabase } from '../lib/supabase';
 
 const SIDEBAR_ITEMS = [
@@ -443,6 +444,7 @@ function copyToClipboard(text: string) {
 export function SuperAdminDashboard() {
   const { user, accessToken, logout } = useAuth();
   const { branding } = useBranding();
+  const { darkMode, toggleUserDarkMode } = useDarkMode();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
@@ -482,6 +484,27 @@ export function SuperAdminDashboard() {
       case 'settings': return (
         <div className="p-8 space-y-8">
           <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">🌙 Appearance</h2>
+            <Card className="max-w-md">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Dark Mode</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Switch between light and dark interface</p>
+                  </div>
+                  <button
+                    aria-label={darkMode ? 'Disable dark mode' : 'Enable dark mode'}
+                    onClick={toggleUserDarkMode}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${darkMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">🎨 Company Branding</h2>
             <CompanyBrandingSettings />
           </div>
@@ -512,6 +535,13 @@ export function SuperAdminDashboard() {
             <h2 className="text-2xl font-bold mb-6">🔐 Two-Factor Authentication</h2>
             <TwoFactorSettings />
           </div>
+
+          <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6">🔔 Notification Preferences</h2>
+            <div className="max-w-xl">
+              <NotificationSettings />
+            </div>
+          </div>
         </div>
       );
       case 'global-hiring-applications': return <GlobalHiringApplicationsPanel accessToken={accessToken} />;
@@ -522,7 +552,13 @@ export function SuperAdminDashboard() {
       );
       default:
         if (ENTITY_CONFIGS[activeSection]) {
-          return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} />;
+          // When a specific company is selected (not 'all'), filter the companies list to
+          // show only that company so the view reflects the selected context.
+          const companyFilterFn =
+            activeSection === 'companies' && selectedCompanyId && selectedCompanyId !== 'all'
+              ? (item: any) => item.id === selectedCompanyId
+              : undefined;
+          return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} filterFn={companyFilterFn} />;
         }
         return <PlaceholderView title={SIDEBAR_ITEMS.find(i => i.id === activeSection)?.label || 'Coming Soon'} />;
     }
@@ -832,6 +868,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   // Auto-fix missing assignedCompanies on component mount
   useEffect(() => {
     const fixCompanyScope = async () => {
+      if (!accessToken) { setScopeFixed(true); return; } // not yet authenticated
       try {
         console.log('🔧 Attempting to fix company scope...');
         const result = await api('/superadmin/fix-company-scope', { 
@@ -852,6 +889,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   }, [accessToken, scopeFixed]);
 
   const loadDashboardData = useCallback(() => {
+    if (!accessToken) return; // skip until auth is ready
     const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.log(`Dashboard fetch ${path} failed:`, e); return null; });
     Promise.all([
       safeFetch('/users'),
@@ -1984,7 +2022,7 @@ function PayrollView() {
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Total Payroll</p><p className="text-2xl font-bold mt-1">{currencySymbol} {totalPayroll.toLocaleString()}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Total Payroll</p><p className="text-2xl font-bold mt-1">{currencySymbol} {totalPayroll.toFixed(2)}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Records</p><p className="text-2xl font-bold mt-1">{items.length}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Paid</p><p className="text-2xl font-bold text-green-600 mt-1">{paidCount}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Pending</p><p className="text-2xl font-bold text-amber-600 mt-1">{pendingCount}</p></CardContent></Card>
@@ -3557,7 +3595,7 @@ function UserManagementView() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Company</TableHead><TableHead>Department</TableHead><TableHead className="w-28">Actions</TableHead></TableRow>
+                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Company</TableHead><TableHead>Department</TableHead><TableHead>Managed By</TableHead><TableHead className="w-28">Actions</TableHead></TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(u => (
@@ -3579,6 +3617,9 @@ function UserManagementView() {
                       ) : (
                         u.department || '\u2014'
                       )}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {u.managingAdminId ? (users.find(a => a.userId === u.managingAdminId)?.name || u.managingAdminId) : '\u2014'}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -3652,6 +3693,13 @@ function UserManagementView() {
                 
                 <div><Label>Position</Label><Input value={formData.position || ''} onChange={e => setFormData({ ...formData, position: e.target.value })} /></div>
                 <div>
+                  <Label>Managed By (Admin)</Label>
+                  <NativeSelect value={formData.managingAdminId || ''} onChange={e => setFormData({ ...formData, managingAdminId: e.target.value || undefined })}>
+                    <option value="">— None —</option>
+                    {users.filter(u => u.role === 'admin').map(u => <option key={u.userId} value={u.userId}>{u.name} ({u.email})</option>)}
+                  </NativeSelect>
+                </div>
+                <div>
                   <Label>Grade/Level</Label>
                   <Select value={formData.grade || ''} onValueChange={v => setFormData({ ...formData, grade: v })}>
                     <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
@@ -3681,7 +3729,7 @@ function UserManagementView() {
 }
 
 // ========== GENERIC ENTITY CRUD ==========
-function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityConfig }) {
+function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config: EntityConfig; filterFn?: (item: any) => boolean }) {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
   const [items, setItems] = useState<any[]>([]);
@@ -3887,6 +3935,7 @@ function EntityCrud({ entityKey, config }: { entityKey: string; config: EntityCo
 
   const filtered = items
     .filter(item => {
+      if (filterFn && !filterFn(item)) return false;
       if (statusFilter !== 'all' && item.status !== statusFilter) return false;
       if (!search) return true;
       const s = search.toLowerCase();

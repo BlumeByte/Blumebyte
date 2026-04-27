@@ -70,18 +70,44 @@ export function NotificationsBell() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const prevUnreadRef = useRef(0);
+  const [soundEnabled] = useState(() => {
+    const v = localStorage.getItem('notification_sound_enabled');
+    return v === null ? true : v === 'true';
+  });
+
+  const playPopSound = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch (e) { /* ignore audio errors */ }
+  };
 
   const fetchNotifications = useCallback(async () => {
     if (!accessToken) return;
     try {
       const data = await api('/notifications', { token: accessToken });
-      setNotifications(Array.isArray(data) ? data : []);
+      const notifs = Array.isArray(data) ? data : [];
+      setNotifications(notifs);
+      const newUnreadCount = notifs.filter((n: any) => !n.read).length;
+      if (soundEnabled && newUnreadCount > prevUnreadRef.current && prevUnreadRef.current > 0) {
+        playPopSound();
+      }
+      prevUnreadRef.current = newUnreadCount;
     } catch (e: any) { 
       console.log('Notifications fetch error:', e);
-      // Don't throw error, just set empty array
       setNotifications([]);
     }
-  }, [accessToken]);
+  }, [accessToken, soundEnabled]);
 
   useEffect(() => {
     fetchNotifications();

@@ -618,6 +618,45 @@ async function isItemInUserCompany(userId: string, itemCompanyId: string | undef
   return companyMatches(userScope, itemCompanyId);
 }
 
+// --- Workflow trigger helper ---
+// Fires notifications to the approvers configured in the admin's Workflows & Approvals setup.
+// workflowType matches the `type` field on workflow: KV entries ('leave','expense','overtime', etc.)
+async function triggerWorkflowNotifications(
+  companyId: string,
+  workflowType: string,
+  notificationTitle: string,
+  notificationMessage: string
+) {
+  try {
+    const allWorkflows = await kv.getByPrefix('workflow:');
+    const matchingWorkflows = allWorkflows.filter(
+      (w: any) =>
+        w.status === 'active' &&
+        w.type === workflowType &&
+        (w.companyId === companyId || w.company === companyId)
+    );
+
+    for (const wf of matchingWorkflows) {
+      const approverIds: string[] = [wf.approver1Id, wf.approver2Id].filter(Boolean);
+      for (const approverId of approverIds) {
+        const nid = crypto.randomUUID();
+        await kv.set(`notification:${nid}`, {
+          id: nid,
+          userId: approverId,
+          type: `workflow-${workflowType}`,
+          title: notificationTitle,
+          message: notificationMessage,
+          workflowId: wf.id,
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+  } catch (e) {
+    console.error('triggerWorkflowNotifications error:', e);
+  }
+}
+
 // --- Generic CRUD factory ---
 function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise<any>) {
   // List
@@ -2617,9 +2656,10 @@ app.get(`${PREFIX}/users`, async (c) => {
     
     console.log(`✅ /users: User ${user.id} (${role}) accessing ${filtered.length} users in companies: ${scope.join(', ')}`);
     
-    // Admin cannot see superadmins
+    // Admin cannot see superadmins; admin only sees users they manage (or untagged users for backward compat)
     if (role === "admin") {
       filtered = filtered.filter((e: any) => e.role !== "superadmin");
+      filtered = filtered.filter((e: any) => !e.managingAdminId || e.managingAdminId === user.id);
     }
     // Manager can only see employees and other managers
     if (role === "manager") {
@@ -4194,10 +4234,10 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
     // Normalize employmentType
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
-    // Explicitly resolve visibilityType — prefer body value over existing, never allow undefined to overwrite
-    const visibilityType = body.visibilityType ?? existing.visibilityType ?? 'internal_only';
+    // Explicitly resolve visibilityType — prefer body value over existing, never allow undefined or empty string to overwrite
+    const visibilityType = body.visibilityType || existing.visibilityType || 'internal_only';
     // Auto-activate status when visibility is set to public_global
-    let status = body.status ?? existing.status ?? 'active';
+    let status = body.status || existing.status || 'active';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'active';
     }
@@ -4502,8 +4542,8 @@ app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
     const companyName = body.companyName || existing.companyName || (companyId ? await resolveCompanyName(companyId) : '');
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
-    const visibilityType = body.visibilityType ?? existing.visibilityType ?? 'internal_only';
-    let status = body.status ?? existing.status ?? 'open';
+    const visibilityType = body.visibilityType || existing.visibilityType || 'internal_only';
+    let status = body.status || existing.status || 'open';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'open';
     }
@@ -4930,6 +4970,17 @@ app.post(`${PREFIX}/leave-requests`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`leave:${id}`, leave);
+    // Trigger workflow notifications for leave type
+    if (companyId) {
+      const empName = kvData?.name || user.user_metadata?.name || 'An employee';
+      const leaveType = body.leaveType || 'leave';
+      await triggerWorkflowNotifications(
+        companyId,
+        'leave',
+        'Leave Request Submitted',
+        `${empName} submitted a ${leaveType} request from ${body.startDate || ''} to ${body.endDate || ''}`
+      );
+    }
     return c.json(leave, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -5103,11 +5154,12 @@ app.delete(`${PREFIX}/training-programs/:id`, async (c) => {
 app.get(`${PREFIX}/admin/training-programs`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
+    const scope = await resolveCompanyScope(user.id);
     const allTrainings = await kv.getByPrefix("training:");
-    const employees = await kv.getByPrefix("employee:");
-    const filteredEmployees = await filterEmployeesByCompany(employees, user.id, role);
-    const companyId = filteredEmployees.length > 0 ? filteredEmployees[0].companyId : null;
-    return c.json(allTrainings.filter((t: any) => !companyId || t.companyId === companyId));
+    const filtered = allTrainings.filter((t: any) =>
+      scope && companyMatches(scope, t.companyId || t.company)
+    );
+    return c.json(filtered);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
@@ -5422,13 +5474,35 @@ app.post(`${PREFIX}/attendance/clock-in`, async (c) => {
     if (existing?.clockIn) {
       return c.json({ error: "Already clocked in today" }, 400);
     }
+
+    // Detect late arrival using the company's auto-clock schedule
+    let status = "present";
+    try {
+      const companyId = kvData?.companyId || kvData?.company;
+      if (companyId) {
+        const autoSettings = await kv.get(`auto-clock-settings:${companyId}`);
+        if (autoSettings?.clockInTime) {
+          const [schHour, schMin] = autoSettings.clockInTime.split(':').map(Number);
+          // Grace period before marking as late (default 15 minutes)
+          const gracePeriodMinutes = Number(autoSettings.lateGracePeriod ?? 15);
+          const thresholdMinutes = schHour * 60 + schMin + gracePeriodMinutes;
+          const clockInMinutes = now.getHours() * 60 + now.getMinutes();
+          if (clockInMinutes > thresholdMinutes) {
+            status = "late";
+          }
+        }
+      }
+    } catch (_) {
+      // If schedule lookup fails, keep status as 'present'
+    }
+
     const record = {
       userId: user.id,
       employeeName: kvData?.name || user.user_metadata?.name || "",
       date: today,
       clockIn: now.toISOString(),
       clockOut: null,
-      status: "present",
+      status,
       isWeekend: [0, 6].includes(now.getDay()),
       regularMinutes: 0,
       overtimeMinutes: 0,
@@ -5471,7 +5545,9 @@ app.post(`${PREFIX}/attendance/clock-out`, async (c) => {
       isPaused: false,
       pauses,
       totalPausedMinutes: Math.round(totalPausedMs / 60000),
-      status: "present",
+      // Mark overtime if worked >8 active hours; preserve 'late' status for employees
+      // who clocked in late but did not work overtime — don't downgrade back to 'present'.
+      status: Math.max(0, activeMinutes - 480) > 0 ? "overtime" : (existing.status || "present"),
       regularMinutes: Math.min(activeMinutes, 480),
       overtimeMinutes: Math.max(0, activeMinutes - 480),
       updatedAt: now.toISOString(),
@@ -6664,6 +6740,198 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
   }
 });
 
+// GET /subscription/all-users — return all active users for the superadmin's company.
+// Called by LicenseManagement when the purchase count is less than current active users,
+// so the superadmin can pick which users keep their license active.
+app.get(`${PREFIX}/subscription/all-users`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const companyId = await getCompanyId(user.id);
+    const allEmployees = await kv.getByPrefix('employee:');
+    const companyUsers = companyId
+      ? allEmployees.filter((u: any) =>
+          u.id !== user.id && // exclude the superadmin themselves
+          (u.companyId === companyId || u.company === companyId)
+        )
+      : allEmployees.filter((u: any) => u.id !== user.id);
+
+    const users = companyUsers.map((u: any) => ({
+      id: u.id,
+      name: u.name || u.email || u.id,
+      email: u.email || '',
+      role: u.role || 'employee',
+      status: u.status || 'active',
+      department: u.department || '',
+    }));
+
+    return c.json({ users });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /subscription/purchase-licenses — alias for /subscription/initialize used by LicenseManagement.
+// Accepts { licenses, plan, amount } and delegates to the same Paystack flow.
+app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    const { licenses, plan, amount } = body;
+
+    if (!licenses || !plan || !amount) {
+      return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+    }
+    if (!['monthly', 'yearly'].includes(plan)) {
+      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
+    }
+
+    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const expectedPrice = licenses * pricePerUser;
+    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
+      console.error(`purchase-licenses: amount mismatch — received ${amount}, expected ${expectedPrice}`);
+      return c.json({ error: 'Invalid amount for the selected plan' }, 400);
+    }
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment gateway not configured' }, 500);
+    }
+
+    const reference = `SUB_${user.id}_${Date.now()}`;
+    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: user.email,
+        amount: amount * 100,
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          userId: user.id,
+          plan,
+          userCount: licenses,
+          custom_fields: [
+            { display_name: 'Subscription Plan', variable_name: 'plan', value: plan },
+            { display_name: 'User Count', variable_name: 'user_count', value: String(licenses) },
+          ],
+        },
+      }),
+    });
+
+    const paystackData = await paystackResponse.json();
+    if (!paystackData.status) {
+      console.error('Paystack initialization failed:', paystackData);
+      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
+    }
+
+    await kv.set(`pending-subscription:${reference}`, {
+      userId: user.id,
+      plan,
+      userCount: licenses,
+      amount,
+      reference,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
+      authorization_url: paystackData.data.authorization_url,
+      access_code: paystackData.data.access_code,
+      reference: paystackData.data.reference,
+    });
+  } catch (e: any) {
+    console.error('Error in purchase-licenses:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /subscription/purchase-licenses-with-selection — same as purchase-licenses but
+// with explicit user IDs to activate after payment.
+app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    const { licenses, plan, amount, selectedUserIds } = body;
+
+    if (!licenses || !plan || !amount) {
+      return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+    }
+    if (!['monthly', 'yearly'].includes(plan)) {
+      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
+    }
+
+    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const expectedPrice = licenses * pricePerUser;
+    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
+      return c.json({ error: 'Invalid amount for the selected plan' }, 400);
+    }
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment gateway not configured' }, 500);
+    }
+
+    const reference = `SUB_${user.id}_${Date.now()}`;
+    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: user.email,
+        amount: amount * 100,
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          userId: user.id,
+          plan,
+          userCount: licenses,
+          selectedUserIds: selectedUserIds || [],
+        },
+      }),
+    });
+
+    const paystackData = await paystackResponse.json();
+    if (!paystackData.status) {
+      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
+    }
+
+    await kv.set(`pending-subscription:${reference}`, {
+      userId: user.id,
+      plan,
+      userCount: licenses,
+      amount,
+      reference,
+      selectedUserIds: selectedUserIds || [],
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
+      authorization_url: paystackData.data.authorization_url,
+      access_code: paystackData.data.access_code,
+      reference: paystackData.data.reference,
+    });
+  } catch (e: any) {
+    console.error('Error in purchase-licenses-with-selection:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Verify Paystack payment
 app.post(`${PREFIX}/subscription/verify`, async (c) => {
   try {
@@ -7701,6 +7969,22 @@ app.post(`${PREFIX}/employee/overtime-request`, async (c) => {
     };
     await kv.set(`overtime:${id}`, request);
     
+    // Trigger workflow notifications for overtime type
+    if (companyId) {
+      await triggerWorkflowNotifications(
+        companyId,
+        'expense', // workflows typed as 'expense' in admin config cover OT too; also check 'overtime'
+        'Overtime Request Submitted',
+        `${kvData?.name || 'An employee'} submitted an overtime request for ${hours}h on ${date}`
+      );
+      await triggerWorkflowNotifications(
+        companyId,
+        'overtime',
+        'Overtime Request Submitted',
+        `${kvData?.name || 'An employee'} submitted an overtime request for ${hours}h on ${date}`
+      );
+    }
+
     const allEmps = await kv.getByPrefix('employee:');
     const managers = allEmps.filter((e: any) => ['superadmin', 'admin', 'manager'].includes(e.role) && (e.companyId === companyId || e.company === companyId));
     for (const mgr of managers) {
@@ -7748,7 +8032,17 @@ app.post(`${PREFIX}/employee/expense-claim`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`expense:${id}`, claim);
-    
+
+    // Trigger workflow notifications for expense type
+    if (companyId) {
+      await triggerWorkflowNotifications(
+        companyId,
+        'expense',
+        'Expense Claim Submitted',
+        `${kvData?.name || 'An employee'} submitted an expense claim: ${title} (${currency || 'NGN'} ${amount})`
+      );
+    }
+
     const allEmps = await kv.getByPrefix('employee:');
     const hrStaff = allEmps.filter((e: any) => ['superadmin', 'admin'].includes(e.role) && (e.companyId === companyId || e.company === companyId));
     for (const hr of hrStaff) {
@@ -7986,10 +8280,11 @@ app.get(`${PREFIX}/employee/team-calendar`, async (c) => {
 
 app.get(`${PREFIX}/admin/overtime-requests`, async (c) => {
   try {
-    const { user, role, kvData } = await requireAdminOrAbove(c);
-    const companyId = kvData?.companyId || kvData?.company;
+    const { user } = await requireAdminOrAbove(c);
+    const scope = await resolveCompanyScope(user.id);
     const all = await kv.getByPrefix('overtime:');
-    const companyRequests = all.filter((r: any) => r.companyId === companyId)
+    const companyRequests = all
+      .filter((r: any) => scope && companyMatches(scope, r.companyId || r.company))
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return c.json(companyRequests);
   } catch (e: any) {
@@ -8019,10 +8314,11 @@ app.put(`${PREFIX}/admin/overtime-requests/:id`, async (c) => {
 
 app.get(`${PREFIX}/admin/expense-claims`, async (c) => {
   try {
-    const { user, role, kvData } = await requireAdminOrAbove(c);
-    const companyId = kvData?.companyId || kvData?.company;
+    const { user } = await requireAdminOrAbove(c);
+    const scope = await resolveCompanyScope(user.id);
     const all = await kv.getByPrefix('expense:');
-    const companyClaims = all.filter((r: any) => r.companyId === companyId)
+    const companyClaims = all
+      .filter((r: any) => scope && companyMatches(scope, r.companyId || r.company))
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return c.json(companyClaims);
   } catch (e: any) {

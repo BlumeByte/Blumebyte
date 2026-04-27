@@ -129,12 +129,31 @@ export function SharedMyProfile() {
   const generateDocument = (docType: string) => {
     if (!profile) return;
     const roleLabel = profile.role === 'superadmin' ? 'Super Administrator' : profile.role === 'admin' ? 'Administrator' : profile.role === 'manager' ? 'Manager' : 'Employee';
+    const currentYear = new Date().getFullYear();
+    const joinDate = profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '—';
+
+    let extraContent = '';
+    if (docType === 'Tax Forms') {
+      extraContent = `<div class="section"><h3>Tax Information — ${currentYear}</h3>
+        <div class="row"><div class="field"><label>Tax Year</label><p>${currentYear}</p></div><div class="field"><label>Taxable Income</label><p>${profile.salary || '—'}</p></div><div class="field"><label>Company</label><p>${profile.company || '—'}</p></div></div>
+        <div class="row"><div class="field"><label>Employee ID</label><p>${profile.userId?.slice(0,8).toUpperCase() || 'N/A'}</p></div><div class="field"><label>Department</label><p>${profile.department || '—'}</p></div></div>
+      </div>`;
+    } else if (docType === 'Benefits Enrollment') {
+      extraContent = `<div class="section"><h3>Benefits Information</h3>
+        <div class="row"><div class="field"><label>Enrollment Date</label><p>${joinDate}</p></div><div class="field"><label>Status</label><p>Active</p></div></div>
+      </div>`;
+    } else if (docType.includes('Performance Review')) {
+      extraContent = `<div class="section"><h3>Review Details</h3>
+        <div class="row"><div class="field"><label>Review Period</label><p>${docType.replace('Performance Review ', '')}</p></div><div class="field"><label>Employee</label><p>${profile.name}</p></div></div>
+      </div>`;
+    }
+
     const content = `<h1>${branding.companyName} HR - ${docType}</h1><p class="sub">Employee: ${profile.name} | ID: ${profile.userId?.slice(0,8).toUpperCase() || 'N/A'}</p>
       <div class="section"><h3>Employee Details</h3>
-        <div class="row"><div class="field"><label>Full Name</label><p>${profile.name}</p></div><div class="field"><label>Role</label><p>${roleLabel}</p></div><div class="field"><label>Position</label><p>${profile.position || '\u2014'}</p></div></div>
-        <div class="row"><div class="field"><label>Department</label><p>${profile.department || '\u2014'}</p></div><div class="field"><label>Company</label><p>${profile.company || '\u2014'}</p></div><div class="field"><label>Email</label><p>${profile.email}</p></div></div>
-        <div class="row"><div class="field"><label>Salary</label><p>${profile.salary || '\u2014'}</p></div><div class="field"><label>Status</label><p>${profile.status || 'active'}</p></div><div class="field"><label>Start Date</label><p>${profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '\u2014'}</p></div></div>
-      </div>`;
+        <div class="row"><div class="field"><label>Full Name</label><p>${profile.name}</p></div><div class="field"><label>Role</label><p>${roleLabel}</p></div><div class="field"><label>Position</label><p>${profile.position || '—'}</p></div></div>
+        <div class="row"><div class="field"><label>Department</label><p>${profile.department || '—'}</p></div><div class="field"><label>Company</label><p>${profile.company || '—'}</p></div><div class="field"><label>Email</label><p>${profile.email}</p></div></div>
+        <div class="row"><div class="field"><label>Salary</label><p>${profile.salary || '—'}</p></div><div class="field"><label>Status</label><p>${profile.status || 'active'}</p></div><div class="field"><label>Join Date</label><p>${joinDate}</p></div></div>
+      </div>${extraContent}`;
     exportToPDFDoc(docType, content, branding.companyName);
   };
 
@@ -644,13 +663,17 @@ export function SharedMyProfile() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {[
-                  { name: 'Employment Contract', date: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString(), color: 'text-red-500' },
-                  { name: 'Appointment Letter', date: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString(), color: 'text-red-500' },
-                  { name: 'Tax Forms', date: 'Jan 01, 2026', color: 'text-blue-500' },
-                  { name: 'Benefits Enrollment', date: 'Feb 01, 2024', color: 'text-green-500' },
-                  { name: `Performance Review Q4 2025`, date: 'Dec 15, 2025', color: 'text-purple-500' },
-                ].map((doc, idx) => (
+                {(() => {
+                  const currentYear = new Date().getFullYear();
+                  const joinDate = profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                  const docList = [
+                    { name: 'Employment Contract', date: joinDate, color: 'text-red-500' },
+                    { name: 'Appointment Letter', date: joinDate, color: 'text-red-500' },
+                    { name: 'Tax Forms', date: `Jan 01, ${currentYear}`, color: 'text-blue-500' },
+                    { name: 'Benefits Enrollment', date: joinDate, color: 'text-green-500' },
+                    { name: `Performance Review Q${Math.ceil((new Date().getMonth() + 1) / 3)} ${currentYear}`, date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), color: 'text-purple-500' },
+                  ];
+                  return docList.map((doc, idx) => (
                   <div key={idx} className="flex items-center justify-between p-4 bg-accent rounded-lg hover:bg-accent/80 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-lg bg-card flex items-center justify-center border ${doc.color}`}><FileText className="w-5 h-5" /></div>
@@ -661,8 +684,9 @@ export function SharedMyProfile() {
                       <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => generateDocument(doc.name)}><Download className="w-3.5 h-3.5 mr-1" />Download PDF</Button>
                     </div>
                   </div>
-                ))}
-              </CardContent>
+                  ));
+                })()}
+                </CardContent>
             </Card>
           </div>
         )}
