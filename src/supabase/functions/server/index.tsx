@@ -8314,7 +8314,7 @@ app.put(`${PREFIX}/admin/overtime-requests/:id`, async (c) => {
 
 app.get(`${PREFIX}/admin/expense-claims`, async (c) => {
   try {
-    const { user, role } = await requireAdminOrAbove(c);
+    const { user } = await requireAdminOrAbove(c);
     const scope = await resolveCompanyScope(user.id);
     const all = await kv.getByPrefix('expense:');
     const companyClaims = all
