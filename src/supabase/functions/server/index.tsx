@@ -8280,7 +8280,7 @@ app.get(`${PREFIX}/employee/team-calendar`, async (c) => {
 
 app.get(`${PREFIX}/admin/overtime-requests`, async (c) => {
   try {
-    const { user, role } = await requireAdminOrAbove(c);
+    const { user } = await requireAdminOrAbove(c);
     const scope = await resolveCompanyScope(user.id);
     const all = await kv.getByPrefix('overtime:');
     const companyRequests = all
