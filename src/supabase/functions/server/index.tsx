@@ -5493,8 +5493,9 @@ app.post(`${PREFIX}/attendance/clock-out`, async (c) => {
       isPaused: false,
       pauses,
       totalPausedMinutes: Math.round(totalPausedMs / 60000),
-      // Mark overtime if the employee worked more than 8 hours active time
-      status: Math.max(0, activeMinutes - 480) > 0 ? "overtime" : "present",
+      // Mark overtime if worked >8 active hours; preserve 'late' status for employees
+      // who clocked in late but did not work overtime — don't downgrade back to 'present'.
+      status: Math.max(0, activeMinutes - 480) > 0 ? "overtime" : (existing.status || "present"),
       regularMinutes: Math.min(activeMinutes, 480),
       overtimeMinutes: Math.max(0, activeMinutes - 480),
       updatedAt: now.toISOString(),
