@@ -49,7 +49,6 @@ import { useDarkMode } from '../lib/dark-mode-context';
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'employees', label: 'Employees', icon: Users },
-  { id: 'users', label: 'Users', icon: UserPlus },
   { id: 'departments', label: 'Departments', icon: FolderTree },
   { id: 'leave', label: 'Leave Mgmt', icon: CalendarDays },
   { id: 'assets', label: 'Assets', icon: Briefcase },
@@ -183,7 +182,6 @@ export function AdminDashboard() {
           
           {activeTab === 'overview' && <AdminOverview setTab={setActiveTab} />}
           {activeTab === 'employees' && <AdminEmployees />}
-          {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'departments' && <AdminDepartments />}
           {activeTab === 'leave' && <AdminLeave />}
           {activeTab === 'assets' && <AdminAssets />}
@@ -273,7 +271,6 @@ function AdminOverview({ setTab }: { setTab: (t: string) => void }) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: 'Add Employee', icon: UserPlus, tab: 'employees', color: 'bg-blue-500 hover:bg-blue-600' },
-            { label: 'Add User', icon: UserCog, tab: 'users', color: 'bg-purple-500 hover:bg-purple-600' },
             { label: 'Workflows', icon: GitMerge, tab: 'workflows', color: 'bg-indigo-500 hover:bg-indigo-600' },
             { label: 'Reports', icon: BarChart3, tab: 'reports', color: 'bg-green-500 hover:bg-green-600' },
             { label: 'Training', icon: GraduationCap, tab: 'training', color: 'bg-amber-500 hover:bg-amber-600' },
@@ -300,7 +297,7 @@ function AdminOverview({ setTab }: { setTab: (t: string) => void }) {
 }
 
 function AdminEmployees() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -318,6 +315,24 @@ function AdminEmployees() {
   const [contractFiles, setContractFiles] = useState<any[]>([]);
   const [uploadingContract, setUploadingContract] = useState(false);
   const contractUploadRef = useRef<HTMLInputElement>(null);
+  const isSuperAdminEmp = user?.role === 'superadmin';
+
+  const allowedCompanies = isSuperAdminEmp
+    ? companies
+    : companies.filter(c => {
+        const adminAssigned = (user as any)?.assignedCompanies || [];
+        const adminCompanyId = (user as any)?.companyId || (user as any)?.company;
+        return adminAssigned.includes(c.id) || adminAssigned.includes(c.name) || c.id === adminCompanyId || c.name === adminCompanyId;
+      });
+
+  const allowedDepartments = isSuperAdminEmp
+    ? departmentsList
+    : departmentsList.filter(d => {
+        const adminDepts = (user as any)?.departments || (user as any)?.assignedDepartments || [];
+        const adminDept = (user as any)?.department || '';
+        const deptName = typeof d === 'string' ? d : d.name || d.id || '';
+        return adminDepts.includes(deptName) || deptName === adminDept || adminDepts.length === 0;
+      });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -507,7 +522,7 @@ function AdminEmployees() {
                   <div><Label className="text-xs">Company</Label>
                     <Select value={formData.companyId || ''} onValueChange={v => setFormData({ ...formData, companyId: v })}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>{companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{allowedCompanies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -515,7 +530,7 @@ function AdminEmployees() {
                     <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
                       <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
                       <SelectContent>
-                        {departmentsList.filter(d => d.status === 'active').map(d => (
+                        {allowedDepartments.filter(d => d.status === 'active').map(d => (
                           <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -587,6 +602,23 @@ function AdminUsers() {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [initialDepartment, setInitialDepartment] = useState('');
   const isSuperAdmin = user?.role === 'superadmin';
+
+  const allowedCompanies = isSuperAdmin
+    ? companies
+    : companies.filter(c => {
+        const adminAssigned = (user as any)?.assignedCompanies || [];
+        const adminCompanyId = (user as any)?.companyId || (user as any)?.company;
+        return adminAssigned.includes(c.id) || adminAssigned.includes(c.name) || c.id === adminCompanyId || c.name === adminCompanyId;
+      });
+
+  const allowedDepartments = isSuperAdmin
+    ? departmentsList
+    : departmentsList.filter(d => {
+        const adminDepts = (user as any)?.departments || (user as any)?.assignedDepartments || [];
+        const adminDept = (user as any)?.department || '';
+        const deptName = typeof d === 'string' ? d : d.name || d.id || '';
+        return adminDepts.includes(deptName) || deptName === adminDept || adminDepts.length === 0;
+      });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -747,7 +779,7 @@ function AdminUsers() {
                   <div><Label className="text-xs">Company</Label>
                     <Select value={formData.companyId || ''} onValueChange={v => setFormData({ ...formData, companyId: v })}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>{companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{allowedCompanies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -755,7 +787,7 @@ function AdminUsers() {
                     <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
                       <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
                       <SelectContent>
-                        {departmentsList.filter(d => d.status === 'active').map(d => (
+                        {allowedDepartments.filter(d => d.status === 'active').map(d => (
                           <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                         ))}
                       </SelectContent>

@@ -2022,7 +2022,7 @@ function PayrollView() {
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Total Payroll</p><p className="text-2xl font-bold mt-1">{currencySymbol} {totalPayroll.toLocaleString()}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Total Payroll</p><p className="text-2xl font-bold mt-1">{currencySymbol} {totalPayroll.toFixed(2)}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Records</p><p className="text-2xl font-bold mt-1">{items.length}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Paid</p><p className="text-2xl font-bold text-green-600 mt-1">{paidCount}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Pending</p><p className="text-2xl font-bold text-amber-600 mt-1">{pendingCount}</p></CardContent></Card>

@@ -17,6 +17,7 @@ interface NotificationPrefs {
   emailOnAnnouncement: boolean;
   emailOnPerformanceReview: boolean;
   inAppNotifications: boolean;
+  notificationSoundEnabled: boolean;
 }
 
 const DEFAULT_PREFS: NotificationPrefs = {
@@ -28,6 +29,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   emailOnAnnouncement: true,
   emailOnPerformanceReview: true,
   inAppNotifications: true,
+  notificationSoundEnabled: true,
 };
 
 const EMAIL_SETTINGS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
@@ -78,6 +80,7 @@ export function NotificationSettings() {
         token,
         body: prefs,
       });
+      localStorage.setItem('notification_sound_enabled', String(prefs.notificationSoundEnabled));
       toast.success('Notification preferences saved');
     } catch (e: any) {
       // Log the real error for debugging while showing a user-friendly message
@@ -122,6 +125,27 @@ export function NotificationSettings() {
             <Switch
               checked={prefs.inAppNotifications}
               onCheckedChange={() => toggle('inAppNotifications')}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Notification Sound
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-medium">Play sound on new notifications</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Play a pop sound when new notifications arrive</p>
+            </div>
+            <Switch
+              checked={prefs.notificationSoundEnabled}
+              onCheckedChange={() => toggle('notificationSoundEnabled')}
             />
           </div>
         </CardContent>
