@@ -1400,6 +1400,7 @@ app.get(`${PREFIX}/profile`, async (c) => {
           await kv.set(`employee:${user.id}`, { ...kvData, profileImageUrl });
           await kv.set(`file:${user.id}:profile-image`, { ...profileFile, signedUrl: profileImageUrl });
         }
+      } catch (_) { /* ignore URL refresh errors */ }
     }
     return c.json({
       id: user.id,
@@ -1942,6 +1943,7 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
         const sb = supabaseAdmin();
         const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(settings.logoPath, 60 * 60 * 24 * 7);
         if (urlData?.signedUrl) settings.logoUrl = urlData.signedUrl;
+      } catch (_) { /* ignore URL refresh errors */ }
     }
     return c.json(settings);
   } catch (e: any) {
@@ -1973,6 +1975,7 @@ app.put(`${PREFIX}/superadmin/company-branding`, async (c) => {
         const sb = supabaseAdmin();
         const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(updated.logoPath, 60 * 60 * 24 * 7);
         if (urlData?.signedUrl) updated.logoUrl = urlData.signedUrl;
+      } catch (_) { /* ignore URL refresh errors */ }
     }
     return c.json(updated);
   } catch (e: any) {
@@ -2004,6 +2007,7 @@ app.put(`${PREFIX}/admin/company-settings`, async (c) => {
         const sb = supabaseAdmin();
         const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(updated.logoPath, 60 * 60 * 24 * 7);
         if (urlData?.signedUrl) updated.logoUrl = urlData.signedUrl;
+      } catch (_) { /* ignore URL refresh errors */ }
     }
     return c.json(updated);
   } catch (e: any) {
