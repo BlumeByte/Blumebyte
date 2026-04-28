@@ -1,4 +1,4 @@
-import React, { useState, useEffect, startTransition, useRef } from 'react';
+import React, { useState, useEffect, startTransition, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -26,7 +26,8 @@ export function PasswordReset() {
   // Supabase JS automatically exchanges the recovery token from the hash,
   // which can remove #access_token from window.location before getSession()
   // resolves — causing a false "Invalid Reset Link" error.
-  const initialHash = useRef(typeof window !== 'undefined' ? window.location.hash : '').current;
+  // useMemo with [] captures the hash exactly once during the initial render.
+  const initialHash = React.useMemo(() => (typeof window !== 'undefined' ? window.location.hash : ''), []);
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

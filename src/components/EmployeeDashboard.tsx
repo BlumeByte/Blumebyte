@@ -1707,8 +1707,9 @@ function EmpOvertimeExpenses() {
         api('/employee/overtime-requests', { token: accessToken }).catch(() => null),
         api('/employee/expense-claims', { token: accessToken }).catch(() => null),
       ]);
-      setOvertimeRequests(Array.isArray(otData) ? otData : (otData?.requests || []));
-      setExpenseClaims(Array.isArray(expData) ? expData : (expData?.claims || []));
+      // Server returns { requests: [...] } and { claims: [...] }
+      setOvertimeRequests(otData?.requests || []);
+      setExpenseClaims(expData?.claims || []);
     } catch (e) {
       console.error('EmpOvertimeExpenses load error:', e);
     } finally {
@@ -1718,7 +1719,10 @@ function EmpOvertimeExpenses() {
 
   useEffect(() => { load(); }, [load]);
 
-  const formatCurrency = (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = useCallback(
+    (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    [currencySymbol]
+  );
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;
