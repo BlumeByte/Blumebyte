@@ -124,10 +124,12 @@ export default function OAuthConsent() {
       navigate('/login');
       return;
     }
-    // Basic safety check: only redirect to http(s) URLs to prevent open redirect
+    // Safety check: only redirect to https:// URLs (or http://localhost for dev) to prevent open redirect
     try {
       const parsed = new URL(redirectUri);
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      const isHttps = parsed.protocol === 'https:';
+      const isLocalhost = parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1');
+      if (!isHttps && !isLocalhost) {
         navigate('/login');
         return;
       }
