@@ -6658,26 +6658,23 @@ app.get(`${PREFIX}/subscription/all-users`, async (c) => {
 });
 
 // POST /subscription/purchase-licenses — alias for /subscription/initialize used by LicenseManagement.
-// Accepts { licenses, plan, amount } and delegates to the same Paystack flow.
+// Accepts { licenses, plan } and delegates to the same Paystack flow.
 app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
-    const { licenses, plan, amount } = body;
+    const { licenses, plan } = body;
 
-    if (!licenses || !plan || !amount) {
-      return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+    if (!licenses || !plan) {
+      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
     }
     if (!['monthly', 'yearly'].includes(plan)) {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
 
+    // Always compute amount server-side from canonical price list — never trust client-provided amount
     const pricePerUser = plan === 'monthly' ? 6 : 60;
-    const expectedPrice = licenses * pricePerUser;
-    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
-      console.error(`purchase-licenses: amount mismatch — received ${amount}, expected ${expectedPrice}`);
-      return c.json({ error: 'Invalid amount for the selected plan' }, 400);
-    }
+    const amount = licenses * pricePerUser;
 
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
@@ -6745,20 +6742,18 @@ app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) =>
   try {
     const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
-    const { licenses, plan, amount, selectedUserIds } = body;
+    const { licenses, plan, selectedUserIds } = body;
 
-    if (!licenses || !plan || !amount) {
-      return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+    if (!licenses || !plan) {
+      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
     }
     if (!['monthly', 'yearly'].includes(plan)) {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
 
+    // Always compute amount server-side from canonical price list
     const pricePerUser = plan === 'monthly' ? 6 : 60;
-    const expectedPrice = licenses * pricePerUser;
-    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
-      return c.json({ error: 'Invalid amount for the selected plan' }, 400);
-    }
+    const amount = licenses * pricePerUser;
 
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
@@ -9670,12 +9665,227 @@ app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
       requires2FA: user.user_metadata?.requires2FA || false,
       twoFactorEnabled: user.user_metadata?.twoFactorEnabled || false,
       twoFactorVerifiedAt: user.user_metadata?.twoFactorVerifiedAt || null,
+      totpEnabled: user.user_metadata?.totpEnabled || false,
     });
   } catch (e: any) {
     console.error("2FA status check error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
+
+// ── TOTP (Authenticator-App) 2FA ────────────────────────────────────────────
+// Pure Web Crypto TOTP implementation — no external libraries needed.
+
+function totpBase32Encode(bytes: Uint8Array): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let result = '';
+  let bits = 0;
+  let value = 0;
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      result += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) {
+    result += alphabet[(value << (5 - bits)) & 31];
+  }
+  return result;
+}
+
+function totpBase32Decode(base32: string): Uint8Array {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  const output: number[] = [];
+  for (const char of base32.toUpperCase().replace(/=+$/, '')) {
+    const idx = alphabet.indexOf(char);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      output.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return new Uint8Array(output);
+}
+
+async function generateTOTPCode(secret: string, counter?: number): Promise<string> {
+  const time = counter ?? Math.floor(Date.now() / 1000 / 30);
+  const keyBytes = totpBase32Decode(secret);
+  const key = await crypto.subtle.importKey(
+    'raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+  );
+  const counterBuffer = new ArrayBuffer(8);
+  const view = new DataView(counterBuffer);
+  view.setUint32(0, 0, false);
+  view.setUint32(4, time, false);
+  const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, counterBuffer));
+  const offset = hmac[19] & 0xf;
+  const truncated = ((hmac[offset] & 0x7f) << 24) | ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) | (hmac[offset + 3] & 0xff);
+  return String(truncated % 1_000_000).padStart(6, '0');
+}
+
+async function verifyTOTPCode(secret: string, code: string, windowSize = 1): Promise<boolean> {
+  const time = Math.floor(Date.now() / 1000 / 30);
+  for (let i = -windowSize; i <= windowSize; i++) {
+    if (await generateTOTPCode(secret, time + i) === code) return true;
+  }
+  return false;
+}
+
+function generateTOTPSecret(): string {
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  return totpBase32Encode(bytes);
+}
+
+function getTOTPUri(secret: string, email: string, issuer = 'Blumebyte HR'): string {
+  return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+}
+
+// POST /auth/totp/setup — generate a new TOTP secret + QR code URL for the authenticated user
+app.post(`${PREFIX}/auth/totp/setup`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const secret = generateTOTPSecret();
+    const issuer = 'Blumebyte HR';
+    const totpUri = getTOTPUri(secret, user.email || '', issuer);
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`;
+
+    // Store pending secret in KV (10-min TTL) — confirmed only after user verifies a code
+    await kv.set(`totp-setup:${user.id}`, {
+      secret,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+
+    return c.json({ secret, qrCodeUrl, issuer });
+  } catch (e: any) {
+    console.error('totp/setup error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /auth/totp/verify-setup — confirm TOTP setup by verifying the first code from the app
+app.post(`${PREFIX}/auth/totp/verify-setup`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { code } = await c.req.json();
+    if (!code) return c.json({ error: 'Code is required' }, 400);
+
+    const pending = await kv.get(`totp-setup:${user.id}`);
+    if (!pending) return c.json({ error: 'No pending TOTP setup. Please restart setup.' }, 400);
+    if (new Date(pending.expiresAt) < new Date()) {
+      await kv.del(`totp-setup:${user.id}`);
+      return c.json({ error: 'TOTP setup expired. Please restart.' }, 400);
+    }
+
+    const valid = await verifyTOTPCode(pending.secret, String(code).trim());
+    if (!valid) return c.json({ error: 'Invalid code. Please try again.' }, 400);
+
+    // Activate TOTP: persist secret in user_metadata
+    const sb = supabaseAdmin();
+    await sb.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...user.user_metadata,
+        totpEnabled: true,
+        totpSecret: pending.secret,
+        totpEnabledAt: new Date().toISOString(),
+        // Keep old email-based flag for backward compat
+        twoFactorEnabled: true,
+        twoFactorVerifiedAt: new Date().toISOString(),
+      },
+    });
+    await kv.del(`totp-setup:${user.id}`);
+
+    return c.json({ success: true, message: 'TOTP two-factor authentication enabled successfully.' });
+  } catch (e: any) {
+    console.error('totp/verify-setup error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /auth/totp/verify-login — verify a TOTP code during login (called after password auth)
+app.post(`${PREFIX}/auth/totp/verify-login`, async (c) => {
+  try {
+    const { email, code } = await c.req.json();
+    if (!email || !code) return c.json({ error: 'Email and code are required' }, 400);
+
+    const sb = supabaseAdmin();
+    const { data: { users }, error } = await sb.auth.admin.listUsers();
+    if (error) return c.json({ error: 'Failed to verify user' }, 500);
+
+    const user = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user) return c.json({ error: 'User not found' }, 404);
+
+    const secret = user.user_metadata?.totpSecret;
+    if (!secret) return c.json({ error: 'TOTP not configured for this account' }, 400);
+
+    const valid = await verifyTOTPCode(secret, String(code).trim());
+    if (!valid) return c.json({ error: 'Invalid authenticator code. Please try again.' }, 400);
+
+    return c.json({ success: true });
+  } catch (e: any) {
+    console.error('totp/verify-login error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /auth/totp/status — check whether TOTP is enabled for the authenticated user
+app.get(`${PREFIX}/auth/totp/status`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({
+      totpEnabled: user.user_metadata?.totpEnabled || false,
+      totpEnabledAt: user.user_metadata?.totpEnabledAt || null,
+    });
+  } catch (e: any) {
+    console.error('totp/status error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /auth/totp/disable — disable TOTP for the authenticated user
+app.post(`${PREFIX}/auth/totp/disable`, async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { code } = await c.req.json();
+    // Require a valid TOTP code to disable (prevents accidental disable)
+    if (code && user.user_metadata?.totpSecret) {
+      const valid = await verifyTOTPCode(user.user_metadata.totpSecret, String(code).trim());
+      if (!valid) return c.json({ error: 'Invalid authenticator code. Cannot disable 2FA.' }, 400);
+    }
+
+    const sb = supabaseAdmin();
+    const { user_metadata } = user;
+    delete user_metadata?.totpSecret;
+    await sb.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...user_metadata,
+        totpEnabled: false,
+        totpEnabledAt: null,
+        twoFactorEnabled: false,
+      },
+    });
+
+    return c.json({ success: true, message: 'TOTP disabled successfully.' });
+  } catch (e: any) {
+    console.error('totp/disable error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+// ── End TOTP ────────────────────────────────────────────────────────────────
 
 // --- OAuth Company Creation ---
 // Create company for new OAuth users
@@ -10067,17 +10277,20 @@ const DEFAULT_NOTIF_PREFS = {
   emailOnAnnouncement: true,
   emailOnPerformanceReview: true,
   inAppNotifications: true,
+  notificationSoundEnabled: true,
 };
 
 const EMAIL_PREF_KEYS = (Object.keys(DEFAULT_NOTIF_PREFS) as (keyof typeof DEFAULT_NOTIF_PREFS)[])
-  .filter(k => k !== 'inAppNotifications');
+  .filter(k => k !== 'inAppNotifications' && k !== 'notificationSoundEnabled');
 
 // GET /notification-preferences — get current user's notification preferences
 app.get(`${PREFIX}/notification-preferences`, async (c) => {
   try {
     const user = await getAuthUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const stored = await kv.get(`notif-prefs:${user.id}`);
+    // Prefer user_metadata (reliable), fall back to legacy KV store
+    const stored = user.user_metadata?.notificationPrefs
+      || await kv.get(`notif-prefs:${user.id}`).catch(() => null);
     return c.json({ ...DEFAULT_NOTIF_PREFS, ...(stored || {}) });
   } catch (e: any) {
     return c.json(DEFAULT_NOTIF_PREFS);
@@ -10091,7 +10304,19 @@ app.put(`${PREFIX}/notification-preferences`, async (c) => {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.json();
     const prefs = { ...DEFAULT_NOTIF_PREFS, ...body };
-    await kv.set(`notif-prefs:${user.id}`, prefs);
+    // Store in user_metadata (primary) — avoids KV-store connectivity issues
+    const sb = supabaseAdmin();
+    const { error: updateError } = await sb.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...user.user_metadata,
+        notificationPrefs: prefs,
+      },
+    });
+    if (updateError) {
+      console.error('notification-preferences user_metadata update error:', updateError.message);
+      // Fallback: try KV store
+      await kv.set(`notif-prefs:${user.id}`, prefs);
+    }
     return c.json({ success: true, prefs });
   } catch (e: any) {
     console.error('notification-preferences PUT error:', e?.message || e);

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Eye, EyeOff, Loader2, AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Smartphone } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -31,13 +31,14 @@ export function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [logoutReason, setLogoutReason] = useState<string | null>(null);
-  // License checking temporarily deactivated
-  /*
-  const [licenseStatus, setLicenseStatus] = useState<{ hasLicenses: boolean; loading: boolean }>({
-    hasLicenses: true,
-    loading: true,
-  });
-  */
+
+  // TOTP verification state
+  const [totpRequired, setTotpRequired] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [totpError, setTotpError] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [pendingPassword, setPendingPassword] = useState('');
 
   useEffect(() => {
     // Check for logout reason in URL
@@ -55,46 +56,58 @@ export function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (!sessionLoading && user) {
+    if (!sessionLoading && user && !totpRequired) {
       startTransition(() => {
         const destination = user.role === 'ultimateadmin' ? '/customer-care' : `/${user.role}`;
         navigate(destination, { replace: true });
       });
     }
-  }, [user, sessionLoading, navigate]);
-
-  // License checking temporarily deactivated
-  /*
-  // Check license status on page load
-  useEffect(() => {
-    checkLicenseStatus();
-  }, []);
-
-  const checkLicenseStatus = async () => {
-    try {
-      // Make a public check to see if system has licenses
-      const data = await api('/subscription/public-license-check');
-      setLicenseStatus({
-        hasLicenses: data.hasLicenses || false,
-        loading: false,
-      });
-    } catch (error) {
-      console.error('Error checking license status:', error);
-      // If error, assume licenses might exist (don't block login on check error)
-      setLicenseStatus({
-        hasLicenses: true,
-        loading: false,
-      });
-    }
-  };
-  */
+  }, [user, sessionLoading, navigate, totpRequired]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     try {
+      // Check if TOTP is required BEFORE calling login, so we can intercept if needed
+      let needsTotp = false;
+      try {
+        const statusData = await api(`/auth/2fa/status?email=${encodeURIComponent(email)}`);
+        needsTotp = statusData?.totpEnabled === true;
+      } catch {
+        // If status check fails, proceed without TOTP
+      }
+
+      if (needsTotp) {
+        // Show TOTP form — login will complete after code verification
+        setPendingEmail(email);
+        setPendingPassword(password);
+        setTotpRequired(true);
+        return;
+      }
+
+      // No TOTP — sign in normally
       await login(email, password);
     } catch (_) {}
+  };
+
+  const handleTotpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTotpLoading(true);
+    setTotpError('');
+    try {
+      // First, verify the TOTP code is correct before signing in
+      await api('/auth/totp/verify-login', {
+        method: 'POST',
+        body: { email: pendingEmail, code: totpCode },
+      });
+      // Code is valid — now complete the password login
+      setTotpRequired(false);
+      await login(pendingEmail, pendingPassword);
+    } catch (err: any) {
+      setTotpError(err.message || 'Invalid code. Please try again.');
+    } finally {
+      setTotpLoading(false);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -128,29 +141,77 @@ export function LoginPage() {
     );
   }
 
+  // TOTP verification screen
+  if (totpRequired) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={blumeGradientStyle()}>
+        <div className="w-full max-w-md">
+          <Card className="shadow-2xl border-0">
+            <CardHeader className="text-center pb-2 pt-8">
+              <div className="flex justify-center mb-4">
+                <img src={logoImage} alt="Blumebyte" className="h-12" />
+              </div>
+              <div className="flex justify-center mb-2">
+                <div className="rounded-full bg-blue-100 p-3">
+                  <Smartphone className="h-8 w-8 text-blue-600" />
+                </div>
+              </div>
+              <p className="font-semibold text-gray-900 mt-1">Two-Factor Authentication</p>
+              <p className="text-sm text-gray-500">Open your authenticator app and enter the 6-digit code for Blumebyte HR.</p>
+            </CardHeader>
+            <CardContent className="pt-4 pb-8 px-8">
+              <form onSubmit={handleTotpSubmit} className="space-y-4">
+                {totpError && (
+                  <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-red-700">{totpError}</p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="totp-code">Authenticator Code</Label>
+                  <Input
+                    id="totp-code"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000000"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength={6}
+                    className="text-center text-2xl font-mono tracking-widest"
+                    disabled={totpLoading}
+                    autoFocus
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full text-white"
+                  style={{ backgroundColor: BLUMEBYTE_COLOR }}
+                  disabled={totpLoading || totpCode.length !== 6}
+                >
+                  {totpLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Verify &amp; Sign In
+                </Button>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => { setTotpRequired(false); setTotpCode(''); setTotpError(''); setPendingPassword(''); }}
+                    className="text-xs text-gray-500 hover:text-black transition-colors"
+                  >
+                    ← Back to login
+                  </button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={blumeGradientStyle()}>
       <div className="w-full max-w-md">
-        {/* License Warning Alert - temporarily deactivated */}
-        {/*
-        {!licenseStatus.loading && !licenseStatus.hasLicenses && (
-          <Alert variant="destructive" className="mb-4 border-2 animate-pulse bg-red-50">
-            <AlertTriangle className="h-5 w-5" />
-            <AlertTitle className="text-lg font-bold">⚠️ System Access Limited</AlertTitle>
-            <AlertDescription className="mt-2">
-              <div className="space-y-2">
-                <p className="font-semibold text-red-900">
-                  This organization has not purchased user licenses yet.
-                </p>
-                <p className="text-sm text-red-800">
-                  Please contact your <strong>SuperAdmin</strong> to purchase licenses and activate the system.
-                </p>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )
-        */}
-
         <Card className="shadow-2xl border-0">
           <CardHeader className="text-center pb-2 pt-8">
             <div className="flex justify-center mb-4">
@@ -253,26 +314,6 @@ export function LoginPage() {
             </p>
           </CardContent>
         </Card>
-        {/* Footer temporarily hidden */}
-        {/*
-        <div className="text-center mt-4 space-y-2">
-          <p className="text-xs text-blue-200">
-            &copy; {new Date().getFullYear()} Blumebyte HRIS. All rights reserved.
-          </p>
-          <p className="text-xs text-blue-200">
-            Visit{' '}
-            <a
-              href="https://www.blumebyte.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-blue-100 transition-colors font-medium"
-            >
-              www.blumebyte.com
-            </a>
-            {' '}for more products and services
-          </p>
-        </div>
-        */}
       </div>
 
       {/* Forgot Password Dialog */}

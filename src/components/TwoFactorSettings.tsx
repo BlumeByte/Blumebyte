@@ -4,17 +4,18 @@ import { api } from '../lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
-import { Shield, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, Loader2, AlertTriangle, Smartphone } from 'lucide-react';
 import { TwoFactorSetup } from './TwoFactorSetup';
 import { toast } from 'sonner@2.0.3';
 
 export function TwoFactorSettings() {
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<{
     requires2FA: boolean;
     twoFactorEnabled: boolean;
     twoFactorVerifiedAt: string | null;
+    totpEnabled: boolean;
   } | null>(null);
   const [showSetup, setShowSetup] = useState(false);
 
@@ -40,7 +41,7 @@ export function TwoFactorSettings() {
   const handleSetupComplete = () => {
     setShowSetup(false);
     fetchStatus();
-    toast.success('Two-factor authentication enabled successfully!');
+    toast.success('Authenticator app 2FA enabled successfully!');
   };
 
   if (loading) {
@@ -80,6 +81,8 @@ export function TwoFactorSettings() {
     );
   }
 
+  const isEnabled = status?.totpEnabled || status?.twoFactorEnabled;
+
   return (
     <Card>
       <CardHeader>
@@ -95,7 +98,7 @@ export function TwoFactorSettings() {
         {/* Current Status */}
         <div className="flex items-start gap-3 p-4 border rounded-lg bg-gray-50">
           <div className="flex-shrink-0 mt-0.5">
-            {status?.twoFactorEnabled ? (
+            {isEnabled ? (
               <CheckCircle className="h-5 w-5 text-green-600" />
             ) : (
               <XCircle className="h-5 w-5 text-gray-400" />
@@ -103,12 +106,12 @@ export function TwoFactorSettings() {
           </div>
           <div className="flex-1">
             <h4 className="font-semibold text-gray-900">
-              {status?.twoFactorEnabled ? '2FA Enabled' : '2FA Not Enabled'}
+              {isEnabled ? '2FA Enabled' : '2FA Not Enabled'}
             </h4>
             <p className="text-sm text-gray-600 mt-1">
-              {status?.twoFactorEnabled
-                ? 'Your account is protected with two-factor authentication.'
-                : 'Enable 2FA to secure your account with an additional verification step.'}
+              {isEnabled
+                ? 'Your account is protected with an authenticator app.'
+                : 'Enable 2FA to secure your account with an authenticator app.'}
             </p>
             {status?.twoFactorVerifiedAt && (
               <p className="text-xs text-gray-500 mt-2">
@@ -119,7 +122,7 @@ export function TwoFactorSettings() {
         </div>
 
         {/* SuperAdmin Requirement Notice */}
-        {status?.requires2FA && !status?.twoFactorEnabled && (
+        {status?.requires2FA && !isEnabled && (
           <Alert className="border-amber-500 bg-amber-50">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-800">
@@ -136,24 +139,25 @@ export function TwoFactorSettings() {
         <div className="space-y-2 text-sm text-gray-600">
           <h4 className="font-semibold text-gray-900">How 2FA Works:</h4>
           <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>When you log in, you'll receive a verification code via email</li>
-            <li>Enter the code to complete your login</li>
-            <li>This ensures only you can access your account</li>
-            <li>Protects against unauthorized access even if your password is compromised</li>
+            <li>Install an authenticator app (Google Authenticator, Authy, etc.)</li>
+            <li>Scan the QR code to link Blumebyte HR to your app</li>
+            <li>After logging in with your password, enter the 6-digit code from the app</li>
+            <li>Codes refresh every 30 seconds and work offline</li>
+            <li>Protects against unauthorised access even if your password is compromised</li>
           </ul>
         </div>
 
         {/* Action Button */}
         <div className="pt-2">
-          {status?.twoFactorEnabled ? (
+          {isEnabled ? (
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 onClick={() => setShowSetup(true)}
               >
-                Re-verify 2FA
+                <Smartphone className="h-4 w-4 mr-2" />
+                Re-link Authenticator App
               </Button>
-              {/* Future: Add disable 2FA option */}
             </div>
           ) : (
             <Button
@@ -169,8 +173,8 @@ export function TwoFactorSettings() {
         {/* Security Tips */}
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs text-blue-900">
-            <strong>💡 Security Tip:</strong> Always keep your email account secure with a strong, 
-            unique password and enable 2FA on your email provider as well.
+            <strong>💡 Security Tip:</strong> Store your authenticator app recovery codes safely.
+            Recommended apps: Google Authenticator, Authy, Microsoft Authenticator, or 1Password.
           </p>
         </div>
       </CardContent>
