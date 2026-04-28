@@ -23,7 +23,8 @@ interface UserLicenseSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   users: any[];
-  maxLicenses: number;
+  maxLicenses: number;       // total licenses after the purchase (existing + new)
+  additionalLicenses: number; // how many extra are being bought right now
   currentPurchasedLicenses: number;
   onConfirm: (selectedUserIds: string[]) => void;
   loading?: boolean;
@@ -34,6 +35,7 @@ export function UserLicenseSelector({
   onOpenChange,
   users,
   maxLicenses,
+  additionalLicenses,
   currentPurchasedLicenses,
   onConfirm,
   loading = false,
@@ -104,15 +106,16 @@ export function UserLicenseSelector({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
+      <DialogContent className="w-full max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Select Users to Activate
+            Select Users to Keep Active
           </DialogTitle>
           <DialogDescription>
-            You're purchasing {maxLicenses} license(s), but you currently have {activeCount} active user(s). 
-            Select which users should remain active. Unselected users will be deactivated.
+            You're purchasing {additionalLicenses} additional license(s).
+            After this purchase you'll have {maxLicenses} total license(s), but you currently have {activeCount} active user(s).
+            Select up to {maxLicenses} users to remain active — unselected users will be deactivated.
           </DialogDescription>
         </DialogHeader>
 
@@ -144,7 +147,7 @@ export function UserLicenseSelector({
               <div className="h-8 w-px bg-gray-300" />
               <div className="text-center">
                 <p className="text-2xl font-bold text-blue-600">{maxLicenses}</p>
-                <p className="text-xs text-muted-foreground">Licenses</p>
+                <p className="text-xs text-muted-foreground">Total Licenses</p>
               </div>
               <div className="h-8 w-px bg-gray-300" />
               <div className="text-center">
@@ -171,7 +174,7 @@ export function UserLicenseSelector({
           </div>
 
           {/* User List */}
-          <ScrollArea className="h-[400px] border rounded-lg">
+          <ScrollArea className="h-[min(340px,50vh)] border rounded-lg">
             <div className="p-4 space-y-2">
               {filteredUsers.map((user) => {
                 const userId = user.id || user.userId;

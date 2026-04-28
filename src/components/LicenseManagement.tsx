@@ -335,10 +335,12 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     try {
       setLoading(true);
 
-      // Check if we need user selection (buying fewer licenses than current active users)
+      // Check if we need user selection (new total licenses would still be fewer than active users)
       const currentActiveUsers = licenseInfo?.usedLicenses || 0;
+      const currentPurchased = licenseInfo?.purchasedLicenses || 0;
+      const newTotalLicenses = currentPurchased + additionalLicenses;
       
-      if (currentActiveUsers > additionalLicenses) {
+      if (currentActiveUsers > newTotalLicenses) {
         // Need to select which users to keep active — fetch users first
         setFetchingUsers(true);
         const usersResponse = await apiClient.get('/subscription/all-users', accessToken);
@@ -937,7 +939,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           open={showUserSelector}
           onOpenChange={setShowUserSelector}
           users={allUsers}
-          maxLicenses={additionalLicenses}
+          maxLicenses={(licenseInfo?.purchasedLicenses || 0) + additionalLicenses}
+          additionalLicenses={additionalLicenses}
           currentPurchasedLicenses={licenseInfo?.purchasedLicenses || 0}
           onConfirm={handleUserSelectionConfirm}
           loading={loading}
