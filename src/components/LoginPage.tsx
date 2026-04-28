@@ -199,7 +199,7 @@ export function LoginPage() {
                 <div className="text-center">
                   <button
                     type="button"
-                    onClick={() => { setTotpRequired(false); setTotpCode(''); setTotpError(''); setPendingPassword(''); }}
+                    onClick={() => { setTotpRequired(false); setTotpCode(''); setTotpError(''); setPendingPassword(''); setPendingEmail(''); }}
                     className="text-xs text-gray-500 hover:text-black transition-colors"
                   >
                     ← Back to login
