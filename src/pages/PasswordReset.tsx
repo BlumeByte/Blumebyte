@@ -20,14 +20,15 @@ function blumeGradientStyle() {
 export function PasswordReset() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  // ?token — custom Resend-based reset token
   const token = searchParams.get('token');
+  // ?code  — Supabase PKCE recovery code (sent when flowType='pkce')
+  const code = searchParams.get('code');
 
-  // Capture the initial URL hash BEFORE Supabase may process and clear it.
-  // Supabase JS automatically exchanges the recovery token from the hash,
-  // which can remove #access_token from window.location before getSession()
-  // resolves — causing a false "Invalid Reset Link" error.
-  // useMemo with [] captures the hash exactly once during the initial render.
-  const initialHash = React.useMemo(() => (typeof window !== 'undefined' ? window.location.hash : ''), []);
+  // Capture the initial URL hash for legacy implicit-flow recovery links
+  // (e.g. #access_token=xxx&type=recovery).  useMemo runs synchronously
+  // during the first render, before any async Supabase URL processing.
+  const initialHash = useMemo(() => (typeof window !== 'undefined' ? window.location.hash : ''), []);
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -44,32 +45,47 @@ export function PasswordReset() {
   useEffect(() => {
     document.title = 'Reset Password - Blumebyte';
 
-    // Listen for Supabase PASSWORD_RECOVERY event (from the reset email link)
+    // Whether we came via a PKCE code or a legacy hash — if either is present
+    // we should NOT show the "invalid token" error immediately; instead we
+    // wait for Supabase to finish the code-exchange and fire PASSWORD_RECOVERY.
+    const hasPkceCode = !!code;
+    const hasRecoveryHash = window.location.hash.includes('type=recovery') || initialHash.includes('type=recovery');
+    const hasAccessToken = window.location.hash.includes('access_token') || initialHash.includes('access_token');
+
+    // Timeout so the user is never stuck on the spinner indefinitely.
+    let recoveryTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    // Listen for Supabase PASSWORD_RECOVERY event.
+    // With flowType='pkce', Supabase exchanges ?code= for a session
+    // asynchronously and fires this event when done.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' && session) {
+        if (recoveryTimeout) clearTimeout(recoveryTimeout);
         setIsSupabaseRecovery(true);
         setTokenValid(true);
         setValidating(false);
       }
     });
 
-    // Also check if we already have an active recovery session (page refresh case)
+    // Also check current session state — Supabase may have already finished
+    // the code exchange by the time getSession() resolves.
     supabase.auth.getSession().then(({ data: { session } }) => {
-      // Use both current and captured initial hash — Supabase may have already cleared the
-      // current hash by the time getSession() resolves.
-      const hasRecoveryHash = window.location.hash.includes('type=recovery') || initialHash.includes('type=recovery');
-      const hasAccessToken = window.location.hash.includes('access_token') || initialHash.includes('access_token');
-
-      if (session?.user && hasRecoveryHash) {
+      if (session?.user && (hasRecoveryHash || hasPkceCode)) {
+        // Session already established from this recovery flow.
+        if (recoveryTimeout) clearTimeout(recoveryTimeout);
         setIsSupabaseRecovery(true);
         setTokenValid(true);
         setValidating(false);
-      } else if (!token && !hasAccessToken) {
-        // No Supabase recovery hash and no custom token
-        setError('Invalid or missing reset token');
-        setValidating(false);
+      } else if (hasPkceCode || hasAccessToken) {
+        // Supabase is still exchanging the code / processing the hash.
+        // Stay in loading state and rely on the onAuthStateChange handler above.
+        // Set a fallback timeout so the user isn't stuck forever.
+        recoveryTimeout = setTimeout(() => {
+          setError('This reset link has expired or is invalid. Please request a new one.');
+          setValidating(false);
+        }, 15000);
       } else if (token) {
-        // Validate custom token
+        // Custom token-based reset (Resend fallback flow).
         const validateToken = async () => {
           try {
             const result = await api('/auth/validate-reset-token', {
@@ -88,11 +104,18 @@ export function PasswordReset() {
           }
         };
         validateToken();
+      } else {
+        // No code, no hash, no token — genuinely missing.
+        setError('Invalid or missing reset token');
+        setValidating(false);
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [token]);
+    return () => {
+      subscription.unsubscribe();
+      if (recoveryTimeout) clearTimeout(recoveryTimeout);
+    };
+  }, [token, code]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
