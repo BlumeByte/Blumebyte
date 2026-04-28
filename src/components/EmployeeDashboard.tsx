@@ -34,6 +34,7 @@ import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
+import { OvertimeExpenseTab } from './portal/OvertimeExpenseTab';
 import { useDarkMode } from '../lib/dark-mode-context';
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
@@ -88,6 +89,7 @@ export function EmployeeDashboard() {
             <TabsTrigger value="reviews"><Star className="w-4 h-4 mr-1" />Reviews</TabsTrigger>
             <TabsTrigger value="disciplinary"><AlertCircle className="w-4 h-4 mr-1" />Disciplinary</TabsTrigger>
             <TabsTrigger value="compliance"><FileCheck className="w-4 h-4 mr-1" />Compliance</TabsTrigger>
+            <TabsTrigger value="overtime-expenses"><DollarSign className="w-4 h-4 mr-1" />OT & Expenses</TabsTrigger>
             <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
             <TabsTrigger value="meetings"><Video className="w-4 h-4 mr-1" />Meetings</TabsTrigger>
             <TabsTrigger value="messages"><MessageCircle className="w-4 h-4 mr-1" />Messages</TabsTrigger>
@@ -107,6 +109,7 @@ export function EmployeeDashboard() {
           <TabsContent value="reviews"><EmpReviews /></TabsContent>
           <TabsContent value="disciplinary"><EmpDisciplinary /></TabsContent>
           <TabsContent value="compliance"><EmpCompliance /></TabsContent>
+          <TabsContent value="overtime-expenses"><EmpOvertimeExpenses /></TabsContent>
           <TabsContent value="training"><TrainingManagement mode="employee" /></TabsContent>
           <TabsContent value="questionnaires"><EmpQuestionnaires /></TabsContent>
           <TabsContent value="meetings"><MeetingsPanel mode="employee" /></TabsContent>
@@ -1687,5 +1690,51 @@ function EmpCompliance() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function EmpOvertimeExpenses() {
+  const { accessToken } = useAuth();
+  const { currencySymbol } = useCurrency();
+  const [overtimeRequests, setOvertimeRequests] = useState<any[]>([]);
+  const [expenseClaims, setExpenseClaims] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const [otData, expData] = await Promise.all([
+        api('/employee/overtime-requests', { token: accessToken }).catch(() => null),
+        api('/employee/expense-claims', { token: accessToken }).catch(() => null),
+      ]);
+      // Server returns { requests: [...] } and { claims: [...] }
+      setOvertimeRequests(otData?.requests || []);
+      setExpenseClaims(expData?.claims || []);
+    } catch (e) {
+      console.error('EmpOvertimeExpenses load error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const formatCurrency = useCallback(
+    (amount: number) => `${currencySymbol}${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    [currencySymbol]
+  );
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;
+  }
+
+  return (
+    <OvertimeExpenseTab
+      accessToken={accessToken || ''}
+      overtimeRequests={overtimeRequests}
+      expenseClaims={expenseClaims}
+      onRefresh={load}
+      formatCurrency={formatCurrency}
+    />
   );
 }
