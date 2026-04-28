@@ -252,7 +252,7 @@ export const router = createBrowserRouter([
         Component: AuthCallbackPage,
       },
       {
-        path: '/oauth-consent',
+        path: '/oauth/consent',
         Component: OAuthConsentPage,
       },
       {
