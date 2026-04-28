@@ -24,13 +24,11 @@ async function getAllRates(): Promise<Record<string, number>> {
     if (!data.rates || typeof data.rates !== 'object') throw new Error('Invalid exchange rate data');
 
     cachedRates = { rates: data.rates, timestamp: Date.now() };
-    console.log('Exchange rates fetched. GHS:', data.rates.GHS, 'NGN:', data.rates.NGN);
     return data.rates;
   } catch (error) {
     console.error('Error fetching exchange rates:', error);
     // Fallback rates as of March 2026 (approximate)
     const fallback = { GHS: 15.5, NGN: 1600, USD: 1 };
-    console.warn('Using fallback exchange rates:', fallback);
     return fallback;
   }
 }
@@ -44,7 +42,6 @@ export function getPaystackCurrency(): string {
   const currency = Deno.env.get('PAYSTACK_CURRENCY') || 'GHS';
   const supported = ['GHS', 'NGN', 'USD'];
   if (!supported.includes(currency.toUpperCase())) {
-    console.warn(`Unsupported PAYSTACK_CURRENCY "${currency}", defaulting to GHS`);
     return 'GHS';
   }
   return currency.toUpperCase();
@@ -70,8 +67,6 @@ export async function usdToPaystackAmount(usdAmount: number): Promise<{ amountSm
 
   // All Paystack currencies use ×100 for smallest unit (pesewas, kobo, cents)
   const amountSmallestUnit = Math.round(amountDisplay * 100);
-
-  console.log(`USD ${usdAmount} → ${currency} ${amountDisplay} (${amountSmallestUnit} smallest units)`);
 
   return { amountSmallestUnit, amountDisplay, currency };
 }

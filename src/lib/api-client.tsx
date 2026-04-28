@@ -97,6 +97,12 @@ export function invalidateCache(path: string, token?: string | null) {
   requestCache.delete(cacheKey);
 }
 
+// Clear the entire GET cache (e.g., when the SuperAdmin switches companies so
+// every subsequent fetch goes straight to the server with no stale data).
+export function clearAllCache() {
+  requestCache.clear();
+}
+
 // File upload helper function
 export async function apiUpload(path: string, formData: FormData, token?: string | null) {
   const res = await fetch(`${BASE}${path}`, {

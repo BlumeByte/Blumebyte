@@ -9,6 +9,10 @@ export interface CompanyBranding {
   description: string;
   primaryColor: string;
   logoUrl: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+  companyWebsite: string;
 }
 
 const DEFAULT_BRANDING: CompanyBranding = {
@@ -16,6 +20,10 @@ const DEFAULT_BRANDING: CompanyBranding = {
   description: 'Human Resource Information System',
   primaryColor: '#10b981',
   logoUrl: '',
+  companyAddress: '',
+  companyPhone: '',
+  companyEmail: '',
+  companyWebsite: '',
 };
 
 interface BrandingContextType {
@@ -51,70 +59,48 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       
       if (res.ok) {
         const settings = await res.json();
-        console.log('🎨 Branding data fetched from backend:', {
-          companyName: settings.companyName,
-          primaryColor: settings.primaryColor,
-          logoUrl: settings.logoUrl,
-          hasData: !!settings.companyName
-        });
-        
-        const updatedBranding = {
+        const updatedBranding: CompanyBranding = {
           companyName: settings.companyName || DEFAULT_BRANDING.companyName,
           description: settings.description || DEFAULT_BRANDING.description,
           primaryColor: settings.primaryColor || DEFAULT_BRANDING.primaryColor,
           logoUrl: settings.logoUrl || '',
+          companyAddress: settings.companyAddress || '',
+          companyPhone: settings.companyPhone || '',
+          companyEmail: settings.companyEmail || '',
+          companyWebsite: settings.companyWebsite || '',
         };
-        
-        console.log('🎨 Setting branding to:', updatedBranding);
         setBranding(updatedBranding);
       } else {
-        // 401/403 are expected on public pages (user not logged in) — don't warn about them
+        // 401/403 are expected on public pages (user not logged in)
         if (res.status !== 401 && res.status !== 403) {
-          console.warn('❌ Branding fetch failed with status:', res.status);
+          console.warn('Branding fetch failed with status:', res.status);
         }
-        // On error, use default branding
         setBranding(DEFAULT_BRANDING);
       }
     } catch (e) {
-      console.error('❌ Branding fetch error:', e);
-      // On error, keep using default branding - don't block the app
+      console.error('Branding fetch error:', e);
       setBranding(DEFAULT_BRANDING);
     }
   }, []);
 
   useEffect(() => {
-    // Fetch branding immediately on mount
     fetchBranding();
-    
-    // Always set up polling - fetchBranding handles the case when not logged in
-    // Poll every 30 seconds for branding updates (balance between freshness and performance)
     const iv = setInterval(fetchBranding, 30000);
     
-    // Listen for custom branding update event for immediate refresh
     const handleBrandingUpdate = () => {
-      console.log('🎨 Branding update event received, refreshing immediately...');
       fetchBranding();
-      // Refresh again after a short delay to ensure backend has propagated
       setTimeout(fetchBranding, 1000);
     };
     window.addEventListener('branding-updated', handleBrandingUpdate);
     
-    // Listen for storage events (for multi-tab sync)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'branding-refresh-trigger') {
-        console.log('🎨 Branding refresh triggered from another tab');
-        fetchBranding();
-      }
+      if (e.key === 'branding-refresh-trigger') fetchBranding();
     };
     window.addEventListener('storage', handleStorageChange);
     
-    // Listen for Supabase auth state changes to refresh branding on login/logout
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        fetchBranding();
-      } else {
-        setBranding(DEFAULT_BRANDING);
-      }
+      if (session) fetchBranding();
+      else setBranding(DEFAULT_BRANDING);
     });
     
     return () => {

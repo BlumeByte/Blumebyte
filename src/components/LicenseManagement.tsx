@@ -78,7 +78,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       clearInterval(pollingRef.current);
     }
 
-    console.log('Starting payment polling for reference:', reference);
     setPollingStatus('Waiting for payment...');
 
     pollingRef.current = setInterval(async () => {
@@ -87,7 +86,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         // accessToken may be stale if the auth context refreshed it mid-poll.
         const freshToken = await getToken();
         if (!freshToken) {
-          console.warn('Payment poll: no valid token available, skipping this cycle');
           return;
         }
 
@@ -98,7 +96,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         if (!response.ok) return;
 
         const data = await response.json();
-        console.log('Payment poll result:', data.status);
 
         if (data.status === 'completed') {
           // Already processed by the verification page in the payment tab
@@ -216,11 +213,9 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   // Auto-sync user licenses after successful payment
   const autoSyncAfterPayment = async () => {
     try {
-      console.log('Auto-syncing licenses after payment...');
       const response = await apiClient.post('/sync-user-licenses', {}, accessToken);
       if (response.ok) {
         const result = await response.json();
-        console.log('Auto-sync result:', result);
         if (result.activatedCount > 0 || result.deactivatedCount > 0) {
           toast.success(
             `Licenses synced! Activated: ${result.activatedCount}, Deactivated: ${result.deactivatedCount}`,
@@ -245,7 +240,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         setAdditionalLicenses(syncedCount);
         setAutoSyncedLicenses(true);
         
-        console.log(`Auto-synced licenses to ${syncedCount} based on ${currentUsers} current users`);
         
         // Show a toast notification
         if (currentUsers > licenseInfo.purchasedLicenses) {
@@ -383,8 +377,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const safeLicenses = Number.isFinite(additionalLicenses) ? Math.max(MIN_LICENSES, Math.round(additionalLicenses)) : MIN_LICENSES;
       const totalAmount = safeLicenses * pricePerUser;
 
-      console.log('Frontend: Initiating license purchase');
-      console.log('- Licenses:', safeLicenses, '| Plan:', selectedPlan, '| USD:', totalAmount);
 
       const endpoint = selectedUserIds.length > 0 
         ? '/subscription/purchase-licenses-with-selection'
@@ -408,7 +400,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       }
 
       const data = await response.json();
-      console.log('Payment init success. Authorization URL:', data.authorization_url);
 
       if (data.authorization_url) {
         if (payWindow && !payWindow.closed) {
@@ -416,7 +407,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           payWindow.location.href = data.authorization_url;
         } else {
           // Tab was closed or blocked — fall back to same-window navigation
-          console.warn('Payment tab was closed or blocked; falling back to same-window redirect');
           window.location.href = data.authorization_url;
         }
         setLoading(false);
@@ -481,7 +471,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       }
       
       const result = await response.json();
-      console.log('Paystack test result:', result);
       
       if (result.success) {
         toast.success('Paystack connection successful! Payment gateway is working correctly.');

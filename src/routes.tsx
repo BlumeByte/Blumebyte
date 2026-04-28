@@ -14,10 +14,8 @@ import { ScrollToTop } from './components/ScrollToTop';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './components/LoginPage';
 import CompanySignup from './pages/CompanySignup';
-import DevSettings from './pages/DevSettings';
 import EmployeePortal from './pages/EmployeePortal';
 import PaystackSubscription from './pages/PaystackSubscription';
-import ProductionCleanup from './pages/ProductionCleanup';
 import TwoFactorVerification from './pages/TwoFactorVerification';
 import AuthCallback from './pages/AuthCallback';
 import OAuthConsent from './pages/OAuthConsent';
@@ -95,8 +93,6 @@ const LoginPageWrapper = () => <LoginPage />;
 
 const CompanySignupPage = () => <CompanySignup />;
 
-const DevSettingsPage = () => <DevSettings />;
-
 const EmployeePortalPage = () => <EmployeePortal />;
 
 const SubscriptionPage = () => (
@@ -158,8 +154,6 @@ const SecurityPolicyPage = () => <SecurityPolicy />;
 const PrivacyPolicyPage = () => <PrivacyPolicy />;
 
 const TermsConditionsPage = () => <TermsConditions />;
-
-const ProductionCleanupPage = () => <ProductionCleanup />;
 
 const TwoFactorVerificationPage = () => <TwoFactorVerification />;
 
@@ -244,14 +238,6 @@ export const router = createBrowserRouter([
       {
         path: '/employee-portal',
         Component: EmployeePortalPage,
-      },
-      {
-        path: '/dev-settings',
-        Component: DevSettingsPage,
-      },
-      {
-        path: '/production-cleanup',
-        Component: ProductionCleanupPage,
       },
       {
         path: '/two-factor-verification',

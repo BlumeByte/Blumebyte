@@ -49,9 +49,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const testReference = `TEST_${user.id}_${Date.now()}`;
       const testAmount = 10000; // 100 GHS in pesewas (minimum for testing)
       
-      console.log('Testing Paystack connection...');
-      console.log('- Reference:', testReference);
-      console.log('- Amount:', testAmount, 'pesewas (100 GHS)');
       
       const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
@@ -87,7 +84,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
 
       const paystackData = await paystackResponse.json();
       
-      console.log('Paystack test response:', paystackData);
 
       if (!paystackData.status) {
         return c.json({
@@ -295,14 +291,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
       
       // Debug logging
-      console.log('Initializing Paystack payment:');
-      console.log('- Licenses requested:', licenses);
-      console.log('- Plan:', plan);
-      console.log('- Price per license (USD):', pricePerLicense);
-      console.log('- Total amount (USD):', amount);
-      console.log('- Currency:', currency);
-      console.log('- Amount in currency:', amountDisplay);
-      console.log('- Amount smallest unit sent to Paystack:', amountSmallestUnit);
       
       const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
@@ -327,8 +315,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       });
       
       // Log the response status for debugging
-      console.log('Paystack API response status:', paystackResponse.status);
-      console.log('Paystack API response status text:', paystackResponse.statusText);
       
       // Check if the response is OK before parsing JSON
       if (!paystackResponse.ok) {
@@ -343,7 +329,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const paystackData = await paystackResponse.json();
       
       // Log the full response for debugging
-      console.log('Paystack API response:', JSON.stringify(paystackData, null, 2));
       
       if (!paystackData.status) {
         console.error('Paystack initialization failed:', paystackData);
@@ -418,8 +403,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const paystackData = await paystackResponse.json();
       
       // Log full Paystack response for debugging
-      console.log('Paystack verify response (HTTP status):', paystackResponse.status);
-      console.log('Paystack verify response body:', JSON.stringify(paystackData, null, 2));
       
       // paystackData.status = API-level success (bool)
       // paystackData.data.status = transaction status string ('success', 'failed', 'abandoned', etc.)
@@ -470,7 +453,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       // as 'processing'. If a second request arrives and sees
       // 'processing', it waits briefly then returns the finished result.
       if (pendingLicense.status === 'processing') {
-        console.log(`Reference ${reference} is already being processed by another request — waiting...`);
         // Brief wait to let the first request finish, then return the result
         await new Promise(r => setTimeout(r, 3000));
         const subscription = await kv.get(`subscription:${user.id}`);
@@ -499,8 +481,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       // Note: We don't verify the exact amount because it was converted from USD to GHS
       // Paystack will have the GHS amount, and exchange rates may vary slightly
       // We verify the payment was successful, which is sufficient
-      console.log('Payment verified - Amount paid (pesewas):', paystackData.data.amount);
-      console.log('Original USD amount:', pendingLicense.amount);
       
       // Get or create subscription
       const subscription = await kv.get(`subscription:${pendingLicense.userId}`) || {
@@ -551,7 +531,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         const allUsers = await kv.getByPrefix('employee:');
         const selectedIds = new Set(pendingLicense.selectedUserIds);
         
-        console.log(`Processing user selection: ${selectedIds.size} users selected out of ${allUsers.length} total`);
         
         // Deactivate users not in the selected list
         for (const user of allUsers) {
@@ -568,7 +547,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
             await kv.set(`employee:${userId}`, user);
             deactivatedCount++;
             
-            console.log(`Deactivated user: ${user.email} (${userId})`);
             
             await logAudit({
               userId: pendingLicense.userId,
@@ -585,7 +563,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           }
         }
         
-        console.log(`License sync complete: ${deactivatedCount} users deactivated`);
       }
       
       await logAudit({
@@ -649,10 +626,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       // Convert USD to GHS for Paystack
       const { amountSmallestUnit: renewAmountSmallestUnit, currency: renewCurrency } = await usdToPaystackAmount(amount);
       
-      console.log('Auto-renewal payment:');
-      console.log('- USD amount:', amount);
-      console.log('- Currency:', renewCurrency);
-      console.log('- Amount (smallest unit):', renewAmountSmallestUnit);
       
       // Charge the saved card
       const paystackResponse = await fetch('https://api.paystack.co/transaction/charge_authorization', {
@@ -791,7 +764,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
 
       const event = JSON.parse(bodyText);
-      console.log('Received Paystack Webhook Event:', event.event);
 
       // Only handle successful charges for license purchases
       if (event.event === 'charge.success') {
@@ -799,13 +771,11 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         const pendingLicense = await kv.get(`pending-license:${reference}`);
         
         if (!pendingLicense) {
-          console.log(`Webhook: Pending license not found for reference: ${reference}`);
           return c.text('OK'); // Acknowledge to prevent retries
         }
 
         // Check if it's already processed to prevent double crediting
         if (pendingLicense.status === 'processed') {
-          console.log(`Webhook: License already processed for reference: ${reference}`);
           return c.text('OK');
         }
 
@@ -910,7 +880,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           details: { reference, amount: pendingLicense.amount, licenses: pendingLicense.licenses }
         });
         
-        console.log(`Webhook successfully processed license payment for reference: ${reference}`);
       }
 
       return c.text('OK');
@@ -958,14 +927,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
       
       // Debug logging
-      console.log('Initializing Paystack payment with user selection:');
-      console.log('- Licenses requested:', licenses);
-      console.log('- Selected users:', selectedUserIds?.length || 0);
-      console.log('- Plan:', plan);
-      console.log('- Total amount (USD):', amount);
-      console.log('- Currency:', currency);
-      console.log('- Amount in currency:', amountDisplay);
-      console.log('- Amount smallest unit sent to Paystack:', amountSmallestUnit);
       
       const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
@@ -991,8 +952,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       });
       
       // Log the response status for debugging
-      console.log('Paystack API response status:', paystackResponse.status);
-      console.log('Paystack API response status text:', paystackResponse.statusText);
       
       // Check if the response is OK before parsing JSON
       if (!paystackResponse.ok) {
@@ -1007,7 +966,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const paystackData = await paystackResponse.json();
       
       // Log the full response for debugging
-      console.log('Paystack API response:', JSON.stringify(paystackData, null, 2));
       
       if (!paystackData.status) {
         console.error('Paystack initialization failed:', paystackData);

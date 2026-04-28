@@ -180,18 +180,7 @@ function showInitializationError(errorMessage: string) {
             margin-right: 10px;
             transition: all 0.2s;
           ">🔄 Reload Page</button>
-          
-          <button onclick="window.location.href='/debug.html'" style="
-            background: #6b7280;
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 15px;
-            cursor: pointer;
-            transition: all 0.2s;
-          ">🔧 Debug Tools</button>
+
         </div>
       </div>
     `;
@@ -205,14 +194,6 @@ try {
     throw new Error('Root element not found');
   }
 
-  console.log('🚀 Initializing React app...');
-  console.log('📦 Root element found:', rootElement);
-  console.log('🌐 Environment:', {
-    isIframe: window.self !== window.top,
-    referrer: document.referrer,
-    location: window.location.href,
-  });
-  
   createRoot(rootElement).render(
     <StrictMode>
       <ErrorBoundary>
@@ -221,22 +202,8 @@ try {
     </StrictMode>
   );
   
-  console.log('✅ React app initialized successfully');
-  
-  // Mark initialization as successful after a brief delay
-  setTimeout(() => {
-    const root = document.getElementById('root');
-    if (root && root.children.length > 0) {
-      console.log('✓ App rendered successfully');
-      console.log('📊 Root has', root.children.length, 'children');
-    } else {
-      console.error('✗ App initialized but did not render');
-      console.error('Root innerHTML:', root?.innerHTML);
-    }
-  }, 1000);
   
 } catch (error) {
-  console.error('❌ Failed to initialize app:', error);
   initializationFailed = true;
   showInitializationError(error instanceof Error ? error.message : String(error));
 }
