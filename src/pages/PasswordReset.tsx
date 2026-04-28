@@ -1,4 +1,4 @@
-import React, { useState, useEffect, startTransition } from 'react';
+import React, { useState, useEffect, startTransition, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -21,6 +21,12 @@ export function PasswordReset() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+
+  // Capture the initial URL hash BEFORE Supabase may process and clear it.
+  // Supabase JS automatically exchanges the recovery token from the hash,
+  // which can remove #access_token from window.location before getSession()
+  // resolves — causing a false "Invalid Reset Link" error.
+  const initialHash = useRef(typeof window !== 'undefined' ? window.location.hash : '').current;
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,11 +54,16 @@ export function PasswordReset() {
 
     // Also check if we already have an active recovery session (page refresh case)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user && window.location.hash.includes('type=recovery')) {
+      // Use both current and captured initial hash — Supabase may have already cleared the
+      // current hash by the time getSession() resolves.
+      const hasRecoveryHash = window.location.hash.includes('type=recovery') || initialHash.includes('type=recovery');
+      const hasAccessToken = window.location.hash.includes('access_token') || initialHash.includes('access_token');
+
+      if (session?.user && hasRecoveryHash) {
         setIsSupabaseRecovery(true);
         setTokenValid(true);
         setValidating(false);
-      } else if (!token && !window.location.hash.includes('access_token')) {
+      } else if (!token && !hasAccessToken) {
         // No Supabase recovery hash and no custom token
         setError('Invalid or missing reset token');
         setValidating(false);
