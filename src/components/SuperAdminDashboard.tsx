@@ -870,12 +870,10 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
     const fixCompanyScope = async () => {
       if (!accessToken) { setScopeFixed(true); return; } // not yet authenticated
       try {
-        console.log('🔧 Attempting to fix company scope...');
-        const result = await api('/superadmin/fix-company-scope', { 
+        await api('/superadmin/fix-company-scope', { 
           method: 'POST', 
           token: accessToken 
         });
-        console.log('✅ Company scope check result:', result);
         setScopeFixed(true);
       } catch (e) {
         console.error('Company scope fix failed:', e);
@@ -890,7 +888,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
 
   const loadDashboardData = useCallback(() => {
     if (!accessToken) return; // skip until auth is ready
-    const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.log(`Dashboard fetch ${path} failed:`, e); return null; });
+    const safeFetch = (path: string) => api(path, { token: accessToken }).catch(e => { console.error(`Dashboard fetch ${path} failed:`, e); return null; });
     Promise.all([
       safeFetch('/users'),
       safeFetch('/reference-data'),

@@ -70,15 +70,12 @@ export function LicensePaymentVerification() {
     }
 
     try {
-      console.log('Verifying payment with reference:', reference);
 
       const response = await apiClient.post('/subscription/verify-license', { reference }, token);
 
-      console.log('Verification response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Verification response data:', data);
 
         if (data.success) {
           setStatus('success');
@@ -116,13 +113,11 @@ export function LicensePaymentVerification() {
   const autoSyncLicenses = async (token: string) => {
     try {
       setSyncing(true);
-      console.log('Auto-syncing user licenses after payment...');
 
       const response = await apiClient.post('/sync-user-licenses', {}, token);
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Auto-sync result:', result);
         toast.success(
           `Licenses synced! Activated: ${result.activatedCount}, Deactivated: ${result.deactivatedCount}`,
           { duration: 5000 }

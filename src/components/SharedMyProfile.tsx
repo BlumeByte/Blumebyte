@@ -245,9 +245,8 @@ export function SharedMyProfile() {
 
       const fd = new FormData();
       fd.append('file', blob, 'profile.jpg');
-      console.log(`Uploading cropped profile image: size=${blob.size}, type=${blob.type}`);
       const result = await apiUpload('/upload/profile-image', fd, accessToken);
-      console.log('Profile image upload result:', result);
+      if (!result) throw new Error('Upload failed');
       toast.success('Profile image updated');
       setCropDialogOpen(false);
       setCropImageSrc(null);

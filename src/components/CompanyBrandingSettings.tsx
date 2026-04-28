@@ -45,17 +45,13 @@ export function CompanyBrandingSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      console.log('💾 Saving branding settings:', settings);
-      
-      const response = await api('/superadmin/company-branding', { 
+      await api('/superadmin/company-branding', { 
         method: 'PUT', 
         body: settings, 
         token: accessToken 
       });
       
-      console.log('✅ Branding save response:', response);
-      
-      toast.success('✅ Company branding updated successfully!');
+      toast.success('Company branding updated successfully!');
       
       // Trigger immediate refresh multiple times to ensure it sticks
       await refreshBranding();
@@ -72,11 +68,10 @@ export function CompanyBrandingSettings() {
       
       // Force reload to ensure all components pick up the changes
       setTimeout(() => {
-        console.log('🔄 Reloading page to apply branding changes...');
         window.location.reload();
       }, 1500);
     } catch (e: any) {
-      console.error('❌ Branding save error:', e);
+      console.error('Branding save error:', e);
       toast.error(e.message || 'Failed to save branding');
       setSaving(false);
     }

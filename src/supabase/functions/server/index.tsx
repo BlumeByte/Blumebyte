@@ -2,7 +2,6 @@
 // SECURITY: Updated to Hono 4.7.7+ to patch all known vulnerabilities (Jan 2025)
 import { Hono } from "npm:hono@4.7.7";
 import { cors } from "npm:hono@4.7.7/cors";
-import { logger } from "npm:hono@4.7.7/logger";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
@@ -15,7 +14,6 @@ const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flo
 const EMAIL_FROM = 'Blumebyte HR <noreply@blumebyte.com>';
 const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
-app.use("*", logger(console.log));
 app.use(
   "/*",
   cors({
@@ -74,10 +72,8 @@ app.post(`${PREFIX}/admin/sync-all-stats`, async (c) => {
 
 // Simple test endpoint for payment flow
 app.post(`${PREFIX}/company/test-payment`, async (c) => {
-  console.log('Test payment endpoint called');
   try {
     const body = await c.req.json();
-    console.log('Received body:', body);
     return c.json({ 
       success: true, 
       message: 'Test endpoint working',
@@ -102,8 +98,6 @@ app.post(`${PREFIX}/production/cleanup`, async (c) => {
       return c.json({ error: 'Unauthorized - Invalid cleanup key' }, 401);
     }
 
-    console.log('⚠️  PRODUCTION CLEANUP INITIATED ⚠️');
-    console.log('This will delete ALL data, users, and reset the system!');
     
     const results = await performProductionCleanup();
     
@@ -157,7 +151,6 @@ async function broadcastUpdate(channelName: string, eventType: string, key: stri
     });
 
     sb.removeChannel(channel);
-    console.log(`✅ Broadcast sent: ${channelName} → ${eventType} → ${key}`);
     return true;
   } catch (error) {
     console.error(`❌ Broadcast error on ${channelName}:`, error);
@@ -177,17 +170,14 @@ function extractUserToken(c: any): string | null {
 async function getAuthUser(c: any) {
   const token = extractUserToken(c);
   if (!token) {
-    console.log('getAuthUser: No token found in request');
     return null;
   }
   const sb = supabaseAdmin();
   const { data, error } = await sb.auth.getUser(token);
   if (error) {
-    console.log('getAuthUser: Error validating token:', error.message);
     return null;
   }
   if (!data?.user) {
-    console.log('getAuthUser: No user data returned');
     return null;
   }
   return data.user;
@@ -201,7 +191,6 @@ async function getSuperAdmin(companyId?: string) {
     return allUsers.find((u: any) => u.role === 'superadmin' && (u.companyId === companyId || u.company === companyId));
   }
   // CRITICAL FIX: Without companyId, return null - never return a random superadmin from any company
-  console.log('getSuperAdmin: No companyId provided - returning null for strict tenant isolation');
   return null;
 }
 
@@ -409,11 +398,9 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
   }
   
   if (scope.length > 0) {
-    console.log(`✅ resolveCompanyScope: User ${userId} can access companies:`, scope);
     return scope;
   }
   
-  console.log(`❌ resolveCompanyScope: No company scope found for user ${userId}.`);
   return null;
 }
 
@@ -517,8 +504,7 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
   
   // If no company scope, return EMPTY - strict isolation
   if (!assignedCompanies || assignedCompanies.length === 0) {
-    console.log(`⚠️ applyCompanyFilter: User ${userId} (${role}) has no assignedCompanies - returning empty for strict tenant isolation`);
-    return [];
+      return [];
   }
   
   // Filter items by company for ALL roles
@@ -529,7 +515,6 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
     return assignedCompanies.some(ac => ac.toLowerCase() === itemCompany.toLowerCase());
   });
   
-  console.log(`✅ applyCompanyFilter: User ${userId} (${role}) accessing ${filtered.length}/${items.length} items in companies: ${assignedCompanies.join(', ')}`);
   return filtered;
 }
 
@@ -539,41 +524,25 @@ async function filterEmployeesByCompany(employees: any[], userId: string, role: 
   // SuperAdmins are company-level admins, NOT platform-wide admins
   const scope = await resolveCompanyScope(userId);
   
-  console.log(`🔍 DEBUG filterEmployeesByCompany: User ${userId} (${role}) has scope:`, scope);
   
   // If no scope, return EMPTY - strict isolation
   if (!scope || scope.length === 0) {
-    console.log(`⚠️ filterEmployeesByCompany: User ${userId} (${role}) has no company scope - returning empty for strict tenant isolation`);
     return [];
-  }
-  
-  // DEBUG: Log sample employee companies for debugging
-  if (employees.length > 0 && employees.length <= 10) {
-    console.log(`🔍 DEBUG: Sample employee companies:`, employees.map(e => ({
-      id: e.id || e.userId,
-      name: e.name,
-      company: e.company,
-      companyId: e.companyId,
-      assignedCompanies: e.assignedCompanies
-    })));
   }
   
   // Filter by company for ALL roles
   const filtered = employees.filter((e: any) => {
     const empCompany = e.company || e.companyId;
     if (!empCompany) {
-      console.log(`⚠️ Employee ${e.id || e.userId} (${e.name}) has NO company field - excluding`);
-      return false; // Exclude employees without company
+        return false; // Exclude employees without company
     }
     // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
     const included = scope.some(s => s.toLowerCase() === empCompany.toLowerCase());
     if (!included && employees.length <= 10) {
-      console.log(`⚠️ Employee ${e.id || e.userId} (${e.name}) company "${empCompany}" NOT in scope [${scope.join(', ')}] - excluding`);
-    }
+      }
     return included;
   });
   
-  console.log(`✅ filterEmployeesByCompany: User ${userId} (${role}) accessing ${filtered.length}/${employees.length} employees in companies: ${scope.join(', ')}`);
   return filtered;
 }
 
@@ -606,7 +575,7 @@ function handleError(e: any, c: any, context: string = '') {
     }, 500);
   }
   
-  console.log(`${context} error:`, errorMsg, e);
+  console.error(`${context} error:`, errorMsg);
   return c.json({ error: errorMsg }, 500);
 }
 
@@ -669,8 +638,7 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
       if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-      console.log(`Error listing ${prefix}:`, e);
-      return c.json({ error: e.message }, 500);
+          return c.json({ error: e.message }, 500);
     }
   });
 
@@ -713,8 +681,7 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
         updatedAt: new Date().toISOString() 
       };
       await kv.set(`${kvPrefix}${id}`, item);
-      console.log(`✅ Created ${prefix}:${id} with companyId: ${companyId}`);
-      
+          
       // Broadcast real-time update
       const channelName = kvPrefix.replace(':', '');
       await broadcastUpdate(channelName, 'INSERT', id, item);
@@ -723,8 +690,7 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
       if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-      console.log(`Error creating ${prefix}:`, e);
-      return c.json({ error: e.message }, 500);
+          return c.json({ error: e.message }, 500);
     }
   });
 
@@ -795,7 +761,6 @@ app.get(`${PREFIX}/check-setup`, async (c) => {
     const hasSuperAdmin = admins.some((a: any) => a.role === "superadmin");
     return c.json({ hasSuperAdmin, hasAnyAdmin: admins.some((a: any) => ["superadmin", "admin"].includes(a.role)) });
   } catch (e: any) {
-    console.log("check-setup error:", e);
     return c.json({ hasSuperAdmin: false, hasAnyAdmin: false });
   }
 });
@@ -824,7 +789,6 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
       email_confirm: true,
     });
     if (error) {
-      console.log("Setup superadmin auth error:", error);
       return c.json({ error: error.message }, 400);
     }
     const userId = data.user.id;
@@ -839,7 +803,6 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
     });
     return c.json({ success: true, userId });
   } catch (e: any) {
-    console.log("setup-superadmin error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -886,8 +849,7 @@ app.post(`${PREFIX}/company/register`, async (c) => {
 
     // If payment reference provided, verify payment first (pay-first flow)
     if (paymentReference) {
-      console.log('Verifying payment reference:', paymentReference);
-      
+        
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
       if (!paystackSecretKey) {
         return c.json({ error: 'Payment system not configured' }, 500);
@@ -901,7 +863,6 @@ app.post(`${PREFIX}/company/register`, async (c) => {
         
         while (attempts < maxAttempts && !verifyData) {
           attempts++;
-          console.log(`Payment verification attempt ${attempts}/${maxAttempts}...`);
           
           const verifyResponse = await fetch(
             `https://api.paystack.co/transaction/verify/${paymentReference}`,
@@ -915,7 +876,6 @@ app.post(`${PREFIX}/company/register`, async (c) => {
           );
 
           const data = await verifyResponse.json();
-          console.log(`Attempt ${attempts} - Payment verification response:`, JSON.stringify(data));
 
           if (data.status && data.data?.status === 'success') {
             verifyData = data;
@@ -948,7 +908,6 @@ app.post(`${PREFIX}/company/register`, async (c) => {
           paidAt: new Date().toISOString(),
         };
 
-        console.log(`Payment verified successfully: ${paidLicenses} licenses, ${paidAmount} GHS`);
       } catch (paymentError: any) {
         console.error('Payment verification error:', paymentError);
         return c.json({ error: 'Failed to verify payment. Please contact support with reference: ' + paymentReference }, 500);
@@ -972,11 +931,9 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       ...(paymentData && { lastPayment: paymentData }),
     };
     
-    console.log('Creating company record:', companyId);
     await kv.set(`company:${companyId}`, company);
 
     // Create SuperAdmin user in Supabase Auth
-    console.log('Creating SuperAdmin auth user for:', adminEmail);
     const { data: authData, error: authError } = await sb.auth.admin.createUser({
       email: adminEmail.toLowerCase(),
       password,
@@ -992,14 +949,12 @@ app.post(`${PREFIX}/company/register`, async (c) => {
     });
 
     if (authError) {
-      console.log("Company registration auth error:", authError);
       // Clean up company record if user creation failed
       await kv.del(`company:${companyId}`);
       return c.json({ error: authError.message }, 400);
     }
 
     const userId = authData.user.id;
-    console.log('SuperAdmin user created with ID:', userId);
 
     // Create SuperAdmin employee record
     await kv.set(`employee:${userId}`, {
@@ -1016,7 +971,6 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       createdAt: new Date().toISOString(),
     });
 
-    console.log('SuperAdmin employee record created');
 
     // CRITICAL FIX: Create default company-scoped settings for new tenant
     await kv.set(`company-settings:${companyId}`, {
@@ -1053,7 +1007,6 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       updatedAt: new Date().toISOString(),
     });
 
-    console.log('Default company settings created for tenant:', companyId);
 
     // Mark registration as verified if payment was provided
     if (paymentReference) {
@@ -1079,7 +1032,6 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       },
     });
 
-    console.log('Company registration completed successfully for:', companyName);
     
     return c.json({ 
       success: true, 
@@ -1091,14 +1043,12 @@ app.post(`${PREFIX}/company/register`, async (c) => {
         : "Company created successfully. Please sign in to continue."
     });
   } catch (e: any) {
-    console.log("company-registration error:", e);
     return c.json({ error: e.message || "Failed to create company" }, 500);
   }
 });
 
 // --- Initialize Payment for Company Registration (Pay-Before-Account-Creation) ---
 app.post(`${PREFIX}/company/init-payment`, async (c) => {
-  console.log('Init payment endpoint called');
   try {
     const { 
       companyName, companySize, industry, adminName, adminEmail, password,
@@ -1184,7 +1134,6 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
       reference,
     });
   } catch (e: any) {
-    console.log("company-payment-init error:", e);
     return c.json({ error: e.message || "Failed to initialize payment" }, 500);
   }
 });
@@ -1237,7 +1186,6 @@ app.get(`${PREFIX}/company/payment-status/:reference`, async (c) => {
       return c.json({ status: 'pending', paystackStatus: paystackData.data?.status });
     }
   } catch (e: any) {
-    console.log("payment-status-check error:", e);
     return c.json({ status: 'unknown', error: e.message }, 500);
   }
 });
@@ -1284,7 +1232,6 @@ async function createCompanyAccount(registrationData: any) {
     });
 
     if (authError) {
-      console.log("Account creation auth error:", authError);
       await kv.del(`company:${companyId}`);
       return { success: false, error: authError.message };
     }
@@ -1306,7 +1253,6 @@ async function createCompanyAccount(registrationData: any) {
       createdAt: new Date().toISOString(),
     });
     
-    console.log(`✅ Created SuperAdmin account for ${adminEmail} with companyId: ${companyId}, assignedCompanies: [${companyId}]`);
 
     // Log audit event
     await logAudit({
@@ -1326,7 +1272,6 @@ async function createCompanyAccount(registrationData: any) {
       licenses,
     };
   } catch (e: any) {
-    console.log("create-company-account error:", e);
     return { success: false, error: e.message };
   }
 }
@@ -1445,7 +1390,6 @@ app.get(`${PREFIX}/profile`, async (c) => {
     
     // DEBUG: Log tenant isolation info
     const scope = await resolveCompanyScope(user.id);
-    console.log(`🔍 /profile: User ${user.id} (${role}), companyScope: ${scope?.join(', ') || 'NONE'}, kvData.companyId: ${kvData?.companyId}, kvData.assignedCompanies: ${kvData?.assignedCompanies?.join(', ') || 'NONE'}`);
     
     // Regenerate profile image signed URL if file exists
     let profileImageUrl = kvData?.profileImageUrl || "";
@@ -1460,7 +1404,6 @@ app.get(`${PREFIX}/profile`, async (c) => {
           await kv.set(`employee:${user.id}`, { ...kvData, profileImageUrl });
           await kv.set(`file:${user.id}:profile-image`, { ...profileFile, signedUrl: profileImageUrl });
         }
-      } catch (e) { console.log("Profile image URL refresh error:", e); }
     }
     return c.json({
       id: user.id,
@@ -1513,7 +1456,6 @@ app.post(`${PREFIX}/change-password`, async (c) => {
     return c.json({ success: true });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("change-password error:", e.message);
     return c.json({ error: `Password change failed: ${e.message}` }, 500);
   }
 });
@@ -1576,7 +1518,6 @@ app.put(`${PREFIX}/employee/profile`, async (c) => {
     return c.json({ success: true, ...updated });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Profile update error:", e.message);
     return c.json({ error: `Profile update failed: ${e.message}` }, 500);
   }
 });
@@ -1586,21 +1527,17 @@ app.get(`${PREFIX}/profile-change-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     const all = await kv.getByPrefix("profile-change:");
-    console.log(`🔍 /profile-change-requests: User ${user.id} (${role}), total requests: ${all.length}`);
     
     // Employee only sees their own requests
     if (role === "employee") {
       const filtered = all.filter((r: any) => r.userId === user.id);
-      console.log(`📤 Employee ${user.id} sees ${filtered.length} own requests`);
       return c.json(filtered);
     }
     
     // CRITICAL: For superadmin/admin/manager, filter by company scope
     const scope = await resolveCompanyScope(user.id);
-    console.log(`🔒 User ${user.id} company scope:`, scope);
     
     if (!scope?.length) {
-      console.log(`⚠️ No company scope for ${user.id}, returning empty`);
       return c.json([]);
     }
     
@@ -1608,17 +1545,14 @@ app.get(`${PREFIX}/profile-change-requests`, async (c) => {
     const companyEmployees = employees.filter((e: any) => companyMatches(scope, e.companyId) || companyMatches(scope, e.company));
     const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.userId || e.id));
     
-    console.log(`✅ Found ${companyEmployees.length} employees in company, IDs:`, Array.from(companyEmployeeIds).slice(0, 5));
     
     const filtered = all.filter((r: any) => {
       const hasMatch = companyEmployeeIds.has(r.userId);
       if (!hasMatch && all.length < 10) {
-        console.log(`⚠️ Request ${r.id} userId ${r.userId} not in company employee set`);
       }
       return hasMatch;
     });
     
-    console.log(`📤 Returning ${filtered.length} profile change requests for user ${user.id}`);
     return c.json(filtered);
   } catch (e: any) {
     console.error(`❌ Error in /profile-change-requests:`, e);
@@ -1670,14 +1604,11 @@ app.put(`${PREFIX}/profile-change-requests/:id`, async (c) => {
 app.get(`${PREFIX}/users/for-messages`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
-    console.log(`🔍 /users/for-messages called by user ${user.id} with role: "${role}"`);
     
     const allEmployees = await kv.getByPrefix("employee:");
-    console.log(`📊 Total employees in system: ${allEmployees.length}`);
     
     // CRITICAL FIX: ALL roles including SuperAdmins are filtered by company scope
     const filtered = await filterEmployeesByCompany(allEmployees, user.id, role);
-    console.log(`✅ User ${user.id} (${role}) accessing ${filtered.length} company-scoped users for messaging`);
     
     const result = filtered
       .filter((e: any) => e.userId !== user.id)
@@ -1689,7 +1620,6 @@ app.get(`${PREFIX}/users/for-messages`, async (c) => {
         company: e.company || e.companyId || "",
       }));
     
-    console.log(`📤 Returning ${result.length} users for messaging (excluded self)`);
     return c.json(result);
   } catch (e: any) {
     console.error(`❌ Error in /users/for-messages:`, e);
@@ -1727,21 +1657,17 @@ async function ensureBucket() {
     const sb = supabaseAdmin();
     const { data: buckets, error: listErr } = await sb.storage.listBuckets();
     if (listErr) {
-      console.log("ensureBucket listBuckets error:", listErr.message);
       throw new Error(`Storage init failed: ${listErr.message}`);
     }
     const exists = buckets?.some(b => b.name === BUCKET_NAME);
     if (!exists) {
       const { error: createErr } = await sb.storage.createBucket(BUCKET_NAME, { public: false });
       if (createErr) {
-        console.log("ensureBucket createBucket error:", createErr.message);
         throw new Error(`Storage bucket creation failed: ${createErr.message}`);
       }
-      console.log(`Storage bucket '${BUCKET_NAME}' created successfully`);
     }
     bucketReady = true;
   } catch (e: any) {
-    console.log("ensureBucket error:", e.message);
     throw e;
   }
 }
@@ -1764,13 +1690,11 @@ app.post(`${PREFIX}/upload/profile-image`, async (c) => {
     const formData = await c.req.formData();
     const file = formData.get('file');
     if (!file || typeof file === 'string') {
-      console.log("Profile image upload: No file in formData. Keys:", [...formData.keys()]);
       return c.json({ error: "No file provided" }, 400);
     }
     const blob = file as File;
     const arrayBuf = await blob.arrayBuffer();
     const size = arrayBuf.byteLength;
-    console.log(`Profile image upload: file=${blob.name}, size=${size}, type=${blob.type}`);
     if (size === 0) {
       return c.json({ error: "File is empty (0 bytes)" }, 400);
     }
@@ -1794,7 +1718,6 @@ app.post(`${PREFIX}/upload/profile-image`, async (c) => {
         const sbDel = supabaseAdmin();
         await sbDel.storage.from(BUCKET_NAME).remove([existingProfileImage.storagePath]);
       } catch (delErr) {
-        console.log("Old profile image delete warning:", delErr);
       }
     }
     const storagePath = `profiles/${user.id}/avatar.${ext}`;
@@ -1805,12 +1728,10 @@ app.post(`${PREFIX}/upload/profile-image`, async (c) => {
       upsert: true,
     });
     if (uploadErr) {
-      console.log("Profile image storage upload error:", JSON.stringify(uploadErr));
       return c.json({ error: `Upload to storage failed: ${uploadErr.message}` }, 500);
     }
     const { data: urlData, error: urlErr } = await sb.storage.from(BUCKET_NAME).createSignedUrl(storagePath, 60 * 60 * 24 * 365);
     if (urlErr) {
-      console.log("Profile image signed URL error:", JSON.stringify(urlErr));
     }
     const signedUrl = urlData?.signedUrl || '';
     const fileMeta = {
@@ -1828,11 +1749,9 @@ app.post(`${PREFIX}/upload/profile-image`, async (c) => {
     // Also update the employee KV record with the profile image URL
     const updated = { ...kvData, profileImageUrl: signedUrl, updatedAt: new Date().toISOString() };
     await kv.set(`employee:${user.id}`, updated);
-    console.log(`Profile image uploaded successfully for user ${user.id}, URL length: ${signedUrl.length}`);
     return c.json({ ...fileMeta, profileImageUrl: signedUrl }, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Profile image upload error:", e.message, e.stack);
     return c.json({ error: `Profile image upload failed: ${e.message}` }, 500);
   }
 });
@@ -1868,7 +1787,6 @@ app.post(`${PREFIX}/upload/document`, async (c) => {
       upsert: false,
     });
     if (uploadErr) {
-      console.log("Document upload error:", uploadErr);
       return c.json({ error: `Upload failed: ${uploadErr.message}` }, 500);
     }
     const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(storagePath, 60 * 60 * 24 * 365);
@@ -1888,7 +1806,6 @@ app.post(`${PREFIX}/upload/document`, async (c) => {
     return c.json(fileMeta, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Document upload error:", e.message);
     return c.json({ error: `Document upload failed: ${e.message}` }, 500);
   }
 });
@@ -1968,7 +1885,6 @@ app.delete(`${PREFIX}/files/:userId/:fileId`, async (c) => {
     return c.json({ success: true });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("File delete error:", e.message);
     return c.json({ error: `File delete failed: ${e.message}` }, 500);
   }
 });
@@ -1997,7 +1913,6 @@ app.get(`${PREFIX}/public/company-branding`, async (c) => {
       logoUrl: '',
     });
   } catch (e: any) {
-    console.log("Public branding fetch error:", e.message);
     return c.json({});
   }
 });
@@ -2009,7 +1924,6 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
     const scope = await resolveCompanyScope(user.id);
     const companyId = scope?.[0];
     
-    console.log(`🔍 GET /company-settings - User: ${user.id}, Role: ${role}, CompanyId: ${companyId}`);
     
     if (!companyId) {
       console.warn(`⚠️ No company ID found for user ${user.id}`);
@@ -2017,13 +1931,6 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
     }
     
     const settings = await kv.get(`company-settings:${companyId}`);
-    console.log(`🎨 Fetched settings for ${companyId}:`, {
-      hasSettings: !!settings,
-      companyName: settings?.companyName,
-      primaryColor: settings?.primaryColor,
-      hasLogo: !!settings?.logoUrl || !!settings?.logoPath
-    });
-    
     if (!settings) return c.json({});
     
     // Set default currency if not set
@@ -2039,7 +1946,6 @@ app.get(`${PREFIX}/company-settings`, async (c) => {
         const sb = supabaseAdmin();
         const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(settings.logoPath, 60 * 60 * 24 * 7);
         if (urlData?.signedUrl) settings.logoUrl = urlData.signedUrl;
-      } catch (e) { console.log("Logo URL refresh error:", e); }
     }
     return c.json(settings);
   } catch (e: any) {
@@ -2065,18 +1971,12 @@ app.put(`${PREFIX}/superadmin/company-branding`, async (c) => {
     const updated = { ...existing, ...safeBody, companyId, updatedAt: new Date().toISOString() };
     await kv.set(`company-settings:${companyId}`, updated);
     
-    console.log(`🎨 Branding updated for company ${companyId} by SuperAdmin ${user.id}:`, { 
-      companyName: updated.companyName, 
-      primaryColor: updated.primaryColor 
-    });
-    
     // Return with fresh signed URL if logo exists
     if (updated.logoPath) {
       try {
         const sb = supabaseAdmin();
         const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(updated.logoPath, 60 * 60 * 24 * 7);
         if (urlData?.signedUrl) updated.logoUrl = urlData.signedUrl;
-      } catch (e) { console.log("Logo URL refresh on settings save:", e); }
     }
     return c.json(updated);
   } catch (e: any) {
@@ -2108,7 +2008,6 @@ app.put(`${PREFIX}/admin/company-settings`, async (c) => {
         const sb = supabaseAdmin();
         const { data: urlData } = await sb.storage.from(BUCKET_NAME).createSignedUrl(updated.logoPath, 60 * 60 * 24 * 7);
         if (urlData?.signedUrl) updated.logoUrl = urlData.signedUrl;
-      } catch (e) { console.log("Logo URL refresh on settings save:", e); }
     }
     return c.json(updated);
   } catch (e: any) {
@@ -2233,7 +2132,6 @@ app.get(`${PREFIX}/reference-data`, async (c) => {
     
     // CRITICAL: STRICT filter by company scope - return empty if no scope
     if (!companyId) {
-      console.log(`reference-data: User ${user.id} has no companyId scope - returning empty for strict isolation`);
       return c.json({ companies: [], departments: [], branches: [], assets: [], assetCategories: [], paygrades: [], leaveTypes: [], financialYears: [] });
     }
     // CRITICAL FIX: Companies filter should include both direct matches AND companies owned by this tenant
@@ -2262,7 +2160,6 @@ app.get(`${PREFIX}/reference-data`, async (c) => {
     });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("reference-data error:", e.message);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2313,8 +2210,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     }
     
     // ENHANCED: Better subscription validation with multiple format support
-    console.log('=== SUBSCRIPTION DEBUG ===');
-    console.log('Company subscription status check for company:', userCompanyId);
     
     // Check multiple subscription formats
     let subscription = null;
@@ -2346,9 +2241,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       }
     }
     
-    console.log('Subscription status:', subscriptionStatus);
-    console.log('Purchased licenses:', purchasedLicenses);
-    console.log('========================');
     
     // IMPORTANT: Allow SuperAdmin to create initial users even without subscription
     // This is necessary for setting up the company and testing before purchasing
@@ -2401,7 +2293,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       // SuperAdmin without subscription can create up to 5 users for testing
       effectiveLicenseLimit = 5;
       isTestMode = true;
-      console.log('⚠️ SuperAdmin creating user without subscription - allowing up to 5 users');
     } else if (isAdmin && !isSuperAdmin) {
       // Admin must have available licenses - no test mode
       if (usedLicenses >= purchasedLicenses) {
@@ -2415,7 +2306,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       }
     }
     
-    console.log('License check - Used:', usedLicenses, 'Effective Limit:', effectiveLicenseLimit, 'Limited Mode:', isTestMode);
     
     if (usedLicenses >= effectiveLicenseLimit) {
       const message = isTestMode 
@@ -2434,7 +2324,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
     const tempPassword = generateTempPassword();
     const sb = supabaseAdmin();
     
-    console.log('Creating user with email:', email, 'companyId:', userCompanyId, 'company:', company.name);
 
     const { data, error } = await sb.auth.admin.createUser({
       email: email.toLowerCase(), // Normalize email to lowercase
@@ -2579,17 +2468,9 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
             `,
           }),
         });
-        console.log(`✅ Welcome email sent to ${email} with temporary password`);
       } else {
         // Fallback: Log to console for development
-        console.log(`\n${'='.repeat(80)}`);
-        console.log(`📨 NEW USER CREDENTIALS FOR: ${email}`);
-        console.log(`Name: ${name}`);
-        console.log(`Role: ${role}`);
-        console.log(`Temporary Password: ${tempPassword}`);
-        console.log(`Company: ${company.name}`);
-        console.log(`⚠️  User must change password on first login`);
-        console.log(`${'='.repeat(80)}\n`);
+
       }
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
@@ -2603,7 +2484,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("create user error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2622,7 +2502,6 @@ app.post(`${PREFIX}/users/create`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("admin create user error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2632,7 +2511,6 @@ app.get(`${PREFIX}/users`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     const allEmployees = await kv.getByPrefix("employee:");
-    console.log(`🔍 /users called by ${user.id} (${role}), total employees: ${allEmployees.length}`);
     
     // Employees can only see themselves
     if (role === "employee") {
@@ -2644,7 +2522,6 @@ app.get(`${PREFIX}/users`, async (c) => {
     
     // If no scope, return EMPTY - strict isolation (no company = no data)
     if (!scope || scope.length === 0) {
-      console.log(`⚠️ /users: User ${user.id} (${role}) has no company scope - returning empty`);
       return c.json([]);
     }
     
@@ -2654,7 +2531,6 @@ app.get(`${PREFIX}/users`, async (c) => {
       return companyMatches(scope, empCompany);
     });
     
-    console.log(`✅ /users: User ${user.id} (${role}) accessing ${filtered.length} users in companies: ${scope.join(', ')}`);
     
     // Admin cannot see superadmins; admin only sees users they manage (or untagged users for backward compat)
     if (role === "admin") {
@@ -2669,7 +2545,6 @@ app.get(`${PREFIX}/users`, async (c) => {
     return c.json(filtered);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("list users error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2695,7 +2570,6 @@ app.get(`${PREFIX}/users/for-meetings`, async (c) => {
     return c.json(result);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("list users for meetings error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2716,7 +2590,6 @@ app.get(`${PREFIX}/my-reviews`, async (c) => {
     return c.json(myReviews);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("my reviews error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2736,7 +2609,6 @@ app.get(`${PREFIX}/my-tasks`, async (c) => {
     return c.json(myTasks);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("my tasks error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2773,7 +2645,6 @@ app.get(`${PREFIX}/my-onboarding`, async (c) => {
     return c.json(myItems);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("my onboarding error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2818,7 +2689,6 @@ app.get(`${PREFIX}/my-training`, async (c) => {
     return c.json(myPrograms);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("my training error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2839,7 +2709,6 @@ app.get(`${PREFIX}/my-questionnaires`, async (c) => {
     return c.json(myFeedback);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("my questionnaires error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2881,7 +2750,6 @@ app.get(`${PREFIX}/my-disciplinary`, async (c) => {
     return c.json(myCases);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("my disciplinary error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2901,7 +2769,6 @@ app.get(`${PREFIX}/my-compliance`, async (c) => {
     return c.json(myItems);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("my compliance error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -2987,7 +2854,6 @@ app.post(`${PREFIX}/admin/request-user-create`, async (c) => {
     return c.json({ success: true, requestId, message: 'Request sent to SuperAdmin' });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    console.log('request-user-create error:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3030,7 +2896,6 @@ app.post(`${PREFIX}/admin/request-user-update`, async (c) => {
     return c.json({ success: true, requestId, message: 'Update request sent to SuperAdmin' });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    console.log('request-user-update error:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3073,7 +2938,6 @@ app.post(`${PREFIX}/manager/request-user-update`, async (c) => {
     return c.json({ success: true, requestId, message: 'Update request sent to Admin for approval' });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    console.log('manager request-user-update error:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3100,7 +2964,6 @@ app.get(`${PREFIX}/superadmin/pending-approvals`, async (c) => {
     ));
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    console.log('pending-approvals error:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3254,7 +3117,6 @@ app.post(`${PREFIX}/superadmin/approval/:requestId/:action`, async (c) => {
     return c.json({ error: 'Invalid action' }, 400);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    console.log('approval action error:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3317,7 +3179,6 @@ app.put(`${PREFIX}/users/:userId`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("update user error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3349,13 +3210,11 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
       return c.json({ error: "Cannot delete user from another company" }, 403);
     }
     
-    console.log(`🗑️ Deleting user: ${targetEmail} (${userId})`);
     
     // Delete from Supabase Auth first (this allows email reuse)
     const sb = supabaseAdmin();
     try {
       await sb.auth.admin.deleteUser(userId);
-      console.log(`✅ Deleted from Supabase Auth: ${targetEmail}`);
     } catch (authError: any) {
       console.error(`Error deleting from Supabase Auth:`, authError);
       // Continue with KV deletion even if auth deletion fails
@@ -3379,7 +3238,6 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
     if (targetCompany) {
       try {
         await recalculateCompanyStats(targetCompany);
-        console.log(`✅ Company stats recalculated after deleting ${targetEmail}`);
       } catch (statsError) {
         console.error('Error recalculating stats after deletion:', statsError);
       }
@@ -3414,12 +3272,10 @@ app.delete(`${PREFIX}/users/:userId`, async (c) => {
     // Broadcast real-time update to dashboard
     await broadcastUpdate('users', 'DELETE', userId, { userId, email: targetEmail });
     
-    console.log(`✅ User deletion complete: ${targetEmail}`);
     return c.json({ success: true, message: `User ${targetEmail} has been permanently deleted. Email can now be reused.` });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("delete user error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3484,36 +3340,30 @@ app.get(`${PREFIX}/deletion-requests`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     let all = await kv.getByPrefix("deletion-request:");
-    console.log(`🔍 /deletion-requests: User ${user.id} (${role}), total requests: ${all.length}`);
     
     // CRITICAL FIX: Filter deletion requests by company for multi-tenant isolation
     if (role === "superadmin" || role === "admin") {
       // SuperAdmin/Admin see deletion requests for employees in their company only
       const scope = await resolveCompanyScope(user.id);
-      console.log(`🔒 User ${user.id} company scope:`, scope);
       
       if (scope?.length) {
         const employees = await kv.getByPrefix("employee:");
         const companyEmployees = employees.filter((e: any) => companyMatches(scope, e.companyId) || companyMatches(scope, e.company));
         const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.id || e.userId));
         
-        console.log(`✅ Found ${companyEmployees.length} employees in company for deletion requests`);
         
         all = all.filter((r: any) => {
           const hasMatch = companyEmployeeIds.has(r.targetUserId);
           if (!hasMatch && all.length < 10) {
-            console.log(`⚠️ Deletion request ${r.id} targetUserId ${r.targetUserId} not in company employee set`);
           }
           return hasMatch;
         });
         
-        console.log(`📤 Returning ${all.length} deletion requests after company filtering`);
       }
       return c.json(all.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     }
     
     const filtered = all.filter((r: any) => r.requestedBy === user.id);
-    console.log(`📤 Manager/non-superadmin ${user.id} sees ${filtered.length} own deletion requests`);
     return c.json(filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   } catch (e: any) {
     console.error(`❌ Error in /deletion-requests:`, e);
@@ -3541,7 +3391,6 @@ app.put(`${PREFIX}/deletion-requests/:id`, async (c) => {
       const targetCompany = target?.companyId || target?.company;
       await kv.del(`employee:${request.targetUserId}`);
       const sb = supabaseAdmin();
-      try { await sb.auth.admin.deleteUser(request.targetUserId); } catch (e) { console.log("Auth delete err:", e); }
       // CRITICAL: Only notify same-company employees
       const allEmployees = await kv.getByPrefix("employee:");
       const companyEmps = targetCompany ? allEmployees.filter((e: any) => e.companyId === targetCompany || e.company === targetCompany) : [];
@@ -3675,7 +3524,6 @@ app.post(`${PREFIX}/superadmin/delete-account`, async (c) => {
     const { deleteAccountPhrase } = await c.req.json();
     if (deleteAccountPhrase !== "DELETE MY ACCOUNT") return c.json({ error: "Type 'DELETE MY ACCOUNT' to confirm" }, 400);
     
-    console.log(`⚠️  SuperAdmin ${caller.email} is deleting their account and all company data`);
     
     // CRITICAL: Delete ALL data belonging to the caller's company
     const callerScope = await resolveCompanyScope(caller.id);
@@ -3729,14 +3577,12 @@ app.post(`${PREFIX}/superadmin/delete-account`, async (c) => {
       await kv.del(`employee:${uid}`);
       try { 
         await sb.auth.admin.deleteUser(uid);
-        console.log(`Deleted user: ${emp.email}`);
       } catch (e) {
         console.error(`Failed to delete auth user ${emp.email}:`, e);
       }
       deleted++;
     }
     
-    console.log(`✅ Account deletion complete. ${deleted} records deleted. License cancelled.`);
     
     return c.json({ 
       success: true, 
@@ -3813,7 +3659,6 @@ app.post(`${PREFIX}/superadmin/asset`, async (c) => {
     const itemWithCompany = await ensureCompanyId(body, user.id);
     const item = { ...itemWithCompany, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     await kv.set(`asset:${id}`, item);
-    console.log(`✅ Created asset ${id} with companyId: ${item.companyId}`);
     return c.json(item, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -3851,7 +3696,6 @@ app.get(`${PREFIX}/superadmin/asset`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log('Error listing superadmin/asset:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -3931,7 +3775,6 @@ app.get(`${PREFIX}/admin/assets`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log('Error listing admin/assets:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -4006,7 +3849,6 @@ app.post(`${PREFIX}/superadmin/meeting`, async (c) => {
     const itemWithCompany = await ensureCompanyId(body, user.id);
     const item = { ...itemWithCompany, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     await kv.set(`meeting:${id}`, item);
-    console.log(`✅ Created meeting ${id} with companyId: ${item.companyId}`);
     return c.json(item, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -4051,10 +3893,8 @@ app.get(`${PREFIX}/superadmin/company`, async (c) => {
         company.companyId === superAdminCompany || // Company owned by this tenant
         company.company === superAdminCompany // Legacy field compatibility
       );
-      console.log(`SuperAdmin ${user.id} accessing company data - filtered to tenant: ${superAdminCompany}, found ${companies.length} companies`);
     } else {
       // If SuperAdmin has no company assignment, return empty array
-      console.log(`SuperAdmin ${user.id} has no company assignment - returning empty`);
       companies = [];
     }
     
@@ -4085,7 +3925,6 @@ app.get(`${PREFIX}/superadmin/company`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log('Error listing companies with licenses:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -4229,7 +4068,6 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
     const companyId = body.companyId || body.company || (await getCompanyId(user.id));
     // SuperAdmins may not have a company scope; allow creation with just companyName
     if (!companyId) {
-      console.log(`SuperAdmin ${user.id} has no company scope — creating job posting with companyName only`);
     }
     // Auto-populate companyName from company record if not provided
     const companyName = body.companyName || (companyId ? await resolveCompanyName(companyId) : '') || '';
@@ -4514,7 +4352,6 @@ app.get(`${PREFIX}/leave-types`, async (c) => {
     });
     return c.json(filtered);
   } catch (e: any) {
-    console.log('Leave types fetch error:', e.message);
     return c.json([]);
   }
 });
@@ -4533,7 +4370,6 @@ app.get(`${PREFIX}/holidays`, async (c) => {
     });
     return c.json(filtered);
   } catch (e: any) {
-    console.log('Holidays fetch error:', e.message);
     return c.json([]);
   }
 });
@@ -4691,7 +4527,6 @@ app.post(`${PREFIX}/upload/company-logo`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("Company logo upload error:", e.message);
     return c.json({ error: `Logo upload failed: ${e.message}` }, 500);
   }
 });
@@ -4717,7 +4552,6 @@ app.delete(`${PREFIX}/superadmin/remove-company-logo`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("Remove company logo error:", e.message);
     return c.json({ error: `Failed to remove logo: ${e.message}` }, 500);
   }
 });
@@ -4875,11 +4709,9 @@ app.get(`${PREFIX}/reports/users`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
     const allEmployees = await kv.getByPrefix("employee:");
-    console.log(`🔒 TENANT ISOLATION: /reports/users called by ${user.id} (${role}), total employees in system: ${allEmployees.length}`);
     
     // CRITICAL: Filter by company for multi-tenant isolation
     const employees = await filterEmployeesByCompany(allEmployees, user.id, role);
-    console.log(`✅ TENANT ISOLATION: User ${user.id} can see ${employees.length} employees after filtering`);
     
     const attendance = await kv.getByPrefix("attendance:");
     // Flatten attendance: some records are stored as arrays (company-based) and some as objects (user-based)
@@ -4912,7 +4744,6 @@ app.get(`${PREFIX}/reports/users`, async (c) => {
       return { userId: empId, name: e.name, email: e.email, role: e.role, department: e.department, company: e.company, position: e.position, status: e.status, phone: e.phone, attendanceDays: empAtt.length, totalHoursWorked: totalHoursWorked.toFixed(1), joinDate: e.createdAt };
     });
     
-    console.log(`📤 Returning ${report.length} employee reports with company isolation enforced`);
     return c.json(report);
   } catch (e: any) { 
     console.error(`❌ Error in /reports/users:`, e);
@@ -4926,11 +4757,9 @@ app.get(`${PREFIX}/reports/attendance`, async (c) => {
   try {
     const { user, role } = await requireAdminOrAbove(c);
     const allEmployees = await kv.getByPrefix("employee:");
-    console.log(`🔒 TENANT ISOLATION: /reports/attendance called by ${user.id} (${role})`);
     
     // CRITICAL: Filter by company for multi-tenant isolation
     const filteredEmployees = await filterEmployeesByCompany(allEmployees, user.id, role);
-    console.log(`✅ TENANT ISOLATION: User ${user.id} can see ${filteredEmployees.length} employees for attendance`);
     
     const allowedUserIds = new Set(filteredEmployees.map((e: any) => e.userId || e.id));
     const empMap: Record<string, string> = {};
@@ -4938,7 +4767,6 @@ app.get(`${PREFIX}/reports/attendance`, async (c) => {
     const attendance = await kv.getByPrefix("attendance:");
     const filteredAttendance = attendance.filter((a: any) => allowedUserIds.has(a.userId));
     
-    console.log(`📤 Returning ${filteredAttendance.length} attendance records after tenant isolation`);
     const report = filteredAttendance.map((a: any) => ({ ...a, employeeName: empMap[a.userId] || a.userId })).sort((a: any, b: any) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
     return c.json(report);
   } catch (e: any) { 
@@ -5154,7 +4982,6 @@ app.get(`${PREFIX}/training-programs`, async (c) => {
     
     return c.json(allTrainings.filter((t: any) => t.companyId === companyId));
   } catch (e: any) {
-    console.log('Get training programs error:', e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -5364,7 +5191,6 @@ app.post(`${PREFIX}/attendance/batch-auto-clockout`, async (c) => {
     return c.json({ processed, clockOutTime, message: `Auto clocked out ${processed} user(s)` });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Batch auto-clockout error:", e.message);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -5391,7 +5217,6 @@ app.post(`${PREFIX}/attendance/auto-clock-in`, async (c) => {
     return c.json(record, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Auto clock-in error:", e.message);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -5411,7 +5236,6 @@ app.post(`${PREFIX}/attendance/auto-pause`, async (c) => {
     return c.json(updated);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Auto pause error:", e.message);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -5434,7 +5258,6 @@ app.post(`${PREFIX}/attendance/auto-clock-out`, async (c) => {
     return c.json(updated);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Auto clock-out error:", e.message);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -5466,11 +5289,9 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
     }
     
     // Log the session end
-    console.log(`Session ended for ${userName} (${userId}): ${logoutType}, Auto clock-out: ${wasAutoClockedOut}`);
     
     return c.json({ success: true });
   } catch (e: any) {
-    console.log("Logout report error:", e.message);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -5586,7 +5407,6 @@ app.post(`${PREFIX}/attendance/clock-in`, async (c) => {
     return c.json(record, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Clock-in error:", e.message);
     return c.json({ error: `Clock-in failed: ${e.message}` }, 500);
   }
 });
@@ -5630,7 +5450,6 @@ app.post(`${PREFIX}/attendance/clock-out`, async (c) => {
     return c.json(updated);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Clock-out error:", e.message);
     return c.json({ error: `Clock-out failed: ${e.message}` }, 500);
   }
 });
@@ -6046,7 +5865,6 @@ app.post(`${PREFIX}/superadmin/approve-hiring`, async (c) => {
       return c.json({ success: true, message: "Hiring request rejected" });
     }
   } catch (e: any) {
-    console.log('Approve hiring error:', e);
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
     return c.json({ error: e.message }, 500);
@@ -6391,7 +6209,6 @@ app.post(`${PREFIX}/backup/restore`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("Restore error:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -6429,7 +6246,6 @@ app.get(`${PREFIX}/audit-logs`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("Error fetching audit logs:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -6464,7 +6280,6 @@ app.get(`${PREFIX}/audit-logs/user/:userId`, async (c) => {
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
     if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-    console.log("Error fetching user audit logs:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -6491,7 +6306,6 @@ app.post(`${PREFIX}/audit-logs`, async (c) => {
     return c.json({ success: true });
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-    console.log("Error creating audit log:", e);
     return c.json({ error: e.message }, 500);
   }
 });
@@ -6500,10 +6314,8 @@ app.post(`${PREFIX}/audit-logs`, async (c) => {
 app.onError((err, c) => {
   const msg = err?.message || "";
   if (msg.includes("EPIPE") || msg.includes("broken pipe")) {
-    console.log("Suppressed broken pipe error");
     return c.json({ error: "connection closed" }, 499);
   }
-  console.log("Unhandled server error:", err);
   return c.json({ error: "Internal server error" }, 500);
 });
 
@@ -7179,7 +6991,6 @@ app.post(`${PREFIX}/subscription/webhook`, async (c) => {
         
         await kv.set(`subscription:${pendingLicense.userId}`, subscription);
         await kv.del(`pending-license:${reference}`);
-        console.log('Licenses added via webhook for user:', pendingLicense.userId);
         return c.json({ status: 'success' });
       }
       
@@ -7213,7 +7024,6 @@ app.post(`${PREFIX}/subscription/webhook`, async (c) => {
         
         await kv.set(`subscription:${pendingSubscription.userId}`, subscription);
         await kv.del(`pending-subscription:${reference}`);
-        console.log('Subscription activated via webhook:', subscription);
       }
     }
     
@@ -7312,7 +7122,6 @@ app.put(`${PREFIX}/companies/:id/currency`, async (c) => {
       await kv.set(`company:${companyId}`, company);
     }
     
-    console.log(`💱 Currency updated to ${settings.currencyCode} (${settings.currencySymbol}) for company ${companyId} by user ${user.id}`);
     
     return c.json({ 
       success: true, 
@@ -7333,12 +7142,10 @@ app.get(`${PREFIX}/departments`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     let departments = await kv.getByPrefix('department:');
-    console.log(`🔒 TENANT ISOLATION: /departments called by ${user.id} (${role}), total: ${departments.length}`);
     
     // CRITICAL FIX: ALL roles including SuperAdmins are filtered by company scope
     const scope = await resolveCompanyScope(user.id);
     if (!scope?.length) {
-      console.log(`⚠️ User ${user.id} has no company scope, returning empty`);
       return c.json([]);
     }
     departments = departments.filter((d: any) => {
@@ -7347,7 +7154,6 @@ app.get(`${PREFIX}/departments`, async (c) => {
       return companyMatches(scope, dCompany);
     });
     
-    console.log(`✅ /departments: Returning ${departments.length} departments for companies: ${scope.join(', ')}`);
     return c.json(departments || []);
   } catch (e: any) {
     console.error(`❌ Error in /departments:`, e);
@@ -7380,12 +7186,10 @@ app.get(`${PREFIX}/payroll-runs`, async (c) => {
   try {
     const { user, role } = await requireManagerOrAbove(c);
     let payrollRuns = await kv.getByPrefix('payroll-run:');
-    console.log(`🔒 TENANT ISOLATION: /payroll-runs called by ${user.id} (${role}), total: ${payrollRuns.length}`);
     
     // CRITICAL FIX: ALL roles including SuperAdmins are filtered by company scope
     const scope = await resolveCompanyScope(user.id);
     if (!scope?.length) {
-      console.log(`⚠️ User ${user.id} has no company scope, returning empty`);
       return c.json([]);
     }
     payrollRuns = payrollRuns.filter((p: any) => {
@@ -7394,7 +7198,6 @@ app.get(`${PREFIX}/payroll-runs`, async (c) => {
       return companyMatches(scope, pCompany);
     });
     
-    console.log(`✅ /payroll-runs: Returning ${payrollRuns.length} runs for companies: ${scope.join(', ')}`);
     return c.json(payrollRuns || []);
   } catch (e: any) {
     console.error(`❌ Error in /payroll-runs:`, e);
@@ -9021,17 +8824,13 @@ app.get(`${PREFIX}/subscription/verify-license-upgrade`, async (c) => {
 // AI Assistant endpoint (Google Gemini)
 app.post(`${PREFIX}/ai-assistant`, async (c) => {
   try {
-    console.log('AI Assistant endpoint called');
-    console.log('Authorization header:', c.req.header('Authorization')?.substring(0, 30) + '...');
     
     // Try to authenticate
     let authUser;
     try {
       const authResult = await requireAuth(c);
       authUser = authResult.user;
-      console.log('AI Assistant: User authenticated:', authUser?.id);
     } catch (authError: any) {
-      console.log('AI Assistant: Auth error:', authError.message);
       return c.json({ error: 'Authentication required' }, 401);
     }
     
@@ -9041,24 +8840,19 @@ app.post(`${PREFIX}/ai-assistant`, async (c) => {
       const body = await c.req.json();
       message = body.message;
       history = body.history;
-      console.log('AI Assistant: Message received, length:', message?.length || 0);
     } catch (parseError: any) {
-      console.log('AI Assistant: JSON parse error:', parseError.message);
       return c.json({ error: 'Invalid request body' }, 400);
     }
     
     if (!message || typeof message !== 'string') {
-      console.log('AI Assistant: Invalid message format');
       return c.json({ error: 'Message is required' }, 400);
     }
     
     const apiKey = Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) {
-      console.log('AI Assistant error: GEMINI_API_KEY not configured');
       return c.json({ error: 'Blumebyte is not configured. Please contact your administrator.' }, 500);
     }
     
-    console.log('AI Assistant: API key configured');
     
     // Build conversation context from history
     const conversationHistory = (history || []).map((msg: any) => ({
@@ -9096,7 +8890,6 @@ Guidelines:
 Current user question: ${message}`;
     
     try {
-      console.log('AI Assistant: Making request to Gemini API');
       
       // Call Google Gemini API
       const geminiResponse = await fetch(
@@ -9146,16 +8939,13 @@ Current user question: ${message}`;
         }
       );
       
-      console.log('AI Assistant: Gemini API response status:', geminiResponse.status);
       
       if (!geminiResponse.ok) {
         // Try to get error details from Gemini
         let errorBody = '';
         try {
           errorBody = await geminiResponse.text();
-          console.log('AI Assistant: Gemini API error response:', errorBody);
         } catch (e) {
-          console.log('AI Assistant: Could not read error body');
         }
         
         // Provide specific error messages based on status code
@@ -9173,7 +8963,6 @@ Current user question: ${message}`;
           errorDetails = `Bad request: ${errorBody.substring(0, 200)}`;
         }
         
-        console.log('AI Assistant: Returning error to client:', { errorMessage, errorDetails, statusCode: geminiResponse.status });
         
         return c.json({ 
           error: errorMessage,
@@ -9184,7 +8973,6 @@ Current user question: ${message}`;
       }
       
       const data = await geminiResponse.json();
-      console.log('AI Assistant: Gemini API response structure:', JSON.stringify(data).substring(0, 200));
       
       // Extract response from Gemini
       const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I apologize, but I could not generate a response. Please try again.';
@@ -9192,7 +8980,6 @@ Current user question: ${message}`;
       return c.json({ response: aiResponse });
       
     } catch (fetchError: any) {
-      console.log('AI Assistant: Fetch error:', fetchError.message, fetchError.stack);
       return c.json({ 
         error: 'Failed to communicate with Blumebyte. Please try again.',
         details: fetchError.message 
@@ -9200,7 +8987,6 @@ Current user question: ${message}`;
     }
     
   } catch (e: any) {
-    console.log('AI Assistant: General error:', e.message, e.stack);
     return handleError(e, c, 'ai-assistant');
   }
 });
@@ -9765,8 +9551,7 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
         });
         if (emailRes.ok) {
           emailSent = true;
-          console.log(`✅ 2FA code sent to ${email}`);
-        } else {
+            } else {
           const errBody = await emailRes.text();
           console.error(`Failed to send 2FA email: ${emailRes.status} ${errBody}`);
         }
@@ -9777,8 +9562,7 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
 
     if (!emailSent) {
       // Fallback: log to console when email service is not configured
-      console.log(`\n2FA code for ${email}: ${code} (valid 10 minutes)\n`);
-    }
+      }
 
     return c.json({ 
       success: true, 
@@ -9851,7 +9635,6 @@ app.post(`${PREFIX}/auth/2fa/verify-code`, async (c) => {
       },
     });
 
-    console.log(`2FA verified and enabled for ${email}`);
 
     return c.json({ 
       success: true, 
@@ -9932,7 +9715,6 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
     // Generate company ID
     const companyId = `company_${crypto.randomUUID()}`;
 
-    console.log(`Creating company for OAuth user: ${email}, Company: ${companyName}`);
 
     // Create company record
     const company = {
@@ -9982,7 +9764,6 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
       },
     });
 
-    console.log(`✅ OAuth company created successfully: ${companyId} for user ${email}`);
 
     return c.json({
       success: true,
@@ -10004,7 +9785,6 @@ app.post(`${PREFIX}/oauth/create-company`, async (c) => {
 app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
   try {
     const { user: caller } = await requireSuperAdmin(c);
-    console.log(`🔧 Running company scope fix for SuperAdmin ${caller.email}`);
     
     // Get the caller's employee record
     const empRecord = await kv.get(`employee:${caller.id}`);
@@ -10014,7 +9794,6 @@ app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
     
     // Check if assignedCompanies is already set
     if (empRecord.assignedCompanies?.length) {
-      console.log(`✅ assignedCompanies already set: ${empRecord.assignedCompanies}`);
       return c.json({ 
         success: true, 
         message: 'Company scope already configured',
@@ -10028,7 +9807,6 @@ app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
       return c.json({ error: 'No company found for this SuperAdmin' }, 400);
     }
     
-    console.log(`🔧 Setting assignedCompanies to [${companyId}]`);
     
     // Update KV store
     empRecord.assignedCompanies = [companyId];
@@ -10044,7 +9822,6 @@ app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
       }
     });
     
-    console.log(`✅ Company scope fixed for ${caller.email}: assignedCompanies = [${companyId}]`);
     
     return c.json({ 
       success: true, 
@@ -10065,11 +9842,9 @@ app.post(`${PREFIX}/superadmin/fix-company-scope`, async (c) => {
 app.post(`${PREFIX}/admin/migrate-company-keys`, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
-    console.log('🔧 Running company key migration requested by:', user.email);
     
     const result = await migrateCompanyKeys();
     
-    console.log('✅ Company key migration complete:', result);
     
     return c.json({
       success: true,
@@ -10093,7 +9868,6 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
       return c.json({ error: 'Email is required' }, 400);
     }
     
-    console.log(`📧 Password reset requested for: ${email}`);
     
     // Find user by email
     const allEmployees = await kv.getByPrefix('employee:');
@@ -10101,7 +9875,6 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     
     if (!employee) {
       // Don't reveal if email exists or not for security
-      console.log(`⚠️  Email not found: ${email}, but returning success for security`);
       return c.json({ success: true, message: 'If the email exists, a reset link has been sent' });
     }
     
@@ -10122,7 +9895,6 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     const frontendUrl = Deno.env.get('FRONTEND_URL') || requestOrigin || FRONTEND_FALLBACK_URL;
     const resetLink = `${frontendUrl}/password-reset?token=${resetToken}`;
     
-    console.log(`✅ Password reset token created for ${email}, expires at ${expiresAt.toISOString()}`);
     
     // Send password reset email via Resend
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
@@ -10158,7 +9930,6 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
         });
         if (emailRes.ok) {
           emailSent = true;
-          console.log(`✅ Password reset email sent to ${employee.email}`);
         } else {
           const errBody = await emailRes.text();
           console.error(`Failed to send password reset email: ${emailRes.status} ${errBody}`);
@@ -10169,12 +9940,8 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     }
 
     if (!emailSent) {
-      // Fallback: log to console when email service is not configured
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`📨 PASSWORD RESET LINK FOR: ${email}`);
-      console.log(`${resetLink}`);
-      console.log(`Valid until: ${expiresAt.toLocaleString()}`);
-      console.log(`${'='.repeat(80)}\n`);
+      // Email service not configured — password reset link could not be delivered
+      console.error(`Password reset email could not be sent to ${email}. Please configure an email service.`);
     }
     
     // Log audit event
@@ -10271,7 +10038,6 @@ app.post(`${PREFIX}/auth/reset-password`, async (c) => {
     // Delete the used reset token
     await kv.del(`password-reset:${token}`);
     
-    console.log(`✅ Password reset successful for user ${resetData.email}`);
     
     // Log audit event
     await logAudit({
@@ -10409,7 +10175,6 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
       return GLOBAL_VISIBILITY.has(vt) && ACTIVE_STATUSES.has((j.status || '').toLowerCase());
     });
 
-    console.log(`Public jobs: ${all.length} total job-postings, ${eligible.length} eligible public ones`);
 
     // Build public job objects using Promise.allSettled so one bad company-name
     // lookup never wipes the entire result set.
@@ -10444,7 +10209,6 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
       .map(r => r.value);
 
     publicJobs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    console.log(`Public jobs: returning ${publicJobs.length} jobs`);
     return c.json(publicJobs);
   } catch (e: any) {
     console.error('Public jobs error:', e);
@@ -11198,7 +10962,6 @@ app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
 
 // --- Catch-all 404 handler (returns JSON for better debugging) ---
 app.notFound((c) => {
-  console.log(`404 Not Found: ${c.req.method} ${c.req.url}`);
   return c.json({ error: `Route not found: ${c.req.method} ${c.req.path}` }, 404);
 });
 

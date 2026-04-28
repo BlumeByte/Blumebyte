@@ -50,7 +50,6 @@ export default function CompanySignup() {
   useEffect(() => {
     const checkPaystack = () => {
       if (typeof (window as any).PaystackPop !== 'undefined') {
-        console.log('Paystack script loaded successfully');
         setPaystackLoaded(true);
         return true;
       }
@@ -60,17 +59,14 @@ export default function CompanySignup() {
     // Check immediately
     if (checkPaystack()) return;
 
-    console.log('Waiting for Paystack script to load...');
 
     // Try to load the script dynamically if not already loaded
     const existingScript = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]');
     if (!existingScript) {
-      console.log('Dynamically loading Paystack script...');
       const script = document.createElement('script');
       script.src = 'https://js.paystack.co/v1/inline.js';
       script.async = true;
       script.onload = () => {
-        console.log('Paystack script loaded dynamically');
         setPaystackLoaded(true);
       };
       script.onerror = () => {
@@ -114,17 +110,14 @@ export default function CompanySignup() {
     const fetchPublicKey = async () => {
       try {
         const url = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/paystack/public-key`;
-        console.log('Fetching Paystack public key from:', url);
         
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${publicAnonKey}` },
         });
         
-        console.log('Response status:', response.status);
         
         // If not successful, use fallback immediately
         if (!response.ok) {
-          console.log('Server endpoint not available yet (status:', response.status, '), using fallback...');
           handlePublicKeyFallback();
           return;
         }
@@ -133,7 +126,6 @@ export default function CompanySignup() {
         
         // Check if response is JSON
         if (!contentType || !contentType.includes('application/json')) {
-          console.log('Server returned non-JSON response, using fallback...');
           handlePublicKeyFallback();
           return;
         }
@@ -141,7 +133,6 @@ export default function CompanySignup() {
         const data = await response.json();
         
         if (data.publicKey) {
-          console.log('Paystack public key loaded successfully from server');
           setPaystackPublicKey(data.publicKey);
           // Also store it for future use
           localStorage.setItem('paystack_public_key', data.publicKey);
@@ -151,7 +142,6 @@ export default function CompanySignup() {
         }
       } catch (error: any) {
         console.error('Error fetching Paystack public key:', error.message);
-        console.log('Using fallback method to get Paystack public key...');
         handlePublicKeyFallback();
       }
     };
@@ -160,7 +150,6 @@ export default function CompanySignup() {
       // Check localStorage first
       const storedKey = localStorage.getItem('paystack_public_key');
       if (storedKey && (storedKey.startsWith('pk_test_') || storedKey.startsWith('pk_live_'))) {
-        console.log('Using Paystack public key from localStorage');
         setPaystackPublicKey(storedKey);
         return;
       }
@@ -282,7 +271,6 @@ export default function CompanySignup() {
       // Initialize Paystack payment directly (using inline popup)
       const amountInKobo = Math.round(totalAmountGHS * 100);
       
-      console.log('Initializing Paystack with key:', paystackPublicKey.substring(0, 10) + '...');
       
       const paystackHandler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
@@ -299,7 +287,6 @@ export default function CompanySignup() {
         },
         callback: function(response: any) {
           // Use regular function (not async) as Paystack requires
-          console.log('Payment successful. Reference:', response.reference);
           setPendingReference(response.reference);
           setPaymentWindowOpened(true);
           
@@ -310,7 +297,6 @@ export default function CompanySignup() {
           }, 100);
         },
         onClose: function() {
-          console.log('Payment window closed');
           if (!pendingReference) {
             toast.warning('Payment was cancelled');
             setLoading(false);
@@ -334,7 +320,6 @@ export default function CompanySignup() {
     setPollingStatus('Payment received! Creating your account...');
     
     try {
-      console.log('Creating company account with payment reference:', paymentReference);
       toast.info('Verifying payment and setting up your account...');
       
       const response = await fetch(
@@ -374,7 +359,6 @@ export default function CompanySignup() {
         throw new Error(errorMessage + ` (Payment reference: ${paymentReference})`);
       }
 
-      console.log('Company created successfully:', data);
       toast.success(`🎉 Success! Your company "${formData.companyName}" has been created with ${data.licenses || formData.licenses} licenses!`, {
         duration: 6000,
       });

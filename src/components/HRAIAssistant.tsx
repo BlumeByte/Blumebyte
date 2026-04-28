@@ -121,7 +121,6 @@ export function HRAIAssistant() {
 
     try {
       const token = await getToken();
-      console.log('AI Assistant: Token retrieved:', token ? `${token.substring(0, 20)}...` : 'null');
       
       if (!token) {
         toast.error('Please sign in to use Blumebyte');
@@ -149,16 +148,6 @@ export function HRAIAssistant() {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         const errorMessage = errorData.error || 'Failed to get response';
         const errorDetails = errorData.details || '';
-        
-        console.log('AI error details:', { 
-          status: response.status, 
-          errorData, 
-          errorMessage, 
-          errorDetails,
-          statusCode: errorData.statusCode,
-          rawError: errorData.rawError
-        });
-        console.log('Full error response:', JSON.stringify(errorData, null, 2));
         
         if (errorData.statusCode === 401 || errorData.statusCode === 403) {
           toast.error('Blumebyte is not properly configured. Please contact your administrator.');
