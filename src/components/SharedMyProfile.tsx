@@ -246,7 +246,7 @@ export function SharedMyProfile() {
       const fd = new FormData();
       fd.append('file', blob, 'profile.jpg');
       const result = await apiUpload('/upload/profile-image', fd, accessToken);
-      if (!result) throw new Error('Upload failed');
+      if (!result) throw new Error('Profile image upload failed');
       toast.success('Profile image updated');
       setCropDialogOpen(false);
       setCropImageSrc(null);

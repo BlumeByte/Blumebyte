@@ -504,7 +504,7 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
   
   // If no company scope, return EMPTY - strict isolation
   if (!assignedCompanies || assignedCompanies.length === 0) {
-      return [];
+    return [];
   }
   
   // Filter items by company for ALL roles
@@ -524,7 +524,6 @@ async function filterEmployeesByCompany(employees: any[], userId: string, role: 
   // SuperAdmins are company-level admins, NOT platform-wide admins
   const scope = await resolveCompanyScope(userId);
   
-  
   // If no scope, return EMPTY - strict isolation
   if (!scope || scope.length === 0) {
     return [];
@@ -534,12 +533,10 @@ async function filterEmployeesByCompany(employees: any[], userId: string, role: 
   const filtered = employees.filter((e: any) => {
     const empCompany = e.company || e.companyId;
     if (!empCompany) {
-        return false; // Exclude employees without company
+      return false; // Exclude employees without company
     }
     // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
     const included = scope.some(s => s.toLowerCase() === empCompany.toLowerCase());
-    if (!included && employees.length <= 10) {
-      }
     return included;
   });
   
@@ -575,7 +572,7 @@ function handleError(e: any, c: any, context: string = '') {
     }, 500);
   }
   
-  console.error(`${context} error:`, errorMsg);
+  console.error(`${context} error:`, errorMsg, e);
   return c.json({ error: errorMsg }, 500);
 }
 
@@ -638,7 +635,7 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
       if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-          return c.json({ error: e.message }, 500);
+      return c.json({ error: e.message }, 500);
     }
   });
 
@@ -681,7 +678,7 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
         updatedAt: new Date().toISOString() 
       };
       await kv.set(`${kvPrefix}${id}`, item);
-          
+      
       // Broadcast real-time update
       const channelName = kvPrefix.replace(':', '');
       await broadcastUpdate(channelName, 'INSERT', id, item);
@@ -690,7 +687,7 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
     } catch (e: any) {
       if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
       if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-          return c.json({ error: e.message }, 500);
+      return c.json({ error: e.message }, 500);
     }
   });
 
@@ -849,7 +846,6 @@ app.post(`${PREFIX}/company/register`, async (c) => {
 
     // If payment reference provided, verify payment first (pay-first flow)
     if (paymentReference) {
-        
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
       if (!paystackSecretKey) {
         return c.json({ error: 'Payment system not configured' }, 500);
@@ -2469,8 +2465,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
           }),
         });
       } else {
-        // Fallback: Log to console for development
-
+        // Fallback: email service not configured
       }
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
@@ -9551,7 +9546,7 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
         });
         if (emailRes.ok) {
           emailSent = true;
-            } else {
+          } else {
           const errBody = await emailRes.text();
           console.error(`Failed to send 2FA email: ${emailRes.status} ${errBody}`);
         }
@@ -9561,7 +9556,8 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
     }
 
     if (!emailSent) {
-      // Fallback: log to console when email service is not configured
+      // Email service not configured — 2FA code could not be delivered
+      console.error('2FA email could not be sent. Please configure an email service.');
       }
 
     return c.json({ 
@@ -9941,7 +9937,7 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
 
     if (!emailSent) {
       // Email service not configured — password reset link could not be delivered
-      console.error(`Password reset email could not be sent to ${email}. Please configure an email service.`);
+      console.error('Password reset email could not be sent. Please configure an email service.');
     }
     
     // Log audit event
