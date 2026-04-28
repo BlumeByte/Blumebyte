@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { api } from '../lib/api-client';
+import { api, clearAllCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -68,6 +68,29 @@ import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
 import { useDarkMode } from '../lib/dark-mode-context';
 import { supabase } from '../lib/supabase';
+
+// Context that makes the SuperAdmin's currently-selected company available to
+// all inner view components without prop-drilling.
+interface SelectedCompanyCtx {
+  selectedCompanyId: string;    // UUID or 'all'
+  selectedCompanyName: string;  // Human-readable name or 'All Companies'
+}
+const SelectedCompanyContext = createContext<SelectedCompanyCtx>({
+  selectedCompanyId: 'all',
+  selectedCompanyName: 'All Companies',
+});
+function useSelectedCompany() { return useContext(SelectedCompanyContext); }
+
+// Helper: returns true when the item belongs to the selected company.
+// Compares against both the company UUID and the company name (case-insensitive)
+// because different modules persist the reference differently.
+function itemMatchesCompany(item: any, selectedId: string, selectedName: string): boolean {
+  if (!selectedId || selectedId === 'all') return true;
+  const ic: string = (item.companyId || item.company || item.companyName || '').toString();
+  if (!ic) return false;
+  const lcName = selectedName.toLowerCase();
+  return ic === selectedId || ic.toLowerCase() === selectedId.toLowerCase() || ic.toLowerCase() === lcName;
+}
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
@@ -552,12 +575,17 @@ export function SuperAdminDashboard() {
       );
       default:
         if (ENTITY_CONFIGS[activeSection]) {
-          // When a specific company is selected (not 'all'), filter the companies list to
-          // show only that company so the view reflects the selected context.
-          const companyFilterFn =
-            activeSection === 'companies' && selectedCompanyId && selectedCompanyId !== 'all'
-              ? (item: any) => item.id === selectedCompanyId
-              : undefined;
+          // When a specific company is selected apply a client-side filter:
+          // - For the 'companies' entity: match by company UUID (item.id)
+          // - For all other entities: match by company reference field (companyId / company / companyName)
+          let companyFilterFn: ((item: any) => boolean) | undefined;
+          if (selectedCompanyId && selectedCompanyId !== 'all') {
+            if (activeSection === 'companies') {
+              companyFilterFn = (item: any) => item.id === selectedCompanyId;
+            } else {
+              companyFilterFn = (item: any) => itemMatchesCompany(item, selectedCompanyId, selectedCompanyName);
+            }
+          }
           return <EntityCrud entityKey={activeSection} config={ENTITY_CONFIGS[activeSection]} filterFn={companyFilterFn} />;
         }
         return <PlaceholderView title={SIDEBAR_ITEMS.find(i => i.id === activeSection)?.label || 'Coming Soon'} />;
@@ -639,6 +667,7 @@ export function SuperAdminDashboard() {
             accessToken={accessToken}
             currentCompanyId={selectedCompanyId}
             onCompanySwitch={(companyId, companyName) => {
+              clearAllCache();
               setSelectedCompanyId(companyId);
               setSelectedCompanyName(companyName);
             }}
@@ -649,9 +678,11 @@ export function SuperAdminDashboard() {
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Super Admin</Badge>
           </div>
         </div>
-        <div className="h-[calc(100vh-45px)] overflow-y-auto overflow-x-hidden">
-          {renderContent()}
-        </div>
+        <SelectedCompanyContext.Provider value={{ selectedCompanyId, selectedCompanyName }}>
+          <div key={selectedCompanyId} className="h-[calc(100vh-45px)] overflow-y-auto overflow-x-hidden">
+            {renderContent()}
+          </div>
+        </SelectedCompanyContext.Provider>
       </div>
     </div>
   );
@@ -857,6 +888,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
 // ========== DASHBOARD ==========
 function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   const { accessToken } = useAuth();
+  const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [stats, setStats] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [recentLeaves, setRecentLeaves] = useState<any[]>([]);
@@ -900,9 +932,32 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       safeFetch('/automation/business-rules'),
       safeFetch('/automation/notification-templates'),
     ]).then(([users, ref, leaves, announcements, attendance, workflows, tasks, rules, templates]) => {
-      const usersArr = Array.isArray(users) ? users : [];
-      const leavesArr = Array.isArray(leaves) ? leaves : [];
-      const attendanceArr = Array.isArray(attendance) ? attendance : [];
+      const allUsersArr = Array.isArray(users) ? users : [];
+      const allLeavesArr = Array.isArray(leaves) ? leaves : [];
+      const allAttendanceArr = Array.isArray(attendance) ? attendance : [];
+
+      // Filter by selected company when a specific one is chosen
+      const filterByCompany = (arr: any[]) =>
+        selectedCompanyId === 'all' ? arr : arr.filter(item => itemMatchesCompany(item, selectedCompanyId, selectedCompanyName));
+
+      const usersArr = filterByCompany(allUsersArr);
+      const leavesArr = filterByCompany(allLeavesArr);
+      const attendanceArr = filterByCompany(allAttendanceArr);
+
+      // For reference-data sub-arrays, filter by company too
+      const companies = Array.isArray(ref?.companies)
+        ? (selectedCompanyId === 'all' ? ref.companies : ref.companies.filter((c: any) => c.id === selectedCompanyId))
+        : [];
+      const departments = Array.isArray(ref?.departments)
+        ? (selectedCompanyId === 'all' ? ref.departments : ref.departments.filter((d: any) => itemMatchesCompany(d, selectedCompanyId, selectedCompanyName)))
+        : [];
+      const branches = Array.isArray(ref?.branches)
+        ? (selectedCompanyId === 'all' ? ref.branches : ref.branches.filter((b: any) => itemMatchesCompany(b, selectedCompanyId, selectedCompanyName)))
+        : [];
+      const assets = Array.isArray(ref?.assets)
+        ? (selectedCompanyId === 'all' ? ref.assets : ref.assets.filter((a: any) => itemMatchesCompany(a, selectedCompanyId, selectedCompanyName)))
+        : [];
+
       const workflowsData = Array.isArray(workflows?.data) ? workflows.data : (Array.isArray(workflows) ? workflows : []);
       const tasksData = Array.isArray(tasks?.data) ? tasks.data : (Array.isArray(tasks) ? tasks : []);
       const rulesData = Array.isArray(rules?.data) ? rules.data : (Array.isArray(rules) ? rules : []);
@@ -913,10 +968,10 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       setAllAttendance(attendanceArr);
       setStats({
         users: usersArr.length,
-        companies: ref?.companies?.length || 0,
-        departments: ref?.departments?.length || 0,
-        branches: ref?.branches?.length || 0,
-        assets: ref?.assets?.length || 0,
+        companies: companies.length,
+        departments: departments.length,
+        branches: branches.length,
+        assets: assets.length,
         pendingLeaves: leavesArr.filter((l: any) => l.status === 'pending').length,
         announcements: Array.isArray(announcements) ? announcements.length : 0,
         activeEmployees: usersArr.filter((u: any) => u.status === 'active').length,
@@ -933,7 +988,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
       });
       setRecentLeaves(leavesArr.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5));
     }).catch(console.log).finally(() => setLoading(false));
-  }, [accessToken]);
+  }, [accessToken, selectedCompanyId, selectedCompanyName]);
 
   useEffect(() => {
     if (!scopeFixed) return; // Wait for scope fix before loading data
@@ -1458,6 +1513,7 @@ function TimeOffCalendarView() {
 // ========== ATTENDANCE (Full CRUD) ==========
 function AttendanceView() {
   const { accessToken } = useAuth();
+  const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [records, setRecords] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1570,12 +1626,17 @@ function AttendanceView() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const filtered = records.filter(r => !search || r.employeeName?.toLowerCase().includes(search.toLowerCase()));
-  const present = records.filter(r => r.status === 'present' && !r.isPaused).length;
-  const late = records.filter(r => r.status === 'late').length;
-  const overtime = records.filter(r => r.status === 'overtime').length;
-  const paused = records.filter(r => r.isPaused).length;
-  const autoTracked = records.filter(r => r.autoClocked).length;
+  const filtered = records.filter(r =>
+    itemMatchesCompany(r, selectedCompanyId, selectedCompanyName) &&
+    (!search || r.employeeName?.toLowerCase().includes(search.toLowerCase()))
+  );
+  // Stats should also reflect only the selected company's records
+  const companyRecords = selectedCompanyId === 'all' ? records : records.filter(r => itemMatchesCompany(r, selectedCompanyId, selectedCompanyName));
+  const present = companyRecords.filter(r => r.status === 'present' && !r.isPaused).length;
+  const late = companyRecords.filter(r => r.status === 'late').length;
+  const overtime = companyRecords.filter(r => r.status === 'overtime').length;
+  const paused = companyRecords.filter(r => r.isPaused).length;
+  const autoTracked = companyRecords.filter(r => r.autoClocked).length;
 
   const pieData = [
     { id: 'attendance-present', name: 'Present', value: present || 1, color: '#10b981' },
@@ -1883,6 +1944,7 @@ function AttendanceView() {
 function PayrollView() {
   const { accessToken } = useAuth();
   const { currencySymbol } = useCurrency();
+  const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [items, setItems] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1999,9 +2061,11 @@ function PayrollView() {
     try { await api(`/superadmin/payroll-run/${id}`, { method: 'DELETE', token: accessToken }); toast.success('Deleted'); setItems(prev => prev.filter(i => i.id !== id)); } catch (e: any) { toast.error(e.message); }
   };
 
-  const totalPayroll = items.reduce((sum, i) => sum + parseFloat(i.netPay || 0), 0);
-  const paidCount = items.filter(i => i.status === 'paid').length;
-  const pendingCount = items.filter(i => i.status === 'pending').length;
+  // Filter payroll items by selected company
+  const companyItems = selectedCompanyId === 'all' ? items : items.filter(i => itemMatchesCompany(i, selectedCompanyId, selectedCompanyName));
+  const totalPayroll = companyItems.reduce((sum, i) => sum + parseFloat(i.netPay || 0), 0);
+  const paidCount = companyItems.filter(i => i.status === 'paid').length;
+  const pendingCount = companyItems.filter(i => i.status === 'pending').length;
 
   const monthlyPayroll = [
     { id: 'payroll-jan', month: 'Jan', amount: 125000 }, 
@@ -2021,7 +2085,7 @@ function PayrollView() {
 
       <div className="grid grid-cols-4 gap-4 mb-6">
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Total Payroll</p><p className="text-2xl font-bold mt-1">{currencySymbol} {totalPayroll.toFixed(2)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Records</p><p className="text-2xl font-bold mt-1">{items.length}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Records</p><p className="text-2xl font-bold mt-1">{companyItems.length}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Paid</p><p className="text-2xl font-bold text-green-600 mt-1">{paidCount}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-sm text-gray-500">Pending</p><p className="text-2xl font-bold text-amber-600 mt-1">{pendingCount}</p></CardContent></Card>
       </div>
@@ -2045,7 +2109,7 @@ function PayrollView() {
         <CardContent className="p-0">
           {loading ? (
             <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>
-          ) : items.length === 0 ? (
+          ) : companyItems.length === 0 ? (
             <div className="py-16 text-center text-gray-400"><DollarSign className="w-10 h-10 mx-auto mb-2 opacity-50" /><p>No payroll records yet</p></div>
           ) : (
             <Table>
@@ -2053,7 +2117,7 @@ function PayrollView() {
                 <TableRow><TableHead>Employee</TableHead><TableHead>Period</TableHead><TableHead>Basic Salary</TableHead><TableHead>Allowances</TableHead><TableHead>Deductions</TableHead><TableHead>Net Pay</TableHead><TableHead>Status</TableHead><TableHead className="w-20">Actions</TableHead></TableRow>
               </TableHeader>
               <TableBody>
-                {items.map(item => (
+                {companyItems.map(item => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.employeeName || '\u2014'}</TableCell>
                     <TableCell>{item.period || '\u2014'}</TableCell>
@@ -2426,6 +2490,7 @@ function HRReportsView() {
 // ========== LEAVE MANAGEMENT (Full CRUD) ==========
 function LeaveManagementView() {
   const { accessToken } = useAuth();
+  const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [activeTab, setActiveTab] = useState<'requests' | 'types'>('requests');
   const [leaves, setLeaves] = useState<any[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
@@ -2502,10 +2567,12 @@ function LeaveManagementView() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const pending = leaves.filter(l => l.status === 'pending').length;
-  const approved = leaves.filter(l => l.status === 'approved').length;
-  const rejected = leaves.filter(l => l.status === 'rejected').length;
-  const filtered = leaves.filter(l => !search || l.employeeName?.toLowerCase().includes(search.toLowerCase()));
+  // Company-scoped leaves for stats + table
+  const companyLeaves = selectedCompanyId === 'all' ? leaves : leaves.filter(l => itemMatchesCompany(l, selectedCompanyId, selectedCompanyName));
+  const pending = companyLeaves.filter(l => l.status === 'pending').length;
+  const approved = companyLeaves.filter(l => l.status === 'approved').length;
+  const rejected = companyLeaves.filter(l => l.status === 'rejected').length;
+  const filtered = companyLeaves.filter(l => !search || l.employeeName?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="p-8">
@@ -3251,6 +3318,7 @@ function AnnouncementsView() {
 function EmployeesView() {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
+  const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -3329,7 +3397,9 @@ function EmployeesView() {
       const matchDept = filterValues.department === 'all' || u.department === filterValues.department;
       const matchCompany = filterValues.company === 'all' || u.company === filterValues.company;
       const matchStatus = filterValues.status === 'all' || (u.status || 'active') === filterValues.status;
-      return matchSearch && matchRole && matchDept && matchCompany && matchStatus;
+      // Also apply context-level company filter (from the top CompanySwitcher)
+      const matchContextCompany = itemMatchesCompany(u, selectedCompanyId, selectedCompanyName);
+      return matchSearch && matchRole && matchDept && matchCompany && matchStatus && matchContextCompany;
     })
     .sort((a, b) => {
       const aVal = String(a[sortField] || '').toLowerCase();
