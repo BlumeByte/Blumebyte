@@ -394,6 +394,30 @@ export default function HiringsPage() {
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
+  // ── Periodic polling: re-fetch every 60 s as fallback when realtime fails ──
+  useEffect(() => {
+    const iv = setInterval(() => {
+      // Skip the poll while the tab is hidden — the visibilitychange handler
+      // will trigger a fresh fetch as soon as the user returns to the page.
+      if (document.visibilityState !== 'visible') return;
+      invalidateCache('/public/jobs');
+      fetchJobs();
+    }, 60000);
+    return () => clearInterval(iv);
+  }, [fetchJobs]);
+
+  // ── Refetch when the tab regains focus / visibility ────────────────────────
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        invalidateCache('/public/jobs');
+        fetchJobs();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchJobs]);
+
   // ── Supabase Realtime: re-fetch when job postings change ───────────────────
   useEffect(() => {
     const refetch = () => {

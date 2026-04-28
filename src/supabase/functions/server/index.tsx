@@ -4178,6 +4178,48 @@ makeCrud("superadmin/feedback", "feedback:", requireSuperAdmin);
 makeCrud("superadmin/meeting", "meeting:", requireSuperAdmin);
 makeCrud("superadmin/workflow", "workflow:", requireSuperAdmin);
 
+// CUSTOM: superadmin/job-posting GET — show all job postings scoped to the
+// SuperAdmin's company. Falls back to all postings with a company if the strict
+// per-UUID scope filter would return nothing (handles scope/name mismatches).
+app.get(`${PREFIX}/superadmin/job-posting`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const all = await kv.getByPrefix("job-posting:");
+    // Try strict company-filter first (preserves multi-tenant isolation)
+    const strict = await applyCompanyFilter(all, user.id, 'superadmin');
+    if (strict.length > 0) {
+      return c.json(strict);
+    }
+    // Fallback: if strict filter returned nothing (e.g. scope stores company names but
+    // items were saved with UUIDs), include postings whose companyName is in the
+    // user's scope, plus unscoped postings (no companyId/company field).
+    // Items that have a companyId/company but whose companyName is empty or doesn't
+    // match are excluded — we can't verify they belong to this company without a
+    // DB lookup, and the strict filter would have caught them if they did match.
+    const scope = await resolveCompanyScope(user.id);
+    if (!scope || scope.length === 0) {
+      // No scope at all — only return unscoped items to avoid cross-company leakage.
+      return c.json(all.filter((item: any) => !item.companyId && !item.company));
+    }
+    const scopeSet = new Set(scope.map((s: string) => s.toLowerCase()));
+    const fallback = all.filter((item: any) => {
+      // Unscoped postings (no company assigned) — belong to no tenant, safe to show
+      if (!item.companyId && !item.company) return true;
+      // Try UUID/company field match first
+      const idField = (item.companyId || item.company || '').toLowerCase();
+      if (idField && scopeSet.has(idField)) return true;
+      // Try human-readable name match (separate check)
+      const nameField = (item.companyName || '').toLowerCase();
+      return nameField && scopeSet.has(nameField);
+    });
+    return c.json(fallback);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // CUSTOM: superadmin/job-posting POST/PUT with auto-populated companyName
 app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
   try {
@@ -4493,6 +4535,38 @@ app.get(`${PREFIX}/holidays`, async (c) => {
   } catch (e: any) {
     console.log('Holidays fetch error:', e.message);
     return c.json([]);
+  }
+});
+// CUSTOM: admin/job-postings GET — list company job postings with a fallback
+// when strict applyCompanyFilter returns nothing (scope/name mismatch scenarios).
+app.get(`${PREFIX}/admin/job-postings`, async (c) => {
+  try {
+    const { user } = await requireAdminOrAbove(c);
+    const all = await kv.getByPrefix("job-posting:");
+    const strict = await applyCompanyFilter(all, user.id, 'admin');
+    if (strict.length > 0) {
+      return c.json(strict);
+    }
+    // Fallback: when strict scope/UUID filter returns nothing (e.g. scope holds company
+    // names but items were stored with UUIDs), also try matching by companyName.
+    // We deliberately keep companyId/company checks separate from companyName to avoid
+    // false positives when a UUID string happens to equal a company name substring.
+    const scope = await resolveCompanyScope(user.id);
+    if (!scope || scope.length === 0) return c.json([]);
+    const scopeSet = new Set(scope.map((s: string) => s.toLowerCase()));
+    const fallback = all.filter((item: any) => {
+      // Try UUID/company field match first
+      const idField = (item.companyId || item.company || '').toLowerCase();
+      if (idField && scopeSet.has(idField)) return true;
+      // Try human-readable name match (separate check to avoid UUID/name confusion)
+      const nameField = (item.companyName || '').toLowerCase();
+      return nameField && scopeSet.has(nameField);
+    });
+    return c.json(fallback);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
   }
 });
 // CUSTOM: admin/job-postings POST/PUT with auto-populated companyName and status normalization
@@ -10322,13 +10396,17 @@ async function sendEmailNotification(
 app.get(`${PREFIX}/public/jobs`, async (c) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
-    // Accept both 'public_global' (canonical value used by all POST/PUT handlers)
-    // and 'public' (legacy alias that some older records may have stored).
-    // Both checks are case-insensitive to handle any capitalisation drift.
+    // Accept all variants that mean "visible to the public":
+    //   'public_global' — canonical value used by all current POST/PUT handlers
+    //   'public'        — legacy alias that may exist in older records
+    //   'global'        — another legacy alias used before the underscore convention
+    // Comparison is case-insensitive to handle any capitalisation drift.
+    // Status must be one of the active values (also case-insensitive).
     const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+    const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
-      const vt = (j.visibilityType || '').toLowerCase();
-      return (vt === 'public_global' || vt === 'public') && ACTIVE_STATUSES.has((j.status || '').toLowerCase());
+      const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
+      return GLOBAL_VISIBILITY.has(vt) && ACTIVE_STATUSES.has((j.status || '').toLowerCase());
     });
 
     console.log(`Public jobs: ${all.length} total job-postings, ${eligible.length} eligible public ones`);
@@ -10380,7 +10458,8 @@ app.get(`${PREFIX}/public/jobs/:id`, async (c) => {
     const id = c.req.param('id');
     const job = await kv.get(`job-posting:${id}`);
     if (!job) return c.json({ error: 'Not found' }, 404);
-    if (job.visibilityType !== 'public_global') return c.json({ error: 'Not found' }, 404);
+    const vt = (job.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
+    if (!['public_global', 'public', 'global'].includes(vt)) return c.json({ error: 'Not found' }, 404);
     return c.json({
       id: job.id,
       companyName: job.companyName || job.company || '',
