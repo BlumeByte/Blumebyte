@@ -9650,7 +9650,7 @@ app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
     }
 
     const sb = supabaseAdmin();
-    const { data: { users }, error } = await sb.auth.admin.listUsers();
+    const { data: { users }, error } = await sb.auth.admin.listUsers({ perPage: 1000 });
     if (error) {
       console.error("Error listing users:", error);
       return c.json({ error: "Failed to check 2FA status" }, 500);
@@ -9748,7 +9748,7 @@ function getTOTPUri(secret: string, email: string, issuer = 'Blumebyte HR'): str
   return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }
 
-// POST /auth/totp/setup — generate a new TOTP secret + QR code URL for the authenticated user
+// POST /auth/totp/setup — generate a new TOTP secret + URI for the authenticated user
 app.post(`${PREFIX}/auth/totp/setup`, async (c) => {
   try {
     const user = await getAuthUser(c);
@@ -9757,7 +9757,6 @@ app.post(`${PREFIX}/auth/totp/setup`, async (c) => {
     const secret = generateTOTPSecret();
     const issuer = 'Blumebyte HR';
     const totpUri = getTOTPUri(secret, user.email || '', issuer);
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`;
 
     // Store pending secret in KV (10-min TTL) — confirmed only after user verifies a code
     await kv.set(`totp-setup:${user.id}`, {
@@ -9765,7 +9764,8 @@ app.post(`${PREFIX}/auth/totp/setup`, async (c) => {
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     });
 
-    return c.json({ secret, qrCodeUrl, issuer });
+    // Return secret and totpUri only — QR code is generated client-side to avoid exposing the secret to third parties
+    return c.json({ secret, totpUri, issuer });
   } catch (e: any) {
     console.error('totp/setup error:', e);
     return c.json({ error: e.message }, 500);
@@ -9820,7 +9820,8 @@ app.post(`${PREFIX}/auth/totp/verify-login`, async (c) => {
     if (!email || !code) return c.json({ error: 'Email and code are required' }, 400);
 
     const sb = supabaseAdmin();
-    const { data: { users }, error } = await sb.auth.admin.listUsers();
+    // Use paginated list with filter to avoid loading all users
+    const { data: { users }, error } = await sb.auth.admin.listUsers({ perPage: 1000 });
     if (error) return c.json({ error: 'Failed to verify user' }, 500);
 
     const user = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
@@ -9868,11 +9869,11 @@ app.post(`${PREFIX}/auth/totp/disable`, async (c) => {
     }
 
     const sb = supabaseAdmin();
-    const { user_metadata } = user;
-    delete user_metadata?.totpSecret;
+    // Build clean metadata without totpSecret — avoid mutating the user object
+    const { totpSecret, ...cleanedMetadata } = user.user_metadata || {};
     await sb.auth.admin.updateUserById(user.id, {
       user_metadata: {
-        ...user_metadata,
+        ...cleanedMetadata,
         totpEnabled: false,
         totpEnabledAt: null,
         twoFactorEnabled: false,

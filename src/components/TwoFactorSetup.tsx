@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -22,7 +23,7 @@ export function TwoFactorSetup({ email, onComplete, onSkip }: TwoFactorSetupProp
   const [loading, setLoading] = useState(false);
   const [loadingSetup, setLoadingSetup] = useState(true);
   const [error, setError] = useState('');
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const [secret, setSecret] = useState('');
 
   useEffect(() => {
@@ -38,8 +39,10 @@ export function TwoFactorSetup({ email, onComplete, onSkip }: TwoFactorSetupProp
         token: accessToken,
         body: {},
       });
-      setQrCodeUrl(response.qrCodeUrl);
       setSecret(response.secret);
+      // Generate QR code client-side — secret never leaves the browser
+      const dataUrl = await QRCode.toDataURL(response.totpUri, { width: 200, margin: 1 });
+      setQrDataUrl(dataUrl);
     } catch (err: any) {
       setError(err.message || 'Failed to generate QR code. Please try again.');
     } finally {
@@ -71,6 +74,8 @@ export function TwoFactorSetup({ email, onComplete, onSkip }: TwoFactorSetupProp
   const copySecret = () => {
     navigator.clipboard.writeText(secret).then(() => {
       toast.success('Secret copied to clipboard');
+    }).catch(() => {
+      toast.error('Could not copy to clipboard. Please copy it manually.');
     });
   };
 
@@ -133,9 +138,9 @@ export function TwoFactorSetup({ email, onComplete, onSkip }: TwoFactorSetupProp
             ) : (
               <>
                 <div className="flex justify-center py-2">
-                  {qrCodeUrl && (
+                  {qrDataUrl && (
                     <img
-                      src={qrCodeUrl}
+                      src={qrDataUrl}
                       alt="TOTP QR Code"
                       className="w-48 h-48 rounded border border-gray-200"
                     />

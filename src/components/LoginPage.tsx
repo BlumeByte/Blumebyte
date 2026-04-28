@@ -81,6 +81,8 @@ export function LoginPage() {
         // Show TOTP form — login will complete after code verification
         setPendingEmail(email);
         setPendingPassword(password);
+        // Clear password from primary state to avoid keeping it in memory
+        setPassword('');
         setTotpRequired(true);
         return;
       }
@@ -100,9 +102,11 @@ export function LoginPage() {
         method: 'POST',
         body: { email: pendingEmail, code: totpCode },
       });
-      // Code is valid — now complete the password login
+      // Code is valid — now complete the password login (capture before clearing)
+      const savedPassword = pendingPassword;
       setTotpRequired(false);
-      await login(pendingEmail, pendingPassword);
+      setPendingPassword('');
+      await login(pendingEmail, savedPassword);
     } catch (err: any) {
       setTotpError(err.message || 'Invalid code. Please try again.');
     } finally {
