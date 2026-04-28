@@ -314,6 +314,49 @@ export function CompanyBrandingSettings() {
             />
           </div>
 
+          {/* Company Contact Info (used in PDF letterheads) */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 font-semibold">Company Contact Information</Label>
+            <p className="text-[10px] text-muted-foreground">Used in PDF document letterheads and footers.</p>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <Label className="text-xs">Company Address</Label>
+                <Input
+                  value={settings.companyAddress || ''}
+                  onChange={(e) => setSettings({ ...settings, companyAddress: e.target.value })}
+                  placeholder="e.g., 123 Main Street, Accra, Ghana"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Phone</Label>
+                  <Input
+                    value={settings.companyPhone || ''}
+                    onChange={(e) => setSettings({ ...settings, companyPhone: e.target.value })}
+                    placeholder="e.g., +233 20 000 0000"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Email</Label>
+                  <Input
+                    type="email"
+                    value={settings.companyEmail || ''}
+                    onChange={(e) => setSettings({ ...settings, companyEmail: e.target.value })}
+                    placeholder="e.g., hr@company.com"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Website</Label>
+                <Input
+                  value={settings.companyWebsite || ''}
+                  onChange={(e) => setSettings({ ...settings, companyWebsite: e.target.value })}
+                  placeholder="e.g., https://www.company.com"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Primary Color */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">

@@ -347,16 +347,16 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
       // roleTitle is used on the public hiring page; title is the internal reference
       { key: 'roleTitle', label: 'Role Title (shown publicly)' },
       { key: 'companyName', label: 'Company Name (shown publicly)' },
-      { key: 'department', label: 'Department' },
+      { key: 'visibilityType', label: 'Visibility', type: 'select', options: ['internal_only', 'public_global'] },
+      { key: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
       { key: 'location', label: 'Location' },
       { key: 'employmentType', label: 'Employment Type', type: 'select', options: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Remote', 'Hybrid'] },
+      { key: 'department', label: 'Department' },
       { key: 'description', label: 'Job Description' },
       { key: 'requirements', label: 'Requirements' },
       { key: 'qualifications', label: 'Qualifications' },
       { key: 'salaryRange', label: 'Salary Range' },
       { key: 'deadline', label: 'Application Deadline', type: 'date' },
-      { key: 'visibilityType', label: 'Visibility (set to "public_global" to appear on the public Hirings page)', type: 'select', options: ['internal_only', 'public_global'] },
-      { key: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
     ],
     defaults: { visibilityType: 'public_global', status: 'active' },
   },
@@ -723,7 +723,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api('/care/global-applications', { token: accessToken });
+      const data = await api('/superadmin/public-job-applications', { token: accessToken });
       setApplications(Array.isArray(data) ? data : []);
     } catch {
       setApplications([]);
@@ -4104,6 +4104,10 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                                 ? 'bg-orange-100 text-orange-800'
                                 : ''
                             }>{typeof item[f.key] === 'string' ? item[f.key] : String(item[f.key] || '')}</Badge>
+                          ) : f.key === 'visibilityType' ? (
+                            <Badge className={item[f.key] === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}>
+                              {item[f.key] === 'public_global' ? '🌍 Public' : '🔒 Internal'}
+                            </Badge>
                           ) : f.key === 'rating' ? (
                             <div className="flex items-center gap-1">
                               {Array.from({ length: parseInt(item[f.key] || '0') }).map((_, i) => (

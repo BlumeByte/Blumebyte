@@ -19,12 +19,89 @@ import {
 import { useBranding } from '../lib/branding-context';
 import { useCurrency } from '../lib/currency-context';
 
-function exportToPDFDoc(title: string, content: string, companyName = 'Blumebyte') {
+interface PDFBranding {
+  companyName: string;
+  logoUrl: string;
+  primaryColor: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+  companyWebsite: string;
+  description: string;
+}
+
+function exportToPDFDoc(title: string, content: string, b: PDFBranding) {
   const w = window.open('', '_blank');
-  if (!w) { toast.error('Popup blocked'); return; }
-  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-    body{font-family:Arial,sans-serif;margin:40px;color:#333;} h1{font-size:20px;margin-bottom:4px;} .sub{font-size:12px;color:#888;margin-bottom:20px;} .section{margin:20px 0;padding:16px;border:1px solid #eee;border-radius:8px;} .section h3{font-size:14px;font-weight:600;margin-bottom:12px;color:#1e40af;} .row{display:flex;gap:24px;margin-bottom:8px;} .field{flex:1;} .field label{font-size:11px;color:#888;display:block;} .field p{font-size:13px;margin:2px 0 0;} .footer{margin-top:30px;font-size:11px;color:#aaa;border-top:1px solid #eee;padding-top:12px;}
-  </style></head><body>${content}<div class="footer">Generated from ${companyName} HRIS on ${new Date().toLocaleString()}</div><script>window.onload=function(){window.print();}</script></body></html>`);
+  if (!w) { toast.error('Popup blocked. Please allow popups for this site.'); return; }
+
+  const color = b.primaryColor || '#10b981';
+  const footerParts = [b.companyAddress, b.companyPhone, b.companyEmail, b.companyWebsite].filter(Boolean);
+  const footerText = footerParts.join(' &nbsp;|&nbsp; ') || b.companyName;
+  const logoHtml = b.logoUrl
+    ? `<img src="${b.logoUrl}" alt="${b.companyName}" style="max-height:64px;max-width:160px;object-fit:contain;display:block;"/>`
+    : `<div style="width:64px;height:64px;border-radius:8px;background:${color};display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;">${b.companyName.charAt(0).toUpperCase()}</div>`;
+
+  w.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>${title} — ${b.companyName}</title>
+  <style>
+    @page { size: A4; margin: 20mm 15mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Arial', sans-serif; font-size: 13px; color: #222; background: #fff; }
+    /* ── Letterhead ── */
+    .letterhead { display: flex; align-items: center; gap: 16px; padding-bottom: 14px; border-bottom: 3px solid ${color}; margin-bottom: 18px; }
+    .letterhead-text { flex: 1; }
+    .letterhead-company { font-size: 20px; font-weight: 700; color: ${color}; }
+    .letterhead-desc { font-size: 11px; color: #666; margin-top: 2px; }
+    /* ── Document title bar ── */
+    .doc-title { background: ${color}; color: #fff; padding: 10px 16px; border-radius: 6px; font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+    /* ── Sections ── */
+    .section { margin-bottom: 16px; padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 6px; page-break-inside: avoid; }
+    .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: ${color}; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 10px; }
+    /* ── Field grid ── */
+    .row { display: flex; gap: 20px; margin-bottom: 8px; }
+    .field { flex: 1; }
+    .field-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px; }
+    .field-value { font-size: 13px; color: #111; font-weight: 500; }
+    /* ── Signature block ── */
+    .sig-block { display: flex; gap: 40px; margin-top: 30px; }
+    .sig-line { flex: 1; border-top: 1.5px solid #333; padding-top: 6px; font-size: 12px; color: #555; }
+    /* ── Prose paragraphs ── */
+    .prose { line-height: 1.65; color: #333; }
+    .prose p { margin-bottom: 8px; }
+    /* ── Footer ── */
+    .doc-footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #888; text-align: center; }
+    /* ── Print overrides ── */
+    @media print { button { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <!-- Letterhead -->
+  <div class="letterhead">
+    ${logoHtml}
+    <div class="letterhead-text">
+      <div class="letterhead-company">${b.companyName}</div>
+      ${b.description ? `<div class="letterhead-desc">${b.description}</div>` : ''}
+    </div>
+    <div style="text-align:right;font-size:11px;color:#888;">
+      <div>${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+      ${b.companyWebsite ? `<div>${b.companyWebsite}</div>` : ''}
+    </div>
+  </div>
+  <!-- Document Title -->
+  <div class="doc-title">${title}</div>
+  <!-- Main Content -->
+  ${content}
+  <!-- Footer -->
+  <div class="doc-footer">
+    ${footerText}
+    <br/>Generated by ${b.companyName} HR System &nbsp;&middot;&nbsp; Blumebyte HR &nbsp;&middot;&nbsp; Confidential
+  </div>
+  <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 600); };</script>
+</body>
+</html>`);
   w.document.close();
 }
 
@@ -128,33 +205,251 @@ export function SharedMyProfile() {
 
   const generateDocument = (docType: string) => {
     if (!profile) return;
-    const roleLabel = profile.role === 'superadmin' ? 'Super Administrator' : profile.role === 'admin' ? 'Administrator' : profile.role === 'manager' ? 'Manager' : 'Employee';
     const currentYear = new Date().getFullYear();
-    const joinDate = profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '—';
+    const currentQ = `Q${Math.ceil((new Date().getMonth() + 1) / 3)} ${currentYear}`;
+    const joinDate = profile.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const empId = profile.userId?.slice(0, 8).toUpperCase() || 'N/A';
+    const empName = profile.name || '—';
+    const empEmail = profile.email || '—';
+    const empPhone = profile.phone || '—';
+    const empAddress = [profile.address, profile.city, profile.state, profile.country].filter(Boolean).join(', ') || '—';
+    const dept = profile.department || '—';
+    const position = profile.position || '—';
+    const salary = profile.salary || '—';
+    const company = profile.company || branding.companyName;
+    const companyAddr = branding.companyAddress || '—';
+    const managerName = profile.managerName || 'HR Manager';
 
-    let extraContent = '';
-    if (docType === 'Tax Forms') {
-      extraContent = `<div class="section"><h3>Tax Information — ${currentYear}</h3>
-        <div class="row"><div class="field"><label>Tax Year</label><p>${currentYear}</p></div><div class="field"><label>Taxable Income</label><p>${profile.salary || '—'}</p></div><div class="field"><label>Company</label><p>${profile.company || '—'}</p></div></div>
-        <div class="row"><div class="field"><label>Employee ID</label><p>${profile.userId?.slice(0,8).toUpperCase() || 'N/A'}</p></div><div class="field"><label>Department</label><p>${profile.department || '—'}</p></div></div>
-      </div>`;
+    const brandObj: PDFBranding = {
+      companyName: branding.companyName,
+      logoUrl: branding.logoUrl,
+      primaryColor: branding.primaryColor,
+      companyAddress: branding.companyAddress,
+      companyPhone: branding.companyPhone,
+      companyEmail: branding.companyEmail,
+      companyWebsite: branding.companyWebsite,
+      description: branding.description,
+    };
+
+    // ── Helper for a field row ──
+    const fieldRow = (...pairs: [string, string][]) =>
+      `<div class="row">${pairs.map(([label, val]) =>
+        `<div class="field"><span class="field-label">${label}</span><span class="field-value">${val}</span></div>`
+      ).join('')}</div>`;
+
+    const sigBlock = (left: string, right: string) =>
+      `<div class="sig-block"><div class="sig-line">${left}<br/>Date: _______________</div><div class="sig-line">${right}<br/>Date: _______________</div></div>`;
+
+    let content = '';
+
+    if (docType === 'Employment Contract') {
+      content = `
+        <div class="section">
+          <div class="section-title">1. Parties</div>
+          <div class="prose"><p>This Employment Contract is entered into between:</p></div>
+          ${fieldRow(['Employer (Company)', company], ['Company Address', companyAddr])}
+          ${fieldRow(['Employee Full Name', empName], ['Employee Address', empAddress])}
+          ${fieldRow(['Employee ID', empId], ['Employee Email', empEmail])}
+        </div>
+        <div class="section">
+          <div class="section-title">2. Job Title &amp; Role</div>
+          ${fieldRow(['Job Title / Position', position], ['Department', dept])}
+          ${fieldRow(['Employment Type', 'Full Time'], ['Reports To', managerName])}
+        </div>
+        <div class="section">
+          <div class="section-title">3. Employment Start Date</div>
+          ${fieldRow(['Start Date', joinDate], ['Contract Date', today])}
+        </div>
+        <div class="section">
+          <div class="section-title">4. Compensation</div>
+          ${fieldRow(['Annual / Monthly Salary', salary], ['Pay Period', 'Monthly'])}
+          ${fieldRow(['Payment Method', 'Bank Transfer'], ['Currency', 'As per payroll configuration'])}
+        </div>
+        <div class="section">
+          <div class="section-title">5. Working Hours</div>
+          ${fieldRow(['Standard Hours', '40 hours per week'], ['Working Days', 'Monday – Friday'])}
+        </div>
+        <div class="section">
+          <div class="section-title">6. Duties &amp; Responsibilities</div>
+          <div class="prose"><p>The Employee shall perform all duties assigned to the role of <strong>${position}</strong> in the <strong>${dept}</strong> department, as directed by the Employer from time to time.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">7. Benefits</div>
+          <div class="prose"><p>The Employee is entitled to benefits as outlined in the company's Benefits Policy, including health insurance, leave entitlements, and any other approved benefit plans.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">8. Leave Policy</div>
+          <div class="prose"><p>The Employee is entitled to annual leave, sick leave, and other leave types as per the company's Leave Policy. Details can be accessed from the HR portal.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">9. Confidentiality</div>
+          <div class="prose"><p>The Employee agrees to keep confidential all proprietary information, trade secrets, and business data of the Employer and shall not disclose such information to any third party during or after employment.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">10. Termination</div>
+          <div class="prose"><p>Either party may terminate this agreement with a notice period as stipulated by applicable labour law. The Employer reserves the right to terminate for cause without notice in cases of gross misconduct.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">11. Governing Law</div>
+          <div class="prose"><p>This contract is governed by the laws of <strong>${profile.country || 'the applicable jurisdiction'}</strong>.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Signatures</div>
+          <div class="prose" style="margin-bottom:16px;"><p>By signing below, both parties confirm they have read, understood, and agree to the terms of this Employment Contract.</p></div>
+          ${sigBlock(`Employer / HR Manager: ${managerName}`, `Employee: ${empName}`)}
+        </div>`;
+
+    } else if (docType === 'Appointment Letter') {
+      content = `
+        <div class="section">
+          <div class="section-title">Appointment Details</div>
+          ${fieldRow(['Date', today], ['Reference', `APT-${empId}`])}
+          ${fieldRow(['To', empName], ['Email', empEmail])}
+          ${fieldRow(['Address', empAddress], ['Phone', empPhone])}
+        </div>
+        <div class="section">
+          <div class="section-title">Dear ${empName},</div>
+          <div class="prose">
+            <p>We are pleased to offer you the position of <strong>${position}</strong> at <strong>${company}</strong>. After careful consideration, we are confident that your skills and experience will be a valuable addition to our team.</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Appointment Details</div>
+          ${fieldRow(['Position / Job Title', position], ['Department', dept])}
+          ${fieldRow(['Start Date', joinDate], ['Work Location', companyAddr || company])}
+          ${fieldRow(['Reporting To', managerName], ['Salary', salary])}
+          ${fieldRow(['Employee ID', empId], ['Employment Type', 'Full Time'])}
+        </div>
+        <div class="section">
+          <div class="section-title">Role Summary</div>
+          <div class="prose"><p>In this role, you will be responsible for all duties associated with the <strong>${position}</strong> position within the <strong>${dept}</strong> department. You are expected to maintain professional conduct, meet performance targets, and uphold the company's values at all times.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Expectations</div>
+          <div class="prose">
+            <p>• Adhere to all company policies and procedures.</p>
+            <p>• Maintain confidentiality of all business and client information.</p>
+            <p>• Actively participate in performance reviews and team activities.</p>
+            <p>• Report directly to your line manager for task assignments and performance feedback.</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Acceptance</div>
+          <div class="prose"><p>Please sign and return a copy of this letter to confirm your acceptance of this appointment no later than <strong>5 working days</strong> from the date of this letter.</p></div>
+          ${sigBlock(`HR Manager: ${managerName}<br/>${company}`, `Employee: ${empName}<br/>Employee Signature`)}
+        </div>`;
+
+    } else if (docType === 'Tax Forms') {
+      content = `
+        <div class="section">
+          <div class="section-title">Employee Tax Information — ${currentYear}</div>
+          ${fieldRow(['Employee Full Name', empName], ['Employee ID', empId])}
+          ${fieldRow(['Department', dept], ['Company', company])}
+          ${fieldRow(['Email', empEmail], ['Tax Year', String(currentYear)])}
+        </div>
+        <div class="section">
+          <div class="section-title">Financial Details</div>
+          ${fieldRow(['Gross Salary / Income', salary], ['Pay Period', 'Monthly'])}
+          ${fieldRow(['Allowances', 'As per payroll configuration'], ['Deductions', 'As per payroll configuration'])}
+          ${fieldRow(['Total Taxable Income', salary], ['Tax Payable', 'As calculated by payroll system'])}
+        </div>
+        <div class="section">
+          <div class="section-title">Tax Summary</div>
+          <div class="prose">
+            <p>This form summarises the tax information for the employee as recorded in the HR system for the tax year <strong>${currentYear}</strong>. Actual tax calculations are governed by the applicable tax laws and regulations.</p>
+            <p>For full payroll breakdowns, refer to the employee's payslip history in the HR portal.</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Declaration</div>
+          <div class="prose"><p>I, <strong>${empName}</strong>, hereby confirm that the information provided in this form is accurate and complete to the best of my knowledge.</p></div>
+          ${sigBlock(`Employee: ${empName}`, `HR Manager: ${managerName}<br/>${company}`)}
+        </div>`;
+
     } else if (docType === 'Benefits Enrollment') {
-      extraContent = `<div class="section"><h3>Benefits Information</h3>
-        <div class="row"><div class="field"><label>Enrollment Date</label><p>${joinDate}</p></div><div class="field"><label>Status</label><p>Active</p></div></div>
-      </div>`;
+      content = `
+        <div class="section">
+          <div class="section-title">Employee Information</div>
+          ${fieldRow(['Full Name', empName], ['Employee ID', empId])}
+          ${fieldRow(['Department', dept], ['Position', position])}
+          ${fieldRow(['Enrollment Date', joinDate], ['Status', 'Active'])}
+        </div>
+        <div class="section">
+          <div class="section-title">1. Selected Benefits</div>
+          <div class="prose"><p>Benefits are provided as per the company's approved benefit plans. Contact HR for a full list of available plans and entitlements.</p></div>
+          ${fieldRow(['Health Insurance', 'Company Health Plan (Active)'], ['Retirement Plan', 'As per company policy'])}
+          ${fieldRow(['Annual Leave', 'As per Leave Policy'], ['Sick Leave', 'As per Leave Policy'])}
+        </div>
+        <div class="section">
+          <div class="section-title">2. Health Insurance Plan</div>
+          ${fieldRow(['Health Plan', 'Standard Company Health Insurance'], ['Effective From', joinDate])}
+          ${fieldRow(['Coverage', 'Employee + Dependents (as applicable)'], ['Provider', 'As per company arrangement'])}
+        </div>
+        <div class="section">
+          <div class="section-title">3. Retirement Plan</div>
+          ${fieldRow(['Plan Name', 'Company Pension / Provident Fund'], ['Contribution', 'As per statutory requirement'])}
+          ${fieldRow(['Effective From', joinDate], ['Employee Contribution', 'As per payroll'])}
+        </div>
+        <div class="section">
+          <div class="section-title">4. Dependents</div>
+          <div class="prose"><p>Dependents covered under this benefits enrollment should be registered with HR separately. Please submit the relevant documentation to the HR department.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Agreement &amp; Signature</div>
+          <div class="prose"><p>I, <strong>${empName}</strong>, agree to the terms and conditions of the selected benefits as outlined in this enrollment form and the company's Benefits Policy.</p></div>
+          ${sigBlock(`Employee: ${empName}`, `HR Manager: ${managerName}<br/>${company}`)}
+        </div>`;
+
     } else if (docType.includes('Performance Review')) {
-      extraContent = `<div class="section"><h3>Review Details</h3>
-        <div class="row"><div class="field"><label>Review Period</label><p>${docType.replace('Performance Review ', '')}</p></div><div class="field"><label>Employee</label><p>${profile.name}</p></div></div>
-      </div>`;
+      const period = docType.includes('Q') ? docType.replace('Performance Review ', '') : currentQ;
+      content = `
+        <div class="section">
+          <div class="section-title">Review Information</div>
+          ${fieldRow(['Employee', empName], ['Employee ID', empId])}
+          ${fieldRow(['Department', dept], ['Position', position])}
+          ${fieldRow(['Review Period', period], ['Review Date', today])}
+          ${fieldRow(['Reviewer / Manager', managerName], ['Company', company])}
+        </div>
+        <div class="section">
+          <div class="section-title">1. Key Objectives</div>
+          <div class="prose"><p>Objectives set for the review period should be aligned with department goals and the employee's individual development plan. Refer to Goals &amp; OKRs in the HR portal for the specific targets for this period.</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">2. Performance Rating</div>
+          ${fieldRow(['Overall Rating', '_____ / 5'], ['Rating Scale', '1 = Needs Improvement, 5 = Exceptional'])}
+        </div>
+        <div class="section">
+          <div class="section-title">3. Achievements</div>
+          <div class="prose"><p>Notable achievements during the review period:</p>
+            <p>1. _______________________________________________</p>
+            <p>2. _______________________________________________</p>
+            <p>3. _______________________________________________</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">4. Areas for Improvement</div>
+          <div class="prose">
+            <p>1. _______________________________________________</p>
+            <p>2. _______________________________________________</p>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">5. Manager Feedback</div>
+          <div class="prose"><p>_______________________________________________<br/>_______________________________________________<br/>_______________________________________________</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">6. Employee Comments</div>
+          <div class="prose"><p>_______________________________________________<br/>_______________________________________________<br/>_______________________________________________</p></div>
+        </div>
+        <div class="section">
+          <div class="section-title">7. Final Evaluation &amp; Signatures</div>
+          ${fieldRow(['Final Rating', '_____ / 5'], ['Outcome', '☐ Meets Expectations  ☐ Exceeds  ☐ Below Expectations'])}
+          ${sigBlock(`Manager: ${managerName}`, `Employee: ${empName}`)}
+        </div>`;
     }
 
-    const content = `<h1>${branding.companyName} HR - ${docType}</h1><p class="sub">Employee: ${profile.name} | ID: ${profile.userId?.slice(0,8).toUpperCase() || 'N/A'}</p>
-      <div class="section"><h3>Employee Details</h3>
-        <div class="row"><div class="field"><label>Full Name</label><p>${profile.name}</p></div><div class="field"><label>Role</label><p>${roleLabel}</p></div><div class="field"><label>Position</label><p>${profile.position || '—'}</p></div></div>
-        <div class="row"><div class="field"><label>Department</label><p>${profile.department || '—'}</p></div><div class="field"><label>Company</label><p>${profile.company || '—'}</p></div><div class="field"><label>Email</label><p>${profile.email}</p></div></div>
-        <div class="row"><div class="field"><label>Salary</label><p>${profile.salary || '—'}</p></div><div class="field"><label>Status</label><p>${profile.status || 'active'}</p></div><div class="field"><label>Join Date</label><p>${joinDate}</p></div></div>
-      </div>${extraContent}`;
-    exportToPDFDoc(docType, content, branding.companyName);
+    exportToPDFDoc(docType, content, brandObj);
   };
 
   // Profile image upload handler
@@ -501,7 +796,12 @@ export function SharedMyProfile() {
           const sorted = [...payslips].sort((a, b) => { const av = a[payslipSort.key]||'', bv = b[payslipSort.key]||''; return payslipSort.dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av)); });
           const toggleSort = (k: string) => setPayslipSort(p => p.key === k ? { key: k, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: 'desc' });
           const SI = ({ c }: { c: string }) => payslipSort.key === c ? (payslipSort.dir === 'asc' ? <ArrowUp className="w-3 h-3 ml-1 inline" /> : <ArrowDown className="w-3 h-3 ml-1 inline" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline opacity-30" />;
-          const printAll = () => { if (!profile) return; const rows = sorted.map(p => { const net = (parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `<tr><td>${p.period||'—'}</td><td>${p.payDate||'—'}</td><td>${currencySymbol} ${parseFloat(p.basicSalary||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.allowances||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.deductions||0).toLocaleString()}</td><td><strong>${currencySymbol} ${parseFloat(net).toLocaleString()}</strong></td><td>${p.status||'pending'}</td></tr>`; }).join(''); exportToPDFDoc('Payslip Report', `<h1>${branding.companyName} — Payslip Report</h1><p class="sub">Employee: ${profile.name} | Generated: ${new Date().toLocaleString()}</p><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f3f4f6;"><th>Period</th><th>Pay Date</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`, branding.companyName); };
+          const printAll = () => {
+            if (!profile) return;
+            const rows = sorted.map(p => { const net = (parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `<tr><td>${p.period||'—'}</td><td>${p.payDate||'—'}</td><td>${currencySymbol} ${parseFloat(p.basicSalary||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.allowances||0).toLocaleString()}</td><td>${currencySymbol} ${parseFloat(p.deductions||0).toLocaleString()}</td><td><strong>${currencySymbol} ${parseFloat(net).toLocaleString()}</strong></td><td>${p.status||'pending'}</td></tr>`; }).join('');
+            const b: PDFBranding = { companyName: branding.companyName, logoUrl: branding.logoUrl, primaryColor: branding.primaryColor, companyAddress: branding.companyAddress, companyPhone: branding.companyPhone, companyEmail: branding.companyEmail, companyWebsite: branding.companyWebsite, description: branding.description };
+            exportToPDFDoc('Payslip Report', `<div class="section"><div class="section-title">Employee: ${profile.name}</div><p style="font-size:11px;color:#888;margin-bottom:12px;">Generated: ${new Date().toLocaleString()}</p><table border="0" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #e5e7eb;"><thead><tr style="background:#f3f4f6;"><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Period</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Pay Date</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Basic</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Allowances</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Deductions</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Net Pay</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Status</th></tr></thead><tbody>${rows}</tbody></table></div>`, b);
+          };
           return (
           <Card>
             <CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">My Payslips</CardTitle>{payslips.length > 0 && <div className="flex gap-2"><Button variant="outline" size="sm" onClick={printAll}><Printer className="w-3.5 h-3.5 mr-1" />Print All</Button><Button variant="outline" size="sm" onClick={() => { const csv = ['Period,Pay Date,Basic,Allowances,Deductions,Net,Status',...sorted.map(p => { const net=(parseFloat(p.basicSalary||0)+parseFloat(p.allowances||0)-parseFloat(p.deductions||0)).toFixed(2); return `${p.period||''},${p.payDate||''},${p.basicSalary||0},${p.allowances||0},${p.deductions||0},${net},${p.status||'pending'}`; })].join('\n'); const b=new Blob([csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='payslips.csv'; a.click(); URL.revokeObjectURL(u); toast.success('Exported'); }}><Download className="w-3.5 h-3.5 mr-1" />CSV</Button></div>}</div></CardHeader>
@@ -546,7 +846,12 @@ export function SharedMyProfile() {
           const sorted = [...leaves].sort((a, b) => { const av = a[leaveSort.key]||'', bv = b[leaveSort.key]||''; return leaveSort.dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av)); });
           const toggleSort = (k: string) => setLeaveSort(p => p.key === k ? { key: k, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: 'desc' });
           const SI = ({ c }: { c: string }) => leaveSort.key === c ? (leaveSort.dir === 'asc' ? <ArrowUp className="w-3 h-3 ml-1 inline" /> : <ArrowDown className="w-3 h-3 ml-1 inline" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline opacity-30" />;
-          const printLeave = () => { if (!profile) return; const rows = sorted.map(l => `<tr><td>${l.leaveType||l.type||'—'}</td><td>${l.startDate||'—'}</td><td>${l.endDate||'—'}</td><td>${l.reason||'—'}</td><td>${l.status}</td></tr>`).join(''); exportToPDFDoc('Leave History', `<h1>${branding.companyName} — Leave History</h1><p class="sub">Employee: ${profile.name} | Generated: ${new Date().toLocaleString()}</p><table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f3f4f6;"><th>Type</th><th>Start</th><th>End</th><th>Reason</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`, branding.companyName); };
+          const printLeave = () => {
+            if (!profile) return;
+            const rows = sorted.map(l => `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${l.leaveType||l.type||'—'}</td><td style="padding:8px;border:1px solid #e5e7eb;">${l.startDate||'—'}</td><td style="padding:8px;border:1px solid #e5e7eb;">${l.endDate||'—'}</td><td style="padding:8px;border:1px solid #e5e7eb;">${l.reason||'—'}</td><td style="padding:8px;border:1px solid #e5e7eb;">${l.status}</td></tr>`).join('');
+            const b: PDFBranding = { companyName: branding.companyName, logoUrl: branding.logoUrl, primaryColor: branding.primaryColor, companyAddress: branding.companyAddress, companyPhone: branding.companyPhone, companyEmail: branding.companyEmail, companyWebsite: branding.companyWebsite, description: branding.description };
+            exportToPDFDoc('Leave History', `<div class="section"><div class="section-title">Employee: ${profile.name}</div><p style="font-size:11px;color:#888;margin-bottom:12px;">Generated: ${new Date().toLocaleString()}</p><table border="0" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #e5e7eb;"><thead><tr style="background:#f3f4f6;"><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Type</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Start</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">End</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Reason</th><th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Status</th></tr></thead><tbody>${rows}</tbody></table></div>`, b);
+          };
           return (
           <Card>
             <CardHeader><div className="flex items-center justify-between"><CardTitle className="text-base">Leave History</CardTitle>{leaves.length > 0 && <Button variant="outline" size="sm" onClick={printLeave}><Printer className="w-3.5 h-3.5 mr-1" />Print</Button>}</div></CardHeader>
