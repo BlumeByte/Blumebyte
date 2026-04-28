@@ -115,7 +115,7 @@ export function PasswordReset() {
       subscription.unsubscribe();
       if (recoveryTimeout) clearTimeout(recoveryTimeout);
     };
-  }, [token, code]);
+  }, [token, code, initialHash]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
