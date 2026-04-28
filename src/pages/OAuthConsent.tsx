@@ -124,6 +124,17 @@ export default function OAuthConsent() {
       navigate('/login');
       return;
     }
+    // Basic safety check: only redirect to http(s) URLs to prevent open redirect
+    try {
+      const parsed = new URL(redirectUri);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        navigate('/login');
+        return;
+      }
+    } catch {
+      navigate('/login');
+      return;
+    }
     const sep = redirectUri.includes('?') ? '&' : '?';
     const deniedUrl = redirectUri
       + sep
@@ -191,7 +202,7 @@ export default function OAuthConsent() {
             <Shield className="h-4 w-4" />
             <AlertTitle>Permission Request</AlertTitle>
             <AlertDescription>
-              This application (<code className="text-xs bg-gray-100 px-1 rounded">{clientId}</code>) is requesting:
+              This application (<span aria-label={`Client ID: ${clientId}`}><code className="text-xs bg-gray-100 px-1 rounded">{clientId}</code></span>) is requesting:
             </AlertDescription>
           </Alert>
 

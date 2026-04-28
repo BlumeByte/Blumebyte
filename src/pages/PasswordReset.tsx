@@ -81,7 +81,7 @@ export function PasswordReset() {
         // Stay in loading state and rely on the onAuthStateChange handler above.
         // Set a fallback timeout so the user isn't stuck forever.
         recoveryTimeout = setTimeout(() => {
-          setError('This reset link has expired or is invalid. Please request a new one.');
+          setError('Password reset timed out. Please check your connection or request a new reset link.');
           setValidating(false);
         }, 15000);
       } else if (token) {
