@@ -2621,7 +2621,9 @@ app.put(`${PREFIX}/my-tasks/:id`, async (c) => {
     const existing = await kv.get(`task:${id}`);
     if (!existing) return c.json({ error: "Task not found" }, 404);
     const userName = user.user_metadata?.name || user.email;
-    const isOwner = existing.assigneeId === user.id || existing.assignedToId === user.id || existing.employeeId === user.id || existing.userId === user.id || existing.assignedTo === userName || existing.assignedTo === user.id || existing.assignee === userName;
+    const isSingleAssignee = existing.assigneeId === user.id || existing.assignedToId === user.id || existing.employeeId === user.id || existing.userId === user.id || existing.assignedTo === userName || existing.assignedTo === user.id || existing.assignee === userName || existing.assignedToName === userName;
+    const isInAssigneesArray = Array.isArray(existing.assignedToIds) && existing.assignedToIds.includes(user.id);
+    const isOwner = isSingleAssignee || isInAssigneesArray;
     if (!isOwner) {
       return c.json({ error: "Not your task" }, 403);
     }
@@ -2759,11 +2761,16 @@ app.get(`${PREFIX}/my-compliance`, async (c) => {
     const { user } = await requireAuth(c);
     const allItems = await kv.getByPrefix("compliance:");
     const userName = user.user_metadata?.name || user.email;
-    const myItems = allItems.filter((c: any) => {
+    const userCompanyId = await getCompanyId(user.id);
+    const myItems = allItems.filter((item: any) => {
       // Support assignedTo as array
-      const isSingleAssignee = c.responsibleId === user.id || c.responsibleName === userName || c.assignedTo === user.id;
-      const isInAssigneesArray = Array.isArray(c.assignedTo) && c.assignedTo.includes(user.id);
-      return isSingleAssignee || isInAssigneesArray;
+      const isSingleAssignee = item.responsibleId === user.id || item.responsibleName === userName || item.assignedTo === user.id;
+      const isInAssigneesArray = Array.isArray(item.assignedTo) && item.assignedTo.includes(user.id);
+      // Also include company-wide items (no specific assignee) from the same company
+      const hasNoAssignee = !item.responsibleId && !item.responsibleName &&
+        (!item.assignedTo || (Array.isArray(item.assignedTo) && item.assignedTo.length === 0));
+      const sameCompany = userCompanyId && (item.companyId === userCompanyId || item.company === userCompanyId);
+      return isSingleAssignee || isInAssigneesArray || (hasNoAssignee && sameCompany);
     });
     return c.json(myItems);
   } catch (e: any) {

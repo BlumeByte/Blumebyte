@@ -156,8 +156,14 @@ export function SharedMyProfile() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, []);
-  // Increase refresh interval to 60 seconds to reduce unnecessary reloads
+  // Refresh profile every 60 seconds
   useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
+  // Immediately reload profile when HR approves profile changes
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('blumebyte:profile-updated', handler);
+    return () => window.removeEventListener('blumebyte:profile-updated', handler);
+  }, [load]);
 
   const handleEditSave = async () => {
     setSaving(true);
@@ -400,6 +406,43 @@ export function SharedMyProfile() {
           <div class="prose"><p>I, <strong>${empName}</strong>, agree to the terms and conditions of the selected benefits as outlined in this enrollment form and the company's Benefits Policy.</p></div>
           ${sigBlock(`Employee: ${empName}`, `HR Manager: ${managerName}<br/>${company}`)}
         </div>`;
+
+    } else if (docType.startsWith('Payslip - ')) {
+      const period = docType.replace('Payslip - ', '');
+      const p = payslips.find((ps: any) => ps.period === period) || payslips[0];
+      if (p) {
+        const net = (parseFloat(p.basicSalary || 0) + parseFloat(p.allowances || 0) - parseFloat(p.deductions || 0)).toFixed(2);
+        content = `
+          <div class="section">
+            <div class="section-title">Employee Information</div>
+            ${fieldRow(['Employee Name', empName], ['Employee ID', empId])}
+            ${fieldRow(['Department', dept], ['Position', position])}
+            ${fieldRow(['Company', company], ['Email', empEmail])}
+          </div>
+          <div class="section">
+            <div class="section-title">Payslip Details — ${p.period || '—'}</div>
+            ${fieldRow(['Pay Period', p.period || '—'], ['Pay Date', p.payDate || '—'])}
+            ${fieldRow(['Status', p.status || 'pending'], ['Reference', p.id ? p.id.slice(0, 8).toUpperCase() : '—'])}
+          </div>
+          <div class="section">
+            <div class="section-title">Earnings &amp; Deductions</div>
+            <table border="0" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #e5e7eb;">
+              <tbody>
+                <tr style="background:#f9fafb;"><td style="padding:8px;border:1px solid #e5e7eb;font-weight:600;">Basic Salary</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:right;">${currencySymbol} ${parseFloat(p.basicSalary || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+                <tr><td style="padding:8px;border:1px solid #e5e7eb;">Allowances</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:right;color:#16a34a;">+ ${currencySymbol} ${parseFloat(p.allowances || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+                <tr><td style="padding:8px;border:1px solid #e5e7eb;">Deductions</td><td style="padding:8px;border:1px solid #e5e7eb;text-align:right;color:#dc2626;">- ${currencySymbol} ${parseFloat(p.deductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+                <tr style="background:#f0fdf4;font-weight:700;"><td style="padding:10px;border:1px solid #e5e7eb;">Net Pay</td><td style="padding:10px;border:1px solid #e5e7eb;text-align:right;font-size:14px;">${currencySymbol} ${parseFloat(net).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+              </tbody>
+            </table>
+            ${p.notes ? `<p style="margin-top:12px;font-size:11px;color:#6b7280;"><em>Notes: ${p.notes}</em></p>` : ''}
+          </div>
+          <div class="section">
+            <div class="section-title">Acknowledgement</div>
+            ${sigBlock(`Employee: ${empName}`, `HR Manager / ${company}`)}
+          </div>`;
+      } else {
+        content = `<div class="section"><p>No payslip data found for the selected period.</p></div>`;
+      }
 
     } else if (docType.includes('Performance Review')) {
       const period = docType.includes('Q') ? docType.replace('Performance Review ', '') : currentQ;

@@ -64,7 +64,9 @@ console.warn = (...args: any[]) => {
 };
 
 // Enhanced error handling for production
-let initializationFailed = false;
+// Track whether the React app has successfully mounted to avoid showing
+// the init-failure overlay for ordinary runtime errors (click handlers, etc.)
+let appInitialized = false;
 
 window.onerror = (message, source, lineno, colno, error) => {
   // Allow suppressed warnings to pass through
@@ -75,9 +77,9 @@ window.onerror = (message, source, lineno, colno, error) => {
   // Log actual errors
   originalConsoleError('Global error:', message, 'at', source, lineno, colno, error);
   
-  // If the app hasn't rendered yet, show a user-friendly error
-  if (!initializationFailed) {
-    initializationFailed = true;
+  // Only show the init overlay for errors that happen BEFORE the app mounts.
+  // After mount the React ErrorBoundary (and Sonner toasts) handle runtime errors.
+  if (!appInitialized) {
     showInitializationError(String(message));
   }
   
@@ -92,8 +94,7 @@ window.onunhandledrejection = (event) => {
   
   originalConsoleError('Unhandled promise rejection:', event.reason);
   
-  if (!initializationFailed) {
-    initializationFailed = true;
+  if (!appInitialized) {
     showInitializationError(`Promise rejection: ${event.reason}`);
   }
 };
@@ -201,9 +202,10 @@ try {
       </ErrorBoundary>
     </StrictMode>
   );
-  
+
+  // Mark app as successfully mounted so runtime errors don't show the init overlay
+  requestAnimationFrame(() => { appInitialized = true; });
   
 } catch (error) {
-  initializationFailed = true;
   showInitializationError(error instanceof Error ? error.message : String(error));
 }

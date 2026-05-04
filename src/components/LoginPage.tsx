@@ -39,6 +39,8 @@ export function LoginPage() {
   const [totpError, setTotpError] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
   const [pendingPassword, setPendingPassword] = useState('');
+  // Whether the pending 2FA is email-OTP (true) or TOTP authenticator app (false)
+  const [is2FAEmail, setIs2FAEmail] = useState(false);
 
   useEffect(() => {
     // Check for logout reason in URL
@@ -68,26 +70,41 @@ export function LoginPage() {
     e.preventDefault();
     clearError();
     try {
-      // Check if TOTP is required BEFORE calling login, so we can intercept if needed
+      // Check 2FA status BEFORE calling login so we can intercept if needed
       let needsTotp = false;
+      let needsEmailOtp = false;
       try {
         const statusData = await api(`/auth/2fa/status?email=${encodeURIComponent(email)}`);
         needsTotp = statusData?.totpEnabled === true;
+        // Email OTP: enabled but no TOTP configured → use email flow
+        needsEmailOtp = !needsTotp && statusData?.twoFactorEnabled === true;
       } catch {
-        // If status check fails, proceed without TOTP
+        // If status check fails, proceed without 2FA
       }
 
-      if (needsTotp) {
-        // Show TOTP form — login will complete after code verification
+      if (needsTotp || needsEmailOtp) {
         setPendingEmail(email);
         setPendingPassword(password);
-        // Clear password from primary state to avoid keeping it in memory
         setPassword('');
+        setIs2FAEmail(needsEmailOtp);
         setTotpRequired(true);
+        // For email OTP, send the code immediately
+        if (needsEmailOtp) {
+          try {
+            await api('/auth/2fa/send-code', { method: 'POST', body: { email } });
+            toast.success('Verification code sent to your email');
+          } catch {
+            toast.error('Failed to send verification code. Please try again.');
+            setTotpRequired(false);
+            setPendingEmail('');
+            setPendingPassword('');
+            return;
+          }
+        }
         return;
       }
 
-      // No TOTP — sign in normally
+      // No 2FA — sign in normally
       await login(email, password);
     } catch (_) {}
   };
@@ -97,12 +114,20 @@ export function LoginPage() {
     setTotpLoading(true);
     setTotpError('');
     try {
-      // First, verify the TOTP code is correct before signing in
-      await api('/auth/totp/verify-login', {
-        method: 'POST',
-        body: { email: pendingEmail, code: totpCode },
-      });
-      // Code is valid — now complete the password login (capture before clearing)
+      if (is2FAEmail) {
+        // Email OTP verification
+        await api('/auth/2fa/verify-code', {
+          method: 'POST',
+          body: { email: pendingEmail, code: totpCode },
+        });
+      } else {
+        // TOTP authenticator app verification
+        await api('/auth/totp/verify-login', {
+          method: 'POST',
+          body: { email: pendingEmail, code: totpCode },
+        });
+      }
+      // Code is valid — complete the password login
       const savedPassword = pendingPassword;
       setTotpRequired(false);
       setPendingPassword('');
@@ -111,6 +136,15 @@ export function LoginPage() {
       setTotpError(err.message || 'Invalid code. Please try again.');
     } finally {
       setTotpLoading(false);
+    }
+  };
+
+  const handleResendEmailCode = async () => {
+    try {
+      await api('/auth/2fa/send-code', { method: 'POST', body: { email: pendingEmail } });
+      toast.success('New verification code sent to your email');
+    } catch {
+      toast.error('Failed to resend code. Please try again.');
     }
   };
 
@@ -145,7 +179,7 @@ export function LoginPage() {
     );
   }
 
-  // TOTP verification screen
+  // 2FA verification screen (handles both email OTP and TOTP authenticator)
   if (totpRequired) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={blumeGradientStyle()}>
@@ -161,7 +195,11 @@ export function LoginPage() {
                 </div>
               </div>
               <p className="font-semibold text-gray-900 mt-1">Two-Factor Authentication</p>
-              <p className="text-sm text-gray-500">Open your authenticator app and enter the 6-digit code for Blumebyte HR.</p>
+              <p className="text-sm text-gray-500">
+                {is2FAEmail
+                  ? `Enter the 6-digit code sent to ${pendingEmail}`
+                  : 'Open your authenticator app and enter the 6-digit code for Blumebyte HR.'}
+              </p>
             </CardHeader>
             <CardContent className="pt-4 pb-8 px-8">
               <form onSubmit={handleTotpSubmit} className="space-y-4">
@@ -172,7 +210,7 @@ export function LoginPage() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="totp-code">Authenticator Code</Label>
+                  <Label htmlFor="totp-code">{is2FAEmail ? 'Email Verification Code' : 'Authenticator Code'}</Label>
                   <Input
                     id="totp-code"
                     type="text"
@@ -196,10 +234,21 @@ export function LoginPage() {
                   {totpLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                   Verify &amp; Sign In
                 </Button>
+                {is2FAEmail && (
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={handleResendEmailCode}
+                      className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      Resend code
+                    </button>
+                  </div>
+                )}
                 <div className="text-center">
                   <button
                     type="button"
-                    onClick={() => { setTotpRequired(false); setTotpCode(''); setTotpError(''); setPendingPassword(''); setPendingEmail(''); }}
+                    onClick={() => { setTotpRequired(false); setTotpCode(''); setTotpError(''); setPendingPassword(''); setPendingEmail(''); setIs2FAEmail(false); }}
                     className="text-xs text-gray-500 hover:text-black transition-colors"
                   >
                     ← Back to login

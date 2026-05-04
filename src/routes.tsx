@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router';
-import { lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider } from './lib/auth-context';
 import { BrandingProvider } from './lib/branding-context';
@@ -41,19 +41,33 @@ import HiringsPage from './pages/HiringsPage';
 import HiringDetailPage from './pages/HiringDetailPage';
 import CustomerCareDashboard from './pages/UltimateadminSupport';
 
+// Retry helper for lazy imports: on network failure, bust the cache and retry once.
+function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    factory().catch(() =>
+      factory().catch(err => {
+        // If both attempts fail, reload the page to clear the stale module cache
+        console.error('Failed to load module after retry, reloading page:', err);
+        window.location.reload();
+        return factory();
+      })
+    )
+  );
+}
+
 // PERFORMANCE: Lazy load heavy dashboard components
-const SuperAdminDashboard = lazy(() => import('./components/SuperAdminDashboard'));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
-const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
-const EmployeeDashboard = lazy(() => import('./components/EmployeeDashboard'));
-const PaymentVerification = lazy(() => import('./components/PaymentVerification'));
-const LicensePaymentVerification = lazy(() => import('./components/LicensePaymentVerification'));
+const SuperAdminDashboard = lazyWithRetry(() => import('./components/SuperAdminDashboard'));
+const AdminDashboard = lazyWithRetry(() => import('./components/AdminDashboard'));
+const ManagerDashboard = lazyWithRetry(() => import('./components/ManagerDashboard'));
+const EmployeeDashboard = lazyWithRetry(() => import('./components/EmployeeDashboard'));
+const PaymentVerification = lazyWithRetry(() => import('./components/PaymentVerification'));
+const LicensePaymentVerification = lazyWithRetry(() => import('./components/LicensePaymentVerification'));
 
 // PERFORMANCE: Lazy load EmployeeChat to reduce initial bundle
-const EmployeeChat = lazy(() => import('./components/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
+const EmployeeChat = lazyWithRetry(() => import('./components/EmployeeChat').then(m => ({ default: m.EmployeeChat })));
 
 // PERFORMANCE: Lazy load NotificationsPage
-const NotificationsPage = lazy(() => import('./components/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
+const NotificationsPage = lazyWithRetry(() => import('./components/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
 
 // Loading fallback component
 const LoadingFallback = () => (

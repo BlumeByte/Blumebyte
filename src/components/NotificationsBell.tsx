@@ -101,13 +101,19 @@ export function NotificationsBell() {
       const newUnreadCount = notifs.filter((n: any) => !n.read).length;
       if (soundEnabled && newUnreadCount > prevUnreadRef.current && prevUnreadRef.current > 0) {
         playPopSound();
+        // Check if any new unread notifications are profile-change-approved — trigger reload
+        const prevIds = new Set((notifications).map((n: any) => n.id));
+        const newNotifs = notifs.filter((n: any) => !n.read && !prevIds.has(n.id));
+        if (newNotifs.some((n: any) => n.type === 'profile-change-approved')) {
+          window.dispatchEvent(new CustomEvent('blumebyte:profile-updated'));
+        }
       }
       prevUnreadRef.current = newUnreadCount;
     } catch (e: any) { 
       console.log('Notifications fetch error:', e);
       setNotifications([]);
     }
-  }, [accessToken, soundEnabled]);
+  }, [accessToken, soundEnabled, notifications]);
 
   useEffect(() => {
     fetchNotifications();
