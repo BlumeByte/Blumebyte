@@ -2093,7 +2093,7 @@ function AdminSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm flex items-center gap-2">
-            🌙 Appearance
+            Appearance
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -2217,7 +2217,7 @@ function AdminSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm flex items-center gap-2">
-            🌐 Display Language
+            Display Language
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             Choose the display language for your dashboard.
@@ -2367,7 +2367,7 @@ function AdminHiring() {
                       <TableCell className="text-sm">{p.type || '—'}</TableCell>
                       <TableCell className="text-sm">{p.location || '—'}</TableCell>
                       <TableCell className="text-sm">{p.salaryRange || '—'}</TableCell>
-                      <TableCell><Badge className={p.visibilityType === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-muted text-muted-foreground'}>{p.visibilityType === 'public_global' ? '🌍 Global' : 'Internal'}</Badge></TableCell>
+                      <TableCell><Badge className={p.visibilityType === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-muted text-muted-foreground'}>{p.visibilityType === 'public_global' ? 'Global' : 'Internal'}</Badge></TableCell>
                       <TableCell><Badge className={statusColor(p.status)}>{p.status}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -2454,7 +2454,7 @@ function AdminHiring() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="internal_only">Internal Only</SelectItem>
-                    <SelectItem value="public_global">🌍 Global (public job board)</SelectItem>
+                    <SelectItem value="public_global">Global (public job board)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2994,26 +2994,41 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
                     </SelectContent>
                   </Select>
                 ) : f.type === 'user-multi-select' ? (
-                  <div className="max-h-40 overflow-y-auto border rounded-lg p-2 bg-white space-y-1">
-                    {allUsers.length === 0 ? (
-                      <p className="text-xs text-gray-400 p-2">No users loaded</p>
-                    ) : allUsers.map(u => {
-                      const uid = u.userId || u.id;
-                      const selected = Array.isArray(formData[f.key]) ? formData[f.key].includes(uid) : false;
-                      return (
-                        <label key={uid} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer hover:bg-gray-50 ${selected ? 'bg-blue-50' : ''}`}>
-                          <input type="checkbox" checked={selected} onChange={() => {
-                            const current = Array.isArray(formData[f.key]) ? [...formData[f.key]] : [];
-                            const updated = selected ? current.filter(id => id !== uid) : [...current, uid];
-                            const names = updated.map(id => { const found = allUsers.find(u => (u.userId || u.id) === id); return found?.name || id; });
-                            setFormData({ ...formData, [f.key]: updated, [f.key.replace(/Ids$/, 'Names')]: names });
-                          }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                          <span className="text-sm">{u.name}</span>
-                          <Badge variant="outline" className="text-[10px]">{u.role}</Badge>
-                        </label>
-                      );
-                    })}
-                    <p className="text-[10px] text-gray-400 pt-1 border-t mt-1">{(Array.isArray(formData[f.key]) ? formData[f.key].length : 0)} selected</p>
+                  <div className="border rounded-lg bg-background dark:bg-gray-800">
+                    <div className="flex items-center justify-between px-2 py-1.5 border-b dark:border-gray-700">
+                      <span className="text-xs text-muted-foreground">{(Array.isArray(formData[f.key]) ? formData[f.key].length : 0)} of {allUsers.length} selected</span>
+                      <div className="flex gap-1">
+                        <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => {
+                          const allIds = allUsers.map(u => u.userId || u.id);
+                          const allNames = allUsers.map(u => u.name || '');
+                          setFormData({ ...formData, [f.key]: allIds, [f.key.replace(/Ids$/, 'Names')]: allNames });
+                        }}>Select All</button>
+                        <span className="text-xs text-muted-foreground">·</span>
+                        <button type="button" className="text-xs text-gray-500 hover:underline" onClick={() => {
+                          setFormData({ ...formData, [f.key]: [], [f.key.replace(/Ids$/, 'Names')]: [] });
+                        }}>Clear</button>
+                      </div>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+                      {allUsers.length === 0 ? (
+                        <p className="text-xs text-muted-foreground p-2">No users loaded</p>
+                      ) : allUsers.map(u => {
+                        const uid = u.userId || u.id;
+                        const selected = Array.isArray(formData[f.key]) ? formData[f.key].includes(uid) : false;
+                        return (
+                          <label key={uid} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer hover:bg-accent dark:hover:bg-gray-700 ${selected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
+                            <input type="checkbox" checked={selected} onChange={() => {
+                              const current = Array.isArray(formData[f.key]) ? [...formData[f.key]] : [];
+                              const updated = selected ? current.filter(id => id !== uid) : [...current, uid];
+                              const names = updated.map(id => { const found = allUsers.find(u => (u.userId || u.id) === id); return found?.name || id; });
+                              setFormData({ ...formData, [f.key]: updated, [f.key.replace(/Ids$/, 'Names')]: names });
+                            }} className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+                            <span className="text-sm dark:text-gray-200">{u.name}</span>
+                            <Badge variant="outline" className="text-[10px] dark:border-gray-600 dark:text-gray-300">{u.role}</Badge>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : f.type === 'questions' ? (
                   <div className="space-y-2">

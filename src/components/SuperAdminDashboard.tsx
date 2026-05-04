@@ -507,7 +507,7 @@ export function SuperAdminDashboard() {
       case 'settings': return (
         <div className="p-8 space-y-8">
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">🌙 Appearance</h2>
+            <h2 className="text-2xl font-bold mb-6">Appearance</h2>
             <Card className="max-w-md">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -528,12 +528,12 @@ export function SuperAdminDashboard() {
           </div>
 
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">🎨 Company Branding</h2>
+            <h2 className="text-2xl font-bold mb-6">Company Branding</h2>
             <CompanyBrandingSettings />
           </div>
           
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">💱 Global Currency Settings</h2>
+            <h2 className="text-2xl font-bold mb-6">Global Currency Settings</h2>
             <Card>
               <CardHeader>
                 <CardTitle>Select Default Currency</CardTitle>
@@ -545,22 +545,22 @@ export function SuperAdminDashboard() {
           </div>
           
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">🌐 Language</h2>
+            <h2 className="text-2xl font-bold mb-6">Language</h2>
             <LanguageSettingsCard />
           </div>
           
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">⏰ Working Hours Configuration</h2>
+            <h2 className="text-2xl font-bold mb-6">Working Hours Configuration</h2>
             <WorkingHoursConfig />
           </div>
 
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">🔐 Two-Factor Authentication</h2>
+            <h2 className="text-2xl font-bold mb-6">Two-Factor Authentication</h2>
             <TwoFactorSettings />
           </div>
 
           <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">🔔 Notification Preferences</h2>
+            <h2 className="text-2xl font-bold mb-6">Notification Preferences</h2>
             <div className="max-w-xl">
               <NotificationSettings />
             </div>
@@ -725,11 +725,8 @@ function LanguageSettingsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm flex items-center gap-2">
-            🌐 Display Language
+            Display Language
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Choose the display language for your dashboard. The entire application, including documents and exports, will reflect this language.
-          </p>
         </CardHeader>
         <CardContent>
           <LanguageSelector variant="card" />
@@ -4176,7 +4173,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                             }>{typeof item[f.key] === 'string' ? item[f.key] : String(item[f.key] || '')}</Badge>
                           ) : f.key === 'visibilityType' ? (
                             <Badge className={item[f.key] === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}>
-                              {item[f.key] === 'public_global' ? '🌍 Public' : '🔒 Internal'}
+                              {item[f.key] === 'public_global' ? 'Public' : 'Internal'}
                             </Badge>
                           ) : f.key === 'rating' ? (
                             <div className="flex items-center gap-1">
@@ -4378,26 +4375,41 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                       })}
                     </NativeSelect>
                   ) : field.type === 'user-multi-select' ? (
-                    <div className="max-h-40 overflow-y-auto border rounded-lg p-2 bg-white space-y-1">
-                      {allUsers.length === 0 ? (
-                        <p className="text-xs text-gray-400 p-2">No users loaded</p>
-                      ) : allUsers.map(u => {
-                        const uid = u.userId || u.id;
-                        const selected = Array.isArray(formData[field.key]) ? formData[field.key].includes(uid) : false;
-                        return (
-                          <label key={uid} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer hover:bg-gray-50 ${selected ? 'bg-blue-50' : ''}`}>
-                            <input type="checkbox" checked={selected} onChange={() => {
-                              const current = Array.isArray(formData[field.key]) ? [...formData[field.key]] : [];
-                              const updated = selected ? current.filter(id => id !== uid) : [...current, uid];
-                              const names = updated.map(id => { const f = allUsers.find(u => (u.userId || u.id) === id); return f?.name || id; });
-                              setFormData({ ...formData, [field.key]: updated, [field.key.replace(/Ids$/, 'Names')]: names });
-                            }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                            <span className="text-sm">{u.name}</span>
-                            <Badge variant="outline" className="text-[10px]">{u.role}</Badge>
-                          </label>
-                        );
-                      })}
-                      <p className="text-[10px] text-gray-400 pt-1 border-t mt-1">{(Array.isArray(formData[field.key]) ? formData[field.key].length : 0)} selected</p>
+                    <div className="border rounded-lg bg-background dark:bg-gray-800">
+                      <div className="flex items-center justify-between px-2 py-1.5 border-b dark:border-gray-700">
+                        <span className="text-xs text-muted-foreground">{(Array.isArray(formData[field.key]) ? formData[field.key].length : 0)} of {allUsers.length} selected</span>
+                        <div className="flex gap-1">
+                          <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => {
+                            const allIds = allUsers.map(u => u.userId || u.id);
+                            const allNames = allUsers.map(u => u.name || '');
+                            setFormData({ ...formData, [field.key]: allIds, [field.key.replace(/Ids$/, 'Names')]: allNames });
+                          }}>Select All</button>
+                          <span className="text-xs text-muted-foreground">·</span>
+                          <button type="button" className="text-xs text-gray-500 hover:underline" onClick={() => {
+                            setFormData({ ...formData, [field.key]: [], [field.key.replace(/Ids$/, 'Names')]: [] });
+                          }}>Clear</button>
+                        </div>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+                        {allUsers.length === 0 ? (
+                          <p className="text-xs text-muted-foreground p-2">No users loaded</p>
+                        ) : allUsers.map(u => {
+                          const uid = u.userId || u.id;
+                          const selected = Array.isArray(formData[field.key]) ? formData[field.key].includes(uid) : false;
+                          return (
+                            <label key={uid} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer hover:bg-accent dark:hover:bg-gray-700 ${selected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
+                              <input type="checkbox" checked={selected} onChange={() => {
+                                const current = Array.isArray(formData[field.key]) ? [...formData[field.key]] : [];
+                                const updated = selected ? current.filter(id => id !== uid) : [...current, uid];
+                                const names = updated.map(id => { const f = allUsers.find(u => (u.userId || u.id) === id); return f?.name || id; });
+                                setFormData({ ...formData, [field.key]: updated, [field.key.replace(/Ids$/, 'Names')]: names });
+                              }} className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+                              <span className="text-sm dark:text-gray-200">{u.name}</span>
+                              <Badge variant="outline" className="text-[10px] dark:border-gray-600 dark:text-gray-300">{u.role}</Badge>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : field.type === 'questions' ? (
                     <div className="space-y-2">

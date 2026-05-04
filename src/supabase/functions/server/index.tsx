@@ -6533,23 +6533,21 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
   try {
     const { user, role } = await requireSuperAdmin(c);
     const body = await c.req.json();
-    const { plan, userCount, amount } = body;
+    // Accept both 'userCount' (legacy) and 'licenses' (current LicenseManagement field name)
+    const plan = body.plan;
+    const userCount = Number(body.userCount || body.licenses || 0);
     
-    if (!plan || !userCount || !amount) {
-      return c.json({ error: 'Missing required fields: plan, userCount, amount' }, 400);
+    if (!plan || !userCount) {
+      return c.json({ error: 'Missing required fields: plan, userCount (or licenses)' }, 400);
     }
     
     if (!['monthly', 'yearly'].includes(plan)) {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
     
-    // Validate pricing — $6/user/month or $60/user/year (matches LicenseManagement & PricingPage)
+    // Always compute amount server-side — never trust client-provided amount
     const pricePerUser = plan === 'monthly' ? 6 : 60;
-    const expectedPrice = userCount * pricePerUser;
-    if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
-      console.error(`subscription/initialize: amount mismatch — received ${amount}, expected ${expectedPrice} (${userCount} users × $${pricePerUser}/${plan})`);
-      return c.json({ error: 'Invalid amount for the selected plan' }, 400);
-    }
+    const amount = userCount * pricePerUser;
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
@@ -6559,7 +6557,7 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     
     // Initialize Paystack transaction
     const reference = `SUB_${user.id}_${Date.now()}`;
-    const callbackUrl = `${c.req.header('origin')}/payment-verify`;
+    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
     
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -6585,7 +6583,7 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
             {
               display_name: 'User Count',
               variable_name: 'user_count',
-              value: userCount.toString(),
+              value: String(userCount),
             },
           ],
         },
