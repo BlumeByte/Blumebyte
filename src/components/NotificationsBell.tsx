@@ -92,6 +92,9 @@ export function NotificationsBell() {
     } catch (e) { /* ignore audio errors */ }
   };
 
+  // Track previous notification IDs to detect new arrivals without causing re-renders
+  const prevNotifIdsRef = useRef<Set<string>>(new Set());
+
   const fetchNotifications = useCallback(async () => {
     if (!accessToken) return;
     try {
@@ -101,19 +104,19 @@ export function NotificationsBell() {
       const newUnreadCount = notifs.filter((n: any) => !n.read).length;
       if (soundEnabled && newUnreadCount > prevUnreadRef.current && prevUnreadRef.current > 0) {
         playPopSound();
-        // Check if any new unread notifications are profile-change-approved — trigger reload
-        const prevIds = new Set((notifications).map((n: any) => n.id));
-        const newNotifs = notifs.filter((n: any) => !n.read && !prevIds.has(n.id));
+        // Check if any new unread notifications are profile-change-approved — trigger profile reload
+        const newNotifs = notifs.filter((n: any) => !n.read && !prevNotifIdsRef.current.has(n.id));
         if (newNotifs.some((n: any) => n.type === 'profile-change-approved')) {
           window.dispatchEvent(new CustomEvent('blumebyte:profile-updated'));
         }
       }
       prevUnreadRef.current = newUnreadCount;
+      prevNotifIdsRef.current = new Set(notifs.map((n: any) => n.id));
     } catch (e: any) { 
       console.log('Notifications fetch error:', e);
       setNotifications([]);
     }
-  }, [accessToken, soundEnabled, notifications]);
+  }, [accessToken, soundEnabled]);
 
   useEffect(() => {
     fetchNotifications();
