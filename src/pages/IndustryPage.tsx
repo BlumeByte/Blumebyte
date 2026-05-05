@@ -66,7 +66,7 @@ export default function IndustryPage() {
       icon: DollarSign,
       tagline: 'Secure HR solutions for financial institutions',
       description: 'Meet compliance requirements while managing your finance team efficiently.',
-      heroImage: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1920&q=80',
+      heroImage: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1920&q=80',
       challenges: [
         'Strict regulatory compliance',
         'Confidential employee data',

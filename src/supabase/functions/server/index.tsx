@@ -10413,7 +10413,6 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
     // Comparison is case-insensitive to handle any capitalisation drift.
     // Status must be one of the active values (also case-insensitive).
     const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'paused']);
-    const REJECTED_STATUSES = new Set(['closed', 'filled', 'cancelled', 'rejected', 'expired']);
     const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
       // Guard against null/undefined KV entries — a corrupt or partially written record
@@ -10422,9 +10421,9 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
       const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
       if (!GLOBAL_VISIBILITY.has(vt)) return false;
       const st = (j.status || '').toLowerCase();
-      // Show if status is active, OR if status is missing/empty (public_global implies active),
-      // but never show explicitly closed/rejected postings.
-      return !st || ACTIVE_STATUSES.has(st) || !REJECTED_STATUSES.has(st);
+      // Include jobs with no status set (public visibility implies active),
+      // or with an explicitly active status. Excludes draft/closed/filled/etc.
+      return !st || ACTIVE_STATUSES.has(st);
     });
 
 
