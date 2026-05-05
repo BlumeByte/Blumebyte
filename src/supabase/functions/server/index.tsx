@@ -9690,6 +9690,7 @@ app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
       twoFactorEnabled: user.user_metadata?.twoFactorEnabled || false,
       twoFactorVerifiedAt: user.user_metadata?.twoFactorVerifiedAt || null,
       totpEnabled: user.user_metadata?.totpEnabled || false,
+      emailOtpAvailable: Boolean(Deno.env.get('RESEND_API_KEY')),
     });
   } catch (e: any) {
     console.error("2FA status check error:", e);
@@ -10360,7 +10361,7 @@ app.put(`${PREFIX}/notification-preferences`, async (c) => {
       return c.json({ error: 'Failed to save preferences' }, 500);
     }
 
-    return c.json({ success: true, prefs, persistedIn: { kv: kvSaved, metadata: metadataSaved } });
+    return c.json({ success: true, prefs });
   } catch (e: any) {
     console.error('notification-preferences PUT error:', e?.message || e);
     return c.json({ error: 'Failed to save preferences' }, 500);

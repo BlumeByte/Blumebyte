@@ -20,6 +20,13 @@ function blumeGradientStyle() {
   return { background: 'linear-gradient(135deg, #000000, #1a1a1a)' };
 }
 
+function isEmailDeliveryFailure(error: any) {
+  return error?.status === 503
+    || error?.error === 'email_delivery_failed'
+    || (error?.message || '').includes('email_delivery_failed')
+    || (error?.message || '').includes('not configured');
+}
+
 export function LoginPage() {
   const { user, sessionLoading, loginLoading, loginError, login, clearError } = useAuth();
   const navigate = useNavigate();
@@ -75,17 +82,17 @@ export function LoginPage() {
       let needsEmailOtp = false;
       try {
         const statusData = await api(`/auth/2fa/status?email=${encodeURIComponent(email)}`);
+        const emailOtpAvailable = statusData?.emailOtpAvailable !== false;
         needsTotp = statusData?.totpEnabled === true;
         // Email OTP: enabled but no TOTP configured → use email flow
-        needsEmailOtp = !needsTotp && statusData?.twoFactorEnabled === true;
+        needsEmailOtp = !needsTotp && statusData?.twoFactorEnabled === true && emailOtpAvailable;
       } catch {
         // If status check fails, proceed without 2FA
       }
 
       if (needsTotp || needsEmailOtp) {
-        const submittedPassword = password;
         setPendingEmail(email);
-        setPendingPassword(submittedPassword);
+        setPendingPassword(password);
         setPassword('');
         setIs2FAEmail(needsEmailOtp);
         setTotpRequired(true);
@@ -95,17 +102,9 @@ export function LoginPage() {
             await api('/auth/2fa/send-code', { method: 'POST', body: { email } });
             toast.success('Verification code sent to your email');
           } catch (sendErr: any) {
-            // If email delivery is not configured or temporarily unavailable,
-            // allow the user to sign in normally rather than leaving them locked out.
-            if (sendErr?.status === 503 || sendErr?.error === 'email_delivery_failed' || (sendErr?.message || '').includes('email_delivery_failed') || (sendErr?.message || '').includes('not configured')) {
-              toast.error('2FA email could not be sent (email service unavailable). Signing in without 2FA.');
-              setTotpRequired(false);
-              setPendingEmail('');
-              setPendingPassword('');
-              await login(email, submittedPassword);
-              return;
-            }
-            toast.error('Failed to send verification code. Please try again.');
+            toast.error(isEmailDeliveryFailure(sendErr)
+              ? 'Email verification is unavailable right now. Please use authenticator-app 2FA or contact your administrator.'
+              : 'Failed to send verification code. Please try again.');
             setTotpRequired(false);
             setPendingEmail('');
             setPendingPassword('');
@@ -156,32 +155,6 @@ export function LoginPage() {
       toast.success('New verification code sent to your email');
     } catch {
       toast.error('Failed to resend code. Please try again.');
-    }
-  };
-
-  const handleEmailOtpBypassLogin = async () => {
-    if (!pendingEmail || !pendingPassword) {
-      toast.error('Please return to login and try again.');
-      return;
-    }
-    setTotpLoading(true);
-    setTotpError('');
-    try {
-      const savedEmail = pendingEmail;
-      const savedPassword = pendingPassword;
-      setTotpRequired(false);
-      setTotpCode('');
-      setPendingEmail('');
-      setPendingPassword('');
-      setIs2FAEmail(false);
-      await login(savedEmail, savedPassword);
-      toast.success('Signed in without email code.');
-    } catch (err: any) {
-      setTotpRequired(true);
-      setIs2FAEmail(true);
-      setTotpError(err?.message || 'Could not sign in without code. Please try again.');
-    } finally {
-      setTotpLoading(false);
     }
   };
 
@@ -272,7 +245,7 @@ export function LoginPage() {
                   Verify &amp; Sign In
                 </Button>
                 {is2FAEmail && (
-                  <div className="space-y-2 text-center">
+                  <div className="text-center">
                     <button
                       type="button"
                       onClick={handleResendEmailCode}
@@ -280,16 +253,6 @@ export function LoginPage() {
                     >
                       Resend code
                     </button>
-                    <div>
-                      <button
-                        type="button"
-                        onClick={handleEmailOtpBypassLogin}
-                        className="text-xs text-amber-700 hover:text-amber-900 transition-colors"
-                        disabled={totpLoading}
-                      >
-                        Didn&apos;t receive email? Continue without code
-                      </button>
-                    </div>
                   </div>
                 )}
                 <div className="text-center">
