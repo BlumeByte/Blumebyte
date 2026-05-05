@@ -1448,7 +1448,7 @@ function TimeOffCalendarView() {
                             title={`Meeting: ${event.title || ''} - ${event.organizerName} & ${event.participantName}`}
                             onClick={() => setSelectedEvent(event)}
                           >
-                            📅 {event.startTime || 'Meeting'}
+                            {event.startTime || 'Meeting'}
                           </div>
                         )
                       ))}
@@ -1475,7 +1475,7 @@ function TimeOffCalendarView() {
           <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">
-                {selectedEvent.type === 'leave' ? '🏖️ Leave Request' : '📅 Meeting'}
+                {selectedEvent.type === 'leave' ? 'Leave Request' : 'Meeting'}
               </h3>
               <button onClick={() => setSelectedEvent(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                 ✕
@@ -1634,6 +1634,31 @@ function AttendanceView() {
   const overtime = companyRecords.filter(r => r.status === 'overtime').length;
   const paused = companyRecords.filter(r => r.isPaused).length;
   const autoTracked = companyRecords.filter(r => r.autoClocked).length;
+
+  // Build weekly trend from real records (last 7 days)
+  const weeklyTrendData = (() => {
+    const days: Record<string, { day: string; date: string; present: number; late: number; overtime: number; totalHours: number }> = {};
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    // Build map for last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      days[dateStr] = { day: DAY_NAMES[d.getDay()], date: dateStr, present: 0, late: 0, overtime: 0, totalHours: 0 };
+    }
+    companyRecords.forEach((r: any) => {
+      if (!r.date || !days[r.date]) return;
+      const entry = days[r.date];
+      if (r.status === 'present') entry.present++;
+      if (r.status === 'late') { entry.late++; entry.present++; }
+      if (r.status === 'overtime') { entry.overtime++; entry.present++; }
+      // Compute hours for this record
+      const hrs = r.regularMinutes ? r.regularMinutes / 60
+        : (r.clockIn && r.clockOut ? (new Date(r.clockOut).getTime() - new Date(r.clockIn).getTime()) / 3600000 : (r.hoursWorked || 0));
+      entry.totalHours += hrs;
+    });
+    return Object.values(days).map(d => ({ ...d, totalHours: parseFloat(d.totalHours.toFixed(1)) }));
+  })();
 
   const pieData = [
     { id: 'attendance-present', name: 'Present', value: present || 1, color: '#10b981' },
@@ -1829,25 +1854,24 @@ function AttendanceView() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle className="text-base">Weekly Trend</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Weekly Trend (last 7 days)</CardTitle></CardHeader>
           <CardContent>
+            {weeklyTrendData.some(d => d.present > 0 || d.late > 0) ? (
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart id="attendance-weekly-line" data={[
-                { day: 'Mon', present: 42, late: 3 }, 
-                { day: 'Tue', present: 45, late: 2 },
-                { day: 'Wed', present: 43, late: 4 }, 
-                { day: 'Thu', present: 44, late: 1 },
-                { day: 'Fri', present: 40, late: 5 },
-              ]}>
+              <LineChart id="attendance-weekly-line" data={weeklyTrendData}>
                 <CartesianGrid key="grid" strokeDasharray="3 3" />
                 <XAxis key="xaxis" dataKey="day" />
                 <YAxis key="yaxis" />
                 <Tooltip key="tooltip" />
                 <Legend key="legend" />
-                <Line key="line-present" type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} />
-                <Line key="line-late" type="monotone" dataKey="late" stroke="#f59e0b" strokeWidth={2} />
+                <Line key="line-present" type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} name="Present" />
+                <Line key="line-late" type="monotone" dataKey="late" stroke="#f59e0b" strokeWidth={2} name="Late" />
+                <Line key="line-overtime" type="monotone" dataKey="overtime" stroke="#3b82f6" strokeWidth={2} name="Overtime" />
               </LineChart>
             </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">No attendance data for the past 7 days.</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -1881,7 +1905,16 @@ function AttendanceView() {
                     <TableCell>{r.date}</TableCell>
                     <TableCell className="text-sm">{r.clockIn ? new Date(r.clockIn).toLocaleTimeString() : '\u2014'}</TableCell>
                     <TableCell className="text-sm">{r.clockOut ? new Date(r.clockOut).toLocaleTimeString() : '\u2014'}</TableCell>
-                    <TableCell className="text-sm">{r.regularMinutes ? `${Math.floor(r.regularMinutes / 60)}h ${r.regularMinutes % 60}m` : '\u2014'}</TableCell>
+                    <TableCell className="text-sm">{(() => {
+                      if (r.regularMinutes) return `${Math.floor(r.regularMinutes / 60)}h ${r.regularMinutes % 60}m`;
+                      if (r.totalHours) return `${parseFloat(r.totalHours).toFixed(1)}h`;
+                      if (r.hoursWorked) return `${parseFloat(r.hoursWorked).toFixed(1)}h`;
+                      if (r.clockIn && r.clockOut) {
+                        const mins = Math.round((new Date(r.clockOut).getTime() - new Date(r.clockIn).getTime()) / 60000);
+                        return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+                      }
+                      return '—';
+                    })()}</TableCell>
                     <TableCell className="text-sm">{r.totalPausedMinutes > 0 ? <span className="text-amber-600">{r.totalPausedMinutes}m ({r.pauses?.length || 0}x)</span> : r.isPaused ? <Badge className="bg-amber-100 text-amber-700 text-[10px] animate-pulse">PAUSED</Badge> : '\u2014'}</TableCell>
                     <TableCell>
                       <Badge className={r.isPaused ? 'bg-amber-100 text-amber-800' : r.status === 'present' ? 'bg-green-100 text-green-800' : r.status === 'late' ? 'bg-amber-100 text-amber-800' : r.status === 'overtime' ? 'bg-blue-100 text-blue-800' : ''}>{r.isPaused ? 'paused' : r.status}</Badge>
@@ -1901,7 +1934,7 @@ function AttendanceView() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editRecord ? 'Edit Attendance' : 'Add Attendance Record'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div>
@@ -2138,7 +2171,7 @@ function PayrollView() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editItem ? 'Edit Payroll Record' : 'Run Payroll'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div>
@@ -2653,7 +2686,7 @@ function LeaveManagementView() {
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editItem ? 'Edit Leave Request' : 'New Leave Request'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             {!editItem && (
@@ -2838,7 +2871,7 @@ function OnboardingView() {
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editItem ? 'Edit Checklist Item' : 'New Checklist Item'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div><Label>Task Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} /></div>
@@ -3077,7 +3110,7 @@ function SelfServiceView({ onNavigate }: { onNavigate: (id: string) => void }) {
 
       {/* Leave Request Dialog */}
       <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Request Leave</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div>
@@ -3583,21 +3616,21 @@ function UserManagementView() {
       
       // Handle specific error cases with helpful messages
       if (e.message && e.message.includes('already exists')) {
-        toast.error('⚠️ A user with this email already exists. Please use a different email address.');
+        toast.error('A user with this email already exists. Please use a different email address.');
       } else if (e.needsSubscription) {
-        toast.error('⚠️ No active subscription. You can create up to 5 users before purchasing licenses.');
+        toast.error('No active subscription. You can create up to 5 users before purchasing licenses.');
       } else if (e.needsLicenses) {
         const usedCount = e.usedLicenses || 0;
         const purchasedCount = e.purchasedLicenses || 0;
         if (e.isTestMode) {
-          toast.error(`⚠️ User limit reached. You have used all ${purchasedCount} available users. Please purchase licenses to add more users.`);
+          toast.error(`User limit reached. You have used all ${purchasedCount} available users. Please purchase licenses to add more users.`);
         } else {
-          toast.error(`⚠️ No available licenses. You have used ${usedCount} of ${purchasedCount} licenses. Please purchase more to add users.`);
+          toast.error(`No available licenses. You have used ${usedCount} of ${purchasedCount} licenses. Please purchase more to add users.`);
         }
       } else if (e.message && e.message.includes('Invalid email')) {
-        toast.error('⚠️ Invalid email format. Please enter a valid email address.');
+        toast.error('Invalid email format. Please enter a valid email address.');
       } else if (e.message && e.message.includes('required')) {
-        toast.error('⚠️ Please fill in all required fields (Email, Name, and Role).');
+        toast.error('Please fill in all required fields (Email, Name, and Role).');
       } else {
         toast.error(e.message || 'Failed to save user. Please try again.');
       }
@@ -3636,7 +3669,7 @@ function UserManagementView() {
         <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-amber-900">
-            <p className="font-medium mb-1">⚠️ No Active Licenses</p>
+            <p className="font-medium mb-1">No Active Licenses</p>
             <p className="text-amber-700">
               You can create up to <strong>5 users</strong> before purchasing licenses. 
               Currently: <strong>{filtered.length}/5 users</strong>. 
@@ -3713,7 +3746,7 @@ function UserManagementView() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={v => { if (!v) { setDialogOpen(false); setShowTempPw(false); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{showTempPw ? 'Temporary Password' : editUser ? 'Edit User' : 'Create User'}</DialogTitle></DialogHeader>
           {showTempPw ? (
             <div className="space-y-4 py-4">
@@ -4222,7 +4255,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
 
       {/* View Detail Dialog */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>View {singularTitle}</DialogTitle></DialogHeader>
           {viewItem && (
             <div className="space-y-3 py-2">
@@ -4282,7 +4315,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editItem ? `Edit ${singularTitle}` : `Add ${singularTitle}`}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="grid grid-cols-2 gap-3">

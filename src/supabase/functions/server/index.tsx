@@ -6512,14 +6512,27 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
     const endDate = new Date(subscription.endDate);
     const isActive = now < endDate;
     
+    const cardAuth = subscription.cardAuthorization;
+    const cardSaved = !!(cardAuth?.authorizationCode);
+    const cardLast4 = cardAuth?.last4 || '';
+    const cardExpiry = cardAuth ? `${cardAuth.expMonth}/${cardAuth.expYear}` : '';
+    const cardBrand = cardAuth?.brand || cardAuth?.cardType || '';
+
     return c.json({
       totalLicenses,
+      // purchasedLicenses is the canonical field used by LicenseManagement.tsx
+      purchasedLicenses: totalLicenses,
       usedLicenses,
       availableLicenses,
       subscriptionStatus: isActive ? 'active' : 'expired',
       plan: subscription.plan,
       endDate: subscription.endDate,
-      companyId
+      companyId,
+      // Saved card for auto-renewal display
+      cardSaved,
+      cardLast4,
+      cardExpiry,
+      cardBrand,
     });
   } catch (e: any) {
     console.error('Error getting license info:', e);
@@ -10527,6 +10540,29 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
 
     await kv.set(`public-job-application:${id}`, application);
 
+    // Also store as a job-application: record scoped to the company so that
+    // the admin's HiringApprovalPanel (/job-applications endpoint) can see it.
+    const companyIdForJob = job.companyId || job.company || '';
+    if (companyIdForJob) {
+      const adminAppRecord = {
+        ...application,
+        // Map public fields to the job-application schema used by HiringApprovalPanel
+        applicantName: fullName.trim(),
+        applicantEmail: email.trim().toLowerCase(),
+        jobTitle: application.roleTitle,
+        coverLetter: cvMessage.trim(),
+        companyId: companyIdForJob,
+        company: companyIdForJob,
+        source: 'public_portal',
+        // Keep full details for display
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        qualification: qualification.trim(),
+        cvMessage: cvMessage.trim(),
+      };
+      await kv.set(`job-application:${id}`, adminAppRecord);
+    }
+
     // Notify all platform developers/superadmins about new application
     try {
       const allEmployees = await kv.getByPrefix('employee:');
@@ -10765,10 +10801,26 @@ app.get(`${PREFIX}/care/global-applications`, async (c) => {
 // SuperAdmin CRUD for public job applications (status updates, view, archive)
 app.get(`${PREFIX}/superadmin/public-job-applications`, async (c) => {
   try {
-    await requireSuperAdmin(c);
+    const { user } = await requireSuperAdmin(c);
     const apps = await kv.getByPrefix('public-job-application:');
-    apps.sort((a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-    return c.json(apps);
+    // Filter to only show applications for this tenant's job postings
+    const companyScope = await resolveCompanyScope(user.id);
+    const companyId = companyScope?.[0];
+    let filtered = apps;
+    if (companyId) {
+      const scopeSet = new Set(companyScope || [companyId]);
+      const postingBelongsToTenant = (p: any) =>
+        scopeSet.has(p.companyId) || scopeSet.has(p.company);
+      const allPostings = await kv.getByPrefix('job-posting:');
+      const ownPostingIds = new Set(
+        allPostings.filter(postingBelongsToTenant).map((p: any) => p.id)
+      );
+      filtered = apps.filter(
+        (a: any) => ownPostingIds.has(a.jobId) || scopeSet.has(a.companyId)
+      );
+    }
+    filtered.sort((a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    return c.json(filtered);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);

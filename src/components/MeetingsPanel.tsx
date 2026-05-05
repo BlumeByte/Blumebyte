@@ -390,7 +390,7 @@ export function MeetingsPanel({ mode }: MeetingsPanelProps) {
 
       {/* Create/Edit Meeting Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editItem ? 'Edit Meeting' : mode === 'employee' ? 'Request Meeting' : 'Schedule Meeting'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div><Label>Meeting Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., Sprint Planning" /></div>

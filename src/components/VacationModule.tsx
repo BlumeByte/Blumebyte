@@ -212,7 +212,7 @@ export function VacationModule({ userRole }: { userRole: string }) {
               New Request
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Submit Leave Request</DialogTitle>
             </DialogHeader>

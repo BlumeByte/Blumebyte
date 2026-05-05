@@ -241,7 +241,7 @@ export function HiringApprovalPanel() {
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Application Details</DialogTitle></DialogHeader>
           {selected && (
             <div className="space-y-4 py-2">

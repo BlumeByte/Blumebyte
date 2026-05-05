@@ -456,7 +456,7 @@ function AdminEmployees() {
 
       {/* Contract Upload Dialog */}
       <Dialog open={!!contractTarget} onOpenChange={() => setContractTarget(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Employee Documents — {contractTarget?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex items-center justify-between">
@@ -498,7 +498,7 @@ function AdminEmployees() {
       </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={v => { if (!v) { setDialogOpen(false); setShowTempPw(false); } }}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{showTempPw ? 'Temporary Password' : editUser ? 'Edit Employee' : 'Create Employee'}</DialogTitle></DialogHeader>
           {showTempPw ? (
             <div className="space-y-4 py-4">
@@ -755,7 +755,7 @@ function AdminUsers() {
       </CardContent></Card>
 
       <Dialog open={dialogOpen} onOpenChange={v => { if (!v) { setDialogOpen(false); setShowTempPw(false); } }}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{showTempPw ? 'Temporary Password' : editUser ? 'Edit Employee' : 'Create Employee'}</DialogTitle></DialogHeader>
           {showTempPw ? (
             <div className="space-y-4 py-4">
@@ -1992,7 +1992,7 @@ function PendingApprovalsPanel() {
 
       {/* Detail/Reject Dialog */}
       <Dialog open={!!detailDialog} onOpenChange={() => setDetailDialog(null)}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Approval Request Details</DialogTitle></DialogHeader>
           {detailDialog && (
             <div className="space-y-4 py-2">
@@ -2395,7 +2395,7 @@ function AdminHiring() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editItem ? 'Edit' : 'Create'} Job Posting</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div><Label className="text-xs">Job Title / Role Title</Label><Input value={formData.title || formData.roleTitle || ''} onChange={e => setFormData({ ...formData, title: e.target.value, roleTitle: e.target.value })} placeholder="e.g., Software Engineer" /></div>
@@ -2884,7 +2884,7 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
 
       {/* View Dialog */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>View {singularTitle}</DialogTitle></DialogHeader>
           {viewItem && (
             <div className="space-y-3">
@@ -2925,7 +2925,7 @@ function AdminCrudPanel({ entityKey }: { entityKey: string }) {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className={`max-h-[85vh] overflow-y-auto ${config.fields.some(f => f.type === 'questions') ? 'max-w-2xl' : 'max-w-lg'}`}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editItem ? `Edit ${singularTitle}` : `Add ${singularTitle}`}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {config.fields.map(f => (

@@ -586,7 +586,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
 
       {/* ============ APPLY DIALOG ============ */}
       <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Apply for {selectedJob?.title || selectedJob?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="bg-accent rounded-lg p-3">
@@ -610,7 +610,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
 
       {/* ============ JOB DETAILS DIALOG ============ */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{selectedJob?.title || selectedJob?.name}</DialogTitle></DialogHeader>
           {selectedJob && (
             <div className="space-y-3 py-2">
@@ -645,7 +645,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
 
       {/* ============ TASK DIALOG ============ */}
       <Dialog open={!!taskDialog} onOpenChange={() => setTaskDialog(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{taskDialog?.title || taskDialog?.name || 'Task Details'}</DialogTitle></DialogHeader>
           {taskDialog && (
             <div className="space-y-4 py-2">
@@ -754,7 +754,7 @@ export function SharedSelfServiceHub({ onNavigate }: { onNavigate?: (section: st
 
       {/* ============ REVIEW DIALOG ============ */}
       <Dialog open={!!reviewDialog} onOpenChange={() => setReviewDialog(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{reviewDialog?.title || reviewDialog?.period || 'Performance Review'}</DialogTitle></DialogHeader>
           {reviewDialog && (
             <div className="space-y-4 py-2">

@@ -1041,7 +1041,7 @@ export function SharedMyProfile() {
 
       {/* Edit Contact Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Profile Details</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             {/* Employment Details — only for admin/superadmin/manager */}
