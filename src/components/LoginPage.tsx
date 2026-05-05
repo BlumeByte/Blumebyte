@@ -20,6 +20,13 @@ function blumeGradientStyle() {
   return { background: 'linear-gradient(135deg, #000000, #1a1a1a)' };
 }
 
+function isEmailDeliveryFailure(error: any) {
+  return error?.status === 503
+    || error?.error === 'email_delivery_failed'
+    || (error?.message || '').includes('email_delivery_failed')
+    || (error?.message || '').includes('not configured');
+}
+
 export function LoginPage() {
   const { user, sessionLoading, loginLoading, loginError, login, clearError } = useAuth();
   const navigate = useNavigate();
@@ -75,9 +82,10 @@ export function LoginPage() {
       let needsEmailOtp = false;
       try {
         const statusData = await api(`/auth/2fa/status?email=${encodeURIComponent(email)}`);
+        const emailOtpAvailable = statusData?.emailOtpAvailable !== false;
         needsTotp = statusData?.totpEnabled === true;
         // Email OTP: enabled but no TOTP configured → use email flow
-        needsEmailOtp = !needsTotp && statusData?.twoFactorEnabled === true;
+        needsEmailOtp = !needsTotp && statusData?.twoFactorEnabled === true && emailOtpAvailable;
       } catch {
         // If status check fails, proceed without 2FA
       }
@@ -93,8 +101,10 @@ export function LoginPage() {
           try {
             await api('/auth/2fa/send-code', { method: 'POST', body: { email } });
             toast.success('Verification code sent to your email');
-          } catch {
-            toast.error('Failed to send verification code. Please try again.');
+          } catch (sendErr: any) {
+            toast.error(isEmailDeliveryFailure(sendErr)
+              ? 'Email verification is unavailable right now. Please use authenticator-app 2FA or contact your administrator.'
+              : 'Failed to send verification code. Please try again.');
             setTotpRequired(false);
             setPendingEmail('');
             setPendingPassword('');

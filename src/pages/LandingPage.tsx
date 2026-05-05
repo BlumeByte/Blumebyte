@@ -19,12 +19,12 @@ const HERO_SLIDES = [
     sub: 'From hiring to retirement, give your team the tools they need to thrive — with real-time analytics, automated workflows, and seamless payroll.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1920&q=80',
     headline: 'Smarter HR for Every Industry',
     sub: 'Whether you\'re in tech, healthcare, or finance, Blumebyte adapts to your workforce. Compliant, secure, and built for scale.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1920&q=80',
     headline: 'Insights That Move Your Business Forward',
     sub: 'Real-time dashboards and advanced reporting give HR leaders the visibility they need to make confident, data-driven decisions.',
   },

@@ -480,8 +480,18 @@ export default function HiringsPage() {
       <PublicNavbar />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-black to-gray-800 text-white py-16 px-4">
-        <div className="max-w-4xl mx-auto text-center space-y-4">
+      <section className="relative text-white py-16 px-4 overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1521737852567-6949f3f9f2b5?w=1920&q=80"
+            alt=""
+            className="w-full h-full object-cover"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/70 to-gray-900/80" />
+        </div>
+        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold">Find Your Next Opportunity</h1>
           <p className="text-lg text-gray-300">
             Browse job openings from organizations hiring through Blumebyte HR

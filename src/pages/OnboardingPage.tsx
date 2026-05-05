@@ -24,7 +24,7 @@ export default function OnboardingPage() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1653565685060-e15e492a7fda?w=1920&q=80"
+            src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1920&q=80"
             alt=""
             className="w-full h-full object-cover"
           />

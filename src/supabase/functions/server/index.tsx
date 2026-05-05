@@ -9573,9 +9573,15 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
     }
 
     if (!emailSent) {
-      // Email service not configured — 2FA code could not be delivered
-      console.error('2FA email could not be sent. Please configure an email service.');
-      }
+      // Email service not configured or delivery failed — 2FA code could not be delivered.
+      // Return a clear error so the frontend can handle it gracefully (e.g. allow bypass
+      // or prompt the user to contact their administrator).
+      console.error('2FA email could not be sent. Returning error to client.');
+      return c.json({
+        error: 'email_delivery_failed',
+        message: 'Could not send verification code. Email delivery is not configured or temporarily unavailable.',
+      }, 503);
+    }
 
     return c.json({ 
       success: true, 
@@ -9684,6 +9690,7 @@ app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
       twoFactorEnabled: user.user_metadata?.twoFactorEnabled || false,
       twoFactorVerifiedAt: user.user_metadata?.twoFactorVerifiedAt || null,
       totpEnabled: user.user_metadata?.totpEnabled || false,
+      emailOtpAvailable: Boolean(Deno.env.get('RESEND_API_KEY')),
     });
   } catch (e: any) {
     console.error("2FA status check error:", e);
@@ -10307,9 +10314,9 @@ app.get(`${PREFIX}/notification-preferences`, async (c) => {
   try {
     const user = await getAuthUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    // Prefer user_metadata (reliable), fall back to legacy KV store
-    const stored = user.user_metadata?.notificationPrefs
-      || await kv.get(`notif-prefs:${user.id}`).catch(() => null);
+    // Prefer KV (write path), fall back to user_metadata for backward compatibility
+    const stored = await kv.get(`notif-prefs:${user.id}`).catch(() => null)
+      || user.user_metadata?.notificationPrefs;
     return c.json({ ...DEFAULT_NOTIF_PREFS, ...(stored || {}) });
   } catch (e: any) {
     return c.json(DEFAULT_NOTIF_PREFS);
@@ -10323,19 +10330,37 @@ app.put(`${PREFIX}/notification-preferences`, async (c) => {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.json();
     const prefs = { ...DEFAULT_NOTIF_PREFS, ...body };
-    // Store in user_metadata (primary) — avoids KV-store connectivity issues
-    const sb = supabaseAdmin();
-    const { error: updateError } = await sb.auth.admin.updateUserById(user.id, {
-      user_metadata: {
-        ...user.user_metadata,
-        notificationPrefs: prefs,
-      },
-    });
-    if (updateError) {
-      console.error('notification-preferences user_metadata update error:', updateError.message);
-      // Fallback: try KV store
+    let kvSaved = false;
+    try {
       await kv.set(`notif-prefs:${user.id}`, prefs);
+      kvSaved = true;
+    } catch (kvError: any) {
+      console.error('notification-preferences KV save error:', kvError?.message || kvError);
     }
+
+    // Best-effort metadata mirror for legacy readers
+    let metadataSaved = false;
+    try {
+      const sb = supabaseAdmin();
+      const { error: updateError } = await sb.auth.admin.updateUserById(user.id, {
+        user_metadata: {
+          ...user.user_metadata,
+          notificationPrefs: prefs,
+        },
+      });
+      if (updateError) {
+        console.error('notification-preferences user_metadata update error:', updateError.message);
+      } else {
+        metadataSaved = true;
+      }
+    } catch (metadataError: any) {
+      console.error('notification-preferences metadata save error:', metadataError?.message || metadataError);
+    }
+
+    if (!kvSaved && !metadataSaved) {
+      return c.json({ error: 'Failed to save preferences' }, 500);
+    }
+
     return c.json({ success: true, prefs });
   } catch (e: any) {
     console.error('notification-preferences PUT error:', e?.message || e);
@@ -10412,14 +10437,18 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
     //   'global'        — another legacy alias used before the underscore convention
     // Comparison is case-insensitive to handle any capitalisation drift.
     // Status must be one of the active values (also case-insensitive).
-    const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+    const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'paused']);
     const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
       // Guard against null/undefined KV entries — a corrupt or partially written record
       // would otherwise throw TypeError on property access and bubble up as a 500.
       if (!j || typeof j !== 'object') return false;
       const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
-      return GLOBAL_VISIBILITY.has(vt) && ACTIVE_STATUSES.has((j.status || '').toLowerCase());
+      if (!GLOBAL_VISIBILITY.has(vt)) return false;
+      const st = (j.status || '').toLowerCase();
+      // Include jobs with no status set (public visibility implies active),
+      // or with an explicitly active status. Excludes draft/closed/filled/etc.
+      return !st || ACTIVE_STATUSES.has(st);
     });
 
 
@@ -11253,4 +11282,3 @@ app.notFound((c) => {
 
 // Server started with payment-before-registration flow - v2.1 (UPDATED)
 Deno.serve(app.fetch);
-
