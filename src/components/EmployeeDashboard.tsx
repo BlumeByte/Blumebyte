@@ -39,7 +39,6 @@ import { useDarkMode } from '../lib/dark-mode-context';
 export function EmployeeDashboard() {
   const { user, accessToken, logout } = useAuth();
   const { branding } = useBranding();
-  const { currencySymbol } = useCurrency();
   const { darkMode, toggleUserDarkMode } = useDarkMode();
   const [activeTab, setActiveTab] = useState('overview');
 

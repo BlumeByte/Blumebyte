@@ -83,8 +83,9 @@ export function LoginPage() {
       }
 
       if (needsTotp || needsEmailOtp) {
+        const submittedPassword = password;
         setPendingEmail(email);
-        setPendingPassword(password);
+        setPendingPassword(submittedPassword);
         setPassword('');
         setIs2FAEmail(needsEmailOtp);
         setTotpRequired(true);
@@ -96,13 +97,12 @@ export function LoginPage() {
           } catch (sendErr: any) {
             // If email delivery is not configured or temporarily unavailable,
             // allow the user to sign in normally rather than leaving them locked out.
-            if (sendErr?.status === 503 || (sendErr?.message || '').includes('email_delivery_failed') || (sendErr?.message || '').includes('not configured')) {
+            if (sendErr?.status === 503 || sendErr?.error === 'email_delivery_failed' || (sendErr?.message || '').includes('email_delivery_failed') || (sendErr?.message || '').includes('not configured')) {
               toast.error('2FA email could not be sent (email service unavailable). Signing in without 2FA.');
               setTotpRequired(false);
               setPendingEmail('');
               setPendingPassword('');
-              // Use `password` from the closure (original value before setPassword('') was called)
-              await login(email, password);
+              await login(email, submittedPassword);
               return;
             }
             toast.error('Failed to send verification code. Please try again.');
@@ -178,8 +178,6 @@ export function LoginPage() {
       toast.success('Signed in without email code.');
     } catch (err: any) {
       setTotpRequired(true);
-      setPendingEmail(pendingEmail);
-      setPendingPassword(pendingPassword);
       setIs2FAEmail(true);
       setTotpError(err?.message || 'Could not sign in without code. Please try again.');
     } finally {
