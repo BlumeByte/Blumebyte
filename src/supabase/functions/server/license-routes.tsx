@@ -258,24 +258,19 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
     try {
       const { user, role } = await requireSuperAdmin(c);
       const body = await c.req.json();
-      const { licenses, plan, amount, saveCard } = body;
+      const { licenses, plan, saveCard } = body;
       
-      if (!licenses || !plan || !amount) {
-        return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+      if (!licenses || !plan) {
+        return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
       }
       
       if (!['monthly', 'yearly'].includes(plan)) {
         return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
       }
       
-      // Validate pricing
+      // Always compute amount server-side from the canonical price list — never trust client-provided amount
       const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
-      const expectedPrice = licenses * pricePerLicense;
-      
-      if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
-        console.error(`purchase-licenses: amount mismatch — received ${amount}, expected ${expectedPrice} (${licenses} licenses × $${pricePerLicense}/${plan})`);
-        return c.json({ error: 'Invalid amount for the selected plan' }, 400);
-      }
+      const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
       if (!paystackSecretKey) {
@@ -894,24 +889,19 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
     try {
       const { user, role } = await requireSuperAdmin(c);
       const body = await c.req.json();
-      const { licenses, plan, amount, saveCard, selectedUserIds } = body;
+      const { licenses, plan, saveCard, selectedUserIds } = body;
       
-      if (!licenses || !plan || !amount) {
-        return c.json({ error: 'Missing required fields: licenses, plan, amount' }, 400);
+      if (!licenses || !plan) {
+        return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
       }
       
       if (!['monthly', 'yearly'].includes(plan)) {
         return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
       }
       
-      // Validate pricing
+      // Always compute amount server-side from the canonical price list — never trust client-provided amount
       const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
-      const expectedPrice = licenses * pricePerLicense;
-      
-      if (Math.round(amount * 100) !== Math.round(expectedPrice * 100)) {
-        console.error(`purchase-licenses: amount mismatch — received ${amount}, expected ${expectedPrice} (${licenses} licenses × $${pricePerLicense}/${plan})`);
-        return c.json({ error: 'Invalid amount for the selected plan' }, 400);
-      }
+      const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
       if (!paystackSecretKey) {

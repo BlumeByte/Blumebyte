@@ -1182,7 +1182,7 @@ function EmpReviews() {
         })}</div>
       )}
       <Dialog open={!!selectedReview} onOpenChange={() => setSelectedReview(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{selectedReview?.title || selectedReview?.reviewType || 'Review Details'}</DialogTitle></DialogHeader>
           {selectedReview && (<div className="space-y-4 py-2">
             <div className="flex items-center gap-3">
@@ -1271,7 +1271,7 @@ function EmpTraining() {
         ))}</div>
       )}
       <Dialog open={!!selectedProgram} onOpenChange={() => setSelectedProgram(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{selectedProgram?.name || 'Training Details'}</DialogTitle></DialogHeader>
           {selectedProgram && (<div className="space-y-4 py-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1377,7 +1377,7 @@ function EmpQuestionnaires() {
         ))}</div>
       )}
       <Dialog open={!!selectedFeedback} onOpenChange={() => setSelectedFeedback(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{selectedFeedback?.type ? `360\u00b0 ${selectedFeedback.type.charAt(0).toUpperCase() + selectedFeedback.type.slice(1)} Feedback` : 'Feedback Details'}</DialogTitle></DialogHeader>
           {selectedFeedback && (<div className="space-y-4 py-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1511,7 +1511,7 @@ function EmpDisciplinary() {
         ))}</div>
       )}
       <Dialog open={!!selectedCase} onOpenChange={() => setSelectedCase(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{selectedCase?.title || selectedCase?.type || 'Disciplinary Details'}</DialogTitle></DialogHeader>
           {selectedCase && (<div className="space-y-4 py-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1651,7 +1651,7 @@ function EmpCompliance() {
         })}</div>
       )}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{selectedItem?.title || selectedItem?.name || 'Compliance Details'}</DialogTitle></DialogHeader>
           {selectedItem && (<div className="space-y-4 py-2">
             <div className="flex items-center gap-2 flex-wrap">

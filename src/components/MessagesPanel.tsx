@@ -369,7 +369,7 @@ export function MessagesPanel() {
 
       {/* Compose Dialog */}
       <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>New Message</DialogTitle>
           </DialogHeader>

@@ -208,7 +208,7 @@
     visibility: visible;
     background: transparent;
     position: static;
-    filter: invert(47%) sepia(89%) saturate(2126%) hue-rotate(201deg) brightness(98%) contrast(94%);
+    filter: brightness(0);
     width: 16px;
     height: 16px;
   }
@@ -224,7 +224,7 @@
   html.dark body input[type="date"]::-webkit-calendar-picker-indicator,
   html.dark body input[type="time"]::-webkit-calendar-picker-indicator,
   html.dark body input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-    filter: invert(100%);
+    filter: brightness(0) invert(1);
     opacity: 1;
     display: block;
     visibility: visible;

@@ -280,7 +280,7 @@ export function TrainingManagement({ mode }: TrainingManagementProps) {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editItem ? 'Edit Training' : 'Create Training Program'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div><Label>Training Title</Label><Input value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., Advanced Excel Training" /></div>
@@ -316,7 +316,7 @@ export function TrainingManagement({ mode }: TrainingManagementProps) {
 
       {/* Assign Employees Dialog */}
       <Dialog open={!!assignDialog} onOpenChange={() => setAssignDialog(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Assign Employees to Training</DialogTitle></DialogHeader>
           {assignDialog && (
             <div className="space-y-3 py-2">

@@ -2,36 +2,36 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Sparkles, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Building2, Heart, Briefcase, GraduationCap, TrendingUp as Growth, DollarSign, UserCheck, Trophy } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
-// 4 HR-themed hero images
+// HR-themed hero images featuring diverse African/Black professionals
 const HERO_SLIDES = [
   {
-    url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=1920&q=80',
     headline: 'Modern HR Management for Growing Companies',
     sub: 'Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more — all in one powerful platform.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=1920&q=80',
     headline: 'Empower Your People. Drive Results.',
     sub: 'From hiring to retirement, give your team the tools they need to thrive — with real-time analytics, automated workflows, and seamless payroll.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1920&q=80',
     headline: 'Smarter HR for Every Industry',
     sub: 'Whether you\'re in tech, healthcare, or finance, Blumebyte adapts to your workforce. Compliant, secure, and built for scale.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1600880292089-90a7e086ee0c?w=1920&q=80',
     headline: 'Insights That Move Your Business Forward',
     sub: 'Real-time dashboards and advanced reporting give HR leaders the visibility they need to make confident, data-driven decisions.',
   },
 ];
 
-/** Duration (ms) of the text fade-out/in between hero slides */
-const SLIDE_FADE_MS = 400;
+/** Duration (ms) of the crossfade between hero slides — keep it smooth and long */
+const SLIDE_FADE_MS = 800;
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -93,18 +93,24 @@ export default function LandingPage() {
       <PublicNavbar />
 
       {/* ── HERO: Auto-sliding images with glassmorphism overlay ── */}
-      <section className="relative overflow-hidden min-h-[60vh] sm:min-h-[70vh] md:min-h-[80vh] flex items-center">
-        {/* Slide images */}
-        {HERO_SLIDES.map((s, i) => (
-          <div
-            key={i}
-            className="absolute inset-0 z-0 transition-opacity duration-700"
-            style={{ opacity: i === slide ? 1 : 0 }}
-          >
-            <img src={s.url} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/70 to-black/50" />
-          </div>
-        ))}
+      <section className="relative overflow-hidden w-full" style={{ minHeight: 'min(80vh, 700px)', maxHeight: '900px', height: '75vw' }}>
+        <div className="absolute inset-0 flex items-center">
+          {/* Slide images — crossfade with no white flash */}
+          {HERO_SLIDES.map((s, i) => (
+            <div
+              key={i}
+              className="absolute inset-0"
+              style={{
+                opacity: i === slide ? 1 : 0,
+                transition: `opacity ${SLIDE_FADE_MS}ms ease-in-out`,
+                zIndex: i === slide ? 1 : 0,
+              }}
+            >
+              <img src={s.url} alt="" className="w-full h-full object-cover object-center" loading={i === 0 ? 'eager' : 'lazy'} />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
+            </div>
+          ))}
+        </div>
 
         {/* Slide indicators */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
@@ -118,45 +124,38 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10">
-          {/* Centered full-width hero content */}
-          <div className={`space-y-6 text-center transition-opacity duration-500 ${animating ? 'opacity-0' : 'opacity-100'}`}>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-sm font-medium border border-white/25">
-              <Sparkles className="h-4 w-4 text-white" />
-              AI-Powered HR Management
-            </div>
-            {/* Glassmorphism headline card */}
-            <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white mb-4">
-                {currentSlide.headline}
-              </h1>
-              <p className="text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto">{currentSlide.sub}</p>
-            </div>
-            <p className="text-xl font-semibold text-gray-200">Starting at just $5 per employee/month</p>
-            <div className="flex flex-wrap gap-4 justify-center pt-2">
-              <Button
-                size="lg"
-                onClick={() => navigate('/company-signup')}
-                className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-semibold"
-              >
-                Get Started Now
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => navigate('/pricing')}
-                className="border-white/50 bg-transparent text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
-              >
-                View Pricing
-              </Button>
-            </div>
-            {/* Trust badges */}
-            <div className="flex flex-wrap gap-4 justify-center pt-2">
-              {['🔒 SOC 2 Compliant', '⚡ 99.9% Uptime', '🌍 Multi-tenant', '🤖 AI-Powered'].map(badge => (
-                <span key={badge} className="text-xs text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1 rounded-full">
-                  {badge}
-                </span>
-              ))}
+        <div className="relative z-10 w-full h-full flex items-center">
+          <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+            {/* Centered full-width hero content */}
+            <div
+              className="space-y-6 text-center"
+              style={{ opacity: animating ? 0 : 1, transition: `opacity ${SLIDE_FADE_MS}ms ease-in-out` }}
+            >
+              {/* Glassmorphism headline card */}
+              <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white mb-4">
+                  {currentSlide.headline}
+                </h1>
+                <p className="text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto">{currentSlide.sub}</p>
+              </div>
+              <p className="text-xl font-semibold text-gray-200">Starting at just $5 per employee/month</p>
+              <div className="flex flex-wrap gap-4 justify-center pt-2">
+                <Button
+                  size="lg"
+                  onClick={() => navigate('/company-signup')}
+                  className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-semibold"
+                >
+                  Get Started Now
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate('/pricing')}
+                  className="border-white/50 bg-transparent text-white hover:bg-white/15 backdrop-blur-sm text-base px-8 font-semibold"
+                >
+                  View Pricing
+                </Button>
+              </div>
             </div>
           </div>
         </div>
