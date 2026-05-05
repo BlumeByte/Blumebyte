@@ -462,7 +462,15 @@ function EmpOverview({ onNavigate }: { onNavigate: (tab: string) => void }) {
             <Button variant="outline" size="sm" onClick={printReviews} disabled={reviews.length === 0}>
               <Star className="w-3.5 h-3.5 mr-1.5 text-amber-500" />Print Performance Reviews{reviews.length > 0 && ` (${reviews.length})`}
             </Button>
-            <Button variant="outline" size="sm" onClick={printPayslips} disabled={payslips.length === 0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem('employee_my_profile_tab', 'payslips');
+                onNavigate('my-profile');
+              }}
+              disabled={payslips.length === 0}
+            >
               <DollarSign className="w-3.5 h-3.5 mr-1.5 text-green-500" />Print Payslips{payslips.length > 0 && ` (${payslips.length})`}
             </Button>
             <Button variant="outline" size="sm" onClick={() => {

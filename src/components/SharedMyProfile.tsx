@@ -156,6 +156,13 @@ export function SharedMyProfile() {
   }, [accessToken]);
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const requestedTab = localStorage.getItem('employee_my_profile_tab');
+    if (requestedTab === 'payslips' || requestedTab === 'leave-history' || requestedTab === 'documents' || requestedTab === 'profile') {
+      setActiveTab(requestedTab);
+    }
+    localStorage.removeItem('employee_my_profile_tab');
+  }, []);
   // Refresh profile every 60 seconds
   useEffect(() => { const iv = setInterval(load, 60000); return () => clearInterval(iv); }, [load]);
   // Immediately reload profile when HR approves profile changes

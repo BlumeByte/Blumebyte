@@ -10313,9 +10313,9 @@ app.get(`${PREFIX}/notification-preferences`, async (c) => {
   try {
     const user = await getAuthUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    // Prefer user_metadata (reliable), fall back to legacy KV store
-    const stored = user.user_metadata?.notificationPrefs
-      || await kv.get(`notif-prefs:${user.id}`).catch(() => null);
+    // Prefer KV (write path), fall back to user_metadata for backward compatibility
+    const stored = await kv.get(`notif-prefs:${user.id}`).catch(() => null)
+      || user.user_metadata?.notificationPrefs;
     return c.json({ ...DEFAULT_NOTIF_PREFS, ...(stored || {}) });
   } catch (e: any) {
     return c.json(DEFAULT_NOTIF_PREFS);
@@ -10329,20 +10329,38 @@ app.put(`${PREFIX}/notification-preferences`, async (c) => {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.json();
     const prefs = { ...DEFAULT_NOTIF_PREFS, ...body };
-    // Store in user_metadata (primary) — avoids KV-store connectivity issues
-    const sb = supabaseAdmin();
-    const { error: updateError } = await sb.auth.admin.updateUserById(user.id, {
-      user_metadata: {
-        ...user.user_metadata,
-        notificationPrefs: prefs,
-      },
-    });
-    if (updateError) {
-      console.error('notification-preferences user_metadata update error:', updateError.message);
-      // Fallback: try KV store
+    let kvSaved = false;
+    try {
       await kv.set(`notif-prefs:${user.id}`, prefs);
+      kvSaved = true;
+    } catch (kvError: any) {
+      console.error('notification-preferences KV save error:', kvError?.message || kvError);
     }
-    return c.json({ success: true, prefs });
+
+    // Best-effort metadata mirror for legacy readers
+    let metadataSaved = false;
+    try {
+      const sb = supabaseAdmin();
+      const { error: updateError } = await sb.auth.admin.updateUserById(user.id, {
+        user_metadata: {
+          ...user.user_metadata,
+          notificationPrefs: prefs,
+        },
+      });
+      if (updateError) {
+        console.error('notification-preferences user_metadata update error:', updateError.message);
+      } else {
+        metadataSaved = true;
+      }
+    } catch (metadataError: any) {
+      console.error('notification-preferences metadata save error:', metadataError?.message || metadataError);
+    }
+
+    if (!kvSaved && !metadataSaved) {
+      return c.json({ error: 'Failed to save preferences' }, 500);
+    }
+
+    return c.json({ success: true, prefs, persistedIn: { kv: kvSaved, metadata: metadataSaved } });
   } catch (e: any) {
     console.error('notification-preferences PUT error:', e?.message || e);
     return c.json({ error: 'Failed to save preferences' }, 500);
@@ -11263,4 +11281,3 @@ app.notFound((c) => {
 
 // Server started with payment-before-registration flow - v2.1 (UPDATED)
 Deno.serve(app.fetch);
-

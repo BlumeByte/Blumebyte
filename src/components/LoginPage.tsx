@@ -159,6 +159,34 @@ export function LoginPage() {
     }
   };
 
+  const handleEmailOtpBypassLogin = async () => {
+    if (!pendingEmail || !pendingPassword) {
+      toast.error('Please return to login and try again.');
+      return;
+    }
+    setTotpLoading(true);
+    setTotpError('');
+    try {
+      const savedEmail = pendingEmail;
+      const savedPassword = pendingPassword;
+      setTotpRequired(false);
+      setTotpCode('');
+      setPendingEmail('');
+      setPendingPassword('');
+      setIs2FAEmail(false);
+      await login(savedEmail, savedPassword);
+      toast.success('Signed in without email code.');
+    } catch (err: any) {
+      setTotpRequired(true);
+      setPendingEmail(pendingEmail);
+      setPendingPassword(pendingPassword);
+      setIs2FAEmail(true);
+      setTotpError(err?.message || 'Could not sign in without code. Please try again.');
+    } finally {
+      setTotpLoading(false);
+    }
+  };
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetLoading(true);
@@ -246,7 +274,7 @@ export function LoginPage() {
                   Verify &amp; Sign In
                 </Button>
                 {is2FAEmail && (
-                  <div className="text-center">
+                  <div className="space-y-2 text-center">
                     <button
                       type="button"
                       onClick={handleResendEmailCode}
@@ -254,6 +282,16 @@ export function LoginPage() {
                     >
                       Resend code
                     </button>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleEmailOtpBypassLogin}
+                        className="text-xs text-amber-700 hover:text-amber-900 transition-colors"
+                        disabled={totpLoading}
+                      >
+                        Didn&apos;t receive email? Continue without code
+                      </button>
+                    </div>
                   </div>
                 )}
                 <div className="text-center">
