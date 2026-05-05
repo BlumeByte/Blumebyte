@@ -11,7 +11,7 @@ import { TwoFactorSetup } from './TwoFactorSetup';
 import { toast } from 'sonner@2.0.3';
 
 export function TwoFactorSettings() {
-  const { user, accessToken } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<{
     requires2FA: boolean;
