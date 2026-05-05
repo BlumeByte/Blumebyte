@@ -374,22 +374,40 @@ export default function HiringsPage() {
     return () => { mountedRef.current = false; };
   }, []);
 
-  const fetchJobs = useCallback(async () => {
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchJobs = useCallback(async (isRetry = false) => {
     if (!mountedRef.current) return;
+    // Clear any pending retry timer before starting a new fetch
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
     setLoading(true);
-    setError(null);
+    if (!isRetry) setError(null);
     try {
       const data = await api('/public/jobs');
       if (mountedRef.current) {
         setJobs(Array.isArray(data) ? data : []);
+        setError(null);
       }
     } catch (e: any) {
       if (!mountedRef.current) return;
       console.error('Failed to load public jobs:', e?.message);
-      setError('Unable to load job openings. Please try again later.');
+      if (!isRetry) {
+        // On first failure, silently retry once after 3 s before surfacing the error
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          invalidateCache('/public/jobs');
+          fetchJobs(true);
+        }, 3000);
+      } else {
+        setError('Unable to load job openings. Please try again later.');
+      }
     } finally {
       if (mountedRef.current) setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    return () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current); };
   }, []);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
@@ -542,7 +560,7 @@ export default function HiringsPage() {
           <div className="text-center py-20 space-y-4">
             <AlertCircle className="h-12 w-12 text-gray-300 mx-auto" />
             <p className="text-gray-600">{error}</p>
-            <Button variant="outline" onClick={fetchJobs}>
+            <Button variant="outline" onClick={() => { invalidateCache('/public/jobs'); fetchJobs(true); }}>
               <RefreshCw className="h-4 w-4 mr-2" /> Retry
             </Button>
           </div>
