@@ -10436,8 +10436,13 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
     //   'public'        — legacy alias that may exist in older records
     //   'global'        — another legacy alias used before the underscore convention
     // Comparison is case-insensitive to handle any capitalisation drift.
-    // Status must be one of the active values (also case-insensitive).
-    const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'paused']);
+    // Visibility is the primary filter — if an admin explicitly set a job to public,
+    // we honour that intent. We only exclude jobs whose status is explicitly set to
+    // a terminal/inactive state (filled, closed, expired, cancelled, inactive).
+    // Jobs with no status, 'draft', 'active', 'open', 'paused', 'interviewing',
+    // 'offered', etc. are all shown — this covers the common scenario where a job
+    // was saved as public_global before auto-activation was in place.
+    const EXCLUDE_STATUSES = new Set(['filled', 'closed', 'expired', 'cancelled', 'inactive']);
     const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
       // Guard against null/undefined KV entries — a corrupt or partially written record
@@ -10446,9 +10451,8 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
       const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
       if (!GLOBAL_VISIBILITY.has(vt)) return false;
       const st = (j.status || '').toLowerCase();
-      // Include jobs with no status set (public visibility implies active),
-      // or with an explicitly active status. Excludes draft/closed/filled/etc.
-      return !st || ACTIVE_STATUSES.has(st);
+      // Exclude only jobs in an explicitly terminal state.
+      return !EXCLUDE_STATUSES.has(st);
     });
 
 

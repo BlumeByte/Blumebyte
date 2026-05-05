@@ -24,7 +24,7 @@ export default function EmployeeExperiencePage() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1532708059644-5590ed51ce4c?w=1920&q=80"
+            src="https://images.pexels.com/photos/3182812/pexels-photo-3182812.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080"
             alt=""
             className="w-full h-full object-cover"
           />
