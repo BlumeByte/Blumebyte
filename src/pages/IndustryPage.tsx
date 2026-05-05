@@ -16,7 +16,7 @@ export default function IndustryPage() {
       icon: Building2,
       tagline: 'Build stronger teams for stronger projects',
       description: 'Manage your construction workforce with tools designed for the field and office.',
-      heroImage: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1920&q=80',
+      heroImage: 'https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
       challenges: [
         'Managing remote and on-site workers',
         'Tracking certifications and safety training',
@@ -41,7 +41,7 @@ export default function IndustryPage() {
       icon: GraduationCap,
       tagline: 'Empowering educators with better HR tools',
       description: 'Simplify HR management for schools, colleges, and educational institutions.',
-      heroImage: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1920&q=80',
+      heroImage: 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
       challenges: [
         'Managing faculty and staff across departments',
         'Handling seasonal hiring patterns',
@@ -66,7 +66,7 @@ export default function IndustryPage() {
       icon: DollarSign,
       tagline: 'Secure HR solutions for financial institutions',
       description: 'Meet compliance requirements while managing your finance team efficiently.',
-      heroImage: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1920&q=80',
+      heroImage: 'https://images.pexels.com/photos/3182812/pexels-photo-3182812.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
       challenges: [
         'Strict regulatory compliance',
         'Confidential employee data',
@@ -91,7 +91,7 @@ export default function IndustryPage() {
       icon: Heart,
       tagline: 'Healthcare HR for better patient care',
       description: 'Manage healthcare professionals with specialized HR tools.',
-      heroImage: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1920&q=80',
+      heroImage: 'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
       challenges: [
         'Shift scheduling for 24/7 operations',
         'Tracking medical licenses and certifications',
@@ -116,7 +116,7 @@ export default function IndustryPage() {
       icon: Briefcase,
       tagline: 'Streamline operations on the factory floor',
       description: 'Optimize workforce management for manufacturing operations.',
-      heroImage: 'https://images.unsplash.com/photo-1637997840862-9aafaf835eed?w=1920&q=80',
+      heroImage: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
       challenges: [
         'Shift work and complex schedules',
         'Safety compliance and training',
@@ -141,7 +141,7 @@ export default function IndustryPage() {
       icon: Zap,
       tagline: 'Modern HR for modern tech companies',
       description: 'Scale your tech team with agile HR management.',
-      heroImage: 'https://images.unsplash.com/photo-1573497160825-0d94a2724d40?w=1920&q=80',
+      heroImage: 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
       challenges: [
         'Rapid hiring and scaling',
         'Remote and distributed teams',

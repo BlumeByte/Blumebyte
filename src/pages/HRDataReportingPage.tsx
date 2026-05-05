@@ -59,7 +59,7 @@ export default function HRDataReportingPage() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1920&q=80"
+            src="https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080"
             alt=""
             className="w-full h-full object-cover"
           />
