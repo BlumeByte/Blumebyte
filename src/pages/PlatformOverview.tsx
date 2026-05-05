@@ -76,7 +76,7 @@ export default function PlatformOverview() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1573167659694-342d570ce45a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwYnVzaW5lc3MlMjBwcm9mZXNzaW9uYWxzJTIwb2ZmaWNlJTIwdGVhbXdvcmt8ZW58MXx8fHwxNzc1MDQ3ODQ4fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            src="https://images.unsplash.com/photo-1573167659694-342d570ce45a?w=1920&q=80"
             alt=""
             className="w-full h-full object-cover"
           />

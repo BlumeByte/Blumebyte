@@ -59,7 +59,7 @@ export default function TimeAttendancePage() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1584789873809-3de5fb20bfe6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwb2ZmaWNlJTIwd29ya2VyJTIwdGltZSUyMGNsb2NrJTIwYXR0ZW5kYW5jZXxlbnwxfHx8fDE3NzUwNDc4NDh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            src="https://images.unsplash.com/photo-1584789873809-3de5fb20bfe6?w=1920&q=80"
             alt=""
             className="w-full h-full object-cover"
           />

@@ -6,7 +6,7 @@ import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Building2
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
-// HR-themed hero images featuring diverse African/Black professionals
+// HR-themed hero images featuring African/Black professionals
 const HERO_SLIDES = [
   {
     url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=1920&q=80',
@@ -14,17 +14,17 @@ const HERO_SLIDES = [
     sub: 'Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more — all in one powerful platform.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1920&q=80',
     headline: 'Empower Your People. Drive Results.',
     sub: 'From hiring to retirement, give your team the tools they need to thrive — with real-time analytics, automated workflows, and seamless payroll.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1920&q=80',
     headline: 'Smarter HR for Every Industry',
     sub: 'Whether you\'re in tech, healthcare, or finance, Blumebyte adapts to your workforce. Compliant, secure, and built for scale.',
   },
   {
-    url: 'https://images.unsplash.com/photo-1600880292089-90a7e086ee0c?w=1920&q=80',
+    url: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?w=1920&q=80',
     headline: 'Insights That Move Your Business Forward',
     sub: 'Real-time dashboards and advanced reporting give HR leaders the visibility they need to make confident, data-driven decisions.',
   },

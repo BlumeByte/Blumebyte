@@ -24,7 +24,7 @@ export default function ApplicantTrackingPage() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1758519289200-384c7ef2d163?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwam9iJTIwaW50ZXJ2aWV3JTIwaGlyaW5nJTIwcmVjcnVpdG1lbnR8ZW58MXx8fHwxNzc1MDQ3ODUwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            src="https://images.unsplash.com/photo-1758519289200-384c7ef2d163?w=1920&q=80"
             alt=""
             className="w-full h-full object-cover"
           />

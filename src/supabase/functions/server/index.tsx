@@ -10415,6 +10415,9 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
     const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
     const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
+      // Guard against null/undefined KV entries — a corrupt or partially written record
+      // would otherwise throw TypeError on property access and bubble up as a 500.
+      if (!j || typeof j !== 'object') return false;
       const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
       return GLOBAL_VISIBILITY.has(vt) && ACTIVE_STATUSES.has((j.status || '').toLowerCase());
     });

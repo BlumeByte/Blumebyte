@@ -16,7 +16,7 @@ export default function IndustryPage() {
       icon: Building2,
       tagline: 'Build stronger teams for stronger projects',
       description: 'Manage your construction workforce with tools designed for the field and office.',
-      heroImage: 'https://images.unsplash.com/photo-1725811641350-f63dc7442725?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwY29uc3RydWN0aW9uJTIwd29ya2VyJTIwc2l0ZSUyMG1hbmFnZXJ8ZW58MXx8fHwxNzc1MDQ3ODUxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      heroImage: 'https://images.unsplash.com/photo-1725811641350-f63dc7442725?w=1920&q=80',
       challenges: [
         'Managing remote and on-site workers',
         'Tracking certifications and safety training',
@@ -41,7 +41,7 @@ export default function IndustryPage() {
       icon: GraduationCap,
       tagline: 'Empowering educators with better HR tools',
       description: 'Simplify HR management for schools, colleges, and educational institutions.',
-      heroImage: 'https://images.unsplash.com/photo-1744809482817-9a9d4fc280af?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwdGVhY2hlciUyMGVkdWNhdGlvbiUyMGNsYXNzcm9vbSUyMHN0dWRlbnRzfGVufDF8fHx8MTc3NTA0Nzg1OHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      heroImage: 'https://images.unsplash.com/photo-1744809482817-9a9d4fc280af?w=1920&q=80',
       challenges: [
         'Managing faculty and staff across departments',
         'Handling seasonal hiring patterns',
@@ -66,7 +66,7 @@ export default function IndustryPage() {
       icon: DollarSign,
       tagline: 'Secure HR solutions for financial institutions',
       description: 'Meet compliance requirements while managing your finance team efficiently.',
-      heroImage: 'https://images.unsplash.com/photo-1758519290803-f2b25952a5d7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwYmFua2VyJTIwZmluYW5jZSUyMHByb2Zlc3Npb25hbCUyMG9mZmljZXxlbnwxfHx8fDE3NzUwNDc4NTJ8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      heroImage: 'https://images.unsplash.com/photo-1758519290803-f2b25952a5d7?w=1920&q=80',
       challenges: [
         'Strict regulatory compliance',
         'Confidential employee data',
@@ -91,7 +91,7 @@ export default function IndustryPage() {
       icon: Heart,
       tagline: 'Healthcare HR for better patient care',
       description: 'Manage healthcare professionals with specialized HR tools.',
-      heroImage: 'https://images.unsplash.com/photo-1666886573583-9839aafe43cf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwaGVhbHRoY2FyZSUyMGRvY3RvciUyMG51cnNlJTIwaG9zcGl0YWx8ZW58MXx8fHwxNzc1MDQ3ODUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      heroImage: 'https://images.unsplash.com/photo-1666886573583-9839aafe43cf?w=1920&q=80',
       challenges: [
         'Shift scheduling for 24/7 operations',
         'Tracking medical licenses and certifications',
@@ -116,7 +116,7 @@ export default function IndustryPage() {
       icon: Briefcase,
       tagline: 'Streamline operations on the factory floor',
       description: 'Optimize workforce management for manufacturing operations.',
-      heroImage: 'https://images.unsplash.com/photo-1637997840862-9aafaf835eed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbWFudWZhY3R1cmluZyUyMGZhY3RvcnklMjB3b3JrZXIlMjBwcm9kdWN0aW9ufGVufDF8fHx8MTc3NTA0Nzg1M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      heroImage: 'https://images.unsplash.com/photo-1637997840862-9aafaf835eed?w=1920&q=80',
       challenges: [
         'Shift work and complex schedules',
         'Safety compliance and training',
@@ -141,7 +141,7 @@ export default function IndustryPage() {
       icon: Zap,
       tagline: 'Modern HR for modern tech companies',
       description: 'Scale your tech team with agile HR management.',
-      heroImage: 'https://images.unsplash.com/photo-1573497160825-0d94a2724d40?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwdGVjaCUyMGRldmVsb3BlciUyMHNvZnR3YXJlJTIwZW5naW5lZXJ8ZW58MXx8fHwxNzc1MDQ3ODUzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+      heroImage: 'https://images.unsplash.com/photo-1573497160825-0d94a2724d40?w=1920&q=80',
       challenges: [
         'Rapid hiring and scaling',
         'Remote and distributed teams',
