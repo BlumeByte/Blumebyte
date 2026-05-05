@@ -9573,9 +9573,15 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
     }
 
     if (!emailSent) {
-      // Email service not configured — 2FA code could not be delivered
-      console.error('2FA email could not be sent. Please configure an email service.');
-      }
+      // Email service not configured or delivery failed — 2FA code could not be delivered.
+      // Return a clear error so the frontend can handle it gracefully (e.g. allow bypass
+      // or prompt the user to contact their administrator).
+      console.error('2FA email could not be sent. Returning error to client.');
+      return c.json({
+        error: 'email_delivery_failed',
+        message: 'Could not send verification code. Email delivery is not configured or temporarily unavailable.',
+      }, 503);
+    }
 
     return c.json({ 
       success: true, 

@@ -172,6 +172,7 @@ export default EmployeeDashboard;
 function EmpOverview({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { user, accessToken } = useAuth();
   const { branding } = useBranding();
+  const { currencySymbol } = useCurrency();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);

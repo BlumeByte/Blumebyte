@@ -93,7 +93,18 @@ export function LoginPage() {
           try {
             await api('/auth/2fa/send-code', { method: 'POST', body: { email } });
             toast.success('Verification code sent to your email');
-          } catch {
+          } catch (sendErr: any) {
+            // If email delivery is not configured or temporarily unavailable,
+            // allow the user to sign in normally rather than leaving them locked out.
+            if (sendErr?.status === 503 || (sendErr?.message || '').includes('email_delivery_failed') || (sendErr?.message || '').includes('not configured')) {
+              toast.error('2FA email could not be sent (email service unavailable). Signing in without 2FA.');
+              setTotpRequired(false);
+              setPendingEmail('');
+              setPendingPassword('');
+              // Use `password` from the closure (original value before setPassword('') was called)
+              await login(email, password);
+              return;
+            }
             toast.error('Failed to send verification code. Please try again.');
             setTotpRequired(false);
             setPendingEmail('');
