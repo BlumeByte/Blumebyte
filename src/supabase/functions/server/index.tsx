@@ -10454,17 +10454,26 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
     // Show only jobs in a clearly active/live state. 'draft' and paused jobs
     // are intentionally excluded — a public posting should be actively open for
     // applications. Terminal states (filled, closed, etc.) are also excluded.
+    //
+    // BACKWARD COMPAT: Jobs created before the visibilityType field was introduced
+    // (or via paths that did not set it) will have visibilityType undefined/null.
+    // We treat those as public-eligible when they carry an active status, since the
+    // absence of a visibility setting means no explicit "internal-only" intent was
+    // recorded and the job was very likely meant to be publicly listed.
     const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
     const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
       // Guard against null/undefined KV entries — a corrupt or partially written record
       // would otherwise throw TypeError on property access and bubble up as a 500.
       if (!j || typeof j !== 'object') return false;
-      const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
-      if (!GLOBAL_VISIBILITY.has(vt)) return false;
       const st = (j.status || '').toLowerCase();
       // Only include jobs with an explicitly active/live status.
-      return ACTIVE_STATUSES.has(st);
+      if (!ACTIVE_STATUSES.has(st)) return false;
+      const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
+      // Jobs with an explicit non-public visibility (e.g. 'internal_only') are excluded.
+      // Jobs with no visibilityType are included as public by default (backward compat).
+      if (vt && !GLOBAL_VISIBILITY.has(vt)) return false;
+      return true;
     });
 
 
