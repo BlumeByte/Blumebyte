@@ -210,6 +210,11 @@ export function LoginPage() {
                   ? `Enter the 6-digit code sent to ${pendingEmail}`
                   : 'Open your authenticator app and enter the 6-digit code for Blumebyte HR.'}
               </p>
+              {is2FAEmail && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Don't see the email? Check your spam or junk folder.
+                </p>
+              )}
             </CardHeader>
             <CardContent className="pt-4 pb-8 px-8">
               <form onSubmit={handleTotpSubmit} className="space-y-4">

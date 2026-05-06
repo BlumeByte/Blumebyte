@@ -2242,7 +2242,7 @@ function AdminHiring() {
   const [postings, setPostings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({ status: 'open', employmentType: 'Full Time', visibilityType: 'internal_only' });
+  const [formData, setFormData] = useState<any>({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global' });
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -2306,7 +2306,7 @@ function AdminHiring() {
 
   const openNew = () => {
     setEditItem(null);
-    setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'internal_only', companyName: branding.companyName || '' });
+    setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global', companyName: branding.companyName || '' });
     setDialogOpen(true);
   };
 
@@ -2364,7 +2364,7 @@ function AdminHiring() {
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.title || p.roleTitle || '—'}</TableCell>
                       <TableCell className="text-sm">{p.department || '—'}</TableCell>
-                      <TableCell className="text-sm">{p.type || '—'}</TableCell>
+                      <TableCell className="text-sm">{p.employmentType || p.type || '—'}</TableCell>
                       <TableCell className="text-sm">{p.location || '—'}</TableCell>
                       <TableCell className="text-sm">{p.salaryRange || '—'}</TableCell>
                       <TableCell><Badge className={p.visibilityType === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-muted text-muted-foreground'}>{p.visibilityType === 'public_global' ? 'Global' : 'Internal'}</Badge></TableCell>
@@ -2450,7 +2450,7 @@ function AdminHiring() {
             <div><Label className="text-xs">Requirements</Label><Textarea value={formData.requirements || ''} onChange={e => setFormData({ ...formData, requirements: e.target.value })} rows={2} placeholder="Required qualifications..." /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Visibility</Label>
-                <Select value={formData.visibilityType || 'internal_only'} onValueChange={v => setFormData({ ...formData, visibilityType: v })}>
+                <Select value={formData.visibilityType || 'public_global'} onValueChange={v => setFormData({ ...formData, visibilityType: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="internal_only">Internal Only</SelectItem>
