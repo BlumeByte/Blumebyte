@@ -11,7 +11,7 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
-const EMAIL_FROM = 'Blumebyte HR <noreply@blumebyte.com>';
+const EMAIL_FROM = Deno.env.get('RESEND_FROM_EMAIL') || 'Blumebyte HR <noreply@blumebyte.com>';
 const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
 app.use(
@@ -9547,7 +9547,7 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
           },
           body: JSON.stringify({
             from: EMAIL_FROM,
-            to: email,
+            to: email.trim(),
             subject: 'Blumebyte HR – Your Sign-In Verification Code',
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
@@ -9572,13 +9572,15 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
         });
         if (emailRes.ok) {
           emailSent = true;
-          } else {
+        } else {
           const errBody = await emailRes.text();
-          console.error(`Failed to send 2FA email: ${emailRes.status} ${errBody}`);
+          console.error(`Failed to send 2FA email: ${emailRes.status} ${errBody} | from=${EMAIL_FROM} to=${email.trim()}`);
         }
       } catch (emailError) {
         console.error('Error sending 2FA email:', emailError);
       }
+    } else {
+      console.error('2FA email could not be sent: RESEND_API_KEY is not configured.');
     }
 
     if (!emailSent) {
@@ -9643,7 +9645,7 @@ app.post(`${PREFIX}/auth/2fa/verify-code`, async (c) => {
     const sb = supabaseAdmin();
     
     // Get user by email
-    const { data: { users }, error: listError } = await sb.auth.admin.listUsers();
+    const { data: { users }, error: listError } = await sb.auth.admin.listUsers({ perPage: 1000 });
     if (listError) {
       console.error("Error listing users:", listError);
       return c.json({ error: "Failed to verify user" }, 500);
