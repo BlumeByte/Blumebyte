@@ -9,22 +9,22 @@ import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 // HR-themed hero images featuring African/Black professionals
 const HERO_SLIDES = [
   {
-    url: 'https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/5738739/pexels-photo-5738739.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Modern HR Management for Growing Companies',
     sub: 'Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more — all in one powerful platform.',
   },
   {
-    url: 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/5699456/pexels-photo-5699456.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Empower Your People. Drive Results.',
     sub: 'From hiring to retirement, give your team the tools they need to thrive — with real-time analytics, automated workflows, and seamless payroll.',
   },
   {
-    url: 'https://images.pexels.com/photos/3182812/pexels-photo-3182812.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/6476258/pexels-photo-6476258.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Smarter HR for Every Industry',
     sub: 'Whether you\'re in tech, healthcare, or finance, Blumebyte adapts to your workforce. Compliant, secure, and built for scale.',
   },
   {
-    url: 'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/5083016/pexels-photo-5083016.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Insights That Move Your Business Forward',
     sub: 'Real-time dashboards and advanced reporting give HR leaders the visibility they need to make confident, data-driven decisions.',
   },
