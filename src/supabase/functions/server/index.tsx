@@ -9582,14 +9582,19 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
         if (emailRes.ok) {
           // Verify Resend actually queued the email (response must include an `id`)
           let resendData: any = {};
-          try { resendData = JSON.parse(resendRespText); } catch (_) { /* ignore parse failure */ }
+          try { resendData = JSON.parse(resendRespText); } catch (_) {
+            console.warn('2FA email: could not parse Resend response body — treating as delivery failure. body=' + resendRespText.slice(0, 100));
+          }
           if (resendData?.id) {
             emailSent = true;
           } else {
-            console.error(`2FA email: Resend returned 200 but no email id — from=${EMAIL_FROM} to=${email.trim()} body=${resendRespText.slice(0, 200)}`);
+            // Redact the recipient to protect PII in logs — show only domain part
+            const recipientDomain = email.includes('@') ? '@' + email.split('@')[1] : '(unknown)';
+            console.error(`2FA email: Resend returned 200 but no email id — from=${EMAIL_FROM} to=*${recipientDomain} body=${resendRespText.slice(0, 200)}`);
           }
         } else {
-          console.error(`Failed to send 2FA email: status=${emailRes.status} from=${EMAIL_FROM} to=${email.trim()} body=${resendRespText.slice(0, 500)}`);
+          const recipientDomain = email.includes('@') ? '@' + email.split('@')[1] : '(unknown)';
+          console.error(`Failed to send 2FA email: status=${emailRes.status} from=${EMAIL_FROM} to=*${recipientDomain} body=${resendRespText.slice(0, 500)}`);
         }
       } catch (emailError) {
         console.error('Error sending 2FA email:', emailError);
