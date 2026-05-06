@@ -187,17 +187,14 @@ export default function ResourcesPage() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white rounded-xl p-8 text-center shadow-lg">
               <Play className="h-12 w-12 text-red-600 mx-auto mb-4" />
-              <div className="text-4xl font-bold text-gray-900 mb-2">100+</div>
               <div className="text-gray-600">Educational Videos</div>
             </div>
             <div className="bg-white rounded-xl p-8 text-center shadow-lg">
               <Trophy className="h-12 w-12 text-orange-600 mx-auto mb-4" />
-              <div className="text-4xl font-bold text-gray-900 mb-2">5K+</div>
               <div className="text-gray-600">Subscribers</div>
             </div>
             <div className="bg-white rounded-xl p-8 text-center shadow-lg">
               <Users className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-              <div className="text-4xl font-bold text-gray-900 mb-2">50K+</div>
               <div className="text-gray-600">Total Views</div>
             </div>
           </div>
