@@ -2314,7 +2314,7 @@ function AdminHiring() {
     try {
       await api(`/admin/job-postings/${posting.id}`, {
         method: 'PUT',
-        body: { ...posting, visibilityType: newVisibility, status: newStatus },
+        body: { visibilityType: newVisibility, status: newStatus },
         token: accessToken,
       });
       toast.success(newVisibility === 'public_global'
@@ -2354,7 +2354,7 @@ function AdminHiring() {
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
           >
-            <Globe className="w-3.5 h-3.5" />View Public Hiring Board<ExternalLink className="w-3 h-3" />
+            <Globe className="w-3.5 h-3.5" /><span>View Public Hiring Board</span><ExternalLink className="w-3 h-3" />
           </a>
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
           <Button size="sm" onClick={openNew}><Plus className="w-4 h-4 mr-1" />New Job Posting</Button>
