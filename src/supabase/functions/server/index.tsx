@@ -9547,18 +9547,26 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
           body: JSON.stringify({
             from: EMAIL_FROM,
             to: email,
-            subject: 'Your Blumebyte Verification Code',
+            subject: 'Blumebyte HR – Your Sign-In Verification Code',
             html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #000;">Blumebyte - Two-Factor Authentication</h2>
-                <p>Your verification code is:</p>
-                <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
-                  ${code}
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                <div style="background: #000; padding: 20px 24px;">
+                  <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;">Blumebyte HR</h1>
                 </div>
-                <p>This code will expire in <strong>10 minutes</strong>.</p>
-                <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
+                <div style="padding: 32px 24px;">
+                  <h2 style="color: #111827; margin: 0 0 8px 0; font-size: 18px;">Your sign-in verification code</h2>
+                  <p style="color: #374151; margin: 0 0 24px 0;">Use the code below to complete your sign-in. It expires in <strong>10 minutes</strong>.</p>
+                  <div style="background: #f3f4f6; padding: 24px; text-align: center; font-size: 36px; font-weight: bold; letter-spacing: 12px; border-radius: 8px; margin: 0 0 24px 0; color: #111827;">
+                    ${code}
+                  </div>
+                  <p style="color: #6b7280; font-size: 13px; margin: 0;">Didn't request this code? You can safely ignore this email — your account has not been accessed.</p>
+                </div>
+                <div style="background: #f9fafb; padding: 16px 24px; border-top: 1px solid #e5e7eb;">
+                  <p style="color: #9ca3af; font-size: 12px; margin: 0;">This is an automated security email from Blumebyte HR. Please do not reply to this email.</p>
+                </div>
               </div>
             `,
+            text: `Blumebyte HR – Sign-In Verification Code\n\nYour verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this code, please ignore this email.`,
           }),
         });
         if (emailRes.ok) {

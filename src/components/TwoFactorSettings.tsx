@@ -57,9 +57,11 @@ export function TwoFactorSettings() {
     try {
       await api('/auth/2fa/send-code', { method: 'POST', body: { email: user.email } });
       setEmailCodeSent(true);
-      toast.success('Verification code sent to your email');
+      toast.success('Verification code sent to your email.');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send code');
+      toast.error(err?.status === 503
+        ? 'Email delivery is currently unavailable. Please use an authenticator app instead or contact your administrator.'
+        : 'Failed to send verification code. Please try again.');
     } finally {
       setEmailSetupLoading(false);
     }
@@ -153,6 +155,7 @@ export function TwoFactorSettings() {
           ) : (
             <form onSubmit={handleVerifyEmailCode} className="space-y-4">
               <p className="text-sm text-gray-600">Enter the code sent to <strong>{user?.email}</strong></p>
+              <p className="text-xs text-amber-600">Don't see the email? Check your spam or junk folder.</p>
               <div className="space-y-2">
                 <Label htmlFor="email-2fa-code">Verification Code</Label>
                 <Input
