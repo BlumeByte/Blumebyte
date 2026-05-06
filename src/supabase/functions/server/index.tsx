@@ -9555,7 +9555,7 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
           },
           body: JSON.stringify({
             from: EMAIL_FROM,
-            to: email.trim(),
+            to: [email.trim()],
             subject: 'Blumebyte HR – Your Sign-In Verification Code',
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
@@ -9578,27 +9578,40 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
             text: `Blumebyte HR – Sign-In Verification Code\n\nYour verification code is: ${code}\n\nThis code expires in 10 minutes.\n\nIf you did not request this code, please ignore this email.`,
           }),
         });
+        const resendRespText = await emailRes.text();
         if (emailRes.ok) {
-          emailSent = true;
+          // Verify Resend actually queued the email (response must include an `id`)
+          let resendData: any = {};
+          try { resendData = JSON.parse(resendRespText); } catch (_) { /* ignore parse failure */ }
+          if (resendData?.id) {
+            emailSent = true;
+          } else {
+            console.error(`2FA email: Resend returned 200 but no email id — from=${EMAIL_FROM} to=${email.trim()} body=${resendRespText.slice(0, 200)}`);
+          }
         } else {
-          const errBody = await emailRes.text();
-          console.error(`Failed to send 2FA email: ${emailRes.status} ${errBody} | from=${EMAIL_FROM} to=${email.trim()}`);
+          console.error(`Failed to send 2FA email: status=${emailRes.status} from=${EMAIL_FROM} to=${email.trim()} body=${resendRespText.slice(0, 500)}`);
         }
       } catch (emailError) {
         console.error('Error sending 2FA email:', emailError);
       }
     } else {
-      console.error('2FA email could not be sent: RESEND_API_KEY is not configured.');
+      console.error('2FA email could not be sent: RESEND_API_KEY is not configured. Set the RESEND_API_KEY and RESEND_FROM_EMAIL environment variables.');
     }
 
     if (!emailSent) {
       // Email service not configured or delivery failed — 2FA code could not be delivered.
-      // Return a clear error so the frontend can handle it gracefully (e.g. allow bypass
-      // or prompt the user to contact their administrator).
-      console.error('2FA email could not be sent. Returning error to client.');
+      // Return a clear error so the frontend can handle it gracefully.
+      // Hint at the likely cause so the admin can diagnose from server logs.
+      const fromConfigured = configuredEmailFrom.includes('@');
+      const hint = !Deno.env.get('RESEND_API_KEY')
+        ? 'RESEND_API_KEY is not set.'
+        : !fromConfigured
+        ? 'RESEND_FROM_EMAIL is not set or does not contain a valid email address.'
+        : 'Resend rejected the request — verify that the sender domain in RESEND_FROM_EMAIL is verified in your Resend account.';
+      console.error(`2FA email delivery failed. ${hint}`);
       return c.json({
         error: 'email_delivery_failed',
-        message: 'Could not send verification code. Email delivery is not configured or temporarily unavailable.',
+        message: 'Could not send verification code. Email delivery is not available. Please contact your administrator or use an authenticator app.',
       }, 503);
     }
 
@@ -9713,7 +9726,7 @@ app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
       twoFactorEnabled: user.user_metadata?.twoFactorEnabled || false,
       twoFactorVerifiedAt: user.user_metadata?.twoFactorVerifiedAt || null,
       totpEnabled: user.user_metadata?.totpEnabled || false,
-      emailOtpAvailable: Boolean(Deno.env.get('RESEND_API_KEY')),
+      emailOtpAvailable: Boolean(Deno.env.get('RESEND_API_KEY')) && configuredEmailFrom.includes('@'),
     });
   } catch (e: any) {
     console.error("2FA status check error:", e);

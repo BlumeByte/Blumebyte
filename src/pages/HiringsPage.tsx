@@ -38,7 +38,6 @@ interface ApplyFormData {
   cvMessage: string;
 }
 
-const EMPLOYMENT_TYPES = ['Full Time', 'Part Time', 'Contract', 'Internship', 'Remote', 'Hybrid'];
 const MAX_CV_CHARS = 4000;
 
 // ─── Job Card Skeleton ────────────────────────────────────────────────────────
@@ -456,6 +455,11 @@ export default function HiringsPage() {
   // Unique locations for filter
   const locations = Array.from(new Set(jobs.map((j) => j.location).filter(Boolean))) as string[];
 
+  // Unique employment types for filter — only show types that exist in the loaded jobs
+  const employmentTypes = Array.from(
+    new Set(jobs.map((j) => j.employmentType).filter(Boolean))
+  ).sort() as string[];
+
   // Filter + sort
   const filtered = jobs
     .filter((j) => {
@@ -531,7 +535,7 @@ export default function HiringsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              {EMPLOYMENT_TYPES.map((t) => (
+              {employmentTypes.map((t) => (
                 <SelectItem key={t} value={t}>{t}</SelectItem>
               ))}
             </SelectContent>
