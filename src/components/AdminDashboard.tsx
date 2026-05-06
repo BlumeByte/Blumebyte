@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
+import { Switch } from './ui/switch';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
 import {
@@ -19,8 +20,8 @@ import {
   X, Building2, FolderTree, Briefcase, CalendarDays, Megaphone, KeyRound,
   Copy, RefreshCw, PanelLeftClose, PanelLeftOpen, AlertCircle, Settings,
   Clock, CheckCircle, MessageCircle, User, UserCheck, Upload, FileText, Download, LogOut, Camera,
-  UserCog, XCircle, Zap, GitMerge, Target, ClipboardList, FileCheck, BarChart3, Eye, ChevronUp, ChevronDown, Play,
-  MessageSquare, BookOpen, GraduationCap, CreditCard, ExternalLink
+  UserCog, XCircle, Zap, GitMerge, Target, ClipboardList, FileCheck, BarChart3, Eye, EyeOff, ChevronUp, ChevronDown, Play,
+  MessageSquare, BookOpen, GraduationCap, CreditCard, ExternalLink, Globe
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { NotificationsBell } from './NotificationsBell';
@@ -2304,6 +2305,25 @@ function AdminHiring() {
     catch (e: any) { toast.error(e.message); }
   };
 
+  const handleToggleVisibility = async (posting: any) => {
+    const newVisibility = posting.visibilityType === 'public_global' ? 'internal_only' : 'public_global';
+    // Auto-activate status when making a posting public
+    const newStatus = (newVisibility === 'public_global' && !JOB_ACTIVE_STATUSES.has(posting.status))
+      ? 'open'
+      : posting.status;
+    try {
+      await api(`/admin/job-postings/${posting.id}`, {
+        method: 'PUT',
+        body: { visibilityType: newVisibility, status: newStatus },
+        token: accessToken,
+      });
+      toast.success(newVisibility === 'public_global'
+        ? 'Job is now public — visible on the hiring board immediately'
+        : 'Job is now internal only');
+      load();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
   const openNew = () => {
     setEditItem(null);
     setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global', companyName: branding.companyName || '' });
@@ -2327,7 +2347,15 @@ function AdminHiring() {
           <UserCheck className="w-5 h-5 text-blue-600" />
           <h2 className="text-lg font-semibold">Hiring Management</h2>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <a
+            href="/hirings"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+          >
+            <Globe className="w-3.5 h-3.5" /><span>View Public Hiring Board</span><ExternalLink className="w-3 h-3" />
+          </a>
           <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
           <Button size="sm" onClick={openNew}><Plus className="w-4 h-4 mr-1" />New Job Posting</Button>
         </div>
@@ -2356,7 +2384,7 @@ function AdminHiring() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Job Title</TableHead><TableHead>Department</TableHead><TableHead>Type</TableHead>
-                    <TableHead>Location</TableHead><TableHead>Salary</TableHead><TableHead>Visibility</TableHead><TableHead>Status</TableHead><TableHead className="w-28">Actions</TableHead>
+                    <TableHead>Location</TableHead><TableHead>Salary</TableHead><TableHead>Public Visibility</TableHead><TableHead>Status</TableHead><TableHead className="w-28">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2367,7 +2395,18 @@ function AdminHiring() {
                       <TableCell className="text-sm">{p.employmentType || p.type || '—'}</TableCell>
                       <TableCell className="text-sm">{p.location || '—'}</TableCell>
                       <TableCell className="text-sm">{p.salaryRange || '—'}</TableCell>
-                      <TableCell><Badge className={p.visibilityType === 'public_global' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-muted text-muted-foreground'}>{p.visibilityType === 'public_global' ? 'Global' : 'Internal'}</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={p.visibilityType === 'public_global'}
+                            onCheckedChange={() => handleToggleVisibility(p)}
+                            aria-label={p.visibilityType === 'public_global' ? 'Make internal' : 'Make public'}
+                          />
+                          <span className={`text-xs font-medium ${p.visibilityType === 'public_global' ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'}`}>
+                            {p.visibilityType === 'public_global' ? 'Public' : 'Internal'}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell><Badge className={statusColor(p.status)}>{p.status}</Badge></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -2449,7 +2488,8 @@ function AdminHiring() {
             <div><Label className="text-xs">Job Description</Label><Textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={3} placeholder="Detailed job description..." /></div>
             <div><Label className="text-xs">Requirements</Label><Textarea value={formData.requirements || ''} onChange={e => setFormData({ ...formData, requirements: e.target.value })} rows={2} placeholder="Required qualifications..." /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs">Visibility</Label>
+              <div>
+                <Label className="text-xs">Visibility</Label>
                 <Select value={formData.visibilityType || 'public_global'} onValueChange={v => setFormData({ ...formData, visibilityType: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -2457,6 +2497,11 @@ function AdminHiring() {
                     <SelectItem value="public_global">Global (public job board)</SelectItem>
                   </SelectContent>
                 </Select>
+                {(formData.visibilityType === 'public_global' || !formData.visibilityType) && (
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                    ✓ Will appear on the hiring board immediately — no approval needed.
+                  </p>
+                )}
               </div>
               <div><Label className="text-xs">Status</Label>
                 <Select value={formData.status || 'open'} onValueChange={v => setFormData({ ...formData, status: v })}>
