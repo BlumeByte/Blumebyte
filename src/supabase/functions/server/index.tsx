@@ -11,7 +11,15 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
-const EMAIL_FROM = Deno.env.get('RESEND_FROM_EMAIL') || 'Blumebyte HR <noreply@blumebyte.com>';
+// Validate the RESEND_FROM_EMAIL secret: Resend requires the 'from' field to
+// contain an actual email address (e.g. "Name <user@domain.com>" or "user@domain.com").
+// If the secret is missing or contains only a display name with no '@' character
+// (a common misconfiguration), fall back to the safe built-in default so that
+// all email delivery (2FA codes, welcome emails, password resets) continues to work.
+const configuredEmailFrom = Deno.env.get('RESEND_FROM_EMAIL') || '';
+const EMAIL_FROM = configuredEmailFrom.includes('@')
+  ? configuredEmailFrom
+  : 'Blumebyte HR <noreply@blumebyte.com>';
 const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
 app.use(
