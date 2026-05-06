@@ -6,25 +6,25 @@ import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, Building2
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
-// HR-themed hero images featuring African/Black professionals
+// HR-themed hero images showing HR professionals at work
 const HERO_SLIDES = [
   {
-    url: 'https://images.pexels.com/photos/5738739/pexels-photo-5738739.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Modern HR Management for Growing Companies',
     sub: 'Streamline your HR operations with Blumebyte. Manage employees, track attendance, process leave requests, and more — all in one powerful platform.',
   },
   {
-    url: 'https://images.pexels.com/photos/5699456/pexels-photo-5699456.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/5669619/pexels-photo-5669619.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Empower Your People. Drive Results.',
     sub: 'From hiring to retirement, give your team the tools they need to thrive — with real-time analytics, automated workflows, and seamless payroll.',
   },
   {
-    url: 'https://images.pexels.com/photos/6476258/pexels-photo-6476258.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Smarter HR for Every Industry',
     sub: 'Whether you\'re in tech, healthcare, or finance, Blumebyte adapts to your workforce. Compliant, secure, and built for scale.',
   },
   {
-    url: 'https://images.pexels.com/photos/5083016/pexels-photo-5083016.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+    url: 'https://images.pexels.com/photos/669615/pexels-photo-669615.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
     headline: 'Insights That Move Your Business Forward',
     sub: 'Real-time dashboards and advanced reporting give HR leaders the visibility they need to make confident, data-driven decisions.',
   },

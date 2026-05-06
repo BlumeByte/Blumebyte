@@ -24,7 +24,7 @@ export default function PayrollPage() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.pexels.com/photos/5715023/pexels-photo-5715023.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080"
+            src="https://images.pexels.com/photos/7681338/pexels-photo-7681338.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080"
             alt=""
             className="w-full h-full object-cover"
           />
