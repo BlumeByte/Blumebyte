@@ -11,7 +11,15 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
-const EMAIL_FROM = Deno.env.get('RESEND_FROM_EMAIL') || 'Blumebyte HR <noreply@blumebyte.com>';
+// Validate the RESEND_FROM_EMAIL secret: Resend requires the 'from' field to
+// contain an actual email address (e.g. "Name <user@domain.com>" or "user@domain.com").
+// If the secret is missing or contains only a display name with no '@' character
+// (a common misconfiguration), fall back to the safe built-in default so that
+// all email delivery (2FA codes, welcome emails, password resets) continues to work.
+const configuredEmailFrom = Deno.env.get('RESEND_FROM_EMAIL') || '';
+const EMAIL_FROM = configuredEmailFrom.includes('@')
+  ? configuredEmailFrom
+  : 'Blumebyte HR <noreply@blumebyte.com>';
 const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
 app.use(
@@ -10454,17 +10462,26 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
     // Show only jobs in a clearly active/live state. 'draft' and paused jobs
     // are intentionally excluded — a public posting should be actively open for
     // applications. Terminal states (filled, closed, etc.) are also excluded.
+    //
+    // BACKWARD COMPAT: Jobs created before the visibilityType field was introduced
+    // (or via paths that did not set it) will have visibilityType undefined/null.
+    // We treat those as public-eligible when they carry an active status, since the
+    // absence of a visibility setting means no explicit "internal-only" intent was
+    // recorded and the job was very likely meant to be publicly listed.
     const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
     const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
       // Guard against null/undefined KV entries — a corrupt or partially written record
       // would otherwise throw TypeError on property access and bubble up as a 500.
       if (!j || typeof j !== 'object') return false;
-      const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
-      if (!GLOBAL_VISIBILITY.has(vt)) return false;
       const st = (j.status || '').toLowerCase();
       // Only include jobs with an explicitly active/live status.
-      return ACTIVE_STATUSES.has(st);
+      if (!ACTIVE_STATUSES.has(st)) return false;
+      const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
+      // Jobs with an explicit non-public visibility (e.g. 'internal_only') are excluded.
+      // Jobs with no visibilityType are included as public by default (backward compat).
+      if (vt && !GLOBAL_VISIBILITY.has(vt)) return false;
+      return true;
     });
 
 

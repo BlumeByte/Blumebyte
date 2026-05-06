@@ -153,12 +153,26 @@ const GROUPS = [
   { id: 'system', label: 'System' },
 ];
 
+// An option entry for a select field — can be a plain string (value === label) or
+// an object that carries separate value and label strings.
+type FieldOption = string | { value: string; label: string };
+
 type EntityConfig = {
   title: string;
   apiPrefix: string;
-  fields: { key: string; label: string; type?: string; options?: string[]; relatedEntity?: string; defaultQuestions?: string[] }[];
+  fields: { key: string; label: string; type?: string; options?: FieldOption[]; relatedEntity?: string; defaultQuestions?: string[] }[];
   defaults?: Record<string, any>;
 };
+
+/** Return the raw value string for a FieldOption entry. */
+function optionValue(o: FieldOption): string {
+  return typeof o === 'string' ? o : o.value;
+}
+
+/** Return the display label string for a FieldOption entry. */
+function optionLabel(o: FieldOption): string {
+  return typeof o === 'string' ? o : o.label;
+}
 
 const ENTITY_CONFIGS: Record<string, EntityConfig> = {
   companies: {
@@ -370,7 +384,10 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
       // roleTitle is used on the public hiring page; title is the internal reference
       { key: 'roleTitle', label: 'Role Title (shown publicly)' },
       { key: 'companyName', label: 'Company Name (shown publicly)' },
-      { key: 'visibilityType', label: 'Visibility', type: 'select', options: ['internal_only', 'public_global'] },
+      { key: 'visibilityType', label: 'Visibility', type: 'select', options: [
+          { value: 'internal_only', label: 'Internal Only (not on job board)' },
+          { value: 'public_global', label: 'Public (appears on job board)' },
+        ] },
       { key: 'status', label: 'Status', type: 'select', options: ['draft', 'active', 'open', 'interviewing', 'offered', 'filled', 'closed'] },
       { key: 'location', label: 'Location' },
       { key: 'employmentType', label: 'Employment Type', type: 'select', options: ['Full Time', 'Part Time', 'Contract', 'Internship', 'Remote', 'Hybrid'] },
@@ -3846,9 +3863,9 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
   const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
 
   // Helper: for a select field with "other" option, determine if the stored value is custom
-  const getSelectDisplayValue = (field: { key: string; options?: string[] }, value: string) => {
+  const getSelectDisplayValue = (field: { key: string; options?: FieldOption[] }, value: string) => {
     if (!value || !field.options) return value || '';
-    if (field.options.includes(value)) return value;
+    if (field.options.some(o => optionValue(o) === value)) return value;
     return 'other'; // stored value is custom → show "other" in dropdown
   };
 
@@ -4151,7 +4168,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                 {
                   key: 'status',
                   label: 'Status',
-                  options: statusField.options.map(o => ({ value: o, label: o })),
+                  options: statusField.options.map(o => ({ value: optionValue(o), label: optionLabel(o) })),
                 }
               ] : []}
               filterValues={{ status: statusFilter }}
@@ -4234,7 +4251,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                             // Initialize otherTexts for fields whose stored value isn't in predefined options
                             const ot: Record<string, string> = {};
                             config.fields.forEach(f => {
-                              if (f.type === 'select' && f.options?.includes('other') && item[f.key] && !f.options.includes(item[f.key])) {
+                              if (f.type === 'select' && f.options?.some(o => optionValue(o) === 'other') && item[f.key] && !f.options.some(o => optionValue(o) === item[f.key])) {
                                 ot[f.key] = item[f.key];
                               }
                             });
@@ -4302,7 +4319,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
               setViewItem(null); setEditItem(viewItem); setFormData({ ...viewItem });
               const ot: Record<string, string> = {};
               config.fields.forEach(f => {
-                if (f.type === 'select' && f.options?.includes('other') && viewItem[f.key] && !f.options.includes(viewItem[f.key])) {
+                if (f.type === 'select' && f.options?.some(o => optionValue(o) === 'other') && viewItem[f.key] && !f.options.some(o => optionValue(o) === viewItem[f.key])) {
                   ot[f.key] = viewItem[f.key];
                 }
               });
@@ -4325,7 +4342,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                   {field.type === 'select' ? (
                     <div className="space-y-2">
                       <NativeSelect
-                        value={field.options?.includes('other') ? getSelectDisplayValue(field, formData[field.key] || '') : (formData[field.key] || '')}
+                        value={field.options?.some(o => optionValue(o) === 'other') ? getSelectDisplayValue(field, formData[field.key] || '') : (formData[field.key] || '')}
                         onChange={e => {
                           const v = e.target.value;
                           if (v === 'other') {
@@ -4337,9 +4354,9 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                         }}
                       >
                         <option value="">{`Select ${field.label.toLowerCase()}`}</option>
-                        {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        {field.options?.map(opt => <option key={optionValue(opt)} value={optionValue(opt)}>{optionLabel(opt)}</option>)}
                       </NativeSelect>
-                      {field.options?.includes('other') && getSelectDisplayValue(field, formData[field.key] || '') === 'other' && (
+                      {field.options?.some(o => optionValue(o) === 'other') && getSelectDisplayValue(field, formData[field.key] || '') === 'other' && (
                         <Input
                           placeholder={`Specify ${field.label.toLowerCase()}...`}
                           value={otherTexts[field.key] || ''}
