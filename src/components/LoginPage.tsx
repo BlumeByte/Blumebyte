@@ -48,6 +48,8 @@ export function LoginPage() {
   const [pendingPassword, setPendingPassword] = useState('');
   // Whether the pending 2FA is email-OTP (true) or TOTP authenticator app (false)
   const [is2FAEmail, setIs2FAEmail] = useState(false);
+  // Persistent error shown when email OTP delivery fails (so it's not lost if the toast auto-dismisses)
+  const [emailOtpUnavailable, setEmailOtpUnavailable] = useState(false);
 
   useEffect(() => {
     // Check for logout reason in URL
@@ -102,9 +104,15 @@ export function LoginPage() {
             await api('/auth/2fa/send-code', { method: 'POST', body: { email } });
             toast.success('Verification code sent to your email');
           } catch (sendErr: any) {
-            toast.error(isEmailDeliveryFailure(sendErr)
-              ? 'Email verification is unavailable right now. Please use authenticator-app 2FA or contact your administrator.'
+            const isDeliveryFailure = isEmailDeliveryFailure(sendErr);
+            toast.error(isDeliveryFailure
+              ? 'Email 2FA is unavailable — email delivery is not configured on this server.'
               : 'Failed to send verification code. Please try again.');
+            if (isDeliveryFailure) {
+              // Show persistent inline error so users know what to do — a toast can be
+              // auto-dismissed and the user may not notice it.
+              setEmailOtpUnavailable(true);
+            }
             setTotpRequired(false);
             setPendingEmail('');
             setPendingPassword('');
@@ -294,6 +302,15 @@ export function LoginPage() {
                   <AlertCircle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-amber-800">
                     {logoutReason}
+                  </AlertDescription>
+                </Alert>
+              )}
+              {emailOtpUnavailable && (
+                <Alert className="bg-orange-50 border-orange-300">
+                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                  <AlertTitle className="text-orange-800 font-semibold text-sm">Email 2FA unavailable</AlertTitle>
+                  <AlertDescription className="text-orange-700 text-xs mt-1">
+                    Your account has email two-factor authentication enabled, but the email delivery service is not configured on this server. Please contact your administrator to either configure email delivery or switch to an authenticator app (TOTP).
                   </AlertDescription>
                 </Alert>
               )}
