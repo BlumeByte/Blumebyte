@@ -412,7 +412,8 @@ async function getCompanyId(userId: string): Promise<string | null> {
 
 async function resolveCompanyName(companyId: string): Promise<string> {
   if (!companyId) return "";
-  const company = await kv.get(`company:${companyId}`);
+  // Check both key formats: company: (canonical) and company_by_id: (legacy/alternate)
+  const company = await kv.get(`company:${companyId}`) || await kv.get(`company_by_id:${companyId}`);
   return company?.name || "";
 }
 
@@ -10444,13 +10445,10 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
     //   'public'        — legacy alias that may exist in older records
     //   'global'        — another legacy alias used before the underscore convention
     // Comparison is case-insensitive to handle any capitalisation drift.
-    // Visibility is the primary filter — if an admin explicitly set a job to public,
-    // we honour that intent. We only exclude jobs whose status is explicitly set to
-    // a terminal/inactive state (filled, closed, expired, cancelled, inactive).
-    // Jobs with no status, 'draft', 'active', 'open', 'paused', 'interviewing',
-    // 'offered', etc. are all shown — this covers the common scenario where a job
-    // was saved as public_global before auto-activation was in place.
-    const EXCLUDE_STATUSES = new Set(['filled', 'closed', 'expired', 'cancelled', 'inactive']);
+    // Show only jobs in a clearly active/live state. 'draft' and paused jobs
+    // are intentionally excluded — a public posting should be actively open for
+    // applications. Terminal states (filled, closed, etc.) are also excluded.
+    const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
     const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
     const eligible = all.filter((j: any) => {
       // Guard against null/undefined KV entries — a corrupt or partially written record
@@ -10459,8 +10457,8 @@ app.get(`${PREFIX}/public/jobs`, async (c) => {
       const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
       if (!GLOBAL_VISIBILITY.has(vt)) return false;
       const st = (j.status || '').toLowerCase();
-      // Exclude only jobs in an explicitly terminal state.
-      return !EXCLUDE_STATUSES.has(st);
+      // Only include jobs with an explicitly active/live status.
+      return ACTIVE_STATUSES.has(st);
     });
 
 

@@ -4320,7 +4320,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
           <div className="space-y-3 py-2">
             <div className="grid grid-cols-2 gap-3">
               {config.fields.map(field => (
-                <div key={field.key} className={field.label.includes('Description') || field.label.includes('Notes') || field.label.includes('Comments') || field.label.includes('Requirements') || field.label.includes('Action Items') || field.label.includes('Agenda') || field.type === 'questions' ? 'col-span-2' : ''}>
+                <div key={field.key} className={field.label.includes('Description') || field.label.includes('Notes') || field.label.includes('Comments') || field.label.includes('Requirements') || field.label.includes('Qualifications') || field.label.includes('Action Items') || field.label.includes('Agenda') || field.type === 'questions' ? 'col-span-2' : ''}>
                   <Label>{field.label}</Label>
                   {field.type === 'select' ? (
                     <div className="space-y-2">
@@ -4505,7 +4505,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                     <Input type="date" min={new Date().toISOString().slice(0, 10)} value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} />
                   ) : field.type === 'time' ? (
                     <Input type="time" value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} />
-                  ) : field.label.includes('Description') || field.label.includes('Notes') || field.label.includes('Comments') || field.label.includes('Requirements') || field.label.includes('Action Items') || field.label.includes('Agenda') ? (
+                  ) : field.label.includes('Description') || field.label.includes('Notes') || field.label.includes('Comments') || field.label.includes('Requirements') || field.label.includes('Qualifications') || field.label.includes('Action Items') || field.label.includes('Agenda') ? (
                     <Textarea value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} rows={3} />
                   ) : (
                     <Input type={field.type || 'text'} value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} />
