@@ -9643,15 +9643,20 @@ app.post(`${PREFIX}/auth/2fa/verify-code`, async (c) => {
     await kv.del(`2fa:${email.toLowerCase()}`);
 
     const sb = supabaseAdmin();
-    
-    // Get user by email
-    const { data: { users }, error: listError } = await sb.auth.admin.listUsers({ perPage: 1000 });
-    if (listError) {
-      console.error("Error listing users:", listError);
-      return c.json({ error: "Failed to verify user" }, 500);
-    }
 
-    const user = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    // Find user by email with pagination to handle large user bases
+    let user: any = null;
+    let page = 1;
+    while (!user) {
+      const { data: { users: pageUsers }, error: listError } = await sb.auth.admin.listUsers({ perPage: 1000, page });
+      if (listError) {
+        console.error("Error listing users:", listError);
+        return c.json({ error: "Failed to verify user" }, 500);
+      }
+      user = pageUsers.find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) ?? null;
+      if (pageUsers.length < 1000) break; // no more pages
+      page++;
+    }
     if (!user) {
       return c.json({ error: "User not found" }, 404);
     }
@@ -9664,7 +9669,6 @@ app.post(`${PREFIX}/auth/2fa/verify-code`, async (c) => {
         twoFactorVerifiedAt: new Date().toISOString(),
       },
     });
-
 
     return c.json({ 
       success: true, 
