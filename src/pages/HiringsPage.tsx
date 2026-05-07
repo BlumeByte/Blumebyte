@@ -40,6 +40,10 @@ interface ApplyFormData {
 
 const MAX_CV_CHARS = 4000;
 
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 // ─── Job Card Skeleton ────────────────────────────────────────────────────────
 function JobCardSkeleton() {
   return (
@@ -454,21 +458,21 @@ export default function HiringsPage() {
 
   // Unique locations for filter
   const locations = Array.from(
-    new Set(jobs.map((j) => (typeof j.location === 'string' ? j.location.trim() : '')).filter(Boolean))
+    new Set(jobs.map((j) => asString(j.location).trim()).filter(Boolean))
   ) as string[];
 
   // Unique employment types for filter — only show types that exist in the loaded jobs
   const employmentTypes = Array.from(
-    new Set(jobs.map((j) => (typeof j.employmentType === 'string' ? j.employmentType.trim() : '')).filter(Boolean))
+    new Set(jobs.map((j) => asString(j.employmentType).trim()).filter(Boolean))
   ).sort() as string[];
 
   // Filter + sort
   const filtered = jobs
     .filter((j) => {
       const q = search.toLowerCase();
-      const roleTitle = typeof j.roleTitle === 'string' ? j.roleTitle : '';
-      const companyName = typeof j.companyName === 'string' ? j.companyName : '';
-      const employmentType = typeof j.employmentType === 'string' ? j.employmentType : '';
+      const roleTitle = asString(j.roleTitle);
+      const companyName = asString(j.companyName);
+      const employmentType = asString(j.employmentType);
       const matchSearch = !q || roleTitle.toLowerCase().includes(q) || companyName.toLowerCase().includes(q);
       const matchLocation = !filterLocation || filterLocation === 'all' || j.location === filterLocation;
       const matchType = !filterType || filterType === 'all' || employmentType === filterType;
