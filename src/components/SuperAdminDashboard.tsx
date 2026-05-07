@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { api, clearAllCache } from '../lib/api-client';
+import { api, clearAllCache, invalidateCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -778,6 +778,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
     try {
       await api(`/superadmin/public-job-application/${id}`, { method: 'PUT', body: { status }, token: accessToken });
       toast.success('Status updated');
+      invalidateCache('/superadmin/public-job-applications', accessToken);
       load();
     } catch {
       toast.error('Failed to update status');

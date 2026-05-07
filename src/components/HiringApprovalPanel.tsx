@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { api } from '../lib/api-client';
+import { api, invalidateCache } from '../lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -56,6 +56,7 @@ export function HiringApprovalPanel() {
         status === 'rejected' ? 'Application rejected. Applicant notified.' :
         `Status updated to ${status}`
       );
+      invalidateCache('/job-applications', accessToken);
       load();
       setDetailOpen(false);
     } catch (e: any) { toast.error(e.message); }
