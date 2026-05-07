@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { api, clearAllCache } from '../lib/api-client';
+import { api, clearAllCache, invalidateCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -395,6 +395,7 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
       { key: 'requirements', label: 'Requirements' },
       { key: 'qualifications', label: 'Qualifications' },
       { key: 'salaryRange', label: 'Salary Range' },
+      { key: 'applicationNotificationEmails', label: 'Application Notification Emails (comma separated)' },
       { key: 'deadline', label: 'Application Deadline', type: 'date' },
     ],
     defaults: { visibilityType: 'public_global', status: 'active' },
@@ -777,6 +778,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
     try {
       await api(`/superadmin/public-job-application/${id}`, { method: 'PUT', body: { status }, token: accessToken });
       toast.success('Status updated');
+      invalidateCache('/superadmin/public-job-applications', accessToken);
       load();
     } catch {
       toast.error('Failed to update status');
@@ -875,16 +877,40 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
           </DialogHeader>
           {selected && (
             <div className="space-y-4 py-2 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label className="text-xs text-gray-400">Applicant</Label><p className="font-medium">{selected.fullName}</p></div>
-                <div><Label className="text-xs text-gray-400">Email</Label><p>{selected.email}</p></div>
-                <div><Label className="text-xs text-gray-400">Phone</Label><p>{selected.phone}</p></div>
-                <div><Label className="text-xs text-gray-400">Submitted</Label><p>{selected.submittedAt ? new Date(selected.submittedAt).toLocaleString() : '—'}</p></div>
-                <div><Label className="text-xs text-gray-400">Company</Label><p>{selected.companyName}</p></div>
-                <div><Label className="text-xs text-gray-400">Role</Label><p>{selected.roleTitle}</p></div>
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                <p className="text-base font-semibold break-words">{selected.fullName || '—'}</p>
+                <p className="text-xs text-muted-foreground break-all">{selected.email || '—'}</p>
+                <p className="text-xs text-muted-foreground break-words">{selected.phone || '—'}</p>
               </div>
-              <div><Label className="text-xs text-gray-400">Qualifications</Label><p className="mt-1">{selected.qualification}</p></div>
-              <div><Label className="text-xs text-gray-400">CV / Cover Letter</Label><p className="mt-1 whitespace-pre-wrap bg-gray-50 rounded p-3">{selected.cvMessage}</p></div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Company</Label>
+                  <p className="mt-1 break-words">{selected.companyName || '—'}</p>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Role</Label>
+                  <p className="mt-1 break-words">{selected.roleTitle || '—'}</p>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Submitted</Label>
+                  <p className="mt-1 break-words">{selected.submittedAt ? new Date(selected.submittedAt).toLocaleString() : '—'}</p>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Contact Details</Label>
+                  <p className="mt-1 break-words">{selected.contactDetails || '—'}</p>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-3">
+                <Label className="text-[11px] text-muted-foreground">Qualifications</Label>
+                <p className="mt-1 whitespace-pre-wrap break-words">{selected.qualification || '—'}</p>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-3">
+                <Label className="text-[11px] text-muted-foreground">CV / Cover Letter</Label>
+                <p className="mt-1 whitespace-pre-wrap break-words">{selected.cvMessage || '—'}</p>
+              </div>
             </div>
           )}
         </DialogContent>

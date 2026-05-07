@@ -2239,7 +2239,7 @@ function AdminHiring() {
   const [postings, setPostings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<any>({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global' });
+  const [formData, setFormData] = useState<any>({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global', applicationNotificationEmails: '' });
   const [editItem, setEditItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -2322,7 +2322,7 @@ function AdminHiring() {
 
   const openNew = () => {
     setEditItem(null);
-    setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global', companyName: branding.companyName || '' });
+    setFormData({ status: 'open', employmentType: 'Full Time', visibilityType: 'public_global', companyName: branding.companyName || '', applicationNotificationEmails: '' });
     setDialogOpen(true);
   };
 
@@ -2480,6 +2480,14 @@ function AdminHiring() {
             <div className="grid grid-cols-2 gap-3">
               <div><Label className="text-xs">Location</Label><Input value={formData.location || ''} onChange={e => setFormData({ ...formData, location: e.target.value })} placeholder="e.g., Remote / Lagos" /></div>
               <div><Label className="text-xs">Salary Range</Label><Input value={formData.salaryRange || ''} onChange={e => setFormData({ ...formData, salaryRange: e.target.value })} placeholder="e.g., $50K - $80K" /></div>
+            </div>
+            <div>
+              <Label className="text-xs">Application Notification Emails</Label>
+              <Input
+                value={formData.applicationNotificationEmails || ''}
+                onChange={e => setFormData({ ...formData, applicationNotificationEmails: e.target.value })}
+                placeholder="e.g., hiring@company.com, hr@company.com"
+              />
             </div>
             <div><Label className="text-xs">Job Description</Label><Textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={3} placeholder="Detailed job description..." /></div>
             <div><Label className="text-xs">Requirements</Label><Textarea value={formData.requirements || ''} onChange={e => setFormData({ ...formData, requirements: e.target.value })} rows={2} placeholder="Required qualifications..." /></div>

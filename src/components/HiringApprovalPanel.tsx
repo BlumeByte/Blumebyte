@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { api } from '../lib/api-client';
+import { api, invalidateCache } from '../lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -56,6 +56,7 @@ export function HiringApprovalPanel() {
         status === 'rejected' ? 'Application rejected. Applicant notified.' :
         `Status updated to ${status}`
       );
+      invalidateCache('/job-applications', accessToken);
       load();
       setDetailOpen(false);
     } catch (e: any) { toast.error(e.message); }
@@ -247,18 +248,20 @@ export function HiringApprovalPanel() {
             <div className="space-y-4 py-2">
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">{selected.applicantName}</h3>
+                  <h3 className="font-semibold break-words pr-2">{selected.applicantName}</h3>
                   {statusBadge(selected.status)}
                 </div>
-                <p className="text-sm text-gray-500">{selected.applicantEmail}</p>
-                <p className="text-xs text-gray-400">Current: {selected.applicantCurrentPosition || selected.applicantCurrentRole || 'N/A'} &middot; {selected.applicantDepartment || 'N/A'}</p>
+                <p className="text-sm text-gray-500 break-all">{selected.applicantEmail || '—'}</p>
+                <p className="text-xs text-gray-400 break-words">Current: {selected.applicantCurrentPosition || selected.applicantCurrentRole || 'N/A'} &middot; {selected.applicantDepartment || 'N/A'}</p>
+                <p className="text-xs text-gray-400 mt-1 break-words">Phone: {selected.phone || selected.applicantPhone || '—'}</p>
+                <p className="text-xs text-gray-400 mt-1 break-words">Contact Details: {selected.contactDetails || '—'}</p>
               </div>
 
               <Separator />
 
               <div>
                 <h4 className="text-sm font-semibold mb-2">Applied For</h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {[
                     { label: 'Position', value: selected.jobTitle },
                     { label: 'Department', value: selected.jobDepartment },
@@ -269,7 +272,7 @@ export function HiringApprovalPanel() {
                   ].map((f, i) => (
                     <div key={i} className="bg-gray-50 rounded p-2">
                       <p className="text-[10px] text-gray-400">{f.label}</p>
-                      <p className="text-sm">{f.value || '\u2014'}</p>
+                      <p className="text-sm break-words">{f.value || '\u2014'}</p>
                     </div>
                   ))}
                 </div>
@@ -280,7 +283,7 @@ export function HiringApprovalPanel() {
                   <Separator />
                   <div>
                     <h4 className="text-sm font-semibold mb-1">Cover Letter</h4>
-                    <p className="text-sm text-gray-600 bg-gray-50 rounded p-3 whitespace-pre-wrap">{selected.coverLetter}</p>
+                    <p className="text-sm text-gray-600 bg-gray-50 rounded p-3 whitespace-pre-wrap break-words">{selected.coverLetter}</p>
                   </div>
                 </>
               )}

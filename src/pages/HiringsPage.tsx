@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import {
   Search, MapPin, Briefcase, Building2,
-  Loader2, AlertCircle, RefreshCw, Calendar
+  Loader2, AlertCircle, RefreshCw, Calendar, Clock3, Eye, DollarSign
 } from 'lucide-react';
 import { api, invalidateCache } from '../lib/api-client';
 import { supabase } from '../lib/supabase';
@@ -24,6 +24,7 @@ interface PublicJob {
   description?: string;
   requirements?: string;
   qualifications?: string;
+  salaryRange?: string;
   deadline?: string;
   createdAt: string;
   visibilityType: string;
@@ -34,11 +35,28 @@ interface ApplyFormData {
   fullName: string;
   email: string;
   phone: string;
+  contactDetails: string;
   qualification: string;
   cvMessage: string;
 }
 
 const MAX_CV_CHARS = 4000;
+const APPLIED_JOBS_STORAGE_KEY = 'public_hiring_applied_jobs';
+
+function loadAppliedJobs(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(APPLIED_JOBS_STORAGE_KEY) || '[]');
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAppliedJobs(jobIds: string[]) {
+  try {
+    localStorage.setItem(APPLIED_JOBS_STORAGE_KEY, JSON.stringify(jobIds));
+  } catch {}
+}
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -79,15 +97,18 @@ function ApplyModal({
   job,
   open,
   onClose,
+  onApplied,
 }: {
   job: PublicJob | null;
   open: boolean;
   onClose: () => void;
+  onApplied: (jobId: string) => void;
 }) {
   const [form, setForm] = useState<ApplyFormData>({
     fullName: '',
     email: '',
     phone: '',
+    contactDetails: '',
     qualification: '',
     cvMessage: '',
   });
@@ -96,7 +117,7 @@ function ApplyModal({
   const [submitted, setSubmitted] = useState(false);
 
   const reset = () => {
-    setForm({ fullName: '', email: '', phone: '', qualification: '', cvMessage: '' });
+    setForm({ fullName: '', email: '', phone: '', contactDetails: '', qualification: '', cvMessage: '' });
     setErrors({});
     setSubmitted(false);
     setSubmitting(false);
@@ -113,6 +134,7 @@ function ApplyModal({
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Please enter a valid email';
     if (!form.phone.trim()) e.phone = 'Phone number is required';
     else if (!/^\+?[\d\s\-().]{7,15}$/.test(form.phone)) e.phone = 'Please enter a valid phone number';
+    if (!form.contactDetails.trim()) e.contactDetails = 'Contact details are required';
     if (!form.qualification.trim()) e.qualification = 'Qualification is required';
     if (!form.cvMessage.trim()) e.cvMessage = 'CV message is required';
     else if (form.cvMessage.length > MAX_CV_CHARS) e.cvMessage = `Maximum ${MAX_CV_CHARS} characters`;
@@ -133,10 +155,16 @@ function ApplyModal({
           fullName: form.fullName,
           email: form.email,
           phone: form.phone,
+          contactDetails: form.contactDetails,
           qualification: form.qualification,
           cvMessage: form.cvMessage,
         },
       });
+      if (job?.id) {
+        onApplied(job.id);
+        const next = Array.from(new Set([...loadAppliedJobs(), job.id]));
+        saveAppliedJobs(next);
+      }
       setSubmitted(true);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to submit application. Please try again.');
@@ -222,6 +250,7 @@ function ApplyModal({
                   {field('fullName', 'Full Name')}
                   {field('email', 'Email Address', 'input', 'email')}
                   {field('phone', 'Phone Number', 'input', 'tel')}
+                  {field('contactDetails', 'Contact Details (LinkedIn / alternate contact)')}
                   {field('qualification', 'Qualifications')}
                   {field('cvMessage', 'CV / Cover Letter', 'textarea')}
                 </>
@@ -307,52 +336,75 @@ function JobDetailsModal({
 // ─── Job Card ─────────────────────────────────────────────────────────────────
 function JobCard({
   job,
+  applied,
   onDetails,
   onApply,
 }: {
   job: PublicJob;
+  applied: boolean;
   onDetails: () => void;
   onApply: () => void;
 }) {
-  const preview = job.description
-    ? job.description.length > 150
-      ? job.description.slice(0, 150) + '…'
-      : job.description
-    : '';
+  const status = job.status || 'open';
+  const applyButtonClass = applied
+    ? 'flex-1 bg-slate-200 text-blue-700 hover:bg-slate-300'
+    : 'flex-1 bg-black text-white hover:bg-gray-800';
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-6 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center shrink-0">
-          <Building2 className="h-5 w-5 text-white" />
+    <div className="bg-slate-950 text-slate-200 rounded-2xl border border-slate-700/70 shadow-lg hover:shadow-xl transition-all duration-200 p-5 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-slate-100 text-base truncate" title={job.roleTitle || 'Untitled Role'}>
+            {job.roleTitle || 'Untitled Role'}
+          </h3>
+          <p className="text-sm text-slate-400 truncate mt-1" title={job.companyName || 'Hiring Organization'}>
+            {job.companyName || 'Hiring Organization'}
+          </p>
         </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate">{job.roleTitle || 'Untitled Role'}</h3>
-          <p className="text-sm text-gray-500 truncate">{job.companyName || 'Hiring Organization'}</p>
-        </div>
+        <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-1 capitalize">{status}</span>
       </div>
 
-      {/* Meta */}
-      <div className="flex flex-wrap gap-2">
-        {job.location && (
-          <TagChip><MapPin className="h-3 w-3 inline mr-0.5" />{job.location}</TagChip>
-        )}
-        {job.employmentType && <TagChip>{job.employmentType}</TagChip>}
+      <div className="space-y-1 text-sm text-slate-300">
+        <p className="flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 text-slate-400" />
+          <span>{job.location || 'Location not specified'}</span>
+          {job.employmentType && (
+            <>
+              <Clock3 className="h-3.5 w-3.5 text-slate-400 ml-2" />
+              <span>{job.employmentType}</span>
+            </>
+          )}
+        </p>
         {job.deadline && (
-          <TagChip>Due {new Date(job.deadline).toLocaleDateString()}</TagChip>
+          <p className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            <span>Deadline: {new Date(job.deadline).toLocaleDateString()}</span>
+          </p>
+        )}
+        {!!job.salaryRange && (
+          <p className="flex items-center gap-1.5 text-emerald-400 font-medium">
+            <DollarSign className="h-3.5 w-3.5" />
+            <span>{job.salaryRange}</span>
+          </p>
         )}
       </div>
 
-      {/* Preview */}
-      {preview && <p className="text-sm text-gray-600 line-clamp-3">{preview}</p>}
+      <p className="text-sm text-slate-300 line-clamp-2">{job.description || ''}</p>
+      <div className="text-xs text-slate-400 pt-2 border-t border-slate-700/60">
+        Posted {new Date(job.createdAt).toLocaleDateString()}
+      </div>
 
-      {/* Buttons */}
-      <div className="flex gap-2 mt-auto pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-        <Button variant="outline" size="sm" className="flex-1" onClick={onDetails}>
-          View Details
+      <div className="flex gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
+        <Button variant="outline" size="sm" className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700" onClick={onDetails}>
+          <Eye className="h-4 w-4 mr-1" />
+          Details
         </Button>
-        <Button size="sm" className="flex-1 bg-black text-white hover:bg-gray-800" onClick={onApply}>
-          Apply Now
+        <Button
+          size="sm"
+          disabled={applied}
+          className={applyButtonClass}
+          onClick={onApply}
+        >
+          {applied ? 'Applied' : 'Apply'}
         </Button>
       </div>
     </div>
@@ -370,7 +422,12 @@ export default function HiringsPage() {
   const [sortBy, setSortBy] = useState<'latest' | 'deadline' | 'alphabetical'>('latest');
   const [detailJob, setDetailJob] = useState<PublicJob | null>(null);
   const [applyJob, setApplyJob] = useState<PublicJob | null>(null);
+  const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const mountedRef = useRef(true);
+
+  useEffect(() => {
+    setAppliedJobIds(loadAppliedJobs());
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -608,8 +665,11 @@ export default function HiringsPage() {
               <JobCard
                 key={job.id}
                 job={job}
+                applied={appliedJobIds.includes(job.id)}
                 onDetails={() => setDetailJob(job)}
-                onApply={() => setApplyJob(job)}
+                onApply={() => {
+                  if (!appliedJobIds.includes(job.id)) setApplyJob(job);
+                }}
               />
             ))}
           </div>
@@ -627,6 +687,7 @@ export default function HiringsPage() {
         job={applyJob}
         open={!!applyJob}
         onClose={() => setApplyJob(null)}
+        onApplied={(jobId) => setAppliedJobIds((prev) => Array.from(new Set([...prev, jobId])))}
       />
 
       <PublicFooter />
