@@ -789,7 +789,7 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
       user_metadata: { 
         name, 
         role: "superadmin",
-        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        requires2FA: false, // 2FA temporarily disabled
         twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true,
@@ -947,7 +947,7 @@ app.post(`${PREFIX}/company/register`, async (c) => {
         role: "superadmin",
         companyId,
         companyName,
-        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        requires2FA: false, // 2FA temporarily disabled
         twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true, // Auto-confirm since we don't have email configured
@@ -1230,7 +1230,7 @@ async function createCompanyAccount(registrationData: any) {
         companyId,
         companyName,
         assignedCompanies: [companyId], // CRITICAL: Include assignedCompanies in auth metadata
-        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        requires2FA: false, // 2FA temporarily disabled
         twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true,

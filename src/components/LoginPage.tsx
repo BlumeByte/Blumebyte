@@ -78,51 +78,9 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
+    setEmailOtpUnavailable(false);
     try {
-      // Check 2FA status BEFORE calling login so we can intercept if needed
-      let needsTotp = false;
-      let needsEmailOtp = false;
-      try {
-        const statusData = await api(`/auth/2fa/status?email=${encodeURIComponent(email)}`);
-        const emailOtpAvailable = statusData?.emailOtpAvailable !== false;
-        needsTotp = statusData?.totpEnabled === true;
-        // Email OTP: enabled but no TOTP configured → use email flow
-        needsEmailOtp = !needsTotp && statusData?.twoFactorEnabled === true && emailOtpAvailable;
-      } catch {
-        // If status check fails, proceed without 2FA
-      }
-
-      if (needsTotp || needsEmailOtp) {
-        setPendingEmail(email);
-        setPendingPassword(password);
-        setPassword('');
-        setIs2FAEmail(needsEmailOtp);
-        setTotpRequired(true);
-        // For email OTP, send the code immediately
-        if (needsEmailOtp) {
-          try {
-            await api('/auth/2fa/send-code', { method: 'POST', body: { email } });
-            toast.success('Verification code sent to your email');
-          } catch (sendErr: any) {
-            const isDeliveryFailure = isEmailDeliveryFailure(sendErr);
-            toast.error(isDeliveryFailure
-              ? 'Email 2FA is unavailable — email delivery is not configured on this server.'
-              : 'Failed to send verification code. Please try again.');
-            if (isDeliveryFailure) {
-              // Show persistent inline error so users know what to do — a toast can be
-              // auto-dismissed and the user may not notice it.
-              setEmailOtpUnavailable(true);
-            }
-            setTotpRequired(false);
-            setPendingEmail('');
-            setPendingPassword('');
-            return;
-          }
-        }
-        return;
-      }
-
-      // No 2FA — sign in normally
+      // 2FA is temporarily disabled platform-wide.
       await login(email, password);
     } catch (_) {}
   };

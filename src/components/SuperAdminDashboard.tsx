@@ -38,7 +38,6 @@ import { BackupRestore } from './BackupRestore';
 import { HiringApprovalPanel } from './HiringApprovalPanel';
 import { ClockInOut } from './ClockInOut';
 import { ReportsPanel } from './ReportsPanel';
-import { TwoFactorSettings } from './TwoFactorSettings';
 import { MeetingsPanel } from './MeetingsPanel';
 import { ProfileChangeRequests } from './ProfileChangeRequests';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
@@ -569,11 +568,6 @@ export function SuperAdminDashboard() {
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">Working Hours Configuration</h2>
             <WorkingHoursConfig />
-          </div>
-
-          <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">Two-Factor Authentication</h2>
-            <TwoFactorSettings />
           </div>
 
           <div className="border-t pt-8">
