@@ -21,6 +21,8 @@ export default defineConfig({
   publicDir: 'public',
   resolve: {
     alias: [
+      // Figma Make emits imports like `@radix-ui/react-slot@1.1.2`;
+      // map those to normal package names so Vite can resolve from node_modules.
       {
         find: /(.+)@[\d]+\.[\d]+\.[\d]+(?:[-\w.]*)?$/,
         replacement: '$1',
