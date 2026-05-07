@@ -876,16 +876,40 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
           </DialogHeader>
           {selected && (
             <div className="space-y-4 py-2 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label className="text-xs text-gray-400">Applicant</Label><p className="font-medium">{selected.fullName}</p></div>
-                <div><Label className="text-xs text-gray-400">Email</Label><p>{selected.email}</p></div>
-                <div><Label className="text-xs text-gray-400">Phone</Label><p>{selected.phone}</p></div>
-                <div><Label className="text-xs text-gray-400">Submitted</Label><p>{selected.submittedAt ? new Date(selected.submittedAt).toLocaleString() : '—'}</p></div>
-                <div><Label className="text-xs text-gray-400">Company</Label><p>{selected.companyName}</p></div>
-                <div><Label className="text-xs text-gray-400">Role</Label><p>{selected.roleTitle}</p></div>
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                <p className="text-base font-semibold break-words">{selected.fullName || '—'}</p>
+                <p className="text-xs text-muted-foreground break-all">{selected.email || '—'}</p>
+                <p className="text-xs text-muted-foreground break-words">{selected.phone || '—'}</p>
               </div>
-              <div><Label className="text-xs text-gray-400">Qualifications</Label><p className="mt-1">{selected.qualification}</p></div>
-              <div><Label className="text-xs text-gray-400">CV / Cover Letter</Label><p className="mt-1 whitespace-pre-wrap bg-gray-50 rounded p-3">{selected.cvMessage}</p></div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Company</Label>
+                  <p className="mt-1 break-words">{selected.companyName || '—'}</p>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Role</Label>
+                  <p className="mt-1 break-words">{selected.roleTitle || '—'}</p>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Submitted</Label>
+                  <p className="mt-1 break-words">{selected.submittedAt ? new Date(selected.submittedAt).toLocaleString() : '—'}</p>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <Label className="text-[11px] text-muted-foreground">Contact Details</Label>
+                  <p className="mt-1 break-words">{selected.contactDetails || '—'}</p>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-3">
+                <Label className="text-[11px] text-muted-foreground">Qualifications</Label>
+                <p className="mt-1 whitespace-pre-wrap break-words">{selected.qualification || '—'}</p>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-3">
+                <Label className="text-[11px] text-muted-foreground">CV / Cover Letter</Label>
+                <p className="mt-1 whitespace-pre-wrap break-words">{selected.cvMessage || '—'}</p>
+              </div>
             </div>
           )}
         </DialogContent>
