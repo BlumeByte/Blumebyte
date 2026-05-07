@@ -490,6 +490,7 @@ function escapeHtml(text: string): string {
 }
 
 function parseEmailList(...values: any[]): string[] {
+  const emailPattern = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
   const valid = new Set<string>();
   for (const value of values) {
     if (!value) continue;
@@ -499,7 +500,7 @@ function parseEmailList(...values: any[]): string[] {
       .map((entry) => entry.trim().toLowerCase())
       .filter(Boolean)
       .forEach((email) => {
-        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) valid.add(email);
+        if (emailPattern.test(email)) valid.add(email);
       });
   }
   return Array.from(valid);

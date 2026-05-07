@@ -41,6 +41,22 @@ interface ApplyFormData {
 }
 
 const MAX_CV_CHARS = 4000;
+const APPLIED_JOBS_STORAGE_KEY = 'public_hiring_applied_jobs';
+
+function loadAppliedJobs(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(APPLIED_JOBS_STORAGE_KEY) || '[]');
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAppliedJobs(jobIds: string[]) {
+  try {
+    localStorage.setItem(APPLIED_JOBS_STORAGE_KEY, JSON.stringify(jobIds));
+  } catch {}
+}
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -146,11 +162,8 @@ function ApplyModal({
       });
       if (job?.id) {
         onApplied(job.id);
-        try {
-          const stored = JSON.parse(localStorage.getItem('public_hiring_applied_jobs') || '[]');
-          const next = Array.from(new Set([...(Array.isArray(stored) ? stored : []), job.id]));
-          localStorage.setItem('public_hiring_applied_jobs', JSON.stringify(next));
-        } catch {}
+        const next = Array.from(new Set([...loadAppliedJobs(), job.id]));
+        saveAppliedJobs(next);
       }
       setSubmitted(true);
     } catch (err: any) {
@@ -333,12 +346,19 @@ function JobCard({
   onApply: () => void;
 }) {
   const status = job.status || 'open';
+  const applyButtonClass = applied
+    ? 'flex-1 bg-slate-200 text-blue-700 hover:bg-slate-300'
+    : 'flex-1 bg-black text-white hover:bg-gray-800';
   return (
-    <div className="bg-[#0b1220] text-slate-200 rounded-2xl border border-slate-700/70 shadow-lg hover:shadow-xl transition-all duration-200 p-5 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
+    <div className="bg-slate-950 text-slate-200 rounded-2xl border border-slate-700/70 shadow-lg hover:shadow-xl transition-all duration-200 p-5 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-semibold text-slate-100 text-base truncate">{job.roleTitle || 'Untitled Role'}</h3>
-          <p className="text-sm text-slate-400 truncate mt-1">{job.companyName || 'Hiring Organization'}</p>
+          <h3 className="font-semibold text-slate-100 text-base truncate" title={job.roleTitle || 'Untitled Role'}>
+            {job.roleTitle || 'Untitled Role'}
+          </h3>
+          <p className="text-sm text-slate-400 truncate mt-1" title={job.companyName || 'Hiring Organization'}>
+            {job.companyName || 'Hiring Organization'}
+          </p>
         </div>
         <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-1 capitalize">{status}</span>
       </div>
@@ -381,7 +401,7 @@ function JobCard({
         <Button
           size="sm"
           disabled={applied}
-          className={`flex-1 ${applied ? 'bg-slate-200 text-blue-700 hover:bg-slate-200' : 'bg-black text-white hover:bg-gray-800'}`}
+          className={applyButtonClass}
           onClick={onApply}
         >
           {applied ? 'Applied' : 'Apply'}
@@ -406,12 +426,7 @@ export default function HiringsPage() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('public_hiring_applied_jobs') || '[]');
-      setAppliedJobIds(Array.isArray(stored) ? stored : []);
-    } catch {
-      setAppliedJobIds([]);
-    }
+    setAppliedJobIds(loadAppliedJobs());
   }, []);
 
   useEffect(() => {
