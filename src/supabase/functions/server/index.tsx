@@ -470,6 +470,55 @@ function normalizeEmploymentType(raw: string): string {
 
 // --- Active statuses for public job visibility ---
 const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
+const JOB_PUBLIC_VISIBILITIES = new Set(['public_global', 'public', 'global']);
+
+function normalizeJobStatus(raw: any): string {
+  return String(raw ?? '').trim().toLowerCase().replace(/[\s-]/g, '_');
+}
+
+function normalizeJobVisibility(raw: any): string {
+  return String(raw ?? '').trim().toLowerCase().replace(/[\s-]/g, '_');
+}
+
+function isPublicJobPosting(job: any): boolean {
+  if (!job || typeof job !== 'object') return false;
+  const status = normalizeJobStatus(job.status);
+  if (!JOB_ACTIVE_STATUSES.has(status)) return false;
+  const visibility = normalizeJobVisibility(job.visibilityType);
+  // Backward compatibility: older public jobs may not have visibilityType at all.
+  if (visibility && !JOB_PUBLIC_VISIBILITIES.has(visibility)) return false;
+  return true;
+}
+
+async function buildPublicJobResponse(job: any) {
+  if (!job || typeof job !== 'object' || !job.id) return null;
+
+  let companyName = typeof job.companyName === 'string' ? job.companyName : '';
+  if (!companyName && job.companyId) {
+    try {
+      companyName = await resolveCompanyName(job.companyId);
+    } catch (_) {}
+  }
+  if (!companyName && typeof job.company === 'string' && !job.company.includes('-')) {
+    companyName = job.company;
+  }
+
+  return {
+    id: job.id,
+    companyName,
+    roleTitle: job.roleTitle || job.title || 'Untitled Role',
+    employmentType: normalizeEmploymentType(String(job.employmentType || job.type || job.employment_type || '')),
+    location: typeof job.location === 'string' ? job.location : '',
+    description: typeof job.description === 'string' ? job.description : '',
+    requirements: typeof job.requirements === 'string' ? job.requirements : '',
+    qualifications: typeof job.qualifications === 'string' ? job.qualifications : '',
+    salaryRange: typeof job.salaryRange === 'string' ? job.salaryRange : '',
+    deadline: job.deadline || null,
+    createdAt: job.createdAt || job.created_at || new Date().toISOString(),
+    visibilityType: normalizeJobVisibility(job.visibilityType),
+    status: normalizeJobStatus(job.status),
+  };
+}
 
 // --- Build a scope-based item filter for payroll calculation ---
 function makeScopeFilter(scope: string[] | null) {
@@ -789,7 +838,7 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
       user_metadata: { 
         name, 
         role: "superadmin",
-        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        requires2FA: false, // 2FA temporarily disabled
         twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true,
@@ -947,7 +996,7 @@ app.post(`${PREFIX}/company/register`, async (c) => {
         role: "superadmin",
         companyId,
         companyName,
-        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        requires2FA: false, // 2FA temporarily disabled
         twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true, // Auto-confirm since we don't have email configured
@@ -1230,7 +1279,7 @@ async function createCompanyAccount(registrationData: any) {
         companyId,
         companyName,
         assignedCompanies: [companyId], // CRITICAL: Include assignedCompanies in auth metadata
-        requires2FA: true, // Enable 2FA requirement for SuperAdmin
+        requires2FA: false, // 2FA temporarily disabled
         twoFactorEnabled: false, // Will be enabled after first verification
       },
       email_confirm: true,
@@ -10472,67 +10521,14 @@ async function sendEmailNotification(
 app.get(`${PREFIX}/public/jobs`, async (c) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
-    // Accept all variants that mean "visible to the public":
-    //   'public_global' — canonical value used by all current POST/PUT handlers
-    //   'public'        — legacy alias that may exist in older records
-    //   'global'        — another legacy alias used before the underscore convention
-    // Comparison is case-insensitive to handle any capitalisation drift.
-    // Show only jobs in a clearly active/live state. 'draft' and paused jobs
-    // are intentionally excluded — a public posting should be actively open for
-    // applications. Terminal states (filled, closed, etc.) are also excluded.
-    //
-    // BACKWARD COMPAT: Jobs created before the visibilityType field was introduced
-    // (or via paths that did not set it) will have visibilityType undefined/null.
-    // We treat those as public-eligible when they carry an active status, since the
-    // absence of a visibility setting means no explicit "internal-only" intent was
-    // recorded and the job was very likely meant to be publicly listed.
-    const ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
-    const GLOBAL_VISIBILITY = new Set(['public_global', 'public', 'global']);
-    const eligible = all.filter((j: any) => {
-      // Guard against null/undefined KV entries — a corrupt or partially written record
-      // would otherwise throw TypeError on property access and bubble up as a 500.
-      if (!j || typeof j !== 'object') return false;
-      const st = (j.status || '').toLowerCase();
-      // Only include jobs with an explicitly active/live status.
-      if (!ACTIVE_STATUSES.has(st)) return false;
-      const vt = (j.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
-      // Jobs with an explicit non-public visibility (e.g. 'internal_only') are excluded.
-      // Jobs with no visibilityType are included as public by default (backward compat).
-      if (vt && !GLOBAL_VISIBILITY.has(vt)) return false;
-      return true;
-    });
-
+    const eligible = all.filter(isPublicJobPosting);
 
     // Build public job objects using Promise.allSettled so one bad company-name
     // lookup never wipes the entire result set.
-    const settled = await Promise.allSettled(eligible.map(async (j: any) => {
-      let companyName = j.companyName || '';
-      // If companyName missing but we have a companyId, look it up
-      if (!companyName && j.companyId) {
-        try { companyName = await resolveCompanyName(j.companyId); } catch (_) { /* ignore */ }
-      }
-      // If still missing, use raw company field (might be UUID or name)
-      if (!companyName) companyName = typeof j.company === 'string' && !j.company.includes('-') ? j.company : '';
-      return {
-        id: j.id,
-        companyName,
-        roleTitle: j.roleTitle || j.title || '',
-        // Normalize employmentType: check all variants (employmentType, type, employment_type)
-        employmentType: normalizeEmploymentType(j.employmentType || j.type || j.employment_type || ''),
-        location: j.location || '',
-        description: j.description || '',
-        requirements: j.requirements || '',
-        qualifications: j.qualifications || '',
-        salaryRange: j.salaryRange || '',
-        deadline: j.deadline || null,
-        createdAt: j.createdAt || j.created_at || new Date().toISOString(),
-        visibilityType: j.visibilityType,
-        status: j.status,
-      };
-    }));
+    const settled = await Promise.allSettled(eligible.map((j: any) => buildPublicJobResponse(j)));
 
     const publicJobs = settled
-      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
       .map(r => r.value);
 
     publicJobs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -10548,21 +10544,10 @@ app.get(`${PREFIX}/public/jobs/:id`, async (c) => {
   try {
     const id = c.req.param('id');
     const job = await kv.get(`job-posting:${id}`);
-    if (!job) return c.json({ error: 'Not found' }, 404);
-    const vt = (job.visibilityType || '').toLowerCase().replace(/[\s-]/g, '_');
-    if (!['public_global', 'public', 'global'].includes(vt)) return c.json({ error: 'Not found' }, 404);
-    return c.json({
-      id: job.id,
-      companyName: job.companyName || job.company || '',
-      roleTitle: job.roleTitle || job.title || '',
-      employmentType: job.employmentType || '',
-      location: job.location || '',
-      description: job.description || '',
-      requirements: job.requirements || '',
-      qualifications: job.qualifications || '',
-      deadline: job.deadline || null,
-      createdAt: job.createdAt || new Date().toISOString(),
-    });
+    if (!isPublicJobPosting(job)) return c.json({ error: 'Not found' }, 404);
+    const publicJob = await buildPublicJobResponse(job);
+    if (!publicJob) return c.json({ error: 'Not found' }, 404);
+    return c.json(publicJob);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
@@ -10588,8 +10573,7 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
 
     // Verify job exists and is public
     const job = await kv.get(`job-posting:${jobId}`);
-    const APPLY_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
-    if (!job || job.visibilityType !== 'public_global' || !APPLY_STATUSES.has(job.status)) {
+    if (!isPublicJobPosting(job)) {
       return c.json({ error: 'Job not found or no longer accepting applications' }, 404);
     }
 

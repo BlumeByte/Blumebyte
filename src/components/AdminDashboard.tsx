@@ -43,7 +43,6 @@ import { AutomationModule } from './AutomationModule';
 import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
-import { TwoFactorSettings } from './TwoFactorSettings';
 import { LanguageSelector } from './LanguageSelector';
 import { NotificationSettings } from './NotificationSettings';
 import { useDarkMode } from '../lib/dark-mode-context';
@@ -2210,9 +2209,6 @@ function AdminSettings() {
           )}
         </CardContent>
       </Card>
-
-      {/* 2FA Settings */}
-      <TwoFactorSettings />
 
       {/* Language Settings */}
       <Card>

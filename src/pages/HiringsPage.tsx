@@ -40,6 +40,10 @@ interface ApplyFormData {
 
 const MAX_CV_CHARS = 4000;
 
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 // ─── Job Card Skeleton ────────────────────────────────────────────────────────
 function JobCardSkeleton() {
   return (
@@ -187,7 +191,7 @@ function ApplyModal({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {submitted ? 'Application Submitted!' : `Apply — ${job?.roleTitle || ''}`}
+            {submitted ? 'Application Submitted!' : `Apply — ${job?.roleTitle || 'Untitled Role'}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -200,7 +204,7 @@ function ApplyModal({
             </div>
             <h3 className="text-lg font-semibold text-gray-900">Application submitted successfully!</h3>
             <p className="text-sm text-gray-500">
-              Thank you for applying to <strong>{job?.roleTitle}</strong> at <strong>{job?.companyName}</strong>.
+              Thank you for applying to <strong>{job?.roleTitle || 'Untitled Role'}</strong> at <strong>{job?.companyName || 'Hiring Organization'}</strong>.
               You will be contacted if selected.
             </p>
             <Button onClick={onClose} className="bg-black text-white hover:bg-gray-800">Close</Button>
@@ -255,10 +259,10 @@ function JobDetailsModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">{job.roleTitle}</DialogTitle>
-          <p className="text-sm text-gray-500 flex items-center gap-1 pt-1">
-            <Building2 className="h-4 w-4" /> {job.companyName}
-          </p>
+            <DialogTitle className="text-xl">{job.roleTitle || 'Untitled Role'}</DialogTitle>
+            <p className="text-sm text-gray-500 flex items-center gap-1 pt-1">
+              <Building2 className="h-4 w-4" /> {job.companyName || 'Hiring Organization'}
+            </p>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="flex flex-wrap gap-2">
@@ -323,8 +327,8 @@ function JobCard({
           <Building2 className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate">{job.roleTitle}</h3>
-          <p className="text-sm text-gray-500 truncate">{job.companyName}</p>
+          <h3 className="font-semibold text-gray-900 truncate">{job.roleTitle || 'Untitled Role'}</h3>
+          <p className="text-sm text-gray-500 truncate">{job.companyName || 'Hiring Organization'}</p>
         </div>
       </div>
 
@@ -453,20 +457,25 @@ export default function HiringsPage() {
   }, [fetchJobs]);
 
   // Unique locations for filter
-  const locations = Array.from(new Set(jobs.map((j) => j.location).filter(Boolean))) as string[];
+  const locations = Array.from(
+    new Set(jobs.map((j) => asString(j.location).trim()).filter(Boolean))
+  ) as string[];
 
   // Unique employment types for filter — only show types that exist in the loaded jobs
   const employmentTypes = Array.from(
-    new Set(jobs.map((j) => j.employmentType).filter(Boolean))
+    new Set(jobs.map((j) => asString(j.employmentType).trim()).filter(Boolean))
   ).sort() as string[];
 
   // Filter + sort
   const filtered = jobs
     .filter((j) => {
       const q = search.toLowerCase();
-      const matchSearch = !q || j.roleTitle.toLowerCase().includes(q) || j.companyName.toLowerCase().includes(q);
+      const roleTitle = asString(j.roleTitle);
+      const companyName = asString(j.companyName);
+      const employmentType = asString(j.employmentType);
+      const matchSearch = !q || roleTitle.toLowerCase().includes(q) || companyName.toLowerCase().includes(q);
       const matchLocation = !filterLocation || filterLocation === 'all' || j.location === filterLocation;
-      const matchType = !filterType || filterType === 'all' || j.employmentType === filterType;
+      const matchType = !filterType || filterType === 'all' || employmentType === filterType;
       return matchSearch && matchLocation && matchType;
     })
     .sort((a, b) => {

@@ -16,7 +16,6 @@ import LoginPage from './components/LoginPage';
 import CompanySignup from './pages/CompanySignup';
 import EmployeePortal from './pages/EmployeePortal';
 import PaystackSubscription from './pages/PaystackSubscription';
-import TwoFactorVerification from './pages/TwoFactorVerification';
 import AuthCallback from './pages/AuthCallback';
 import OAuthConsent from './pages/OAuthConsent';
 import PasswordReset from './pages/PasswordReset';
@@ -169,7 +168,6 @@ const PrivacyPolicyPage = () => <PrivacyPolicy />;
 
 const TermsConditionsPage = () => <TermsConditions />;
 
-const TwoFactorVerificationPage = () => <TwoFactorVerification />;
 
 const AuthCallbackPage = () => <AuthCallback />;
 
@@ -255,7 +253,7 @@ export const router = createBrowserRouter([
       },
       {
         path: '/two-factor-verification',
-        Component: TwoFactorVerificationPage,
+        element: <Navigate to="/login" replace />,
       },
       {
         path: '/auth/callback',
