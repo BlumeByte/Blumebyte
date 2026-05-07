@@ -480,6 +480,31 @@ function normalizeJobVisibility(raw: any): string {
   return String(raw ?? '').trim().toLowerCase().replace(/[\s-]/g, '_');
 }
 
+function escapeHtml(text: string): string {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function parseEmailList(...values: any[]): string[] {
+  const valid = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    const raw = Array.isArray(value) ? value.join(',') : String(value);
+    raw
+      .split(/[,\n;]+/)
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean)
+      .forEach((email) => {
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) valid.add(email);
+      });
+  }
+  return Array.from(valid);
+}
+
 function isPublicJobPosting(job: any): boolean {
   if (!job || typeof job !== 'object') return false;
   const status = normalizeJobStatus(job.status);
@@ -10399,8 +10424,7 @@ const DEFAULT_NOTIF_PREFS = {
 const EMAIL_PREF_KEYS = (Object.keys(DEFAULT_NOTIF_PREFS) as (keyof typeof DEFAULT_NOTIF_PREFS)[])
   .filter(k => k !== 'inAppNotifications' && k !== 'notificationSoundEnabled');
 
-// GET /notification-preferences — get current user's notification preferences
-app.get(`${PREFIX}/notification-preferences`, async (c) => {
+const readNotificationPreferences = async (c: any) => {
   try {
     const user = await getAuthUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -10411,10 +10435,9 @@ app.get(`${PREFIX}/notification-preferences`, async (c) => {
   } catch (e: any) {
     return c.json(DEFAULT_NOTIF_PREFS);
   }
-});
+};
 
-// PUT /notification-preferences — update current user's notification preferences
-app.put(`${PREFIX}/notification-preferences`, async (c) => {
+const writeNotificationPreferences = async (c: any) => {
   try {
     const user = await getAuthUser(c);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -10456,7 +10479,14 @@ app.put(`${PREFIX}/notification-preferences`, async (c) => {
     console.error('notification-preferences PUT error:', e?.message || e);
     return c.json({ error: 'Failed to save preferences' }, 500);
   }
-});
+};
+
+// Support both prefixed and legacy non-prefixed paths/methods for compatibility.
+for (const route of [`${PREFIX}/notification-preferences`, '/notification-preferences']) {
+  app.get(route, readNotificationPreferences);
+  app.put(route, writeNotificationPreferences);
+  app.post(route, writeNotificationPreferences);
+}
 
 // Helper: send email notification to a user if they have the pref enabled
 async function sendEmailNotification(
@@ -10558,10 +10588,10 @@ app.get(`${PREFIX}/public/jobs/:id`, async (c) => {
 app.post(`${PREFIX}/public/job/apply`, async (c) => {
   try {
     const body = await c.req.json();
-    const { jobId, companyName, roleTitle, fullName, email, phone, qualification, cvMessage } = body;
+    const { jobId, companyName, roleTitle, fullName, email, phone, qualification, cvMessage, contactDetails } = body;
 
     // Server-side validation
-    if (!jobId || !fullName?.trim() || !email?.trim() || !phone?.trim() || !qualification?.trim() || !cvMessage?.trim()) {
+    if (!jobId || !fullName?.trim() || !email?.trim() || !phone?.trim() || !qualification?.trim() || !cvMessage?.trim() || !contactDetails?.trim()) {
       return c.json({ error: 'All fields are required' }, 400);
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -10599,6 +10629,7 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
       fullName: fullName.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
+      contactDetails: contactDetails.trim(),
       qualification: qualification.trim(),
       cvMessage: cvMessage.trim(),
       submittedAt: new Date().toISOString(),
@@ -10624,6 +10655,7 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
         // Keep full details for display
         fullName: fullName.trim(),
         phone: phone.trim(),
+        contactDetails: contactDetails.trim(),
         qualification: qualification.trim(),
         cvMessage: cvMessage.trim(),
       };
@@ -10648,6 +10680,60 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
       }
     } catch (notifErr) {
       console.error('Failed to create notifications:', notifErr);
+    }
+
+    try {
+      const companyIdForJob = job.companyId || job.company || '';
+      const company = companyIdForJob ? await kv.get(`company:${companyIdForJob}`) : null;
+      const recipientEmails = parseEmailList(
+        job.applicationNotificationEmails,
+        job.applicationEmail,
+        job.contactEmail,
+        company?.email
+      );
+      const resendApiKey = Deno.env.get('RESEND_API_KEY');
+      if (resendApiKey && recipientEmails.length > 0) {
+        const jobTitle = escapeHtml(application.roleTitle || 'Untitled Role');
+        const orgName = escapeHtml(application.companyName || 'Hiring Organization');
+        const candidateName = escapeHtml(application.fullName);
+        const candidateEmail = escapeHtml(application.email);
+        const candidatePhone = escapeHtml(application.phone);
+        const candidateContact = escapeHtml(application.contactDetails);
+        const candidateQualification = escapeHtml(application.qualification);
+        const coverLetter = escapeHtml(application.cvMessage).replace(/\n/g, '<br />');
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: EMAIL_FROM,
+            to: recipientEmails,
+            subject: `New hiring application: ${application.roleTitle} (${application.companyName})`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+                <h2 style="margin-bottom: 8px;">New Public Hiring Application</h2>
+                <p style="margin-top: 0; color: #4b5563;">
+                  A new applicant submitted an application on the public hiring page.
+                </p>
+                <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
+                  <p><strong>Role:</strong> ${jobTitle}</p>
+                  <p><strong>Company:</strong> ${orgName}</p>
+                  <p><strong>Applicant:</strong> ${candidateName}</p>
+                  <p><strong>Email:</strong> ${candidateEmail}</p>
+                  <p><strong>Phone:</strong> ${candidatePhone}</p>
+                  <p><strong>Contact Details:</strong> ${candidateContact}</p>
+                  <p><strong>Qualification:</strong> ${candidateQualification}</p>
+                  <p><strong>CV / Cover Letter:</strong><br />${coverLetter}</p>
+                </div>
+              </div>
+            `,
+          }),
+        });
+      }
+    } catch (emailErr) {
+      console.error('Failed to send hiring application email:', emailErr);
     }
 
     return c.json({ success: true, id });

@@ -395,6 +395,7 @@ const ENTITY_CONFIGS: Record<string, EntityConfig> = {
       { key: 'requirements', label: 'Requirements' },
       { key: 'qualifications', label: 'Qualifications' },
       { key: 'salaryRange', label: 'Salary Range' },
+      { key: 'applicationNotificationEmails', label: 'Application Notification Emails (comma separated)' },
       { key: 'deadline', label: 'Application Deadline', type: 'date' },
     ],
     defaults: { visibilityType: 'public_global', status: 'active' },

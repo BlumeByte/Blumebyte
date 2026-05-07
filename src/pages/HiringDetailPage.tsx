@@ -23,6 +23,7 @@ interface PublicJob {
   description?: string;
   requirements?: string;
   qualifications?: string;
+  salaryRange?: string;
   deadline?: string;
   createdAt: string;
 }
@@ -31,6 +32,7 @@ interface ApplyFormData {
   fullName: string;
   email: string;
   phone: string;
+  contactDetails: string;
   qualification: string;
   cvMessage: string;
 }
@@ -62,7 +64,7 @@ export default function HiringDetailPage() {
 
   // ─── Apply Form ───────────────────────────────────────────────────────────
   const [form, setForm] = useState<ApplyFormData>({
-    fullName: '', email: '', phone: '', qualification: '', cvMessage: ''
+    fullName: '', email: '', phone: '', contactDetails: '', qualification: '', cvMessage: ''
   });
   const [errors, setErrors] = useState<Partial<ApplyFormData>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +77,7 @@ export default function HiringDetailPage() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Please enter a valid email';
     if (!form.phone.trim()) e.phone = 'Phone number is required';
     else if (!/^\+?[\d\s\-().]{7,15}$/.test(form.phone)) e.phone = 'Please enter a valid phone number';
+    if (!form.contactDetails.trim()) e.contactDetails = 'Contact details are required';
     if (!form.qualification.trim()) e.qualification = 'Qualification is required';
     if (!form.cvMessage.trim()) e.cvMessage = 'CV message is required';
     else if (form.cvMessage.length > MAX_CV_CHARS) e.cvMessage = `Maximum ${MAX_CV_CHARS} characters`;
@@ -95,6 +98,7 @@ export default function HiringDetailPage() {
           fullName: form.fullName,
           email: form.email,
           phone: form.phone,
+          contactDetails: form.contactDetails,
           qualification: form.qualification,
           cvMessage: form.cvMessage,
         },
@@ -165,6 +169,7 @@ export default function HiringDetailPage() {
             <div className="flex flex-wrap gap-2 mb-8">
               {job.location && <TagChip><MapPin className="h-3 w-3 inline mr-0.5" />{job.location}</TagChip>}
               {job.employmentType && <TagChip>{job.employmentType}</TagChip>}
+              {job.salaryRange && <TagChip>{job.salaryRange}</TagChip>}
               {job.deadline && (
                 <TagChip>
                   <Calendar className="h-3 w-3 inline mr-0.5" />
@@ -235,6 +240,7 @@ export default function HiringDetailPage() {
                 {inputField('fullName', 'Full Name')}
                 {inputField('email', 'Email Address', 'email')}
                 {inputField('phone', 'Phone Number', 'tel')}
+                {inputField('contactDetails', 'Contact Details (LinkedIn / alternate contact)')}
                 {inputField('qualification', 'Qualifications')}
                 <div className="space-y-1">
                   <Label htmlFor="cvMessage">CV / Cover Letter <span className="text-red-500">*</span></Label>
