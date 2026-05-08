@@ -2611,7 +2611,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
                 </div>
                 <p>Click the button below to set your password and activate your account. This link expires in <strong>24 hours</strong>.</p>
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${setPasswordLink}" style="background-color: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-size: 16px; display: inline-block;">Set Your Password</a>
+                  <a href="${setPasswordLink}" style="background-color: #7C5A1A; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-size: 16px; display: inline-block;">Set Your Password</a>
                 </div>
                 <p style="color: #666; font-size: 14px;">If the button above does not work, copy and paste this link into your browser:<br/>${setPasswordLink}</p>
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5;">
@@ -10505,7 +10505,7 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
                 <p>Hello${employee.name ? ` ${employee.name}` : ''},</p>
                 <p>We received a request to reset the password for your Blumebyte account. Click the button below to set a new password:</p>
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="${resetLink}" style="background-color: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-size: 16px; display: inline-block;">Reset Password</a>
+                  <a href="${resetLink}" style="background-color: #7C5A1A; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-size: 16px; display: inline-block;">Reset Password</a>
                 </div>
                 <p style="color: #666; font-size: 14px;">This link will expire in <strong>1 hour</strong>.</p>
                 <p style="color: #666; font-size: 14px;">If you did not request a password reset, you can safely ignore this email. Your password will not change.</p>

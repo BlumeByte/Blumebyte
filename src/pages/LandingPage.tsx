@@ -431,7 +431,7 @@ export default function LandingPage() {
                 <Button
                   size="lg"
                   onClick={() => navigate('/company-signup')}
-                  className="bg-mint-black text-white hover:bg-gray-800 text-base px-7 shadow-md font-semibold"
+                  className="bg-primary text-white hover:bg-primary/90 text-base px-7 shadow-md font-semibold"
                 >
                   Start Free Trial
                 </Button>
@@ -664,10 +664,10 @@ export default function LandingPage() {
               <FadeSection key={index} delay={index * 0.1} className="relative">
                 {plan.popular && (
                   <div className="absolute -top-4 left-0 right-0 flex justify-center z-10">
-                    <span className="px-4 py-1 bg-mint-black text-white text-xs font-bold rounded-full shadow">Most Popular</span>
+                    <span className="px-4 py-1 bg-primary text-white text-xs font-bold rounded-full shadow">Most Popular</span>
                   </div>
                 )}
-                <div className={`rounded-2xl border p-7 flex flex-col h-full transition-all duration-300 ${plan.popular ? 'border-black bg-mint-black text-white shadow-2xl scale-105' : 'border-black/10 bg-white/90 hover:shadow-lg'}`}>
+                <div className={`rounded-2xl border p-7 flex flex-col h-full transition-all duration-300 ${plan.popular ? 'border-black bg-primary text-white shadow-2xl scale-105' : 'border-black/10 bg-white/90 hover:shadow-lg'}`}>
                   <div className="mb-6">
                     <h3 className={`text-lg font-bold mb-1 ${plan.popular ? 'text-white' : 'text-mint-black'}`}>{plan.name}</h3>
                     <p className={`text-sm mb-4 ${plan.popular ? 'text-white/70' : 'text-gray-500'}`}>{plan.description}</p>
@@ -697,7 +697,7 @@ export default function LandingPage() {
                     </Button>
                   ) : (
                     <Button
-                      className={`w-full font-semibold ${plan.popular ? 'bg-white text-black hover:bg-gray-100' : 'bg-mint-black text-white hover:bg-gray-800'}`}
+                      className={`w-full font-semibold ${plan.popular ? 'bg-white text-black hover:bg-gray-100' : 'bg-primary text-white hover:bg-primary/90'}`}
                       onClick={() => navigate('/company-signup')}
                     >
                       {plan.popular ? 'Get Started Free' : 'Start Free Trial'}
@@ -724,7 +724,7 @@ export default function LandingPage() {
       {/* ── 10. FINAL CTA ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
         <FadeSection>
-          <div className="relative overflow-hidden rounded-3xl bg-mint-black shadow-2xl px-8 py-16 md:py-20 text-center">
+          <div className="relative overflow-hidden rounded-3xl bg-primary shadow-2xl px-8 py-16 md:py-20 text-center">
             {/* subtle gradient overlay */}
             <div className="absolute inset-0 pointer-events-none"
               style={{ background: 'radial-gradient(ellipse at 60% 0%, rgba(255,255,255,0.05) 0%, transparent 60%)' }} />
