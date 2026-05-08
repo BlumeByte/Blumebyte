@@ -1000,9 +1000,6 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
 
   useEffect(() => { load(); }, [load]);
 
-  const assignedTenantsForAgent = (agentId: string) =>
-    assignments.filter((a: any) => a.careAgentId === agentId).map((a: any) => a.tenantId);
-
   const addAssignment = async () => {
     if (!selectedAgent || selectedTenants.length === 0) return toast.error('Select agent and at least one tenant');
     setSaving(true);
