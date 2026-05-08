@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { OAuthButtons } from './OAuthButtons';
 import { toast } from 'sonner';
+import { getRoleDashboardPath } from '../lib/role-utils';
 
 const BLUMEBYTE_COLOR = '#000000';
 
@@ -69,7 +70,7 @@ export function LoginPage() {
   useEffect(() => {
     if (!sessionLoading && user && !totpRequired) {
       startTransition(() => {
-        const destination = user.role === 'ultimateadmin' ? '/customer-care' : `/${user.role}`;
+        const destination = getRoleDashboardPath(user.role);
         navigate(destination, { replace: true });
       });
     }

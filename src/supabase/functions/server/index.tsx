@@ -265,7 +265,8 @@ async function requireAuth(c: any) {
   const user = await getAuthUser(c);
   if (!user) throw new Error("Unauthorized");
   const kvData = await kv.get(`employee:${user.id}`);
-  const role = kvData?.role || user.user_metadata?.role || "employee";
+  const rawRole = kvData?.role || user.user_metadata?.role || "employee";
+  const role = rawRole === "customer-care" ? "customer_care" : rawRole;
   
   // SUBSCRIPTION LOGIC TEMPORARILY DEACTIVATED
   // Just return the user data without subscription/license checks
@@ -306,6 +307,9 @@ async function requireRole(c: any, roles: string[]) {
 const requireSuperAdmin = (c: any) => requireRole(c, ["superadmin"]);
 const requireAdminOrAbove = (c: any) => requireRole(c, ["superadmin", "admin"]);
 const requireManagerOrAbove = (c: any) => requireRole(c, ["superadmin", "admin", "manager"]);
+const CUSTOMER_CARE_ROLES = ["customer_care", "customer-care", "customer_care_agent", "care", "support"];
+const requireDeveloper = (c: any) => requireRole(c, ["developer", "ultimateadmin"]);
+const requireCustomerCare = (c: any) => requireRole(c, CUSTOMER_CARE_ROLES);
 
 // --- Temp password generator ---
 function generateTempPassword(): string {
@@ -10774,7 +10778,9 @@ async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDe
   if (error || !data?.user) return null;
   const profile = await kv.get(`employee:${data.user.id}`);
   const isDeveloper = profile?.role === 'developer' || profile?.isPlatformAdmin === true;
-  const isCare = profile?.role === 'care' || profile?.role === 'support';
+  const role = profile?.role || data.user.user_metadata?.role || '';
+  const normalizedRole = role === 'customer-care' ? 'customer_care' : role;
+  const isCare = normalizedRole === 'customer_care' || normalizedRole === 'customer_care_agent' || normalizedRole === 'care' || normalizedRole === 'support';
   if (!isDeveloper && !isCare) return null;
   return { user: data.user, profile, isDeveloper };
 }
@@ -10784,7 +10790,7 @@ app.get(`${PREFIX}/care/verify-access`, async (c) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ allowed: false }, 403);
-    return c.json({ allowed: true, role: access.isDeveloper ? 'developer' : 'care' });
+    return c.json({ allowed: true, role: access.isDeveloper ? 'developer' : 'customer_care' });
   } catch {
     return c.json({ allowed: false }, 403);
   }
@@ -10799,7 +10805,7 @@ app.get(`${PREFIX}/care/profile`, async (c) => {
       id: access.user.id,
       email: access.user.email,
       name: access.profile?.name || access.user.email,
-      role: access.isDeveloper ? 'developer' : 'care',
+      role: access.isDeveloper ? 'developer' : 'customer_care',
     });
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -10816,8 +10822,16 @@ app.get(`${PREFIX}/care/tenants`, async (c) => {
     let allowed = companies;
 
     // Non-developer care agents can only see their assigned tenants
-    if (!access.isDeveloper && access.profile?.assignedTenants?.length) {
-      allowed = companies.filter((co: any) => access.profile.assignedTenants.includes(co.id));
+    if (!access.isDeveloper) {
+      const assignedByKey = await kv.get(`care_assignments:${access.user.id}`);
+      const assignedTenants = Array.isArray(assignedByKey)
+        ? assignedByKey
+        : (access.profile?.assignedTenants || []);
+      if (assignedTenants.length > 0) {
+        allowed = companies.filter((co: any) => assignedTenants.includes(co.id));
+      } else {
+        allowed = [];
+      }
     }
 
     return c.json(allowed.map((co: any) => {
@@ -10844,6 +10858,13 @@ app.get(`${PREFIX}/care/tenants/:id/users`, async (c) => {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
+    if (!access.isDeveloper) {
+      const assignedByKey = await kv.get(`care_assignments:${access.user.id}`);
+      const assignedTenants = Array.isArray(assignedByKey)
+        ? assignedByKey
+        : (access.profile?.assignedTenants || []);
+      if (!assignedTenants.includes(tenantId)) return c.json({ error: 'Forbidden' }, 403);
+    }
 
     const all = await kv.getByPrefix('employee:');
     const users = all.filter((u: any) => u.companyId === tenantId || u.company === tenantId);
@@ -11412,6 +11433,669 @@ app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
 
     return c.json({ success: true, action, tenantId, executedBy: access.user.email, timestamp: new Date().toISOString() });
   } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ============ DEVELOPER & CUSTOMER CARE DASHBOARDS (NEW) ============
+
+async function appendUniqueListValue(key: string, value: string) {
+  const list = await kv.get(key) || [];
+  if (!Array.isArray(list)) {
+    await kv.set(key, [value]);
+    return;
+  }
+  if (!list.includes(value)) {
+    list.push(value);
+    await kv.set(key, list);
+  }
+}
+
+async function removeListValue(key: string, value: string) {
+  const list = await kv.get(key) || [];
+  if (!Array.isArray(list)) return;
+  await kv.set(key, list.filter((v: string) => v !== value));
+}
+
+async function writeDeveloperAudit(actor: any, action: string, details: any = {}) {
+  const id = crypto.randomUUID();
+  const entry = {
+    id,
+    actorId: actor?.id || '',
+    actorEmail: actor?.email || '',
+    action,
+    details,
+    timestamp: new Date().toISOString(),
+  };
+  await kv.set(`developer_audit_log:${id}`, entry);
+  await appendUniqueListValue('developer_audit_log', id);
+}
+
+function normalizeCareRole(role: string) {
+  if (role === 'customer-care') return 'customer_care';
+  if (role === 'customer_care_agent' || role === 'care' || role === 'support') return 'customer_care';
+  return role;
+}
+
+async function getCareAssignmentsForAgent(agentId: string): Promise<string[]> {
+  const byKey = await kv.get(`care_assignments:${agentId}`);
+  if (Array.isArray(byKey)) return [...new Set(byKey)];
+  const profile = await kv.get(`employee:${agentId}`);
+  if (Array.isArray(profile?.assignedTenants)) return [...new Set(profile.assignedTenants)];
+  return [];
+}
+
+async function isTenantAssignedToCareAgent(agentId: string, tenantId: string) {
+  const assigned = await getCareAssignmentsForAgent(agentId);
+  return assigned.includes(tenantId);
+}
+
+async function getSupportTicketById(ticketId: string) {
+  const ticket = await kv.get(`support_tickets:${ticketId}`);
+  if (ticket) return ticket;
+  return await kv.get(`support-ticket:${ticketId}`);
+}
+
+async function saveSupportTicket(ticket: any) {
+  await kv.set(`support_tickets:${ticket.id}`, ticket);
+  await kv.set(`support-ticket:${ticket.id}`, ticket); // compatibility
+  await appendUniqueListValue('support_tickets', ticket.id);
+}
+
+async function getAllSupportTickets(): Promise<any[]> {
+  const byNewPrefix = await kv.getByPrefix('support_tickets:');
+  const byLegacyPrefix = await kv.getByPrefix('support-ticket:');
+  const merged = [...byNewPrefix, ...byLegacyPrefix];
+  const seen = new Set<string>();
+  const unique = [];
+  for (const ticket of merged) {
+    if (!ticket?.id || seen.has(ticket.id)) continue;
+    seen.add(ticket.id);
+    unique.push(ticket);
+  }
+  unique.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  return unique;
+}
+
+async function requireCareTenantAccess(c: any, tenantId: string) {
+  const auth = await requireAuth(c);
+  const role = normalizeCareRole(auth.role || '');
+  if (role !== 'customer_care') throw new Error('Forbidden');
+  const assigned = await isTenantAssignedToCareAgent(auth.user.id, tenantId);
+  if (!assigned) throw new Error('Forbidden');
+  return auth;
+}
+
+// /developer/*
+app.get(`${PREFIX}/developer/overview`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const [companies, users, tickets, careAgents] = await Promise.all([
+      kv.getByPrefix('company:'),
+      kv.getByPrefix('employee:'),
+      getAllSupportTickets(),
+      kv.getByPrefix('customer_care_users:'),
+    ]);
+
+    const openTickets = tickets.filter((t: any) => t.status !== 'resolved').length;
+    const suspendedTenants = companies.filter((co: any) => co.status === 'suspended').length;
+    const activeTenants = companies.length - suspendedTenants;
+    const activeUsers = users.filter((u: any) => u.status === 'active').length;
+
+    await writeDeveloperAudit(user, 'developer_overview_read');
+    return c.json({
+      totalTenants: companies.length,
+      activeTenants,
+      suspendedTenants,
+      totalUsers: users.length,
+      activeUsers,
+      totalCustomerCareAgents: careAgents.length,
+      openTickets,
+      resolvedTickets: tickets.length - openTickets,
+    });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/tenants`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const companies = await kv.getByPrefix('company:');
+    await writeDeveloperAudit(user, 'developer_tenants_read', { count: companies.length });
+    return c.json(companies);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/tenants/:id`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const id = c.req.param('id');
+    const company = await kv.get(`company:${id}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+    const allUsers = await kv.getByPrefix('employee:');
+    const users = allUsers.filter((u: any) => u.companyId === id || u.company === id);
+    await writeDeveloperAudit(user, 'developer_tenant_read', { tenantId: id });
+    return c.json({
+      ...company,
+      activeUsers: users.filter((u: any) => u.status === 'active').length,
+      totalUsers: users.length,
+    });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/tenants/:id/users`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const id = c.req.param('id');
+    const allUsers = await kv.getByPrefix('employee:');
+    const scoped = allUsers.filter((u: any) => u.companyId === id || u.company === id);
+    await writeDeveloperAudit(user, 'developer_tenant_users_read', { tenantId: id, count: scoped.length });
+    return c.json(scoped);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/developer/tenants/:id/impersonate`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const users = await kv.getByPrefix('employee:');
+    const superadmin = users.find((u: any) =>
+      (u.companyId === tenantId || u.company === tenantId) && u.role === 'superadmin'
+    );
+    if (!superadmin) return c.json({ error: 'SuperAdmin not found for tenant' }, 404);
+    await writeDeveloperAudit(user, 'developer_tenant_impersonate', { tenantId, targetUserId: superadmin.id || superadmin.userId });
+    return c.json({
+      success: true,
+      tenantId,
+      mode: 'read_only',
+      impersonatedUser: {
+        id: superadmin.id || superadmin.userId,
+        email: superadmin.email,
+        name: superadmin.name || superadmin.email,
+        role: 'superadmin',
+      },
+    });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/developer/tenants/:id/suspend`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const company = await kv.get(`company:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+    await kv.set(`company:${tenantId}`, { ...company, status: 'suspended', updatedAt: new Date().toISOString() });
+    const sub = await kv.get(`subscription:${tenantId}`);
+    if (sub) await kv.set(`subscription:${tenantId}`, { ...sub, status: 'suspended', updatedAt: new Date().toISOString() });
+    await writeDeveloperAudit(user, 'developer_tenant_suspend', { tenantId });
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/developer/tenants/:id/reinstate`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const company = await kv.get(`company:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+    await kv.set(`company:${tenantId}`, { ...company, status: 'active', updatedAt: new Date().toISOString() });
+    const sub = await kv.get(`subscription:${tenantId}`);
+    if (sub) await kv.set(`subscription:${tenantId}`, { ...sub, status: 'active', updatedAt: new Date().toISOString() });
+    await writeDeveloperAudit(user, 'developer_tenant_reinstate', { tenantId });
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/developer/tenants/:id/license`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const body = await c.req.json().catch(() => ({}));
+    const company = await kv.get(`company:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+    const updatedCompany = {
+      ...company,
+      licenses: body.licenses ?? company.licenses ?? 0,
+      plan: body.plan ?? company.plan,
+      subscription: {
+        ...(company.subscription || {}),
+        licenses: body.licenses ?? company.subscription?.licenses ?? company.licenses ?? 0,
+        plan: body.plan ?? company.subscription?.plan,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`company:${tenantId}`, updatedCompany);
+    const sub = await kv.get(`subscription:${tenantId}`);
+    if (sub) {
+      await kv.set(`subscription:${tenantId}`, {
+        ...sub,
+        purchasedLicenses: body.licenses ?? sub.purchasedLicenses,
+        plan: body.plan ?? sub.plan,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    await writeDeveloperAudit(user, 'developer_tenant_license_update', { tenantId, body });
+    return c.json({ success: true, tenant: updatedCompany });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/customer-care-agents`, async (c) => {
+  try {
+    await requireDeveloper(c);
+    const agents = await kv.getByPrefix('customer_care_users:');
+    return c.json(agents);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/developer/customer-care-agents`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const body = await c.req.json();
+    if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
+    const id = body.id || body.userId || crypto.randomUUID();
+    const agent = {
+      id,
+      userId: body.userId || id,
+      name: body.name,
+      email: String(body.email).toLowerCase(),
+      role: 'customer_care',
+      status: body.status || 'active',
+      createdAt: new Date().toISOString(),
+      createdBy: user.id,
+    };
+    await kv.set(`customer_care_users:${id}`, agent);
+    await appendUniqueListValue('customer_care_users', id);
+    await writeDeveloperAudit(user, 'developer_care_agent_create', { careAgentId: id });
+    return c.json(agent);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.delete(`${PREFIX}/developer/customer-care-agents/:id`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const id = c.req.param('id');
+    await kv.del(`customer_care_users:${id}`);
+    await removeListValue('customer_care_users', id);
+    await kv.del(`care_assignments:${id}`);
+    await writeDeveloperAudit(user, 'developer_care_agent_delete', { careAgentId: id });
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/assignments`, async (c) => {
+  try {
+    await requireDeveloper(c);
+    const assignments = await kv.getByPrefix('care_assignments_record:');
+    return c.json(assignments);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/developer/assignments`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const body = await c.req.json();
+    const careAgentId = body?.careAgentId || body?.care_agent_id;
+    const tenantIds: string[] = Array.isArray(body?.tenantIds)
+      ? body.tenantIds
+      : body?.tenantId ? [body.tenantId] : [];
+    if (!careAgentId || tenantIds.length === 0) return c.json({ error: 'careAgentId and at least one tenantId are required' }, 400);
+    const current = await getCareAssignmentsForAgent(careAgentId);
+    const merged = [...new Set([...current, ...tenantIds])];
+    await kv.set(`care_assignments:${careAgentId}`, merged);
+    const created = [];
+    for (const tenantId of tenantIds) {
+      const id = crypto.randomUUID();
+      const record = { id, careAgentId, tenantId, assignedBy: user.id, createdAt: new Date().toISOString() };
+      await kv.set(`care_assignments_record:${id}`, record);
+      created.push(record);
+    }
+    await writeDeveloperAudit(user, 'developer_assignment_create', { careAgentId, tenantIds });
+    return c.json({ success: true, assignments: created });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.delete(`${PREFIX}/developer/assignments/:id`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const assignmentId = c.req.param('id');
+    const record = await kv.get(`care_assignments_record:${assignmentId}`);
+    if (!record) return c.json({ error: 'Assignment not found' }, 404);
+    const current = await getCareAssignmentsForAgent(record.careAgentId);
+    await kv.set(
+      `care_assignments:${record.careAgentId}`,
+      current.filter((tenantId: string) => tenantId !== record.tenantId)
+    );
+    await kv.del(`care_assignments_record:${assignmentId}`);
+    await writeDeveloperAudit(user, 'developer_assignment_delete', { assignmentId });
+    return c.json({ success: true });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/tickets`, async (c) => {
+  try {
+    await requireDeveloper(c);
+    const tickets = await getAllSupportTickets();
+    return c.json(tickets);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/tickets/:id`, async (c) => {
+  try {
+    await requireDeveloper(c);
+    const ticketId = c.req.param('id');
+    const ticket = await getSupportTicketById(ticketId);
+    if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+    const comments = await kv.get(`ticket_comments:${ticketId}`) || [];
+    return c.json({ ...ticket, comments: Array.isArray(comments) ? comments : [] });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/developer/tickets/:id/resolve`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const ticketId = c.req.param('id');
+    const ticket = await getSupportTicketById(ticketId);
+    if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+    const updated = { ...ticket, status: 'resolved', resolvedAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    await saveSupportTicket(updated);
+    await writeDeveloperAudit(user, 'developer_ticket_resolve', { ticketId });
+    return c.json(updated);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/developer/tickets/:id/comment`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const ticketId = c.req.param('id');
+    const body = await c.req.json();
+    if (!body?.comment) return c.json({ error: 'comment is required' }, 400);
+    const ticket = await getSupportTicketById(ticketId);
+    if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+    const comments = await kv.get(`ticket_comments:${ticketId}`) || [];
+    const entry = {
+      id: crypto.randomUUID(),
+      authorId: user.id,
+      authorEmail: user.email,
+      authorRole: 'developer',
+      comment: body.comment,
+      createdAt: new Date().toISOString(),
+    };
+    const updatedComments = Array.isArray(comments) ? [...comments, entry] : [entry];
+    await kv.set(`ticket_comments:${ticketId}`, updatedComments);
+    await saveSupportTicket({ ...ticket, updatedAt: new Date().toISOString() });
+    await writeDeveloperAudit(user, 'developer_ticket_comment', { ticketId });
+    return c.json({ success: true, comment: entry });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/system-health`, async (c) => {
+  try {
+    await requireDeveloper(c);
+    const start = Date.now();
+    await kv.get('healthcheck');
+    const latencyMs = Date.now() - start;
+    const snapshot = {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      status: latencyMs < 1000 ? 'healthy' : 'degraded',
+      kvLatencyMs: latencyMs,
+      runtime: 'hono-edge',
+    };
+    await kv.set(`system_health_log:${snapshot.id}`, snapshot);
+    await appendUniqueListValue('system_health_log', snapshot.id);
+    return c.json(snapshot);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/developer/audit-log`, async (c) => {
+  try {
+    await requireDeveloper(c);
+    const logs = await kv.getByPrefix('developer_audit_log:');
+    logs.sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+    return c.json(logs);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// /care/*
+app.get(`${PREFIX}/care/me/assignments`, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const assignments = await getCareAssignmentsForAgent(auth.user.id);
+    return c.json({ careAgentId: auth.user.id, tenantIds: assignments });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/care/tenant/:id`, async (c) => {
+  try {
+    const tenantId = c.req.param('id');
+    await requireCareTenantAccess(c, tenantId);
+    const company = await kv.get(`company:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+    const users = await kv.getByPrefix('employee:');
+    const scopedUsers = users.filter((u: any) => u.companyId === tenantId || u.company === tenantId);
+    return c.json({
+      ...company,
+      totalUsers: scopedUsers.length,
+      activeUsers: scopedUsers.filter((u: any) => u.status === 'active').length,
+    });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/care/tenant/:id/users`, async (c) => {
+  try {
+    const tenantId = c.req.param('id');
+    await requireCareTenantAccess(c, tenantId);
+    const users = await kv.getByPrefix('employee:');
+    const scoped = users.filter((u: any) => u.companyId === tenantId || u.company === tenantId);
+    return c.json(scoped);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/care/tenant/:id/tickets`, async (c) => {
+  try {
+    const tenantId = c.req.param('id');
+    await requireCareTenantAccess(c, tenantId);
+    const tickets = await getAllSupportTickets();
+    return c.json(tickets.filter((t: any) => t.tenantId === tenantId));
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/care/tickets`, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const body = await c.req.json();
+    const tenantId = body?.tenantId;
+    if (!tenantId) return c.json({ error: 'tenantId is required' }, 400);
+    const assigned = await isTenantAssignedToCareAgent(auth.user.id, tenantId);
+    if (!assigned) return c.json({ error: 'Forbidden' }, 403);
+    const ticketId = crypto.randomUUID();
+    const ticket = {
+      id: ticketId,
+      tenantId,
+      tenantName: body.tenantName || '',
+      subject: body.subject || '',
+      description: body.description || '',
+      issueType: body.issueType || 'general',
+      priority: body.priority || 'medium',
+      status: 'open',
+      escalated: false,
+      createdBy: auth.user.id,
+      createdByEmail: auth.user.email,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await saveSupportTicket(ticket);
+    return c.json(ticket, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/care/tickets/:id`, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const ticketId = c.req.param('id');
+    const ticket = await getSupportTicketById(ticketId);
+    if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+    const assigned = await isTenantAssignedToCareAgent(auth.user.id, ticket.tenantId);
+    if (!assigned) return c.json({ error: 'Forbidden' }, 403);
+    const comments = await kv.get(`ticket_comments:${ticketId}`) || [];
+    return c.json({ ...ticket, comments: Array.isArray(comments) ? comments : [] });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/care/tickets/:id/comment`, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const ticketId = c.req.param('id');
+    const body = await c.req.json();
+    if (!body?.comment) return c.json({ error: 'comment is required' }, 400);
+    const ticket = await getSupportTicketById(ticketId);
+    if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+    const assigned = await isTenantAssignedToCareAgent(auth.user.id, ticket.tenantId);
+    if (!assigned) return c.json({ error: 'Forbidden' }, 403);
+    const comments = await kv.get(`ticket_comments:${ticketId}`) || [];
+    const entry = {
+      id: crypto.randomUUID(),
+      authorId: auth.user.id,
+      authorEmail: auth.user.email,
+      authorRole: 'customer_care',
+      comment: body.comment,
+      createdAt: new Date().toISOString(),
+    };
+    const updatedComments = Array.isArray(comments) ? [...comments, entry] : [entry];
+    await kv.set(`ticket_comments:${ticketId}`, updatedComments);
+    await saveSupportTicket({ ...ticket, updatedAt: new Date().toISOString() });
+    return c.json({ success: true, comment: entry });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/care/tickets/:id/escalate`, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const ticketId = c.req.param('id');
+    const ticket = await getSupportTicketById(ticketId);
+    if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+    const assigned = await isTenantAssignedToCareAgent(auth.user.id, ticket.tenantId);
+    if (!assigned) return c.json({ error: 'Forbidden' }, 403);
+    const updated = {
+      ...ticket,
+      escalated: true,
+      status: ticket.status === 'resolved' ? 'resolved' : 'escalated',
+      escalatedAt: new Date().toISOString(),
+      escalatedBy: auth.user.id,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveSupportTicket(updated);
+    return c.json({ success: true, ticket: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
 });
