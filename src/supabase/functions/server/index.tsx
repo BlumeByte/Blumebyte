@@ -10574,6 +10574,9 @@ async function sendEmailNotification(
 
 
 
+// Register each endpoint on:
+// 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
+// This prevents route mismatches across different Supabase function URL/path forwarding modes.
 const compatibleRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
 
