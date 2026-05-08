@@ -468,7 +468,7 @@ export default function HiringsPage() {
 
   // HIRING-FIX: Add department filter options from loaded jobs.
   const departments = Array.from(
-    new Set(jobs.map((j: any) => asString(j?.department).trim()).filter(Boolean))
+    new Set(jobs.map((j) => asString(j.department).trim()).filter(Boolean))
   ).sort() as string[];
 
   // Filter + sort
@@ -478,7 +478,7 @@ export default function HiringsPage() {
       const roleTitle = asString(j.roleTitle);
       const companyName = asString(j.companyName);
       const employmentType = asString(j.employmentType);
-      const department = asString((j as any).department);
+      const department = asString(j.department);
       const matchSearch = !q || roleTitle.toLowerCase().includes(q) || companyName.toLowerCase().includes(q);
       const matchLocation = !filterLocation || filterLocation === 'all' || j.location === filterLocation;
       const matchType = !filterType || filterType === 'all' || employmentType === filterType;

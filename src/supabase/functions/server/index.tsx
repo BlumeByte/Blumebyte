@@ -1,6 +1,7 @@
 // Blumebyte HR Management Server - v2.1 - Payment-First Registration
 // SECURITY: Updated to Hono 4.7.7+ to patch all known vulnerabilities (Jan 2025)
 import { Hono } from "npm:hono@4.7.7";
+import type { Context } from "npm:hono@4.7.7";
 import { cors } from "npm:hono@4.7.7/cors";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
@@ -10574,7 +10575,7 @@ async function sendEmailNotification(
 
 
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
-const listPublicJobs = async (c: any) => {
+const listPublicJobs = async (c: Context) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
     const eligible = all.filter(isPublicJobPosting);
@@ -10593,11 +10594,14 @@ const listPublicJobs = async (c: any) => {
 };
 
 // HIRING-FIX: Resolve public job detail by scanning all public postings and return stable 404 payload.
-const getPublicJobDetail = async (c: any) => {
+const getPublicJobDetail = async (c: Context) => {
   try {
     const id = c.req.param('id');
-    const all = await kv.getByPrefix("job-posting:");
-    const match = all.find((job: any) => job?.id === id && isPublicJobPosting(job));
+    let match = await kv.get(`job-posting:${id}`);
+    if (!isPublicJobPosting(match)) {
+      const all = await kv.getByPrefix("job-posting:");
+      match = all.find((job: any) => job?.id === id && isPublicJobPosting(job));
+    }
     if (!match) return c.json({ error: 'Job not found' }, 404);
     const publicJob = await buildPublicJobResponse(match);
     if (!publicJob) return c.json({ error: 'Job not found' }, 404);
