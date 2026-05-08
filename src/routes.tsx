@@ -38,7 +38,8 @@ import OnboardingPage from './pages/OnboardingPage';
 import EmployeeExperiencePage from './pages/EmployeeExperiencePage';
 import HiringsPage from './pages/HiringsPage';
 import HiringDetailPage from './pages/HiringDetailPage';
-import CustomerCareDashboard from './pages/UltimateadminSupport';
+import DeveloperDashboard from './pages/UltimateadminSupport';
+import CustomerCareDashboard from './pages/CareDashboard';
 
 // Retry helper for lazy imports: on network failure, bust the cache and retry once.
 function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>): React.LazyExoticComponent<T> {
@@ -191,7 +192,20 @@ const IndustryPageWrapper = () => <IndustryPage />;
 const ResourcesPageWrapper = () => <ResourcesPage />;
 const HiringsPageWrapper = () => <HiringsPage />;
 const HiringDetailPageWrapper = () => <HiringDetailPage />;
+const DeveloperDashboardWrapper = () => <DeveloperDashboard />;
 const CustomerCareDashboardWrapper = () => <CustomerCareDashboard />;
+
+const DeveloperPage = () => (
+  <ProtectedRoute allowedRoles={['developer', 'ultimateadmin']}>
+    <DeveloperDashboardWrapper />
+  </ProtectedRoute>
+);
+
+const CustomerCarePage = () => (
+  <ProtectedRoute allowedRoles={['customer_care', 'customer-care', 'customer_care_agent', 'care', 'support']}>
+    <CustomerCareDashboardWrapper />
+  </ProtectedRoute>
+);
 
 const NotificationsPageWrapper = () => (
   <ProtectedRoute allowedRoles={['superadmin', 'admin', 'manager', 'employee']}>
@@ -361,11 +375,19 @@ export const router = createBrowserRouter([
       },
       {
         path: '/ultimateadmin/support',
+        element: <Navigate to="/developer" replace />,
+      },
+      {
+        path: '/developer',
+        Component: DeveloperPage,
+      },
+      {
+        path: '/customer_care',
         element: <Navigate to="/customer-care" replace />,
       },
       {
         path: '/customer-care',
-        Component: CustomerCareDashboardWrapper,
+        Component: CustomerCarePage,
       },
       {
         path: '*',

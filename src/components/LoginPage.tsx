@@ -69,7 +69,12 @@ export function LoginPage() {
   useEffect(() => {
     if (!sessionLoading && user && !totpRequired) {
       startTransition(() => {
-        const destination = user.role === 'ultimateadmin' ? '/customer-care' : `/${user.role}`;
+        const destination =
+          user.role === 'ultimateadmin' || user.role === 'developer'
+            ? '/developer'
+            : (user.role === 'customer_care' || user.role === 'customer-care' || user.role === 'customer_care_agent' || user.role === 'care' || user.role === 'support')
+              ? '/customer-care'
+              : `/${user.role}`;
         navigate(destination, { replace: true });
       });
     }

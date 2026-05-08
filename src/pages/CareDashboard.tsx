@@ -170,7 +170,7 @@ function TenantRow({
 export default function CareDashboard() {
   const navigate = useNavigate();
   // Tri-state: null = checking, false = not authenticated, true = authenticated
-  const [authenticated, setAuthenticated] = useState<boolean | null>(isCareSessionActive() ? null : false);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [careProfile, setCareProfile] = useState<any>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -194,22 +194,18 @@ export default function CareDashboard() {
   const isDeveloper = careProfile?.role === 'developer';
 
   const loadProfile = useCallback(async () => {
-    if (!isCareSessionActive()) {
-      setAuthenticated(false);
-      return;
-    }
     const token = await getCareToken();
     if (!token) {
-      clearCareSession();
       setAuthenticated(false);
       return;
     }
     try {
       const p = await api('/care/profile', { token });
       setCareProfile(p);
-      setAuthenticated(true);
+      const role = p?.role || '';
+      const allowed = role === 'developer' || role === 'customer_care' || role === 'customer-care' || role === 'customer_care_agent' || role === 'care' || role === 'support';
+      setAuthenticated(allowed);
     } catch {
-      clearCareSession();
       await supabase.auth.signOut();
       setAuthenticated(false);
     }
@@ -334,8 +330,7 @@ export default function CareDashboard() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    clearCareSession();
-    setAuthenticated(false);
+    navigate('/login', { replace: true });
   };
 
   if (authenticated === null) {
@@ -347,7 +342,8 @@ export default function CareDashboard() {
   }
 
   if (!authenticated) {
-    return <CareDashboardLogin onLogin={() => { setAuthenticated(null); loadProfile(); }} />;
+    navigate('/login', { replace: true });
+    return null;
   }
 
   return (
