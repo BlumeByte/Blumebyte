@@ -268,7 +268,7 @@ const TESTIMONIALS = [
   {
     name: 'Kwame Asante',
     role: 'CEO',
-    company: 'BuildRight Constructions',
+    company: 'BuildRight',
     quote: 'The attendance tracking and leave management alone saved us countless hours every month. Incredible platform.',
     rating: 5,
   },
