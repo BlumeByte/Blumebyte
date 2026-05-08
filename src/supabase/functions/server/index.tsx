@@ -11437,6 +11437,31 @@ app.get(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
       };
     });
 
+    // Also include companies with no employees yet
+    for (const [cid, company] of companyMap.entries()) {
+      if (!tenantMap.has(cid)) {
+        tenantMap.set(cid, {
+          id: cid,
+          name: company.name || cid,
+          industry: company.industry || '',
+          createdAt: company.createdAt || '',
+          activeUsers: 0,
+          totalUsers: 0,
+        });
+      }
+    }
+
+    const tenants = [...tenantMap.entries()].map(([cid, t]) => {
+      const sub = subMap.get(cid);
+      return {
+        ...t,
+        licenseStatus: sub?.status || 'unknown',
+        purchasedLicenses: sub?.purchasedLicenses || 0,
+        plan: sub?.plan || sub?.planName || 'unknown',
+        lastActivity: sub?.updatedAt || t.createdAt || '',
+      };
+    });
+
     tenants.sort((a, b) => a.name.localeCompare(b.name));
 
     // Care agents only see their assigned tenants
@@ -11507,23 +11532,54 @@ app.put(`${PREFIX}/ultimateadmin/support/tenants/:id/license`, async (c) => {
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
     const body = await c.req.json();
-    const sub = await kv.get(`subscription:${tenantId}`);
-    if (sub) {
-      await kv.set(`subscription:${tenantId}`, {
-        ...sub,
-        purchasedLicenses: body.purchasedLicenses ?? sub.purchasedLicenses,
-        status: body.status ?? sub.status,
-        expiresAt: body.expiresAt ?? sub.expiresAt,
+
+    // Duration-based expiry: calculate expiresAt from durationAmount + durationUnit
+    let expiresAt = body.expiresAt;
+    if (!expiresAt && body.durationAmount && body.durationUnit) {
+      const now = new Date();
+      const amount = Number(body.durationAmount);
+      if (body.durationUnit === 'days') now.setDate(now.getDate() + amount);
+      else if (body.durationUnit === 'months') now.setMonth(now.getMonth() + amount);
+      else if (body.durationUnit === 'years') now.setFullYear(now.getFullYear() + amount);
+      expiresAt = now.toISOString();
+    }
+
+    // Upsert subscription (create if doesn't exist)
+    const sub = (await kv.get(`subscription:${tenantId}`)) || {
+      companyId: tenantId, plan: 'custom', status: 'active',
+      purchasedLicenses: 0, createdAt: new Date().toISOString(),
+    };
+    const updatedSub = {
+      ...sub,
+      purchasedLicenses: body.purchasedLicenses ?? sub.purchasedLicenses,
+      status: body.status ?? sub.status,
+      expiresAt: expiresAt ?? sub.expiresAt,
+      plan: body.plan ?? sub.plan,
+      updatedAt: new Date().toISOString(),
+      grantedBy: access.user.id,
+      noPaymentRequired: true,
+    };
+    await kv.set(`subscription:${tenantId}`, updatedSub);
+
+    // Also update company record if it exists
+    const company = await kv.get(`company:${tenantId}`);
+    if (company) {
+      await kv.set(`company:${tenantId}`, {
+        ...company,
+        licenses: updatedSub.purchasedLicenses,
+        plan: updatedSub.plan,
+        status: updatedSub.status === 'active' ? 'active' : company.status,
         updatedAt: new Date().toISOString(),
       });
     }
+
     const auditId = crypto.randomUUID();
     await kv.set(`support-audit:${auditId}`, {
       id: auditId, actorId: access.user.id, actorEmail: access.user.email,
       actionType: 'license_update', tenantId, timestamp: new Date().toISOString(),
       description: `License updated for tenant ${tenantId} by ${access.user.email}: ${JSON.stringify(body)}`,
     });
-    return c.json({ success: true });
+    return c.json({ success: true, subscription: updatedSub });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
@@ -11772,7 +11828,347 @@ app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
   }
 });
 
-// ============ DEVELOPER & CUSTOMER CARE DASHBOARDS (NEW) ============
+// POST /ultimateadmin/support/tenants — create a new tenant without payment
+app.post(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    if (!body?.name) return c.json({ error: 'name is required' }, 400);
+    const tenantId = body.id || crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    // Calculate license expiry from duration
+    let expiresAt = body.expiresAt || null;
+    if (!expiresAt && body.durationAmount && body.durationUnit) {
+      const d = new Date();
+      const amount = Number(body.durationAmount);
+      if (body.durationUnit === 'days') d.setDate(d.getDate() + amount);
+      else if (body.durationUnit === 'months') d.setMonth(d.getMonth() + amount);
+      else if (body.durationUnit === 'years') d.setFullYear(d.getFullYear() + amount);
+      expiresAt = d.toISOString();
+    }
+
+    const company = {
+      id: tenantId, name: body.name, industry: body.industry || '',
+      status: 'active', createdAt: now, updatedAt: now,
+      createdBy: access.user.id,
+    };
+    await kv.set(`company:${tenantId}`, company);
+
+    const sub = {
+      companyId: tenantId, plan: body.plan || 'custom', status: 'active',
+      purchasedLicenses: Number(body.purchasedLicenses) || 0,
+      expiresAt, noPaymentRequired: true,
+      grantedBy: access.user.id, createdAt: now, updatedAt: now,
+    };
+    await kv.set(`subscription:${tenantId}`, sub);
+
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'tenant_create', tenantId, timestamp: now,
+      description: `Tenant "${body.name}" created by ${access.user.email} (no payment)`,
+    });
+    return c.json({ success: true, id: tenantId, ...company, subscription: sub });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /ultimateadmin/support/tenants/:id/users — create a user for a tenant without payment
+app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const tenantId = c.req.param('id');
+    const body = await c.req.json();
+    if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
+    const sb = supabaseAdmin();
+    const password = body.password || generateTempPassword();
+    // Create auth user
+    const { data: authData, error: authErr } = await sb.auth.admin.createUser({
+      email: body.email.toLowerCase().trim(),
+      password,
+      user_metadata: {
+        role: body.role || 'employee',
+        name: body.name,
+        companyId: tenantId,
+        company: tenantId,
+      },
+      email_confirm: true,
+    });
+    if (authErr) return c.json({ error: authErr.message }, 400);
+    const userId = authData.user.id;
+    const company = await kv.get(`company:${tenantId}`);
+    const now = new Date().toISOString();
+    const employee = {
+      id: userId, userId, email: body.email.toLowerCase().trim(),
+      name: body.name, role: body.role || 'employee',
+      companyId: tenantId, company: tenantId,
+      companyName: company?.name || tenantId,
+      status: 'active', createdAt: now, updatedAt: now,
+      createdBy: access.user.id,
+    };
+    await kv.set(`employee:${userId}`, employee);
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'tenant_user_create', tenantId, timestamp: now,
+      description: `User "${body.email}" (${body.role || 'employee'}) created for tenant ${tenantId} by ${access.user.email}`,
+    });
+    return c.json({ success: true, userId, email: body.email, role: body.role || 'employee', tempPassword: body.password ? undefined : password });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /ultimateadmin/users — all users across all tenants
+app.get(`${PREFIX}/ultimateadmin/users`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    const allEmployees = await kv.getByPrefix('employee:');
+    const users = allEmployees.map((e: any) => ({
+      id: e.id || e.userId, email: e.email, name: e.name || e.fullName || e.email,
+      role: e.role, status: e.status, companyId: e.companyId || e.company,
+      companyName: e.companyName || '', createdAt: e.createdAt || '',
+    }));
+    return c.json(users);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ── Ultimateadmin Global Chat ───────────────────────────────────────────────────
+// Ultimateadmin can chat with any tenant user directly
+
+// GET /ultimateadmin/chat/threads — list all chat threads
+app.get(`${PREFIX}/ultimateadmin/chat/threads`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const threads = await kv.getByPrefix('ultimateadmin_chat_thread:');
+    threads.sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+    return c.json(threads);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /ultimateadmin/chat/threads/:threadId — get thread messages
+app.get(`${PREFIX}/ultimateadmin/chat/threads/:threadId`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const threadId = c.req.param('threadId');
+    const thread = await kv.get(`ultimateadmin_chat_thread:${threadId}`);
+    if (!thread) return c.json({ error: 'Thread not found' }, 404);
+    const messages = await kv.getByPrefix(`ultimateadmin_chat_msg:${threadId}:`);
+    messages.sort((a: any, b: any) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+    return c.json({ thread, messages });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /ultimateadmin/chat/send — send a message to a tenant user (creates thread if needed)
+app.post(`${PREFIX}/ultimateadmin/chat/send`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    const { recipientId, recipientEmail, recipientName, tenantId, message, threadId: existingThreadId } = body;
+    if (!message?.trim()) return c.json({ error: 'message is required' }, 400);
+    if (!recipientId && !recipientEmail) return c.json({ error: 'recipientId or recipientEmail is required' }, 400);
+    const now = new Date().toISOString();
+
+    // Find or create thread
+    let threadId = existingThreadId;
+    if (!threadId) {
+      // Try to find existing thread
+      const allThreads = await kv.getByPrefix('ultimateadmin_chat_thread:');
+      const existing = allThreads.find((t: any) =>
+        (recipientId && t.recipientId === recipientId) ||
+        (recipientEmail && t.recipientEmail?.toLowerCase() === recipientEmail?.toLowerCase())
+      );
+      threadId = existing?.id || crypto.randomUUID();
+    }
+
+    const thread = (await kv.get(`ultimateadmin_chat_thread:${threadId}`)) || {
+      id: threadId, recipientId: recipientId || '',
+      recipientEmail: recipientEmail || '',
+      recipientName: recipientName || recipientEmail || '',
+      tenantId: tenantId || '',
+      createdAt: now, updatedAt: now,
+      lastMessage: message.trim(),
+    };
+    thread.updatedAt = now;
+    thread.lastMessage = message.trim();
+    await kv.set(`ultimateadmin_chat_thread:${threadId}`, thread);
+
+    const msgId = crypto.randomUUID();
+    const msg = {
+      id: msgId, threadId, senderRole: 'ultimateadmin',
+      senderEmail: access.user.email, senderId: access.user.id,
+      recipientId: recipientId || '', recipientEmail: recipientEmail || '',
+      message: message.trim(), sentAt: now,
+    };
+    await kv.set(`ultimateadmin_chat_msg:${threadId}:${msgId}`, msg);
+    return c.json({ success: true, threadId, messageId: msgId, sentAt: now });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// ── Ultimateadmin canonical aliases for /developer/* endpoints ─────────────────
+// Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
+
+app.get(`${PREFIX}/ultimateadmin/platform-users`, async (c) => {
+  // Delegate to the same logic as /developer/platform-users
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const users = await kv.getByPrefix('platform_user:');
+    return c.json(users);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/ultimateadmin/platform-users`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
+    const sb = supabaseAdmin();
+    const password = body.password || generateTempPassword();
+    const role = body.role || 'customer_care';
+    const { data: authData, error: authErr } = await sb.auth.admin.createUser({
+      email: body.email.toLowerCase().trim(), password,
+      user_metadata: { role, name: body.name },
+      email_confirm: true,
+    });
+    if (authErr) return c.json({ error: authErr.message }, 400);
+    const userId = authData.user.id;
+    const now = new Date().toISOString();
+    const record = {
+      id: userId, userId, email: body.email.toLowerCase().trim(),
+      name: body.name, role, status: 'active', createdAt: now,
+      createdBy: access.user.id, noLicenseRequired: true,
+    };
+    await kv.set(`platform_user:${userId}`, record);
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'platform_user_create', timestamp: now,
+      description: `Platform user "${body.email}" (${role}) created by ${access.user.email}`,
+    });
+    return c.json({ ...record, tempPassword: body.password ? undefined : password });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.put(`${PREFIX}/ultimateadmin/platform-users/:id`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const userId = c.req.param('id');
+    const body = await c.req.json();
+    const existing = await kv.get(`platform_user:${userId}`);
+    if (!existing) return c.json({ error: 'User not found' }, 404);
+    const updated = { ...existing, ...body, id: userId, updatedAt: new Date().toISOString() };
+    await kv.set(`platform_user:${userId}`, updated);
+    // Update Supabase user_metadata role if role changed
+    if (body.role && body.role !== existing.role) {
+      const sb = supabaseAdmin();
+      await sb.auth.admin.updateUserById(userId, { user_metadata: { role: body.role, name: updated.name } });
+    }
+    return c.json(updated);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.delete(`${PREFIX}/ultimateadmin/platform-users/:id`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const userId = c.req.param('id');
+    await kv.del(`platform_user:${userId}`);
+    await kv.del(`care_assignments:${userId}`);
+    const sb = supabaseAdmin();
+    await sb.auth.admin.deleteUser(userId).catch(() => null);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/ultimateadmin/assignments`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const assignments = await kv.getByPrefix('care_assignments_record:');
+    return c.json(assignments);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post(`${PREFIX}/ultimateadmin/assignments`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    const careAgentId = body?.careAgentId || body?.care_agent_id;
+    const tenantIds: string[] = Array.isArray(body?.tenantIds) ? body.tenantIds : body?.tenantId ? [body.tenantId] : [];
+    if (!careAgentId || tenantIds.length === 0) return c.json({ error: 'careAgentId and at least one tenantId required' }, 400);
+    const current = await getCareAssignmentsForAgent(careAgentId);
+    const merged = [...new Set([...current, ...tenantIds])];
+    await kv.set(`care_assignments:${careAgentId}`, merged);
+    const created = [];
+    for (const tenantId of tenantIds) {
+      const id = crypto.randomUUID();
+      const record = { id, careAgentId, tenantId, assignedBy: access.user.id, createdAt: new Date().toISOString() };
+      await kv.set(`care_assignments_record:${id}`, record);
+      created.push(record);
+    }
+    return c.json({ success: true, assignments: created });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.delete(`${PREFIX}/ultimateadmin/assignments/:id`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const assignmentId = c.req.param('id');
+    const record = await kv.get(`care_assignments_record:${assignmentId}`);
+    if (!record) return c.json({ error: 'Assignment not found' }, 404);
+    const current = await getCareAssignmentsForAgent(record.careAgentId);
+    await kv.set(`care_assignments:${record.careAgentId}`, current.filter((t: string) => t !== record.tenantId));
+    await kv.del(`care_assignments_record:${assignmentId}`);
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
 
 async function appendUniqueListValue(key: string, value: string) {
   const list = await kv.get(key) || [];

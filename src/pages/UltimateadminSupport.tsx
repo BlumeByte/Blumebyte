@@ -23,18 +23,20 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ROLES = ['customer_care_agent', 'support_manager', 'developer', 'ultimateadmin'];
-const PLATFORM_ROLES = ['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
+const ROLES = ['customer_care_agent', 'support_manager', 'ultimateadmin'];
+const PLATFORM_ROLES = ['ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
 
 const SIDEBAR_ITEMS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'tenants', label: 'Tenants', icon: Building2 },
+  { id: 'users', label: 'All Users', icon: Users },
+  { id: 'chat', label: 'Global Chat', icon: MessageSquare },
   { id: 'tickets', label: 'Support Tickets', icon: Ticket },
   { id: 'license-issues', label: 'License Issues', icon: Key },
-  { id: 'platform-users', label: 'Platform Users', icon: Users },
+  { id: 'platform-users', label: 'Platform Users', icon: UserPlus },
   { id: 'assignments', label: 'Assignments', icon: Activity },
   { id: 'audit', label: 'Audit Trail', icon: BookOpen },
-  { id: 'dev-tools', label: 'Developer Tools', icon: Wrench },
+  { id: 'dev-tools', label: 'Tools', icon: Wrench },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -85,7 +87,7 @@ export default function CustomerCareDashboard() {
 
   useEffect(() => {
     if (sessionLoading) return;
-    if (!user || (user.role !== 'developer' && user.role !== 'ultimateadmin')) {
+    if (!user || (user.role !== 'ultimateadmin' && user.role !== 'developer')) {
       clearSupportSession();
       setAuthState(false);
       return;
@@ -177,7 +179,12 @@ function TenantsPanel({ token }: { token: string }) {
   const [showUsers, setShowUsers] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [licenseDialog, setLicenseDialog] = useState(false);
-  const [licenseForm, setLicenseForm] = useState({ purchasedLicenses: '', status: '', expiresAt: '' });
+  const [licenseForm, setLicenseForm] = useState({ purchasedLicenses: '', status: '', expiresAt: '', durationAmount: '', durationUnit: 'days', plan: '' });
+  const [createDialog, setCreateDialog] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', industry: '', plan: 'custom', purchasedLicenses: '0', durationAmount: '30', durationUnit: 'days' });
+  const [createUserDialog, setCreateUserDialog] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({ name: '', email: '', role: 'superadmin', password: '' });
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -228,13 +235,50 @@ function TenantsPanel({ token }: { token: string }) {
       const body: any = {};
       if (licenseForm.purchasedLicenses) body.purchasedLicenses = Number(licenseForm.purchasedLicenses);
       if (licenseForm.status) body.status = licenseForm.status;
-      if (licenseForm.expiresAt) body.expiresAt = licenseForm.expiresAt;
+      if (licenseForm.plan) body.plan = licenseForm.plan;
+      if (licenseForm.expiresAt) {
+        body.expiresAt = licenseForm.expiresAt;
+      } else if (licenseForm.durationAmount) {
+        body.durationAmount = licenseForm.durationAmount;
+        body.durationUnit = licenseForm.durationUnit;
+      }
       await api(`/ultimateadmin/support/tenants/${selected.id}/license`, { method: 'PUT', token, body });
       toast.success('License updated');
       setLicenseDialog(false);
       load();
     } catch { toast.error('License update failed'); }
     finally { setActionLoading(null); }
+  };
+
+  const createTenant = async () => {
+    if (!createForm.name.trim()) return toast.error('Company name required');
+    setSaving(true);
+    try {
+      await api('/ultimateadmin/support/tenants', {
+        method: 'POST', token, body: createForm,
+      });
+      toast.success(`Tenant "${createForm.name}" created`);
+      setCreateDialog(false);
+      setCreateForm({ name: '', industry: '', plan: 'custom', purchasedLicenses: '0', durationAmount: '30', durationUnit: 'days' });
+      load();
+    } catch (e: any) { toast.error(e.message || 'Failed to create tenant'); }
+    finally { setSaving(false); }
+  };
+
+  const createUser = async () => {
+    if (!selected) return;
+    if (!createUserForm.name.trim() || !createUserForm.email.trim()) return toast.error('Name and email required');
+    setSaving(true);
+    try {
+      const result = await api(`/ultimateadmin/support/tenants/${selected.id}/users`, {
+        method: 'POST', token, body: createUserForm,
+      });
+      toast.success(`User created${result.tempPassword ? ` — temp password: ${result.tempPassword}` : ''}`);
+      setCreateUserDialog(false);
+      setCreateUserForm({ name: '', email: '', role: 'superadmin', password: '' });
+      loadUsers(selected);
+    } catch (e: any) { toast.error(e.message || 'Failed to create user'); }
+    finally { setSaving(false); }
   };
 
   const filtered = tenants.filter(t =>
@@ -250,6 +294,9 @@ function TenantsPanel({ token }: { token: string }) {
           <Input className="pl-8" placeholder="Search tenants…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Button size="sm" onClick={() => setCreateDialog(true)}>
+          <Building2 className="h-3.5 w-3.5 mr-1" />New Tenant
+        </Button>
       </div>
 
       {loading ? (
@@ -288,10 +335,14 @@ function TenantsPanel({ token }: { token: string }) {
                   <TableCell className="text-sm">{t.activeUsers}/{t.totalUsers}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => loadUsers(t)} title="View Users">
+                      <Button size="sm" variant="ghost" onClick={() => loadUsers(t)} title="View/Add Users">
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setSelected(t); setLicenseDialog(true); setLicenseForm({ purchasedLicenses: String(t.purchasedLicenses), status: t.licenseStatus || '', expiresAt: '' }); }} title="License">
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        setSelected(t);
+                        setLicenseDialog(true);
+                        setLicenseForm({ purchasedLicenses: String(t.purchasedLicenses), status: t.licenseStatus || '', expiresAt: '', durationAmount: '30', durationUnit: 'days', plan: t.plan || '' });
+                      }} title="Manage License">
                         <Key className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="sm" variant="ghost" className={t.licenseStatus === 'suspended' ? 'text-green-600' : 'text-orange-600'}
@@ -313,6 +364,11 @@ function TenantsPanel({ token }: { token: string }) {
           <DialogHeader>
             <DialogTitle>Users — {selected?.name}</DialogTitle>
           </DialogHeader>
+          <div className="flex justify-end mb-2">
+            <Button size="sm" onClick={() => { setCreateUserDialog(true); }}>
+              <UserPlus className="h-3.5 w-3.5 mr-1" />Add User
+            </Button>
+          </div>
           <div className="border rounded-lg overflow-auto max-h-96">
             <Table>
               <TableHeader>
@@ -338,9 +394,13 @@ function TenantsPanel({ token }: { token: string }) {
       {/* License Dialog */}
       <Dialog open={licenseDialog} onOpenChange={setLicenseDialog}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Update License — {selected?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Manage License — {selected?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Purchased Seats</Label><Input type="number" value={licenseForm.purchasedLicenses} onChange={e => setLicenseForm(f => ({ ...f, purchasedLicenses: e.target.value }))} /></div>
+            <div>
+              <Label>Plan</Label>
+              <Input value={licenseForm.plan} placeholder="e.g. basic, pro, enterprise, custom" onChange={e => setLicenseForm(f => ({ ...f, plan: e.target.value }))} />
+            </div>
             <div>
               <Label>License Status</Label>
               <Select value={licenseForm.status} onValueChange={v => setLicenseForm(f => ({ ...f, status: v }))}>
@@ -350,13 +410,89 @@ function TenantsPanel({ token }: { token: string }) {
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Expires At (optional)</Label><Input type="date" value={licenseForm.expiresAt} onChange={e => setLicenseForm(f => ({ ...f, expiresAt: e.target.value }))} /></div>
+            <div>
+              <Label>License Duration (no payment required)</Label>
+              <div className="flex gap-2 mt-1">
+                <Input type="number" placeholder="30" value={licenseForm.durationAmount} className="w-24"
+                  onChange={e => setLicenseForm(f => ({ ...f, durationAmount: e.target.value, expiresAt: '' }))} />
+                <Select value={licenseForm.durationUnit} onValueChange={v => setLicenseForm(f => ({ ...f, durationUnit: v, expiresAt: '' }))}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                    <SelectItem value="years">Years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Or set a specific expiry date below (overrides duration):</p>
+            </div>
+            <div><Label>Specific Expiry Date</Label><Input type="date" value={licenseForm.expiresAt} onChange={e => setLicenseForm(f => ({ ...f, expiresAt: e.target.value, durationAmount: '' }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLicenseDialog(false)}>Cancel</Button>
             <Button onClick={updateLicense} disabled={actionLoading === 'license'}>
-              {actionLoading === 'license' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Save
+              {actionLoading === 'license' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Apply License
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Tenant Dialog */}
+      <Dialog open={createDialog} onOpenChange={setCreateDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Create New Tenant</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Company Name *</Label><Input value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} placeholder="Acme Corp" /></div>
+            <div><Label>Industry</Label><Input value={createForm.industry} onChange={e => setCreateForm(f => ({ ...f, industry: e.target.value }))} placeholder="Technology, Healthcare, etc." /></div>
+            <div>
+              <Label>Plan</Label>
+              <Input value={createForm.plan} onChange={e => setCreateForm(f => ({ ...f, plan: e.target.value }))} placeholder="custom" />
+            </div>
+            <div><Label>License Seats</Label><Input type="number" value={createForm.purchasedLicenses} onChange={e => setCreateForm(f => ({ ...f, purchasedLicenses: e.target.value }))} /></div>
+            <div>
+              <Label>License Duration</Label>
+              <div className="flex gap-2 mt-1">
+                <Input type="number" placeholder="30" value={createForm.durationAmount} className="w-24"
+                  onChange={e => setCreateForm(f => ({ ...f, durationAmount: e.target.value }))} />
+                <Select value={createForm.durationUnit} onValueChange={v => setCreateForm(f => ({ ...f, durationUnit: v }))}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                    <SelectItem value="years">Years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialog(false)}>Cancel</Button>
+            <Button onClick={createTenant} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Create Tenant</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={createUserDialog} onOpenChange={setCreateUserDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add User to {selected?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Full Name *</Label><Input value={createUserForm.name} onChange={e => setCreateUserForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div><Label>Email *</Label><Input type="email" value={createUserForm.email} onChange={e => setCreateUserForm(f => ({ ...f, email: e.target.value }))} /></div>
+            <div>
+              <Label>Role</Label>
+              <Select value={createUserForm.role} onValueChange={v => setCreateUserForm(f => ({ ...f, role: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['superadmin', 'admin', 'manager', 'employee'].map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>Password (leave blank for auto-generated)</Label><Input type="password" value={createUserForm.password} onChange={e => setCreateUserForm(f => ({ ...f, password: e.target.value }))} placeholder="Auto-generated if empty" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateUserDialog(false)}>Cancel</Button>
+            <Button onClick={createUser} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Create User</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -724,7 +860,7 @@ function PlatformUsersPanel({ token }: { token: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api('/developer/platform-users', { token });
+      const data = await api('/ultimateadmin/platform-users', { token });
       setUsers(Array.isArray(data) ? data : []);
     } catch { toast.error('Failed to load platform users'); }
     finally { setLoading(false); }
@@ -737,10 +873,10 @@ function PlatformUsersPanel({ token }: { token: string }) {
     setSaving(true);
     try {
       if (editUser) {
-        await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body: form });
+        await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body: form });
         toast.success('User updated');
       } else {
-        await api('/developer/platform-users', { method: 'POST', token, body: form });
+        await api('/ultimateadmin/platform-users', { method: 'POST', token, body: form });
         toast.success('Platform user created');
       }
       setShowCreate(false);
@@ -754,7 +890,7 @@ function PlatformUsersPanel({ token }: { token: string }) {
   const deleteUser = async (u: any) => {
     if (!confirm(`Delete platform user ${u.email}?`)) return;
     try {
-      await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
+      await api(`/ultimateadmin/platform-users/${u.id}`, { method: 'DELETE', token });
       toast.success('User removed');
       load();
     } catch { toast.error('Delete failed'); }
@@ -849,8 +985,8 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
     setLoading(true);
     try {
       const [agentsData, assignData] = await Promise.all([
-        api('/developer/platform-users', { token }),
-        api('/developer/assignments', { token }),
+        api('/ultimateadmin/platform-users', { token }),
+        api('/ultimateadmin/assignments', { token }),
       ]);
       const agents = Array.isArray(agentsData) ? agentsData.filter((u: any) => {
         const r = u.role || '';
@@ -871,7 +1007,7 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
     if (!selectedAgent || selectedTenants.length === 0) return toast.error('Select agent and at least one tenant');
     setSaving(true);
     try {
-      await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+      await api('/ultimateadmin/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
       toast.success('Assignment saved');
       setSelectedAgent('');
       setSelectedTenants([]);
@@ -882,7 +1018,7 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
 
   const removeAssignment = async (assignmentId: string) => {
     try {
-      await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
+      await api(`/ultimateadmin/assignments/${assignmentId}`, { method: 'DELETE', token });
       toast.success('Assignment removed');
       load();
     } catch { toast.error('Remove failed'); }
@@ -975,7 +1111,272 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
   );
 }
 
-// ─── Audit Trail Panel ─────────────────────────────────────────────────────────
+// ─── All Users Panel ──────────────────────────────────────────────────────────
+function AllUsersPanel({ token, tenants }: { token: string; tenants: Tenant[] }) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api('/ultimateadmin/users', { token });
+      setUsers(Array.isArray(data) ? data : []);
+    } catch { toast.error('Failed to load users'); }
+    finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = users.filter(u => {
+    const matchSearch = (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.companyName || '').toLowerCase().includes(search.toLowerCase());
+    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    return matchSearch && matchRole;
+  });
+
+  const allRoles = [...new Set(users.map((u: any) => u.role).filter(Boolean))];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Input className="pl-8" placeholder="Search users…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            {allRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Badge variant="secondary">{filtered.length} users</Badge>
+      </div>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+      ) : (
+        <div className="border rounded-lg overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No users found</TableCell></TableRow>}
+              {filtered.map(u => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium text-sm">{u.name || '—'}</TableCell>
+                  <TableCell className="text-sm">{u.email}</TableCell>
+                  <TableCell><StatusBadge status={u.role} /></TableCell>
+                  <TableCell className="text-sm">{u.companyName || tenants.find(t => t.id === u.companyId)?.name || u.companyId || '—'}</TableCell>
+                  <TableCell><StatusBadge status={u.status || 'active'} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Global Chat Panel ────────────────────────────────────────────────────────
+function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] }) {
+  const [threads, setThreads] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeThread, setActiveThread] = useState<any | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [newMsg, setNewMsg] = useState('');
+  const [sending, setSending] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [recipient, setRecipient] = useState('');
+  const [search, setSearch] = useState('');
+
+  const loadThreads = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [threadData, userData] = await Promise.all([
+        api('/ultimateadmin/chat/threads', { token }),
+        api('/ultimateadmin/users', { token }),
+      ]);
+      setThreads(Array.isArray(threadData) ? threadData : []);
+      setAllUsers(Array.isArray(userData) ? userData : []);
+    } catch { toast.error('Failed to load chat'); }
+    finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { loadThreads(); }, [loadThreads]);
+
+  const loadThread = async (thread: any) => {
+    setActiveThread(thread);
+    setMsgLoading(true);
+    try {
+      const data = await api(`/ultimateadmin/chat/threads/${thread.id}`, { token });
+      setMessages(Array.isArray(data.messages) ? data.messages : []);
+    } catch { toast.error('Failed to load messages'); }
+    finally { setMsgLoading(false); }
+  };
+
+  const sendMessage = async () => {
+    if (!newMsg.trim()) return;
+    if (!activeThread && !recipient) return toast.error('Select a recipient');
+    setSending(true);
+    try {
+      const selectedUser = allUsers.find(u => u.id === recipient || u.email === recipient);
+      const body: any = {
+        message: newMsg.trim(),
+        threadId: activeThread?.id,
+        recipientId: activeThread?.recipientId || selectedUser?.id || '',
+        recipientEmail: activeThread?.recipientEmail || selectedUser?.email || recipient,
+        recipientName: activeThread?.recipientName || selectedUser?.name || '',
+        tenantId: activeThread?.tenantId || selectedUser?.companyId || '',
+      };
+      const result = await api('/ultimateadmin/chat/send', { method: 'POST', token, body });
+      setNewMsg('');
+      if (!activeThread) {
+        // New thread created — load it
+        await loadThreads();
+        setShowNewChat(false);
+        setRecipient('');
+        // Find and open the new thread
+        const freshThreads = await api('/ultimateadmin/chat/threads', { token });
+        const newThread = freshThreads.find((t: any) => t.id === result.threadId);
+        if (newThread) loadThread(newThread);
+      } else {
+        // Refresh messages
+        const data = await api(`/ultimateadmin/chat/threads/${activeThread.id}`, { token });
+        setMessages(Array.isArray(data.messages) ? data.messages : []);
+      }
+    } catch (e: any) { toast.error(e.message || 'Failed to send message'); }
+    finally { setSending(false); }
+  };
+
+  const filteredThreads = threads.filter(t =>
+    (t.recipientName || '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.recipientEmail || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="flex h-[calc(100vh-200px)] gap-4">
+      {/* Thread list */}
+      <div className="w-72 shrink-0 border rounded-lg flex flex-col bg-white">
+        <div className="p-3 border-b space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-sm">Conversations</h3>
+            <Button size="sm" variant="outline" onClick={() => setShowNewChat(true)}>
+              <UserPlus className="h-3.5 w-3.5 mr-1" />New
+            </Button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+            <Input className="pl-8 h-8 text-sm" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
+          {!loading && filteredThreads.length === 0 && (
+            <div className="text-center text-gray-400 text-sm py-8">No conversations yet</div>
+          )}
+          {filteredThreads.map(t => (
+            <button
+              key={t.id}
+              onClick={() => loadThread(t)}
+              className={`w-full text-left p-3 border-b hover:bg-gray-50 transition-colors ${activeThread?.id === t.id ? 'bg-blue-50' : ''}`}
+            >
+              <p className="font-medium text-sm truncate">{t.recipientName || t.recipientEmail}</p>
+              <p className="text-xs text-gray-400 truncate">{t.lastMessage}</p>
+              <p className="text-xs text-gray-300 mt-0.5">{t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : ''}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Chat area */}
+      <div className="flex-1 border rounded-lg flex flex-col bg-white">
+        {!activeThread ? (
+          <div className="flex-1 flex items-center justify-center text-gray-400">
+            <div className="text-center">
+              <MessageSquare className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">Select a conversation or start a new one</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="p-3 border-b flex items-center gap-2">
+              <div>
+                <p className="font-semibold text-sm">{activeThread.recipientName || activeThread.recipientEmail}</p>
+                <p className="text-xs text-gray-400">{activeThread.recipientEmail} · {tenants.find(t => t.id === activeThread.tenantId)?.name || activeThread.tenantId || 'No tenant'}</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {msgLoading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
+              {messages.map(m => (
+                <div key={m.id} className={`flex ${m.senderRole === 'ultimateadmin' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[75%] rounded-lg p-2 text-sm ${m.senderRole === 'ultimateadmin' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                    <p>{m.message}</p>
+                    <p className={`text-xs mt-0.5 ${m.senderRole === 'ultimateadmin' ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(m.sentAt).toLocaleTimeString()}</p>
+                  </div>
+                </div>
+              ))}
+              {messages.length === 0 && !msgLoading && <p className="text-center text-gray-400 text-sm py-4">No messages yet</p>}
+            </div>
+            <div className="p-3 border-t flex gap-2">
+              <Input
+                placeholder="Type a message…"
+                value={newMsg}
+                onChange={e => setNewMsg(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              />
+              <Button size="sm" onClick={sendMessage} disabled={sending || !newMsg.trim()}>
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* New Chat Dialog */}
+      <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Start New Conversation</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Select Recipient</Label>
+              <Select value={recipient} onValueChange={setRecipient}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select a user…" /></SelectTrigger>
+                <SelectContent>
+                  {allUsers.map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name || u.email} — {u.role} {u.companyName ? `(${u.companyName})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>Message</Label><Textarea value={newMsg} onChange={e => setNewMsg(e.target.value)} placeholder="Type your message…" rows={3} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewChat(false)}>Cancel</Button>
+            <Button onClick={sendMessage} disabled={sending || !newMsg.trim() || !recipient}>
+              {sending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 function AuditTrailPanel({ token }: { token: string }) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1108,19 +1509,26 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
       <Card>
         <CardHeader><CardTitle className="text-base">SQL Setup</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm text-gray-600">Run this SQL in Supabase to grant Customer Care access to a user:</p>
-          <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{`-- Grant Customer Care (ultimateadmin) access to a specific user
+          <p className="text-sm text-gray-600">Run this SQL in Supabase to grant Ultimateadmin access to a user:</p>
+          <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{`-- Grant Ultimateadmin access
 UPDATE auth.users
 SET raw_user_meta_data = 
   COALESCE(raw_user_meta_data, '{}'::jsonb) ||
   '{"role": "ultimateadmin"}'::jsonb
 WHERE email = 'your-email@example.com';
 
--- Verify the update
+-- Grant Customer Care access
+UPDATE auth.users
+SET raw_user_meta_data = 
+  COALESCE(raw_user_meta_data, '{}'::jsonb) ||
+  '{"role": "customer_care"}'::jsonb
+WHERE email = 'care-agent@example.com';
+
+-- Verify
 SELECT id, email, raw_user_meta_data->>'role' as role
 FROM auth.users
-WHERE email = 'your-email@example.com';`}</pre>
-          <p className="text-xs text-gray-500">Replace the email with the account you want to grant access to.</p>
+WHERE email IN ('your-email@example.com', 'care-agent@example.com');`}</pre>
+          <p className="text-xs text-gray-500">Ultimateadmin → /developer dashboard. Customer Care → /customer-care dashboard.</p>
         </CardContent>
       </Card>
     </div>
@@ -1172,7 +1580,7 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
             <Shield className="h-4 w-4 text-gray-900" />
           </div>
-          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Developer Dashboard</span>}
+          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Ultimateadmin</span>}
         </div>
 
         <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
@@ -1229,9 +1637,11 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <Card>
                       <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
-                      <CardContent className="grid grid-cols-2 gap-2">
+                      <CardContent className="grid grid-cols-3 gap-2">
                         {[
                           { label: 'View Tenants', icon: Building2, section: 'tenants' },
+                          { label: 'All Users', icon: Users, section: 'users' },
+                          { label: 'Global Chat', icon: MessageSquare, section: 'chat' },
                           { label: 'New Ticket', icon: Ticket, section: 'tickets' },
                           { label: 'License Issues', icon: Key, section: 'license-issues' },
                           { label: 'Platform Users', icon: Users, section: 'platform-users' },
@@ -1266,6 +1676,8 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
               )}
 
               {activeSection === 'tenants' && <TenantsPanel token={token} />}
+              {activeSection === 'users' && <AllUsersPanel token={token} tenants={tenants} />}
+              {activeSection === 'chat' && <GlobalChatPanel token={token} tenants={tenants} />}
               {activeSection === 'tickets' && <TicketsPanel token={token} tenants={tenants} />}
               {activeSection === 'license-issues' && <LicenseIssuesPanel tenants={tenants} token={token} onRefresh={loadData} />}
               {activeSection === 'platform-users' && <PlatformUsersPanel token={token} />}
