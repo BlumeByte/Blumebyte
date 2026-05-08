@@ -11441,6 +11441,54 @@ app.get(`${PREFIX}/ultimateadmin/support/audit`, async (c) => {
   }
 });
 
+// POST /ultimateadmin/support/set-platform-user — set role+name for developer/care platform users
+app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    const { userId, name, role } = body;
+    if (!userId || !role) return c.json({ error: 'userId and role are required' }, 400);
+    const ALLOWED_PLATFORM_ROLES = ['developer', 'ultimateadmin', 'customer_care_agent', 'support_manager', 'care'];
+    if (!ALLOWED_PLATFORM_ROLES.includes(role)) {
+      return c.json({ error: `Invalid role. Allowed: ${ALLOWED_PLATFORM_ROLES.join(', ')}` }, 400);
+    }
+    const sb = supabaseAdmin();
+    const { data: authData, error: authErr } = await sb.auth.admin.getUserById(userId);
+    if (authErr || !authData?.user) return c.json({ error: 'User not found in auth' }, 404);
+    const resolvedName = name || authData.user.user_metadata?.name || authData.user.email || '';
+    // Update Supabase auth metadata (fixes the Supabase dashboard display)
+    await sb.auth.admin.updateUserById(userId, {
+      user_metadata: { ...authData.user.user_metadata, name: resolvedName, role },
+    });
+    // Upsert KV employee record so the server role check always resolves correctly
+    const existing = await kv.get(`employee:${userId}`) || {};
+    const updated = {
+      ...existing,
+      userId,
+      id: userId,
+      name: resolvedName,
+      email: authData.user.email || existing.email || '',
+      role,
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`employee:${userId}`, updated);
+    // Audit
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'set_platform_user_role', targetUserId: userId,
+      targetEmail: authData.user.email, newRole: role, newName: resolvedName,
+      timestamp: new Date().toISOString(),
+      description: `Set platform user ${authData.user.email} to role '${role}' by ${access.user.email}`,
+    });
+    return c.json({ success: true, userId, email: authData.user.email, name: resolvedName, role });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // POST /ultimateadmin/support/repair/:tenantId — run quick repair actions
 app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
   try {
