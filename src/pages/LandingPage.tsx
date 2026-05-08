@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../components/ui/button';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, DollarSign, UserCheck, Trophy, ChevronDown, ChevronLeft, ChevronRight, Star, TrendingUp, Award, MessageSquare, BookOpen, Target } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, DollarSign, UserCheck, Trophy, ChevronDown, Star, TrendingUp, Award, MessageSquare, BookOpen } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
