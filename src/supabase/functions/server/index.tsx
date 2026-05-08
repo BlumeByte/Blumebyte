@@ -10781,6 +10781,8 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
 
 // ============ CUSTOMER CARE / DEVELOPER ENDPOINTS ============
 
+const careRoutePaths = (path: string) => [`${PREFIX}${path}`, path];
+
 // Helper: verify care account access
 async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDeveloper: boolean } | null> {
   const token = extractUserToken(c);
@@ -10798,7 +10800,7 @@ async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDe
 }
 
 // GET /care/verify-access — check if authenticated user can access care dashboard
-app.get(`${PREFIX}/care/verify-access`, async (c) => {
+const verifyCareRouteAccess = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ allowed: false }, 403);
@@ -10806,10 +10808,11 @@ app.get(`${PREFIX}/care/verify-access`, async (c) => {
   } catch {
     return c.json({ allowed: false }, 403);
   }
-});
+};
+for (const route of careRoutePaths('/care/verify-access')) app.get(route, verifyCareRouteAccess);
 
 // GET /care/profile — care account's own profile
-app.get(`${PREFIX}/care/profile`, async (c) => {
+const getCareProfile = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10822,10 +10825,11 @@ app.get(`${PREFIX}/care/profile`, async (c) => {
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);
   }
-});
+};
+for (const route of careRoutePaths('/care/profile')) app.get(route, getCareProfile);
 
 // GET /care/tenants — list all tenant companies
-app.get(`${PREFIX}/care/tenants`, async (c) => {
+const listCareTenants = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10862,10 +10866,11 @@ app.get(`${PREFIX}/care/tenants`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of careRoutePaths('/care/tenants')) app.get(route, listCareTenants);
 
 // GET /care/tenants/:id/users — list users for a tenant
-app.get(`${PREFIX}/care/tenants/:id/users`, async (c) => {
+const listCareTenantUsers = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10890,10 +10895,11 @@ app.get(`${PREFIX}/care/tenants/:id/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of careRoutePaths('/care/tenants/:id/users')) app.get(route, listCareTenantUsers);
 
 // DELETE /care/tenants/:id — delete a tenant (developer only)
-app.delete(`${PREFIX}/care/tenants/:id`, async (c) => {
+const deleteCareTenant = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10943,10 +10949,11 @@ app.delete(`${PREFIX}/care/tenants/:id`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of careRoutePaths('/care/tenants/:id')) app.delete(route, deleteCareTenant);
 
 // POST /care/reset-password — generate a password reset link for a user
-app.post(`${PREFIX}/care/reset-password`, async (c) => {
+const createCareResetPassword = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10965,10 +10972,11 @@ app.post(`${PREFIX}/care/reset-password`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of careRoutePaths('/care/reset-password')) app.post(route, createCareResetPassword);
 
 // PUT /care/tenants/:id/license — update license count (developer only)
-app.put(`${PREFIX}/care/tenants/:id/license`, async (c) => {
+const updateCareTenantLicenses = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10987,10 +10995,11 @@ app.put(`${PREFIX}/care/tenants/:id/license`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of careRoutePaths('/care/tenants/:id/license')) app.put(route, updateCareTenantLicenses);
 
 // GET /care/global-applications — list all public job applications
-app.get(`${PREFIX}/care/global-applications`, async (c) => {
+const listCareGlobalApplications = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11001,7 +11010,8 @@ app.get(`${PREFIX}/care/global-applications`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of careRoutePaths('/care/global-applications')) app.get(route, listCareGlobalApplications);
 
 
 // SuperAdmin CRUD for public job applications (status updates, view, archive)
