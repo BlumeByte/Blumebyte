@@ -161,7 +161,7 @@ export default function IntegrationsPage() {
           {benefits.map((benefit, index) => (
             <Card key={index} className="glass-public hover-lift border-gray-200 text-center">
               <CardHeader>
-                <div className="mx-auto h-12 w-12 rounded-lg bg-black flex items-center justify-center mb-4">
+                <div className="mx-auto h-12 w-12 rounded-lg bg-primary flex items-center justify-center mb-4">
                   <benefit.icon className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle className="text-lg">{benefit.title}</CardTitle>
@@ -235,7 +235,7 @@ export default function IntegrationsPage() {
                 <span>Developer support and SDKs</span>
               </li>
             </ul>
-            <Button size="lg" className="bg-black text-white hover:bg-gray-800">
+            <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
               View API Documentation
             </Button>
           </div>
@@ -270,7 +270,7 @@ export default function IntegrationsPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-black text-white py-20">
+      <section className="bg-primary text-primary-foreground py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Connect Your Tools?</h2>
           <p className="text-lg text-gray-300 mb-8">

@@ -13,8 +13,8 @@ import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import {
   Building2, Users, KeyRound, Shield, Search, Loader2, RefreshCw,
-  Eye, Trash2, UserPlus, Lock, Unlock, LogOut, AlertCircle,
-  Copy, CheckCircle, Settings, BarChart3, Briefcase
+  LogOut, Copy, CheckCircle, Briefcase,
+  Ticket, MessageSquare, Send
 } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { supabase } from '../lib/supabase-client';
@@ -52,14 +52,10 @@ function TenantRow({
   tenant,
   onViewUsers,
   onResetPassword,
-  onDelete,
-  isDeveloper,
 }: {
   tenant: Tenant;
   onViewUsers: () => void;
   onResetPassword: () => void;
-  onDelete: () => void;
-  isDeveloper: boolean;
 }) {
   return (
     <TableRow>
@@ -80,11 +76,6 @@ function TenantRow({
           <Button size="sm" variant="outline" onClick={onResetPassword}>
             <KeyRound className="h-3.5 w-3.5 mr-1" /> Reset PW
           </Button>
-          {isDeveloper && (
-            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:border-red-300" onClick={onDelete}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
         </div>
       </TableCell>
     </TableRow>
@@ -109,15 +100,24 @@ export default function CareDashboard() {
   const [resetTarget, setResetTarget] = useState<Tenant | null>(null);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLinkResult, setResetLinkResult] = useState<string | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
   const [activeTab, setActiveTab] = useState('tenants');
 
   // Global hiring applications state
   const [applications, setApplications] = useState<any[]>([]);
   const [appsLoading, setAppsLoading] = useState(false);
 
-  const isDeveloper = careProfile?.role === 'developer';
+  // Tickets state
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
+  const [ticketComments, setTicketComments] = useState<any[]>([]);
+  const [ticketDetailOpen, setTicketDetailOpen] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
+  const [ticketStatusFilter, setTicketStatusFilter] = useState('all');
+
+  // Care agents are NOT developers — developers have their own dashboard at /developer.
+  // The delete and license-edit actions are developer-only and not shown here.
 
   const loadProfile = useCallback(async () => {
     if (!user) {
@@ -133,7 +133,9 @@ export default function CareDashboard() {
       const p = await api('/care/profile', { token });
       setCareProfile(p);
       const role = p?.role || '';
-      const allowed = role === 'developer' || isCustomerCareRole(role);
+      // This dashboard is for customer care agents ONLY.
+      // Developers must use /developer instead.
+      const allowed = isCustomerCareRole(role);
       setAuthenticated(allowed);
     } catch (e: any) {
       if (e?.status === 401 || e?.status === 403) {
@@ -147,7 +149,8 @@ export default function CareDashboard() {
         role: user.role,
       });
       const role = user.role || '';
-      setAuthenticated(role === 'developer' || isCustomerCareRole(role));
+      // Developers are not allowed here — they have /developer
+      setAuthenticated(isCustomerCareRole(role));
     }
   }, [user]);
 
@@ -179,6 +182,67 @@ export default function CareDashboard() {
     }
   }, []);
 
+  const loadTickets = useCallback(async () => {
+    const token = await getCareToken();
+    if (!token) return;
+    setTicketsLoading(true);
+    try {
+      const data = await api('/care/tickets', { token });
+      setTickets(Array.isArray(data) ? data : []);
+    } catch {
+      setTickets([]);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
+  const handleViewTicket = async (ticket: any) => {
+    setSelectedTicket(ticket);
+    setTicketDetailOpen(true);
+    setNewComment('');
+    const token = await getCareToken();
+    if (!token) return;
+    try {
+      const data = await api(`/care/tickets/${ticket.id}`, { token });
+      setTicketComments(Array.isArray(data?.comments) ? data.comments : []);
+    } catch {
+      setTicketComments([]);
+    }
+  };
+
+  const handleSendComment = async () => {
+    if (!newComment.trim() || !selectedTicket) return;
+    setSendingComment(true);
+    try {
+      const token = await getCareToken();
+      await api(`/care/tickets/${selectedTicket.id}/comment`, {
+        method: 'POST',
+        token,
+        body: { comment: newComment.trim() },
+      });
+      const data = await api(`/care/tickets/${selectedTicket.id}`, { token });
+      setTicketComments(Array.isArray(data?.comments) ? data.comments : []);
+      setNewComment('');
+      toast.success('Message sent');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to send message');
+    } finally {
+      setSendingComment(false);
+    }
+  };
+
+  const handleEscalateTicket = async (ticketId: string) => {
+    const token = await getCareToken();
+    if (!token) return;
+    try {
+      await api(`/care/tickets/${ticketId}/escalate`, { method: 'POST', token, body: {} });
+      toast.success('Ticket escalated');
+      loadTickets();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to escalate');
+    }
+  };
+
   useEffect(() => {
     if (sessionLoading) return;
     if (!user) {
@@ -197,6 +261,10 @@ export default function CareDashboard() {
   useEffect(() => {
     if (activeTab === 'applications') loadApplications();
   }, [activeTab, loadApplications]);
+
+  useEffect(() => {
+    if (activeTab === 'tickets') loadTickets();
+  }, [activeTab, loadTickets]);
 
   const handleViewUsers = async (tenant: Tenant) => {
     setSelectedTenant(tenant);
@@ -236,35 +304,6 @@ export default function CareDashboard() {
     }
   };
 
-  const handleDeleteTenant = async () => {
-    if (!deleteTarget || !isDeveloper) return;
-    try {
-      const token = await getCareToken();
-      await api(`/care/tenants/${deleteTarget.id}`, { method: 'DELETE', token });
-      toast.success(`Tenant "${deleteTarget.name}" deleted.`);
-      setDeleteDialog(false);
-      setDeleteTarget(null);
-      loadTenants();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete tenant');
-    }
-  };
-
-  const handleUpdateLicense = async (tenantId: string, licenses: number) => {
-    try {
-      const token = await getCareToken();
-      await api(`/care/tenants/${tenantId}/license`, {
-        method: 'PUT',
-        token,
-        body: { licenses },
-      });
-      toast.success('License count updated.');
-      loadTenants();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to update license');
-    }
-  };
-
   const filteredTenants = tenants.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
     (t.email || '').toLowerCase().includes(search.toLowerCase())
@@ -292,7 +331,7 @@ export default function CareDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-black text-white">
+      <div className="bg-primary text-primary-foreground">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
@@ -300,7 +339,7 @@ export default function CareDashboard() {
               <span className="font-semibold">Blumebyte Customer Care</span>
               {careProfile && (
                 <Badge variant="secondary" className="text-xs">
-                  {isDeveloper ? 'Developer' : 'Support Agent'}
+                  Support Agent
                 </Badge>
               )}
             </div>
@@ -343,6 +382,7 @@ export default function CareDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="tenants"><Building2 className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
+            <TabsTrigger value="tickets"><Ticket className="h-4 w-4 mr-1" />Support Tickets</TabsTrigger>
             <TabsTrigger value="applications"><Briefcase className="h-4 w-4 mr-1" />Global Hiring Apps</TabsTrigger>
           </TabsList>
 
@@ -395,8 +435,6 @@ export default function CareDashboard() {
                               tenant={t}
                               onViewUsers={() => handleViewUsers(t)}
                               onResetPassword={() => handleResetPassword(t)}
-                              onDelete={() => { setDeleteTarget(t); setDeleteDialog(true); }}
-                              isDeveloper={isDeveloper}
                             />
                           ))
                         )}
@@ -466,10 +504,179 @@ export default function CareDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Support Tickets / Chatbox Tab — only assigned tenant tickets */}
+          <TabsContent value="tickets">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                  <div>
+                    <CardTitle>Support Tickets</CardTitle>
+                    <p className="text-xs text-gray-500 mt-1">Only tickets for your assigned tenants are shown.</p>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
+                      <SelectTrigger className="w-36 h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['all', 'open', 'pending', 'escalated', 'resolved'].map((s) => (
+                          <SelectItem key={s} value={s}>{s === 'all' ? 'All statuses' : s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" onClick={loadTickets}>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {ticketsLoading ? (
+                  <div className="flex justify-center py-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tenant</TableHead>
+                          <TableHead>Subject</TableHead>
+                          <TableHead>Priority</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tickets
+                          .filter((t) => ticketStatusFilter === 'all' || t.status === ticketStatusFilter)
+                          .length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-10 text-gray-400">
+                              {tenants.length === 0
+                                ? 'No tenants assigned to you yet.'
+                                : 'No tickets found for your assigned tenants.'}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tickets
+                            .filter((t) => ticketStatusFilter === 'all' || t.status === ticketStatusFilter)
+                            .map((t) => (
+                              <TableRow key={t.id}>
+                                <TableCell className="text-sm font-medium">{t.tenantName || t.tenantId || '—'}</TableCell>
+                                <TableCell className="text-sm max-w-[200px] truncate">{t.subject}</TableCell>
+                                <TableCell>
+                                  <Badge variant={t.priority === 'critical' || t.priority === 'high' ? 'destructive' : 'secondary'}>
+                                    {t.priority}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={t.status === 'resolved' ? 'default' : t.status === 'escalated' ? 'destructive' : 'secondary'}>
+                                    {t.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-gray-500">
+                                  {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="outline" onClick={() => handleViewTicket(t)}>
+                                      <MessageSquare className="h-3.5 w-3.5 mr-1" />Chat
+                                    </Button>
+                                    {t.status !== 'escalated' && t.status !== 'resolved' && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-orange-600 hover:border-orange-300"
+                                        onClick={() => handleEscalateTicket(t.id)}
+                                      >
+                                        Escalate
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
-      {/* View Users Dialog */}
+      {/* Ticket Chat Dialog */}
+      <Dialog open={ticketDetailOpen} onOpenChange={(v) => { if (!v) { setTicketDetailOpen(false); setSelectedTicket(null); setNewComment(''); } }}>
+        <DialogContent className="max-w-xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              <span className="text-gray-500 text-xs font-normal block mb-0.5">{selectedTicket?.tenantName}</span>
+              {selectedTicket?.subject}
+            </DialogTitle>
+            <div className="flex gap-2 mt-1">
+              <Badge variant="outline">{selectedTicket?.issueType}</Badge>
+              <Badge variant={selectedTicket?.priority === 'critical' || selectedTicket?.priority === 'high' ? 'destructive' : 'secondary'}>
+                {selectedTicket?.priority}
+              </Badge>
+              <Badge variant={selectedTicket?.status === 'resolved' ? 'default' : 'secondary'}>
+                {selectedTicket?.status}
+              </Badge>
+            </div>
+          </DialogHeader>
+          {/* Description */}
+          {selectedTicket?.description && (
+            <div className="bg-gray-50 border rounded-lg p-3 text-sm text-gray-700 shrink-0">
+              <p className="font-medium text-xs text-gray-500 mb-1">Description</p>
+              {selectedTicket.description}
+            </div>
+          )}
+          {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto space-y-2 min-h-[120px] max-h-64 bg-gray-50 rounded-lg p-3 border">
+            {ticketComments.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-6">No messages yet. Start the conversation below.</p>
+            ) : (
+              ticketComments.map((c: any) => (
+                <div key={c.id} className={`flex ${c.authorRole === 'customer_care' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`rounded-lg px-3 py-2 max-w-[80%] text-sm ${c.authorRole === 'customer_care' ? 'bg-primary text-primary-foreground' : 'bg-white border text-gray-800'}`}>
+                    <p className="text-xs opacity-60 mb-0.5">{c.authorEmail}</p>
+                    <p>{c.comment}</p>
+                    <p className="text-xs opacity-40 mt-0.5 text-right">{c.createdAt ? new Date(c.createdAt).toLocaleTimeString() : ''}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {/* Send message */}
+          {selectedTicket?.status !== 'resolved' && (
+            <div className="flex gap-2 shrink-0">
+              <Textarea
+                className="resize-none text-sm"
+                rows={2}
+                placeholder="Type a message…"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendComment(); } }}
+              />
+              <Button
+                className="self-end bg-primary text-primary-foreground hover:bg-primary/90"
+                size="sm"
+                onClick={handleSendComment}
+                disabled={sendingComment || !newComment.trim()}
+              >
+                {sendingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setTicketDetailOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={usersDialogOpen} onOpenChange={setUsersDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -549,7 +756,7 @@ export default function CareDashboard() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setResetDialogOpen(false); setResetLinkResult(null); }}>Close</Button>
             {!resetLinkResult && (
-              <Button onClick={doPasswordReset} className="bg-black text-white hover:bg-gray-800">
+              <Button onClick={doPasswordReset} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <KeyRound className="h-4 w-4 mr-2" /> Generate Reset Link
               </Button>
             )}
@@ -557,28 +764,6 @@ export default function CareDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Tenant Dialog */}
-      {isDeveloper && (
-        <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="text-red-600">Delete Tenant</DialogTitle>
-            </DialogHeader>
-            <div className="py-2">
-              <p className="text-sm text-gray-600">
-                Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>?
-                This action cannot be undone and will remove all their data and users.
-              </p>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setDeleteDialog(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeleteTenant}>
-                <Trash2 className="h-4 w-4 mr-2" /> Delete Permanently
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

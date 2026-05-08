@@ -1,10 +1,34 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { motion } from 'motion/react';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Users, Clock, FileText, DollarSign, Trophy, UserCheck, Award, BarChart3, Shield, Zap, Bell, BookOpen, Calendar, Gift, MessageSquare, Settings, Globe, Briefcase, Target, CheckCircle2 } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
-import { SharedNavigation } from '../components/SharedNavigation';
+import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
+
+function useInView(threshold = 0.15) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, visible };
+}
+
+function FadeSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  const { ref, visible } = useInView();
+  return (
+    <div ref={ref} className={className} style={{ opacity: visible ? 1 : 0, transform: visible ? 'none' : 'translateY(20px)', transition: `opacity 0.5s ${delay}s ease, transform 0.5s ${delay}s ease` }}>
+      {children}
+    </div>
+  );
+}
 
 export default function FeaturesPage() {
   const navigate = useNavigate();
@@ -15,211 +39,286 @@ export default function FeaturesPage() {
       description: 'Complete employee lifecycle management',
       icon: Users,
       features: [
-        { name: 'Employee Profiles', description: 'Comprehensive employee information and documents', icon: Users },
-        { name: 'Organization Charts', description: 'Visual hierarchy and reporting structures', icon: Target },
-        { name: 'Department Management', description: 'Organize teams and departments efficiently', icon: Briefcase },
-        { name: 'Role-Based Access', description: '4-tier permission system (SuperAdmin, Admin, Manager, Employee)', icon: Shield },
-      ]
+        { name: 'Employee Profiles', description: 'Comprehensive employee information and documents' },
+        { name: 'Organization Charts', description: 'Visual hierarchy and reporting structures' },
+        { name: 'Department Management', description: 'Organize teams and departments efficiently' },
+        { name: 'Role-Based Access', description: '4-tier permission system (SuperAdmin, Admin, Manager, Employee)' },
+      ],
     },
     {
       category: 'Time & Attendance',
       description: 'Track work hours with precision',
       icon: Clock,
       features: [
-        { name: 'Clock In/Out', description: 'Simple time tracking for employees', icon: Clock },
-        { name: 'Shift Management', description: 'Create and manage work schedules', icon: Calendar },
-        { name: 'Overtime Tracking', description: 'Automatic overtime calculation', icon: BarChart3 },
-        { name: 'Real-time Monitoring', description: 'Live attendance dashboard', icon: Globe },
-      ]
+        { name: 'Clock In/Out', description: 'Simple time tracking for employees' },
+        { name: 'Shift Management', description: 'Create and manage work schedules' },
+        { name: 'Overtime Tracking', description: 'Automatic overtime calculation' },
+        { name: 'Real-time Monitoring', description: 'Live attendance dashboard' },
+      ],
     },
     {
       category: 'Leave Management',
       description: 'Streamline leave requests and approvals',
       icon: FileText,
       features: [
-        { name: 'Leave Requests', description: 'Easy submission and tracking', icon: FileText },
-        { name: 'Approval Workflows', description: 'Multi-level approval process', icon: CheckCircle2 },
-        { name: 'Leave Balance', description: 'Real-time balance tracking', icon: BarChart3 },
-        { name: 'Calendar Integration', description: 'Visual leave calendar', icon: Calendar },
-      ]
+        { name: 'Leave Requests', description: 'Easy submission and tracking' },
+        { name: 'Approval Workflows', description: 'Multi-level approval process' },
+        { name: 'Leave Balance', description: 'Real-time balance tracking' },
+        { name: 'Calendar Integration', description: 'Visual leave calendar' },
+      ],
     },
     {
       category: 'Compensation & Payroll',
       description: 'Accurate payroll processing',
       icon: DollarSign,
       features: [
-        { name: 'Payroll Processing', description: 'Automated payroll calculations', icon: DollarSign },
-        { name: 'Pay Slips', description: 'Digital payslip generation', icon: FileText },
-        { name: 'Salary Grades', description: 'Manage pay grades and scales', icon: Award },
-        { name: 'Bonus Management', description: 'Track and process bonuses', icon: Gift },
-      ]
+        { name: 'Payroll Processing', description: 'Automated payroll calculations' },
+        { name: 'Pay Slips', description: 'Digital payslip generation' },
+        { name: 'Salary Grades', description: 'Manage pay grades and scales' },
+        { name: 'Bonus Management', description: 'Track and process bonuses' },
+      ],
     },
     {
       category: 'Performance Management',
       description: 'Drive employee performance',
       icon: Trophy,
       features: [
-        { name: 'Performance Reviews', description: 'Structured review process', icon: Trophy },
-        { name: 'Goal Setting', description: 'Set and track employee goals', icon: Target },
-        { name: '360° Feedback', description: 'Comprehensive feedback system', icon: MessageSquare },
-        { name: 'Performance Analytics', description: 'Track performance trends', icon: BarChart3 },
-      ]
+        { name: 'Performance Reviews', description: 'Structured review process' },
+        { name: 'Goal Setting', description: 'Set and track employee goals' },
+        { name: '360° Feedback', description: 'Comprehensive feedback system' },
+        { name: 'Performance Analytics', description: 'Track performance trends' },
+      ],
     },
     {
       category: 'Recruitment & Onboarding',
       description: 'Hire and onboard efficiently',
       icon: UserCheck,
       features: [
-        { name: 'Applicant Tracking', description: 'Manage job applications', icon: UserCheck },
-        { name: 'Interview Scheduling', description: 'Coordinate interviews seamlessly', icon: Calendar },
-        { name: 'Onboarding Workflows', description: 'Automated onboarding process', icon: CheckCircle2 },
-        { name: 'Document Collection', description: 'Digital document submission', icon: FileText },
-      ]
+        { name: 'Applicant Tracking', description: 'Manage job applications' },
+        { name: 'Interview Scheduling', description: 'Coordinate interviews seamlessly' },
+        { name: 'Onboarding Workflows', description: 'Automated onboarding process' },
+        { name: 'Document Collection', description: 'Digital document submission' },
+      ],
     },
     {
       category: 'Learning & Development',
       description: 'Invest in employee growth',
       icon: BookOpen,
       features: [
-        { name: 'Training Programs', description: 'Manage training initiatives', icon: BookOpen },
-        { name: 'Certification Tracking', description: 'Track employee certifications', icon: Award },
-        { name: 'Course Management', description: 'Create and assign courses', icon: BookOpen },
-        { name: 'Skill Development', description: 'Track skill development', icon: Target },
-      ]
+        { name: 'Training Programs', description: 'Manage training initiatives' },
+        { name: 'Certification Tracking', description: 'Track employee certifications' },
+        { name: 'Course Management', description: 'Create and assign courses' },
+        { name: 'Skill Development', description: 'Track skill development' },
+      ],
     },
     {
       category: 'Communication',
       description: 'Keep your team connected',
       icon: MessageSquare,
       features: [
-        { name: 'Announcements', description: 'Company-wide announcements', icon: Bell },
-        { name: 'Team Messaging', description: 'Internal communication', icon: MessageSquare },
-        { name: 'Notifications', description: 'Real-time alerts and updates', icon: Bell },
-        { name: 'Employee Directory', description: 'Searchable employee directory', icon: Users },
-      ]
+        { name: 'Announcements', description: 'Company-wide announcements' },
+        { name: 'Team Messaging', description: 'Internal communication' },
+        { name: 'Notifications', description: 'Real-time alerts and updates' },
+        { name: 'Employee Directory', description: 'Searchable employee directory' },
+      ],
     },
     {
       category: 'Analytics & Reporting',
       description: 'Data-driven insights',
       icon: BarChart3,
       features: [
-        { name: 'HR Dashboards', description: 'Visual analytics dashboards', icon: BarChart3 },
-        { name: 'Custom Reports', description: 'Build custom reports', icon: FileText },
-        { name: 'Workforce Analytics', description: 'Comprehensive workforce insights', icon: Users },
-        { name: 'Export Capabilities', description: 'Export data in multiple formats', icon: FileText },
-      ]
+        { name: 'HR Dashboards', description: 'Visual analytics dashboards' },
+        { name: 'Custom Reports', description: 'Build custom reports' },
+        { name: 'Workforce Analytics', description: 'Comprehensive workforce insights' },
+        { name: 'Export Capabilities', description: 'Export data in multiple formats' },
+      ],
     },
     {
       category: 'Security & Compliance',
       description: 'Enterprise-grade protection',
       icon: Shield,
       features: [
-        { name: '2FA Authentication', description: 'Two-factor authentication', icon: Shield },
-        { name: 'Audit Logs', description: 'Complete activity tracking', icon: FileText },
-        { name: 'Data Encryption', description: 'Bank-level encryption', icon: Shield },
-        { name: 'Row Level Security', description: 'Multi-tenant data isolation', icon: Shield },
-      ]
+        { name: '2FA Authentication', description: 'Two-factor authentication' },
+        { name: 'Audit Logs', description: 'Complete activity tracking' },
+        { name: 'Data Encryption', description: 'Bank-level encryption' },
+        { name: 'Row Level Security', description: 'Multi-tenant data isolation' },
+      ],
     },
     {
       category: 'System Administration',
       description: 'Configure and customize',
       icon: Settings,
       features: [
-        { name: 'Custom Branding', description: 'White-label customization', icon: Settings },
-        { name: 'User Management', description: 'Manage users and permissions', icon: Users },
-        { name: 'Integration Settings', description: 'Configure integrations', icon: Globe },
-        { name: 'Backup & Restore', description: 'Data backup and recovery', icon: Shield },
-      ]
+        { name: 'Custom Branding', description: 'White-label customization' },
+        { name: 'User Management', description: 'Manage users and permissions' },
+        { name: 'Integration Settings', description: 'Configure integrations' },
+        { name: 'Backup & Restore', description: 'Data backup and recovery' },
+      ],
     },
   ];
 
+  const stats = [
+    { label: 'Features', value: '100+' },
+    { label: 'HR Modules', value: '11' },
+    { label: 'Access Tiers', value: '4' },
+    { label: 'Uptime', value: '99.9%' },
+  ];
+
+  const platformStats = [
+    { label: '11 Modules', sub: 'End-to-end HR coverage', color: 'text-blue-600' },
+    { label: '100+ Features', sub: 'Built for every use case', color: 'text-purple-600' },
+    { label: '4-Tier Access', sub: 'Role-based permissions', color: 'text-orange-600' },
+    { label: '99.9% Uptime', sub: 'Enterprise reliability', color: 'text-green-600' },
+  ];
+
   return (
-    <div className="min-h-screen public-page-bg">
-      {/* Navigation */}
-      <SharedNavigation />
+    <div className="min-h-screen public-page-bg overflow-x-hidden">
+      <PublicNavbar />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Background Image */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.pexels.com/photos/1181400/pexels-photo-1181400.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080"
-            alt=""
-            className="w-full h-full object-cover"
-          />
-          {/* Dark overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+      {/* ── HERO ── */}
+      <section className="relative overflow-hidden pt-16 pb-24 md:pt-24 md:pb-32">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full opacity-[0.04] blur-3xl" style={{ background: '#7C5A1A' }} />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full opacity-[0.03] blur-3xl" style={{ background: '#444' }} />
         </div>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            <motion.div initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }} className="space-y-7">
+              <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 backdrop-blur px-4 py-1.5 shadow-sm">
+                <Zap className="w-4 h-4 text-primary" />
+                <span className="text-xs font-semibold text-gray-700 tracking-wide">Platform Features</span>
+              </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight text-mint-black">
+                Powerful Features<br />
+                <span className="relative">
+                  for Modern HR
+                  <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-black/20 rounded-full" />
+                </span>
+              </h1>
+              <p className="text-lg text-gray-600 max-w-lg leading-relaxed">
+                Everything you need to manage your workforce efficiently. From employee management to advanced analytics, all in one platform.
+              </p>
+              <div className="flex flex-wrap gap-3 pt-1">
+                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-primary text-white hover:bg-primary/90 text-base px-7 shadow-md font-semibold">
+                  Start Free Trial
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-black/20 bg-white text-gray-800 hover:bg-gray-50 text-base px-7 font-semibold">
+                  View Pricing
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-5 pt-2 text-xs text-gray-500 font-medium">
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> No credit card needed</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> 14-day free trial</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Cancel anytime</span>
+              </div>
+            </motion.div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 relative z-10">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">
-              Powerful Features for Modern HR
-            </h1>
-            <p className="text-xl text-gray-200 mb-8">
-              Everything you need to manage your workforce efficiently. From employee management to advanced analytics, all in one platform.
-            </p>
-            <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
-              Start Free Trial
-            </Button>
+            {/* Platform Features Visual Panel */}
+            <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.65, delay: 0.15, ease: [0.22, 1, 0.36, 1] }} className="flex justify-center lg:justify-end">
+              <div className="w-full max-w-[420px] rounded-2xl border border-black/10 shadow-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.97)' }}>
+                <div className="px-5 py-4 border-b border-black/8 flex items-center justify-between" style={{ background: '#7C5A1A' }}>
+                  <span className="text-xs font-bold text-white/80">Platform Overview</span>
+                  <span className="text-xs text-white/60">hr.blumebyte.com</span>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {platformStats.map(({ label, sub, color }, i) => (
+                      <div key={i} className="rounded-xl bg-gray-50 p-3">
+                        <div className={`text-lg font-black ${color}`}>{label}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-xl border border-black/8 p-3">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">Module Coverage</div>
+                    <div className="space-y-1.5">
+                      {['People & Payroll', 'Time & Leave', 'Performance', 'Recruitment'].map((m, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                          <span className="text-xs text-gray-600">{m}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="space-y-20">
-          {featureCategories.map((category, idx) => (
-            <div key={idx}>
-              <div className="flex items-center gap-4 mb-8">
-                <div className="h-12 w-12 rounded-lg bg-black flex items-center justify-center">
-                  <category.icon className="h-6 w-6 text-white" />
+      {/* ── STATS ── */}
+      <section className="section-mint py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {stats.map(({ label, value }, i) => (
+              <FadeSection key={i} delay={i * 0.08} className="text-center">
+                <div className="text-3xl md:text-4xl font-black text-mint-black mb-2">{value}</div>
+                <p className="text-sm text-gray-500 font-medium">{label}</p>
+              </FadeSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FEATURE CATEGORIES ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <FadeSection className="text-center mb-14">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">All Modules</span>
+          <h2 className="text-3xl md:text-4xl font-bold mt-3 mb-4 text-mint-black">Every HR tool you need, in one platform</h2>
+          <p className="text-lg text-gray-500 max-w-2xl mx-auto">Eleven modules covering the full employee lifecycle — from hire to retire.</p>
+        </FadeSection>
+        <div className="grid md:grid-cols-2 gap-6">
+          {featureCategories.map((cat, i) => (
+            <FadeSection key={i} delay={(i % 4) * 0.07}>
+              <div className="group rounded-2xl border border-black/8 p-6 bg-white/85 hover:shadow-xl hover:border-black/15 hover:-translate-y-1 transition-all duration-300 h-full">
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                    <cat.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-mint-black text-lg">{cat.category}</h3>
+                    <p className="text-sm text-gray-500">{cat.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-black">{category.category}</h2>
-                  <p className="text-gray-600">{category.description}</p>
-                </div>
+                <ul className="space-y-2">
+                  {cat.features.map((f, fi) => (
+                    <li key={fi} className="flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-sm font-semibold text-gray-800">{f.name}</span>
+                        <span className="text-xs text-gray-500 ml-1.5">— {f.description}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {category.features.map((feature, featureIdx) => (
-                  <Card key={featureIdx} className="glass-public hover-lift border-gray-200 hover:border-black transition-all">
-                    <CardHeader>
-                      <feature.icon className="h-8 w-8 text-black mb-3" />
-                      <CardTitle className="text-lg">{feature.name}</CardTitle>
-                      <CardDescription>{feature.description}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </div>
-            </div>
+            </FadeSection>
           ))}
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="bg-black text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold mb-4">See All Features in Action</h2>
-          <p className="text-lg text-gray-300 mb-8">
-            Get started with Blumebyte today and transform your HR operations
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
-              Start Free Trial
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white bg-transparent text-white hover:bg-white hover:text-black">
-              View Pricing
-            </Button>
+      {/* ── CTA ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <FadeSection>
+          <div className="relative overflow-hidden rounded-3xl bg-primary shadow-2xl px-8 py-16 md:py-20 text-center">
+            <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 60% 0%, rgba(255,255,255,0.05) 0%, transparent 60%)' }} />
+            <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10 blur-3xl" style={{ background: '#fff', transform: 'translate(30%, -30%)' }} />
+            <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full opacity-5 blur-3xl" style={{ background: '#fff', transform: 'translate(-30%, 30%)' }} />
+            <div className="relative z-10 space-y-6">
+              <h2 className="text-3xl md:text-5xl font-black text-white leading-tight">See all features in action</h2>
+              <p className="text-lg text-white/70 max-w-xl mx-auto">Get started with Blumebyte today and transform your HR operations with 100+ powerful features.</p>
+              <div className="flex flex-wrap gap-4 justify-center pt-2">
+                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-bold">Start Free Trial</Button>
+                <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white/30 bg-transparent text-white hover:bg-white/10 text-base px-8 font-semibold">View Pricing</Button>
+              </div>
+              <p className="text-xs text-white/40 pt-1">No credit card required · 14-day free trial · Cancel anytime</p>
+            </div>
           </div>
-        </div>
+        </FadeSection>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-white py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-gray-600">© 2026 Blumebyte. All rights reserved.</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

@@ -379,6 +379,10 @@ export const router = createBrowserRouter([
         element: <Navigate to="/developer" replace />,
       },
       {
+        path: '/ultimateadmin',
+        element: <Navigate to="/developer" replace />,
+      },
+      {
         path: '/developer',
         Component: DeveloperPage,
       },

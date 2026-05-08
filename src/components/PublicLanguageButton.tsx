@@ -59,7 +59,7 @@ export function PublicLanguageButton() {
       <button
         onMouseEnter={() => setOpen(true)}
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-2 px-3 py-2 rounded-full bg-black text-white shadow-lg hover:bg-gray-800 transition-colors text-sm font-semibold select-none"
+        className="flex items-center gap-2 px-3 py-2 rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors text-sm font-semibold select-none"
         aria-label="Change language"
       >
         <Globe className="w-4 h-4" />
