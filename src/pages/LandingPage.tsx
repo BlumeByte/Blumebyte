@@ -66,7 +66,7 @@ function DashboardMockup() {
             <div className="w-3 h-3 rounded-full bg-green-400" />
           </div>
           <div className="flex-1 mx-3 h-5 rounded bg-white/15 flex items-center px-2">
-            <span className="text-[10px] text-white/60">app.blumebyte.com/dashboard</span>
+            <span className="text-[10px] text-white/60">hr.blumebyte.com/dashboard</span>
           </div>
         </div>
 
