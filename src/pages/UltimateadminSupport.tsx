@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { api } from '../lib/api-client';
-import { supabase } from '../lib/supabase-client';
+import { useAuth } from '../lib/auth-context';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -43,10 +43,6 @@ const ISSUE_TYPES = ['general', 'billing', 'license', 'technical', 'data', 'acco
 // ─── Session helpers ───────────────────────────────────────────────────────────
 function setSupportSession() { sessionStorage.setItem('ultimateadmin_support_session', '1'); }
 function clearSupportSession() { sessionStorage.removeItem('ultimateadmin_support_session'); }
-async function getSupportToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data?.session?.access_token ?? null;
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Tenant {
@@ -80,26 +76,33 @@ interface AuditLog {
 // ─── Root Component ────────────────────────────────────────────────────────────
 export default function CustomerCareDashboard() {
   const navigate = useNavigate();
+  const { user, sessionLoading, getToken, logout } = useAuth();
   // tri-state: null = verifying, true = authenticated, false = unauthenticated
   const [authState, setAuthState] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Always check the current Supabase session first so that an already-authenticated
-    // ultimateadmin user is routed straight to the dashboard without seeing a login form.
-    getSupportToken().then(async (t) => {
-      if (!t) { clearSupportSession(); setAuthState(false); return; }
-      try {
-        const result = await api('/ultimateadmin/support/verify', { token: t });
-        if (result?.allowed) { setSupportSession(); setToken(t); setAuthState(true); }
-        else { clearSupportSession(); setAuthState(false); }
-      } catch { clearSupportSession(); setAuthState(false); }
+    if (sessionLoading) return;
+    if (!user || (user.role !== 'developer' && user.role !== 'ultimateadmin')) {
+      clearSupportSession();
+      setAuthState(false);
+      return;
+    }
+    getToken().then((t) => {
+      if (!t) {
+        clearSupportSession();
+        setAuthState(false);
+        return;
+      }
+      setSupportSession();
+      setToken(t);
+      setAuthState(true);
     });
-  }, []);
+  }, [sessionLoading, user, getToken]);
 
   const handleLogout = async () => {
     clearSupportSession();
-    await supabase.auth.signOut();
+    await logout();
     navigate('/login');
   };
 
@@ -1011,5 +1014,3 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
     </div>
   );
 }
-
-
