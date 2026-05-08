@@ -11491,7 +11491,9 @@ async function isTenantAssignedToCareAgent(agentId: string, tenantId: string) {
 }
 
 async function getSupportTicketById(ticketId: string) {
-  return (await kv.get(`support_tickets:${ticketId}`)) || (await kv.get(`support-ticket:${ticketId}`));
+  const ticket = await kv.get(`support_tickets:${ticketId}`);
+  if (ticket) return ticket;
+  return await kv.get(`support-ticket:${ticketId}`);
 }
 
 async function saveSupportTicket(ticket: any) {

@@ -40,6 +40,7 @@ import HiringsPage from './pages/HiringsPage';
 import HiringDetailPage from './pages/HiringDetailPage';
 import DeveloperDashboard from './pages/UltimateadminSupport';
 import CustomerCareDashboard from './pages/CareDashboard';
+import { CUSTOMER_CARE_ROLES } from './lib/role-utils';
 
 // Retry helper for lazy imports: on network failure, bust the cache and retry once.
 function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>): React.LazyExoticComponent<T> {
@@ -202,7 +203,7 @@ const DeveloperPage = () => (
 );
 
 const CustomerCarePage = () => (
-  <ProtectedRoute allowedRoles={['customer_care', 'customer-care', 'customer_care_agent', 'care', 'support']}>
+  <ProtectedRoute allowedRoles={[...CUSTOMER_CARE_ROLES]}>
     <CustomerCareDashboardWrapper />
   </ProtectedRoute>
 );

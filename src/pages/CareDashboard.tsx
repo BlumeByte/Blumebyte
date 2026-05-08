@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { supabase } from '../lib/supabase-client';
+import { isCustomerCareRole } from '../lib/role-utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Tenant {
@@ -40,86 +41,9 @@ interface TenantUser {
   companyId?: string;
 }
 
-// ─── Care Auth Context ────────────────────────────────────────────────────────
-// Store only a flag (not the token itself) to indicate care session is active.
-// The actual token is always fetched fresh from Supabase on each request.
-function isCareSessionActive(): boolean {
-  return sessionStorage.getItem('care_session') === '1';
-}
-function setCareSession() {
-  sessionStorage.setItem('care_session', '1');
-}
-function clearCareSession() {
-  sessionStorage.removeItem('care_session');
-}
-
 async function getCareToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data?.session?.access_token ?? null;
-}
-
-// ─── Login Screen ─────────────────────────────────────────────────────────────
-function CareDashboardLogin({ onLogin }: { onLogin: () => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      // Verify this account is a developer/care role
-      const token = data.session?.access_token;
-      if (!token) throw new Error('No session token');
-
-      // Check role via API
-      const profileRes = await api('/care/verify-access', { token });
-      if (!profileRes?.allowed) {
-        await supabase.auth.signOut();
-        throw new Error('This account does not have customer care access.');
-      }
-
-      setCareSession();
-      onLogin();
-    } catch (e: any) {
-      toast.error(e.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center space-y-2">
-          <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center mx-auto">
-            <Shield className="h-6 w-6 text-white" />
-          </div>
-          <CardTitle>Customer Care Portal</CardTitle>
-          <p className="text-xs text-gray-500">Blumebyte Internal Access Only</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-            <Button type="submit" disabled={loading} className="w-full bg-black text-white hover:bg-gray-800">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
-              Sign In
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
 }
 
 // ─── Tenant Row ───────────────────────────────────────────────────────────────
@@ -203,7 +127,7 @@ export default function CareDashboard() {
       const p = await api('/care/profile', { token });
       setCareProfile(p);
       const role = p?.role || '';
-      const allowed = role === 'developer' || role === 'customer_care' || role === 'customer-care' || role === 'customer_care_agent' || role === 'care' || role === 'support';
+      const allowed = role === 'developer' || isCustomerCareRole(role);
       setAuthenticated(allowed);
     } catch {
       await supabase.auth.signOut();

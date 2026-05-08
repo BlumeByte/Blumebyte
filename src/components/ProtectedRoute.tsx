@@ -3,17 +3,12 @@ import { Navigate } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 import { Loader2 } from 'lucide-react';
 import { ForcePasswordChange } from './ForcePasswordChange';
+import { getRoleDashboardPath } from '../lib/role-utils';
 // Subscription enforcement temporarily deactivated
 // import { SubscriptionEnforcement } from './SubscriptionEnforcement';
 
 export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) {
   const { user, sessionLoading } = useAuth();
-  const normalizeRolePath = (role: string) => {
-    if (role === 'customer_care' || role === 'customer_care_agent' || role === 'care' || role === 'support') return '/customer-care';
-    if (role === 'customer-care') return '/customer-care';
-    if (role === 'ultimateadmin') return '/developer';
-    return `/${role}`;
-  };
 
   if (sessionLoading) {
     return (
@@ -29,7 +24,7 @@ export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: strin
   if (!user) return <Navigate to="/login" replace />;
 
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to={normalizeRolePath(user.role)} replace />;
+    return <Navigate to={getRoleDashboardPath(user.role)} replace />;
   }
 
   // Force password change on first login (admin-created accounts)
