@@ -157,7 +157,7 @@ export function TechSliders3D() {
       title: 'Time Efficiency',
       description: 'Automated time tracking',
       icon: Clock,
-      color: 'bg-black',
+      color: 'bg-primary',
       value: 92,
     },
     {
@@ -189,7 +189,7 @@ export function TechSliders3D() {
       title: 'Goal Achievement',
       description: 'OKRs & targets tracking',
       icon: Target,
-      color: 'bg-black',
+      color: 'bg-primary',
       value: 82,
     },
     {
@@ -244,7 +244,7 @@ export function TechSliders3D() {
             transition={{ duration: 0.5, type: 'spring' }}
             className="inline-block mb-4"
           >
-            <div className="px-6 py-2 bg-black rounded-full text-white font-semibold text-sm shadow-lg">
+            <div className="px-6 py-2 bg-primary rounded-full text-white font-semibold text-sm shadow-lg">
               Interactive HR Metrics
             </div>
           </motion.div>
@@ -294,7 +294,7 @@ export function TechSliders3D() {
             whileTap={{ scale: 0.95 }}
             className="inline-block"
           >
-            <button className="px-8 py-4 bg-black text-white font-semibold rounded-xl shadow-lg hover:bg-gray-800 transition-all duration-300" onClick={() => navigate('/features')}>
+            <button className="px-8 py-4 bg-primary text-white font-semibold rounded-xl shadow-lg hover:bg-primary/90 transition-all duration-300" onClick={() => navigate('/features')}>
               Explore All Features →
             </button>
           </motion.div>

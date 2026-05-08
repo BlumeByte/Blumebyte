@@ -148,7 +148,7 @@ export default function ResourcesPage() {
               onClick={openYouTube}
             >
               <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-black flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <resource.icon className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle>{resource.title}</CardTitle>
@@ -163,7 +163,7 @@ export default function ResourcesPage() {
                     </li>
                   ))}
                 </ul>
-                <Button onClick={openYouTube} variant="outline" className="w-full group-hover:bg-black group-hover:text-white transition-colors">
+                <Button onClick={openYouTube} variant="outline" className="w-full group-hover:bg-primary group-hover:text-white transition-colors">
                   <Play className="mr-2 h-4 w-4" />
                   {resource.action}
                 </Button>
@@ -208,7 +208,7 @@ export default function ResourcesPage() {
       </section>
 
       {/* Newsletter Section */}
-      <section className="bg-black text-white py-20">
+      <section className="bg-primary text-primary-foreground py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold mb-4">Stay Updated with HR Insights</h2>
           <p className="text-lg text-gray-300 mb-8">

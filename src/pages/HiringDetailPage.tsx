@@ -164,7 +164,7 @@ export default function HiringDetailPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
             {/* Header */}
             <div className="flex items-start gap-4 mb-6">
-              <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center shrink-0">
+              <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shrink-0">
                 <Building2 className="h-7 w-7 text-white" />
               </div>
               <div>
@@ -212,7 +212,7 @@ export default function HiringDetailPage() {
             <div className="border-t pt-6 mt-6">
               <Button
                 size="lg"
-                className="w-full sm:w-auto bg-black text-white hover:bg-gray-800"
+                className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={() => setApplyOpen(true)}
               >
                 Apply for this position
@@ -237,7 +237,7 @@ export default function HiringDetailPage() {
               </div>
               <h3 className="text-lg font-semibold">Application submitted successfully!</h3>
               <p className="text-sm text-gray-500">You will be contacted if selected.</p>
-              <Button onClick={() => { setApplyOpen(false); setSubmitted(false); }} className="bg-black text-white hover:bg-gray-800">Close</Button>
+              <Button onClick={() => { setApplyOpen(false); setSubmitted(false); }} className="bg-primary text-primary-foreground hover:bg-primary/90">Close</Button>
             </div>
           ) : submitting ? (
             <div className="flex flex-col items-center gap-3 py-10">
@@ -273,7 +273,7 @@ export default function HiringDetailPage() {
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setApplyOpen(false)}>Cancel</Button>
-                <Button onClick={handleSubmit} className="bg-black text-white hover:bg-gray-800">
+                <Button onClick={handleSubmit} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   Submit Application
                 </Button>
               </DialogFooter>

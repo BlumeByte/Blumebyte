@@ -172,7 +172,7 @@ export default function FeaturesPage() {
           {featureCategories.map((category, idx) => (
             <div key={idx}>
               <div className="flex items-center gap-4 mb-8">
-                <div className="h-12 w-12 rounded-lg bg-black flex items-center justify-center">
+                <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
                   <category.icon className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -197,7 +197,7 @@ export default function FeaturesPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-black text-white py-20">
+      <section className="bg-primary text-primary-foreground py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold mb-4">See All Features in Action</h2>
           <p className="text-lg text-gray-300 mb-8">

@@ -120,7 +120,7 @@ export default function PlatformOverview() {
           {modules.map((module, index) => (
             <Card key={index} className="glass-public hover-lift border-gray-200 hover:border-black transition-all hover:shadow-lg">
               <CardHeader>
-                <div className="h-12 w-12 rounded-lg bg-black flex items-center justify-center mb-4">
+                <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center mb-4">
                   <module.icon className="h-6 w-6 text-white" />
                 </div>
                 <CardTitle className="text-xl">{module.title}</CardTitle>
@@ -184,7 +184,7 @@ export default function PlatformOverview() {
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <Card className="bg-black text-white border-0">
+        <Card className="bg-primary text-primary-foreground border-0">
           <CardContent className="p-12 text-center">
             <h2 className="text-3xl font-bold mb-4">Ready to get started?</h2>
             <p className="text-lg text-gray-300 mb-8 max-w-2xl mx-auto">

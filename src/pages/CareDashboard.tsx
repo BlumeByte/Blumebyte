@@ -331,7 +331,7 @@ export default function CareDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-black text-white">
+      <div className="bg-primary text-primary-foreground">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
@@ -642,7 +642,7 @@ export default function CareDashboard() {
             ) : (
               ticketComments.map((c: any) => (
                 <div key={c.id} className={`flex ${c.authorRole === 'customer_care' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`rounded-lg px-3 py-2 max-w-[80%] text-sm ${c.authorRole === 'customer_care' ? 'bg-black text-white' : 'bg-white border text-gray-800'}`}>
+                  <div className={`rounded-lg px-3 py-2 max-w-[80%] text-sm ${c.authorRole === 'customer_care' ? 'bg-primary text-primary-foreground' : 'bg-white border text-gray-800'}`}>
                     <p className="text-xs opacity-60 mb-0.5">{c.authorEmail}</p>
                     <p>{c.comment}</p>
                     <p className="text-xs opacity-40 mt-0.5 text-right">{c.createdAt ? new Date(c.createdAt).toLocaleTimeString() : ''}</p>
@@ -663,7 +663,7 @@ export default function CareDashboard() {
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendComment(); } }}
               />
               <Button
-                className="self-end bg-black text-white hover:bg-gray-800"
+                className="self-end bg-primary text-primary-foreground hover:bg-primary/90"
                 size="sm"
                 onClick={handleSendComment}
                 disabled={sendingComment || !newComment.trim()}
@@ -756,7 +756,7 @@ export default function CareDashboard() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setResetDialogOpen(false); setResetLinkResult(null); }}>Close</Button>
             {!resetLinkResult && (
-              <Button onClick={doPasswordReset} className="bg-black text-white hover:bg-gray-800">
+              <Button onClick={doPasswordReset} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <KeyRound className="h-4 w-4 mr-2" /> Generate Reset Link
               </Button>
             )}

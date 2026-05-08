@@ -59,7 +59,7 @@ function DashboardMockup() {
         style={{ background: 'rgba(255,255,255,0.97)' }}
       >
         {/* Mockup header bar */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-black/8" style={{ background: '#111' }}>
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-black/8" style={{ background: '#7C5A1A' }}>
           <div className="flex gap-1.5">
             <div className="w-3 h-3 rounded-full bg-red-400" />
             <div className="w-3 h-3 rounded-full bg-yellow-400" />
@@ -73,7 +73,7 @@ function DashboardMockup() {
         <div className="flex" style={{ minHeight: 320 }}>
           {/* Sidebar */}
           <div className="w-14 border-r border-black/8 flex flex-col items-center py-4 gap-3" style={{ background: '#fafafa' }}>
-            <div className="w-7 h-7 rounded-lg bg-black flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
               <div className="w-3 h-3 rounded-sm bg-white" />
             </div>
             {[Users, Clock, DollarSign, BarChart3, FileText].map((Icon, i) => (
@@ -98,7 +98,7 @@ function DashboardMockup() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 + i * 0.1, duration: 0.4 }}
                   className="rounded-xl p-2.5 border border-black/8"
-                  style={{ background: i === 0 ? '#111' : '#fafafa' }}
+                  style={{ background: i === 0 ? '#7C5A1A' : '#fafafa' }}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className={`text-[10px] font-medium ${i === 0 ? 'text-white/70' : 'text-gray-500'}`}>{label}</span>
@@ -120,7 +120,7 @@ function DashboardMockup() {
                 <polyline
                   points="0,38 30,30 60,32 90,20 120,18 150,10 180,8"
                   fill="none"
-                  stroke="#111"
+                  stroke="#7C5A1A"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -132,8 +132,8 @@ function DashboardMockup() {
                 />
                 <defs>
                   <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#111" stopOpacity="0.12" />
-                    <stop offset="100%" stopColor="#111" stopOpacity="0" />
+                    <stop offset="0%" stopColor="#7C5A1A" stopOpacity="0.12" />
+                    <stop offset="100%" stopColor="#7C5A1A" stopOpacity="0" />
                   </linearGradient>
                 </defs>
               </svg>
@@ -147,7 +147,7 @@ function DashboardMockup() {
               {[
                 { name: 'Sarah K.', action: 'Leave Approved', time: '2m ago', color: '#16a34a' },
                 { name: 'James O.', action: 'Payslip Generated', time: '1h ago', color: '#2563eb' },
-                { name: 'Amara D.', action: 'Clocked In', time: '3h ago', color: '#111' },
+                { name: 'Amara D.', action: 'Clocked In', time: '3h ago', color: '#7C5A1A' },
               ].map((row, i) => (
                 <motion.div
                   key={i}
@@ -396,7 +396,7 @@ export default function LandingPage() {
       <section className="relative overflow-hidden pt-16 pb-24 md:pt-24 md:pb-32">
         {/* Background orbs */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full opacity-[0.04] blur-3xl" style={{ background: '#111' }} />
+          <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full opacity-[0.04] blur-3xl" style={{ background: '#7C5A1A' }} />
           <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full opacity-[0.03] blur-3xl" style={{ background: '#444' }} />
         </div>
 
@@ -490,7 +490,7 @@ export default function LandingPage() {
           {benefitCards.map((card, i) => (
             <FadeSection key={i} delay={i * 0.08}>
               <div className="group rounded-2xl border border-black/8 p-6 bg-white/85 hover:shadow-xl hover:border-black/15 hover:-translate-y-1 transition-all duration-300 h-full">
-                <div className="w-11 h-11 rounded-xl bg-black flex items-center justify-center mb-5 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center mb-5 shadow-sm group-hover:scale-110 transition-transform duration-300">
                   <card.icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="font-bold text-mint-black mb-2">{card.title}</h3>
@@ -540,7 +540,7 @@ export default function LandingPage() {
             >
               <div className={`group rounded-2xl border border-black/8 bg-white/85 hover:shadow-lg hover:border-black/15 hover:-translate-y-0.5 transition-all duration-300 p-6 ${feat.size === 'large' ? 'min-h-[160px]' : 'min-h-[130px]'}`}>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-black/5 flex items-center justify-center shrink-0 group-hover:bg-black group-hover:scale-105 transition-all duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-black/5 flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:scale-105 transition-all duration-300">
                     <feat.icon className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors duration-300" />
                   </div>
                   <div>
@@ -608,7 +608,7 @@ export default function LandingPage() {
                   </div>
                   <p className="text-sm text-gray-700 leading-relaxed flex-1 mb-5">"{t.quote}"</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-black flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
                       {t.name.split(' ').map(n => n[0]).join('')}
                     </div>
                     <div>
@@ -628,7 +628,7 @@ export default function LandingPage() {
                 key={i}
                 aria-label={`View testimonial ${i + 1}`}
                 onClick={() => setTestimonialIdx(i)}
-                className={`h-1.5 rounded-full transition-all duration-300 ${i === testimonialIdx ? 'w-6 bg-black' : 'w-3 bg-black/20'}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${i === testimonialIdx ? 'w-6 bg-primary' : 'w-3 bg-black/20'}`}
               />
             ))}
           </div>
@@ -649,7 +649,7 @@ export default function LandingPage() {
             <span className={`text-sm font-medium ${!billingAnnual ? 'text-mint-black' : 'text-gray-400'}`}>Monthly</span>
             <button
               onClick={() => setBillingAnnual(v => !v)}
-              className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${billingAnnual ? 'bg-black' : 'bg-gray-300'}`}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${billingAnnual ? 'bg-primary' : 'bg-gray-300'}`}
             >
               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300 ${billingAnnual ? 'left-7' : 'left-1'}`} />
             </button>

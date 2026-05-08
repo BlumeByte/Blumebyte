@@ -130,7 +130,7 @@ export default function HRDataReportingPage() {
                     <span className="text-sm font-bold text-black">8.5%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-black h-2 rounded-full" style={{ width: '8.5%' }}></div>
+                    <div className="bg-primary h-2 rounded-full" style={{ width: '8.5%' }}></div>
                   </div>
                 </div>
                 <div>
@@ -139,7 +139,7 @@ export default function HRDataReportingPage() {
                     <span className="text-sm font-bold text-black">21 days</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-black h-2 rounded-full" style={{ width: '60%' }}></div>
+                    <div className="bg-primary h-2 rounded-full" style={{ width: '60%' }}></div>
                   </div>
                 </div>
                 <div>
@@ -148,7 +148,7 @@ export default function HRDataReportingPage() {
                     <span className="text-sm font-bold text-black">87%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-black h-2 rounded-full" style={{ width: '87%' }}></div>
+                    <div className="bg-primary h-2 rounded-full" style={{ width: '87%' }}></div>
                   </div>
                 </div>
               </div>
@@ -158,7 +158,7 @@ export default function HRDataReportingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-black text-white py-20">
+      <section className="bg-primary text-primary-foreground py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold mb-4">
             Ready to unlock your HR data?

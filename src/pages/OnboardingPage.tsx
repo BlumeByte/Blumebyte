@@ -64,7 +64,7 @@ export default function OnboardingPage() {
           ))}
         </div>
       </section>
-      <section className="bg-black text-white py-20">
+      <section className="bg-primary text-primary-foreground py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to improve your onboarding?</h2>
           <p className="text-lg text-gray-300 mb-8">Create great first impressions for every new hire</p>

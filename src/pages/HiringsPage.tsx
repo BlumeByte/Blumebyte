@@ -237,7 +237,7 @@ function ApplyModal({
               Thank you for applying to <strong>{job?.roleTitle || 'Untitled Role'}</strong> at <strong>{job?.companyName || 'Hiring Organization'}</strong>.
               You will be contacted if selected.
             </p>
-            <Button onClick={onClose} className="bg-black text-white hover:bg-gray-800">Close</Button>
+            <Button onClick={onClose} className="bg-primary text-primary-foreground hover:bg-primary/90">Close</Button>
           </div>
         ) : (
           <>
@@ -261,7 +261,7 @@ function ApplyModal({
             {!submitting && (
               <DialogFooter>
                 <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                <Button onClick={handleSubmit} className="bg-black text-white hover:bg-gray-800">
+                <Button onClick={handleSubmit} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   Submit Application
                 </Button>
               </DialogFooter>
@@ -288,7 +288,7 @@ function JobCard({
   const status = job.status || 'open';
   const applyButtonClass = applied
     ? 'flex-1 bg-slate-200 text-blue-700 hover:bg-slate-300'
-    : 'flex-1 bg-black text-white hover:bg-gray-800';
+    : 'flex-1 bg-primary text-primary-foreground hover:bg-primary/90';
   return (
     <div className="bg-slate-950 text-slate-200 rounded-2xl border border-slate-700/70 shadow-lg hover:shadow-xl transition-all duration-200 p-5 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
       <div className="flex items-start justify-between gap-3">
