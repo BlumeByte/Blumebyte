@@ -469,15 +469,29 @@ function normalizeEmploymentType(raw: string): string {
 }
 
 // --- Active statuses for public job visibility ---
-const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered']);
-const JOB_PUBLIC_VISIBILITIES = new Set(['public_global', 'public', 'global']);
+const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'published', 'live']);
+const JOB_PUBLIC_VISIBILITIES = new Set([
+  'public_global',
+  'public',
+  'global',
+  'public_job_board',
+  'public_appears_on_job_board',
+]);
 
 function normalizeJobStatus(raw: any): string {
-  return String(raw ?? '').trim().toLowerCase().replace(/[\s-]/g, '_');
+  return String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 }
 
 function normalizeJobVisibility(raw: any): string {
-  return String(raw ?? '').trim().toLowerCase().replace(/[\s-]/g, '_');
+  return String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 }
 
 function escapeHtml(text: string): string {
@@ -508,11 +522,16 @@ function parseEmailList(...values: any[]): string[] {
 
 function isPublicJobPosting(job: any): boolean {
   if (!job || typeof job !== 'object') return false;
-  const status = normalizeJobStatus(job.status);
-  if (!JOB_ACTIVE_STATUSES.has(status)) return false;
   const visibility = normalizeJobVisibility(job.visibilityType);
-  // Backward compatibility: older public jobs may not have visibilityType at all.
-  if (visibility && !JOB_PUBLIC_VISIBILITIES.has(visibility)) return false;
+  // Backward compatibility: older public jobs may not have visibilityType at all,
+  // and some records may store label-like visibility strings.
+  if (visibility) {
+    const looksPublic = JOB_PUBLIC_VISIBILITIES.has(visibility);
+    if (!looksPublic) return false;
+  }
+  const status = normalizeJobStatus(job.status);
+  // Backward compatibility: older public jobs may have missing status.
+  if (status && !JOB_ACTIVE_STATUSES.has(status)) return false;
   return true;
 }
 
