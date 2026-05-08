@@ -11489,6 +11489,34 @@ app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
   }
 });
 
+// POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (ultimateadmin only)
+app.post(`${PREFIX}/ultimateadmin/support/generate-reset-link`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    const { email } = body;
+    if (!email) return c.json({ error: 'email is required' }, 400);
+    const sb = supabaseAdmin();
+    const { data, error } = await sb.auth.admin.generateLink({
+      type: 'recovery',
+      email: email.toLowerCase().trim(),
+    });
+    if (error) return c.json({ error: error.message }, 400);
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'generate_reset_link', targetEmail: email,
+      timestamp: new Date().toISOString(),
+      description: `Password reset link generated for ${email} by ${access.user.email}`,
+    });
+    return c.json({ success: true, email, resetLink: data?.properties?.action_link || null });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // POST /ultimateadmin/support/repair/:tenantId — run quick repair actions
 app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
   try {
