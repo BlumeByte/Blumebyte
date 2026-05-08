@@ -11426,16 +11426,6 @@ app.get(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
       if (emp.status === 'active') t.activeUsers++;
     }
 
-    const tenants = [...tenantMap.entries()].map(([cid, t]) => {
-      const sub = subMap.get(cid);
-      return {
-        ...t,
-        licenseStatus: sub?.status || 'unknown',
-        purchasedLicenses: sub?.purchasedLicenses || 0,
-        plan: sub?.plan || sub?.planName || 'unknown',
-        lastActivity: sub?.updatedAt || t.createdAt || '',
-      };
-    });
 
     // Also include companies with no employees yet
     for (const [cid, company] of companyMap.entries()) {
