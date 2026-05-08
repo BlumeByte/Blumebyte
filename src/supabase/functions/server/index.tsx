@@ -24,19 +24,26 @@ const EMAIL_FROM = configuredEmailFrom.includes('@')
 const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
 // SECURITY: Restrict CORS to known frontend origins only.
-// Falls back to the configured FRONTEND_URL when set, otherwise allows the
-// default Supabase project domain so the platform continues to work out of the box.
+// Falls back to wildcard when no real origins are explicitly configured so the
+// platform continues to work out of the box in development / early deployments.
 const _allowedOrigins = (() => {
   const configured = Deno.env.get('ALLOWED_ORIGINS') || '';
   const frontendUrl = Deno.env.get('FRONTEND_URL') || '';
-  const origins = [
+  // Collect all explicitly configured string origins
+  const stringOrigins: string[] = [
     ...configured.split(',').map(o => o.trim()).filter(Boolean),
-    ...frontendUrl ? [frontendUrl.replace(/\/$/, '')] : [],
-    // Allow Supabase-hosted previews and Vercel deploys by default
+    ...(frontendUrl ? [frontendUrl.replace(/\/$/, '')] : []),
+  ];
+  if (stringOrigins.length === 0) {
+    // No real origins configured — use wildcard so the app still works
+    return '*';
+  }
+  return [
+    ...stringOrigins,
+    // Also allow Supabase-hosted previews and Vercel deploys
     /^https:\/\/.*\.supabase\.co$/,
     /^https:\/\/.*\.vercel\.app$/,
-  ].filter(Boolean);
-  return origins.length > 2 ? origins : '*'; // fall back to wildcard only if no real origins are configured
+  ];
 })();
 
 app.use(
@@ -10745,7 +10752,7 @@ async function sendEmailNotification(
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
-      console.warn('sendEmailNotification: RESEND_API_KEY not configured — skipping email to', recipientEmail.split('@')[1] || '?');
+      console.warn('sendEmailNotification: RESEND_API_KEY not configured — email notification skipped');
       return;
     }
 
