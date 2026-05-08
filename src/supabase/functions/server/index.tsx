@@ -11726,7 +11726,7 @@ app.post(`${PREFIX}/developer/customer-care-agents`, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const body = await c.req.json();
-    if (!body?.email || !body?.name) return c.json({ error: 'name and email are required' }, 400);
+    if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
     const id = body.id || body.userId || crypto.randomUUID();
     const agent = {
       id,
@@ -11785,7 +11785,7 @@ app.post(`${PREFIX}/developer/assignments`, async (c) => {
     const tenantIds: string[] = Array.isArray(body?.tenantIds)
       ? body.tenantIds
       : body?.tenantId ? [body.tenantId] : [];
-    if (!careAgentId || tenantIds.length === 0) return c.json({ error: 'careAgentId and tenantIds are required' }, 400);
+    if (!careAgentId || tenantIds.length === 0) return c.json({ error: 'careAgentId and at least one tenantId are required' }, 400);
     const current = await getCareAssignmentsForAgent(careAgentId);
     const merged = [...new Set([...current, ...tenantIds])];
     await kv.set(`care_assignments:${careAgentId}`, merged);

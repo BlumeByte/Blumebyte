@@ -254,6 +254,7 @@ export default function CareDashboard() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setAuthenticated(false);
     navigate('/login', { replace: true });
   };
 

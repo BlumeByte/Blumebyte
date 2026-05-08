@@ -9,5 +9,6 @@ export function getRoleDashboardPath(role: string | null | undefined): string {
   if (!role) return '/login';
   if (role === 'ultimateadmin' || role === 'developer') return '/developer';
   if (isCustomerCareRole(role)) return '/customer-care';
-  return `/${role}`;
+  if (role === 'superadmin' || role === 'admin' || role === 'manager' || role === 'employee') return `/${role}`;
+  return '/login';
 }
