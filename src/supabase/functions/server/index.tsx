@@ -23,10 +23,26 @@ const EMAIL_FROM = configuredEmailFrom.includes('@')
   : 'Blumebyte HR <noreply@blumebyte.com>';
 const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
 
+// SECURITY: Restrict CORS to known frontend origins only.
+// Falls back to the configured FRONTEND_URL when set, otherwise allows the
+// default Supabase project domain so the platform continues to work out of the box.
+const _allowedOrigins = (() => {
+  const configured = Deno.env.get('ALLOWED_ORIGINS') || '';
+  const frontendUrl = Deno.env.get('FRONTEND_URL') || '';
+  const origins = [
+    ...configured.split(',').map(o => o.trim()).filter(Boolean),
+    ...frontendUrl ? [frontendUrl.replace(/\/$/, '')] : [],
+    // Allow Supabase-hosted previews and Vercel deploys by default
+    /^https:\/\/.*\.supabase\.co$/,
+    /^https:\/\/.*\.vercel\.app$/,
+  ].filter(Boolean);
+  return origins.length > 2 ? origins : '*'; // fall back to wildcard only if no real origins are configured
+})();
+
 app.use(
   "/*",
   cors({
-    origin: "*",
+    origin: _allowedOrigins as any,
     allowHeaders: ["Content-Type", "Authorization", "X-User-Token"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
@@ -68,9 +84,16 @@ app.post(`${PREFIX}/admin/sync-company-stats`, async (c) => {
   }
 });
 
-// Sync all companies stats endpoint (debugging - can be called without auth for now)
+// Sync all companies stats endpoint (SuperAdmin only)
 app.post(`${PREFIX}/admin/sync-all-stats`, async (c) => {
   try {
+    const authUser = await getAuthUser(c);
+    if (!authUser) return c.json({ error: 'Unauthorized' }, 401);
+    const profile = await kv.get(`employee:${authUser.id}`);
+    const role = profile?.role || authUser.user_metadata?.role || '';
+    if (!['superadmin', 'developer'].includes(role)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const results = await syncAllCompaniesStats();
     return c.json({ success: true, results });
   } catch (e: any) {
@@ -98,13 +121,13 @@ app.post(`${PREFIX}/company/test-payment`, async (c) => {
 // WARNING: This endpoint deletes ALL data and users. Use with extreme caution!
 app.post(`${PREFIX}/production/cleanup`, async (c) => {
   try {
-    // Optional: Add a secret key for extra security
     const cleanupKey = c.req.header('X-Cleanup-Key');
     const expectedKey = Deno.env.get('CLEANUP_SECRET_KEY');
-    
-    // If cleanup key is configured, validate it
-    if (expectedKey && cleanupKey !== expectedKey) {
-      return c.json({ error: 'Unauthorized - Invalid cleanup key' }, 401);
+
+    // Always require the cleanup key — if it is not configured the endpoint is
+    // effectively disabled so no accidental data loss can occur.
+    if (!expectedKey || cleanupKey !== expectedKey) {
+      return c.json({ error: 'Unauthorized - Invalid or missing cleanup key' }, 401);
     }
 
     
@@ -2544,10 +2567,22 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       },
     });
     
-    // Send welcome email with temporary password
+    // Send welcome email — password-link flow (no credentials in email body)
     try {
       const emailApiKey = Deno.env.get('RESEND_API_KEY');
       if (emailApiKey) {
+        // Generate a one-time set-password token so the new user never sees a
+        // plaintext password in their inbox.
+        const welcomeToken = crypto.randomUUID();
+        const welcomeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 h
+        await kv.set(`password-reset:${welcomeToken}`, {
+          userId,
+          email,
+          expiresAt: welcomeExpiry.toISOString(),
+          createdAt: new Date().toISOString(),
+        });
+        const requestOrigin = Deno.env.get('FRONTEND_URL') || FRONTEND_FALLBACK_URL;
+        const setPasswordLink = `${requestOrigin}/password-reset?token=${welcomeToken}`;
         await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -2557,19 +2592,21 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
           body: JSON.stringify({
             from: EMAIL_FROM,
             to: email,
-            subject: `Welcome to ${company.name} - Your Account Details`,
+            subject: `Welcome to ${company.name} — Set Your Password`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2 style="color: #000;">Welcome to ${company.name}!</h2>
                 <p>Hello ${name},</p>
-                <p>Your account has been created in the Blumebyte HR system. Here are your login credentials:</p>
+                <p>Your account has been created in the Blumebyte HR system.</p>
                 <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
                   <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-                  <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background-color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 16px;">${tempPassword}</code></p>
                   <p style="margin: 5px 0;"><strong>Role:</strong> ${role}</p>
                 </div>
-                <p><strong>Important:</strong> For security reasons, you will be required to change your password after your first login.</p>
-                <p>Please keep this information secure and do not share your password with anyone.</p>
+                <p>Click the button below to set your password and activate your account. This link expires in <strong>24 hours</strong>.</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${setPasswordLink}" style="background-color: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-size: 16px; display: inline-block;">Set Your Password</a>
+                </div>
+                <p style="color: #666; font-size: 14px;">If the button above does not work, copy and paste this link into your browser:<br/>${setPasswordLink}</p>
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5;">
                   <p style="color: #666; font-size: 14px;">If you have any questions, please contact your HR administrator.</p>
                   <p style="color: #666; font-size: 14px;">Best regards,<br/>The ${company.name} Team</p>
@@ -2578,8 +2615,6 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
             `,
           }),
         });
-      } else {
-        // Fallback: email service not configured
       }
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
@@ -4082,6 +4117,16 @@ app.post(`${PREFIX}/superadmin/payroll-run`, async (c) => {
         read: false,
         createdAt: new Date().toISOString(),
       });
+      // Send email notification for payslip
+      const emp = await kv.get(`employee:${item.userId}`) as any;
+      if (emp?.email) {
+        sendEmailNotification(
+          item.userId, emp.email, emp.name || '',
+          `Your Payslip for ${item.period || 'this period'} — Blumebyte HR`,
+          `<p>Your payroll for <strong>${item.period || 'this period'}</strong> has been generated.</p><p style="color:#6b7280;font-size:14px;">Net Pay: <strong>${item.netPay || 0}</strong> &nbsp;|&nbsp; Status: <strong>${statusLabel}</strong></p>`,
+          'emailOnPayslip'
+        );
+      }
     }
     return c.json(item, 201);
   } catch (e: any) {
@@ -4114,6 +4159,16 @@ app.put(`${PREFIX}/superadmin/payroll-run/:id`, async (c) => {
         read: false,
         createdAt: new Date().toISOString(),
       });
+      // Send email notification for payslip status update
+      const emp = await kv.get(`employee:${updated.userId}`) as any;
+      if (emp?.email) {
+        sendEmailNotification(
+          updated.userId, emp.email, emp.name || '',
+          `Payroll Update for ${updated.period || 'this period'} — Blumebyte HR`,
+          `<p>Your payroll for <strong>${updated.period || 'this period'}</strong> is now <strong>${statusLabel}</strong>.</p><p style="color:#6b7280;font-size:14px;">Net Pay: <strong>${updated.netPay || 0}</strong></p>`,
+          'emailOnPayslip'
+        );
+      }
     }
     return c.json(updated);
   } catch (e: any) {
@@ -4597,6 +4652,78 @@ app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
 
 makeCrud("admin/job-postings", "job-posting:", requireAdminOrAbove);
 makeCrud("admin/workflows", "workflow:", requireAdminOrAbove);
+
+// Custom task POST: create task and email the assignee
+app.post(`${PREFIX}/admin/tasks`, async (c) => {
+  try {
+    const { user } = await requireAdminOrAbove(c);
+    const body = await c.req.json();
+    const id = body.id || crypto.randomUUID();
+    const companyId = body.companyId || body.company || (await getCompanyId(user.id));
+    if (!companyId) return c.json({ error: 'User has no company assignment' }, 400);
+    const item = { ...body, id, companyId, company: companyId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    await kv.set(`task:${id}`, item);
+    await broadcastUpdate('task', 'INSERT', id, item);
+    // Notify assignees via email
+    const assigneeIds: string[] = [
+      ...(Array.isArray(body.assignedToIds) ? body.assignedToIds : []),
+      body.assigneeId, body.assignedToId, body.employeeId, body.userId,
+    ].filter((v): v is string => typeof v === 'string' && v.length > 0);
+    for (const aid of [...new Set(assigneeIds)]) {
+      const emp = await kv.get(`employee:${aid}`) as any;
+      if (emp?.email) {
+        const nid = crypto.randomUUID();
+        await kv.set(`notification:${nid}`, { id: nid, userId: aid, type: 'task-assigned', title: 'New Task Assigned', message: `You have been assigned a new task: "${body.title || 'Task'}"`, read: false, createdAt: new Date().toISOString() });
+        sendEmailNotification(
+          aid, emp.email, emp.name || '',
+          `New Task Assigned: "${body.title || 'Task'}" — Blumebyte HR`,
+          `<p>You have been assigned a new task.</p><p><strong>Task:</strong> ${body.title || 'Task'}</p>${body.description ? `<p style="color:#6b7280;font-size:14px;">${body.description}</p>` : ''}${body.dueDate ? `<p style="color:#6b7280;font-size:14px;">Due: <strong>${body.dueDate}</strong></p>` : ''}`,
+          'emailOnTaskAssignment'
+        );
+      }
+    }
+    return c.json(item, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Custom performance-review POST: create review and email the employee
+app.post(`${PREFIX}/admin/performance-reviews`, async (c) => {
+  try {
+    const { user } = await requireAdminOrAbove(c);
+    const body = await c.req.json();
+    const id = body.id || crypto.randomUUID();
+    const companyId = body.companyId || body.company || (await getCompanyId(user.id));
+    if (!companyId) return c.json({ error: 'User has no company assignment' }, 400);
+    const item = { ...body, id, companyId, company: companyId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    await kv.set(`perf-review:${id}`, item);
+    await broadcastUpdate('perf-review', 'INSERT', id, item);
+    // Notify the reviewed employee
+    const revieweeId = body.employeeId || body.userId || body.revieweeId;
+    if (revieweeId) {
+      const emp = await kv.get(`employee:${revieweeId}`) as any;
+      if (emp?.email) {
+        const nid = crypto.randomUUID();
+        await kv.set(`notification:${nid}`, { id: nid, userId: revieweeId, type: 'performance-review', title: 'Performance Review Scheduled', message: `A performance review has been scheduled for you${body.period ? ` for ${body.period}` : ''}.`, read: false, createdAt: new Date().toISOString() });
+        sendEmailNotification(
+          revieweeId, emp.email, emp.name || '',
+          `Performance Review Scheduled — Blumebyte HR`,
+          `<p>A performance review has been scheduled for you${body.period ? ` for the period <strong>${body.period}</strong>` : ''}.</p>${body.reviewDate ? `<p style="color:#6b7280;font-size:14px;">Review Date: <strong>${body.reviewDate}</strong></p>` : ''}`,
+          'emailOnPerformanceReview'
+        );
+      }
+    }
+    return c.json(item, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 makeCrud("admin/performance-reviews", "perf-review:", requireAdminOrAbove);
 makeCrud("admin/disciplinary-cases", "disciplinary:", requireAdminOrAbove);
 makeCrud("admin/compliance-items", "compliance:", requireAdminOrAbove);
@@ -4707,6 +4834,16 @@ app.post(`${PREFIX}/meetings`, async (c) => {
         ? `${kvData?.name || "Someone"} requests a meeting: "${body.title || "Meeting"}" on ${body.date} at ${body.startTime}.`
         : `New meeting: "${body.title || "Meeting"}" on ${body.date} at ${body.startTime}.`;
       await kv.set(`notification:${nid}`, { id: nid, userId: pid, type: body.status === "pending-approval" ? "meeting-request" : "meeting-scheduled", title: msgTitle, message: msgBody, read: false, createdAt: new Date().toISOString() });
+      // Send email notification to each participant
+      const participant = await kv.get(`employee:${pid}`) as any;
+      if (participant?.email) {
+        sendEmailNotification(
+          pid, participant.email, participant.name || '',
+          `${msgTitle}: "${body.title || 'Meeting'}" — Blumebyte HR`,
+          `<p>${msgBody}</p><p style="color:#6b7280;font-size:14px;">Date: <strong>${body.date || ''}</strong> &nbsp;|&nbsp; Time: <strong>${body.startTime || ''}</strong>${body.location ? ` &nbsp;|&nbsp; Location: <strong>${body.location}</strong>` : ''}</p>`,
+          'emailOnMeeting'
+        );
+      }
     }
     return c.json(item, 201);
   } catch (e: any) { if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401); return c.json({ error: e.message }, 500); }
@@ -5726,6 +5863,20 @@ app.post(`${PREFIX}/announcements`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`announcement:${id}`, item);
+    // Send email notifications to all company employees
+    if (companyId) {
+      const allEmps = await kv.getByPrefix('employee:');
+      const companyEmps = allEmps.filter((emp: any) => emp.companyId === companyId || emp.company === companyId);
+      for (const emp of companyEmps) {
+        if (!emp.email) continue;
+        sendEmailNotification(
+          emp.userId || emp.id, emp.email, emp.name || '',
+          `Company Announcement: ${body.title || 'New Announcement'} — Blumebyte HR`,
+          `<h3 style="color:#111827;margin-bottom:8px;">${body.title || 'New Announcement'}</h3><p style="color:#374151;">${body.content || body.message || ''}</p>`,
+          'emailOnAnnouncement'
+        );
+      }
+    }
     return c.json(item, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -5870,6 +6021,20 @@ app.post(`${PREFIX}/admin/announcements`, async (c) => {
       createdAt: new Date().toISOString(),
     };
     await kv.set(`announcement:${id}`, item);
+    // Send email notifications to all company employees
+    if (companyId) {
+      const allEmps = await kv.getByPrefix('employee:');
+      const companyEmps = allEmps.filter((emp: any) => emp.companyId === companyId || emp.company === companyId);
+      for (const emp of companyEmps) {
+        if (!emp.email) continue;
+        sendEmailNotification(
+          emp.userId || emp.id, emp.email, emp.name || '',
+          `Company Announcement: ${body.title || 'New Announcement'} — Blumebyte HR`,
+          `<h3 style="color:#111827;margin-bottom:8px;">${body.title || 'New Announcement'}</h3><p style="color:#374151;">${body.content || body.message || ''}</p>`,
+          'emailOnAnnouncement'
+        );
+      }
+    }
     return c.json(item, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -9623,7 +9788,19 @@ app.post(`${PREFIX}/auth/2fa/send-code`, async (c) => {
       return c.json({ error: "Email is required" }, 400);
     }
 
-    // Generate a 6-digit code
+    // Rate-limit: max 3 send-code requests per email per 10 minutes
+    const rateLimitKey = `2fa-ratelimit:${email.toLowerCase()}`;
+    const rateData = await kv.get(rateLimitKey).catch(() => null) as any;
+    const now = Date.now();
+    const windowMs = 10 * 60 * 1000;
+    if (rateData && rateData.count >= 3 && now - rateData.windowStart < windowMs) {
+      return c.json({ error: 'Too many code requests. Please wait a few minutes before trying again.' }, 429);
+    }
+    await kv.set(rateLimitKey, {
+      count: rateData && now - rateData.windowStart < windowMs ? rateData.count + 1 : 1,
+      windowStart: rateData && now - rateData.windowStart < windowMs ? rateData.windowStart : now,
+    });
+
     // Generate a 6-digit code using rejection sampling to avoid modulo bias
     const codeMax = 900000;
     const codeThreshold = Math.floor(0x100000000 / codeMax) * codeMax;
@@ -9807,15 +9984,26 @@ app.post(`${PREFIX}/auth/2fa/verify-code`, async (c) => {
   }
 });
 
-// Check 2FA status for a user
+// Check 2FA status for a user — requires authentication to prevent user enumeration
 app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
   try {
+    // Require an authenticated session so that unauthenticated callers cannot
+    // probe whether an email address belongs to a registered account.
+    const callerToken = extractUserToken(c);
+    if (!callerToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const sb = supabaseAdmin();
+    const { data: callerData, error: callerError } = await sb.auth.getUser(callerToken);
+    if (callerError || !callerData?.user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const email = c.req.query("email");
     if (!email) {
       return c.json({ error: "Email is required" }, 400);
     }
 
-    const sb = supabaseAdmin();
     const { data: { users }, error } = await sb.auth.admin.listUsers({ perPage: 1000 });
     if (error) {
       console.error("Error listing users:", error);
@@ -9824,7 +10012,9 @@ app.get(`${PREFIX}/auth/2fa/status`, async (c) => {
 
     const user = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
     if (!user) {
-      return c.json({ error: "User not found" }, 404);
+      // Return the same shape as the "found" case to avoid leaking whether the
+      // email is registered (callers must already be authenticated anyway).
+      return c.json({ requires2FA: false, twoFactorEnabled: false, twoFactorVerifiedAt: null, totpEnabled: false, emailOtpAvailable: false });
     }
 
     return c.json({
@@ -10245,7 +10435,20 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     if (!email) {
       return c.json({ error: 'Email is required' }, 400);
     }
-    
+
+    // Rate-limit: max 3 password reset requests per email per hour
+    const fpRateLimitKey = `fp-ratelimit:${email.toLowerCase()}`;
+    const fpRateData = await kv.get(fpRateLimitKey).catch(() => null) as any;
+    const fpNow = Date.now();
+    const fpWindowMs = 60 * 60 * 1000; // 1 hour
+    if (fpRateData && fpRateData.count >= 3 && fpNow - fpRateData.windowStart < fpWindowMs) {
+      // Return the same generic message to avoid leaking whether this email is registered
+      return c.json({ success: true, message: 'If an account with that email exists, a password reset link has been sent.' });
+    }
+    await kv.set(fpRateLimitKey, {
+      count: fpRateData && fpNow - fpRateData.windowStart < fpWindowMs ? fpRateData.count + 1 : 1,
+      windowStart: fpRateData && fpNow - fpRateData.windowStart < fpWindowMs ? fpRateData.windowStart : fpNow,
+    });
     
     // Find user by email
     const allEmployees = await kv.getByPrefix('employee:');
@@ -10508,8 +10711,8 @@ const writeNotificationPreferences = async (c: any) => {
   }
 };
 
-// Support both prefixed and legacy non-prefixed paths/methods for compatibility.
-for (const route of [`${PREFIX}/notification-preferences`, '/notification-preferences']) {
+// Support prefixed, legacy, and Supabase function-name-prefixed paths for compatibility.
+for (const route of [`${PREFIX}/notification-preferences`, '/notification-preferences', `/:functionName/notification-preferences`]) {
   app.get(route, readNotificationPreferences);
   app.put(route, writeNotificationPreferences);
   app.post(route, writeNotificationPreferences);
@@ -10541,9 +10744,12 @@ async function sendEmailNotification(
     // Default (no prefs stored): send email
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    if (!resendApiKey) return;
+    if (!resendApiKey) {
+      console.warn('sendEmailNotification: RESEND_API_KEY not configured — skipping email to', recipientEmail.split('@')[1] || '?');
+      return;
+    }
 
-    await fetch('https://api.resend.com/emails', {
+    const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -10567,8 +10773,12 @@ async function sendEmailNotification(
         `,
       }),
     });
-  } catch {
-    // Silently fail — email is a best-effort enhancement
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`sendEmailNotification: Resend error ${res.status} for subject="${subject}"`, body.slice(0, 200));
+    }
+  } catch (err: any) {
+    console.error('sendEmailNotification: unexpected error', err?.message || err);
   }
 }
 
