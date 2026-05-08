@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -13,9 +13,8 @@ import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import {
   Building2, Users, KeyRound, Shield, Search, Loader2, RefreshCw,
-  Eye, Trash2, UserPlus, Lock, Unlock, LogOut, AlertCircle,
-  Copy, CheckCircle, Settings, BarChart3, Briefcase, Ticket,
-  MessageSquare, Send, ChevronDown
+  LogOut, Copy, CheckCircle, Briefcase,
+  Ticket, MessageSquare, Send
 } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { supabase } from '../lib/supabase-client';
@@ -53,14 +52,10 @@ function TenantRow({
   tenant,
   onViewUsers,
   onResetPassword,
-  onDelete,
-  isDeveloper,
 }: {
   tenant: Tenant;
   onViewUsers: () => void;
   onResetPassword: () => void;
-  onDelete: () => void;
-  isDeveloper: boolean;
 }) {
   return (
     <TableRow>
@@ -81,11 +76,6 @@ function TenantRow({
           <Button size="sm" variant="outline" onClick={onResetPassword}>
             <KeyRound className="h-3.5 w-3.5 mr-1" /> Reset PW
           </Button>
-          {isDeveloper && (
-            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:border-red-300" onClick={onDelete}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
         </div>
       </TableCell>
     </TableRow>
@@ -110,8 +100,6 @@ export default function CareDashboard() {
   const [resetTarget, setResetTarget] = useState<Tenant | null>(null);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLinkResult, setResetLinkResult] = useState<string | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
   const [activeTab, setActiveTab] = useState('tenants');
 
   // Global hiring applications state
@@ -128,8 +116,8 @@ export default function CareDashboard() {
   const [sendingComment, setSendingComment] = useState(false);
   const [ticketStatusFilter, setTicketStatusFilter] = useState('all');
 
-  // Care agents are NOT developers — developers have their own dashboard at /developer
-  const isDeveloper = false;
+  // Care agents are NOT developers — developers have their own dashboard at /developer.
+  // The delete and license-edit actions are developer-only and not shown here.
 
   const loadProfile = useCallback(async () => {
     if (!user) {
@@ -316,35 +304,6 @@ export default function CareDashboard() {
     }
   };
 
-  const handleDeleteTenant = async () => {
-    if (!deleteTarget || !isDeveloper) return;
-    try {
-      const token = await getCareToken();
-      await api(`/care/tenants/${deleteTarget.id}`, { method: 'DELETE', token });
-      toast.success(`Tenant "${deleteTarget.name}" deleted.`);
-      setDeleteDialog(false);
-      setDeleteTarget(null);
-      loadTenants();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete tenant');
-    }
-  };
-
-  const handleUpdateLicense = async (tenantId: string, licenses: number) => {
-    try {
-      const token = await getCareToken();
-      await api(`/care/tenants/${tenantId}/license`, {
-        method: 'PUT',
-        token,
-        body: { licenses },
-      });
-      toast.success('License count updated.');
-      loadTenants();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to update license');
-    }
-  };
-
   const filteredTenants = tenants.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
     (t.email || '').toLowerCase().includes(search.toLowerCase())
@@ -380,7 +339,7 @@ export default function CareDashboard() {
               <span className="font-semibold">Blumebyte Customer Care</span>
               {careProfile && (
                 <Badge variant="secondary" className="text-xs">
-                  {isDeveloper ? 'Developer' : 'Support Agent'}
+                  Support Agent
                 </Badge>
               )}
             </div>
@@ -476,8 +435,6 @@ export default function CareDashboard() {
                               tenant={t}
                               onViewUsers={() => handleViewUsers(t)}
                               onResetPassword={() => handleResetPassword(t)}
-                              onDelete={() => { setDeleteTarget(t); setDeleteDialog(true); }}
-                              isDeveloper={isDeveloper}
                             />
                           ))
                         )}
@@ -807,28 +764,6 @@ export default function CareDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Tenant Dialog */}
-      {isDeveloper && (
-        <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="text-red-600">Delete Tenant</DialogTitle>
-            </DialogHeader>
-            <div className="py-2">
-              <p className="text-sm text-gray-600">
-                Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>?
-                This action cannot be undone and will remove all their data and users.
-              </p>
-            </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setDeleteDialog(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeleteTenant}>
-                <Trash2 className="h-4 w-4 mr-2" /> Delete Permanently
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

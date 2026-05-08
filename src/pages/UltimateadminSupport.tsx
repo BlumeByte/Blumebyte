@@ -1234,7 +1234,7 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
                           { label: 'View Tenants', icon: Building2, section: 'tenants' },
                           { label: 'New Ticket', icon: Ticket, section: 'tickets' },
                           { label: 'License Issues', icon: Key, section: 'license-issues' },
-                          { label: 'Platform Users', icon: UserPlus, section: 'platform-users' },
+                          { label: 'Platform Users', icon: Users, section: 'platform-users' },
                         ].map(a => (
                           <Button key={a.label} variant="outline" className="h-16 flex-col gap-1" onClick={() => setActiveSection(a.section)}>
                             <a.icon className="h-4 w-4" />
