@@ -19,6 +19,7 @@ import {
 import { api } from '../lib/api-client';
 import { supabase } from '../lib/supabase-client';
 import { isCustomerCareRole } from '../lib/role-utils';
+import { useAuth } from '../lib/auth-context';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Tenant {
@@ -93,6 +94,7 @@ function TenantRow({
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function CareDashboard() {
   const navigate = useNavigate();
+  const { user, sessionLoading } = useAuth();
   // Tri-state: null = checking, false = not authenticated, true = authenticated
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [careProfile, setCareProfile] = useState<any>(null);
@@ -118,6 +120,10 @@ export default function CareDashboard() {
   const isDeveloper = careProfile?.role === 'developer';
 
   const loadProfile = useCallback(async () => {
+    if (!user) {
+      setAuthenticated(false);
+      return;
+    }
     const token = await getCareToken();
     if (!token) {
       setAuthenticated(false);
@@ -129,11 +135,21 @@ export default function CareDashboard() {
       const role = p?.role || '';
       const allowed = role === 'developer' || isCustomerCareRole(role);
       setAuthenticated(allowed);
-    } catch {
-      await supabase.auth.signOut();
-      setAuthenticated(false);
+    } catch (e: any) {
+      if (e?.status === 401 || e?.status === 403) {
+        setAuthenticated(false);
+        return;
+      }
+      setCareProfile({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      });
+      const role = user.role || '';
+      setAuthenticated(role === 'developer' || isCustomerCareRole(role));
     }
-  }, []);
+  }, [user]);
 
   const loadTenants = useCallback(async () => {
     const token = await getCareToken();
@@ -164,11 +180,13 @@ export default function CareDashboard() {
   }, []);
 
   useEffect(() => {
-    // Always verify token on mount; also reload when authenticated flips to true after login
-    if (authenticated !== false) {
-      loadProfile();
+    if (sessionLoading) return;
+    if (!user) {
+      setAuthenticated(false);
+      return;
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: verify once on mount
+    loadProfile();
+  }, [sessionLoading, user, loadProfile]);
 
   useEffect(() => {
     if (authenticated === true) {

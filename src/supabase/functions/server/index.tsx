@@ -1,6 +1,7 @@
 // Blumebyte HR Management Server - v2.1 - Payment-First Registration
 // SECURITY: Updated to Hono 4.7.7+ to patch all known vulnerabilities (Jan 2025)
 import { Hono } from "npm:hono@4.7.7";
+import type { Context } from "npm:hono@4.7.7";
 import { cors } from "npm:hono@4.7.7/cors";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
@@ -556,6 +557,8 @@ async function buildPublicJobResponse(job: any) {
     id: job.id,
     companyName,
     roleTitle: job.roleTitle || job.title || 'Untitled Role',
+    // HIRING-FIX: Include department in public payload for client-side filtering.
+    department: typeof job.department === 'string' ? job.department : '',
     employmentType: normalizeEmploymentType(String(job.employmentType || job.type || job.employment_type || '')),
     location: typeof job.location === 'string' ? job.location : '',
     description: typeof job.description === 'string' ? job.description : '',
@@ -10571,45 +10574,60 @@ async function sendEmailNotification(
 
 
 
-// GET /public/jobs — list all active public_global job postings
-app.get(`${PREFIX}/public/jobs`, async (c) => {
+// Register each endpoint on:
+// 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
+// This prevents route mismatches across different Supabase function URL/path forwarding modes.
+const compatibleRoutePaths = (path: string) =>
+  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+
+// HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
+const listPublicJobs = async (c: Context) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
     const eligible = all.filter(isPublicJobPosting);
 
-    // Build public job objects using Promise.allSettled so one bad company-name
-    // lookup never wipes the entire result set.
     const settled = await Promise.allSettled(eligible.map((j: any) => buildPublicJobResponse(j)));
-
-    const publicJobs = settled
+    const jobs = settled
       .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
-      .map(r => r.value);
+      .map((r) => r.value)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    publicJobs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return c.json(publicJobs);
+    return c.json({ jobs, total: jobs.length });
   } catch (e: any) {
     console.error('Public jobs error:', e);
     return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
   }
-});
+};
 
-// GET /public/jobs/:id — single public job detail
-app.get(`${PREFIX}/public/jobs/:id`, async (c) => {
+// HIRING-FIX: Resolve public job detail by scanning all public postings and return stable 404 payload.
+const getPublicJobDetail = async (c: Context) => {
   try {
     const id = c.req.param('id');
-    const job = await kv.get(`job-posting:${id}`);
-    if (!isPublicJobPosting(job)) return c.json({ error: 'Not found' }, 404);
-    const publicJob = await buildPublicJobResponse(job);
-    if (!publicJob) return c.json({ error: 'Not found' }, 404);
+    let match = await kv.get(`job-posting:${id}`);
+    if (!isPublicJobPosting(match)) {
+      const all = await kv.getByPrefix("job-posting:");
+      match = all.find((job: any) => job?.id === id && isPublicJobPosting(job));
+    }
+    if (!match) return c.json({ error: 'Job not found' }, 404);
+    const publicJob = await buildPublicJobResponse(match);
+    if (!publicJob) return c.json({ error: 'Job not found' }, 404);
     return c.json(publicJob);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+
+for (const route of compatibleRoutePaths('/public/jobs')) {
+  app.get(route, listPublicJobs);
+}
+
+for (const route of compatibleRoutePaths('/public/jobs/:id')) {
+  app.get(route, getPublicJobDetail);
+}
 
 // POST /public/job/apply — submit a public job application
 // Basic rate limiting via KV: max 5 submissions per email per hour
-app.post(`${PREFIX}/public/job/apply`, async (c) => {
+const applyToPublicJob = async (c: any) => {
   try {
     const body = await c.req.json();
     const { jobId, companyName, roleTitle, fullName, email, phone, qualification, cvMessage, contactDetails } = body;
@@ -10765,7 +10783,8 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
     console.error('Public job apply error:', e);
     return c.json({ error: e.message || 'Submission failed' }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/public/job/apply')) app.post(route, applyToPublicJob);
 
 // ============ CUSTOMER CARE / DEVELOPER ENDPOINTS ============
 
@@ -10786,7 +10805,7 @@ async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDe
 }
 
 // GET /care/verify-access — check if authenticated user can access care dashboard
-app.get(`${PREFIX}/care/verify-access`, async (c) => {
+const verifyCareRouteAccess = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ allowed: false }, 403);
@@ -10794,10 +10813,11 @@ app.get(`${PREFIX}/care/verify-access`, async (c) => {
   } catch {
     return c.json({ allowed: false }, 403);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/verify-access')) app.get(route, verifyCareRouteAccess);
 
 // GET /care/profile — care account's own profile
-app.get(`${PREFIX}/care/profile`, async (c) => {
+const getCareProfile = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10810,10 +10830,11 @@ app.get(`${PREFIX}/care/profile`, async (c) => {
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/profile')) app.get(route, getCareProfile);
 
 // GET /care/tenants — list all tenant companies
-app.get(`${PREFIX}/care/tenants`, async (c) => {
+const listCareTenants = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10850,10 +10871,11 @@ app.get(`${PREFIX}/care/tenants`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tenants')) app.get(route, listCareTenants);
 
 // GET /care/tenants/:id/users — list users for a tenant
-app.get(`${PREFIX}/care/tenants/:id/users`, async (c) => {
+const listCareTenantUsers = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10878,10 +10900,11 @@ app.get(`${PREFIX}/care/tenants/:id/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tenants/:id/users')) app.get(route, listCareTenantUsers);
 
 // DELETE /care/tenants/:id — delete a tenant (developer only)
-app.delete(`${PREFIX}/care/tenants/:id`, async (c) => {
+const deleteCareTenant = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10931,10 +10954,11 @@ app.delete(`${PREFIX}/care/tenants/:id`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tenants/:id')) app.delete(route, deleteCareTenant);
 
 // POST /care/reset-password — generate a password reset link for a user
-app.post(`${PREFIX}/care/reset-password`, async (c) => {
+const createCareResetPassword = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10953,10 +10977,11 @@ app.post(`${PREFIX}/care/reset-password`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/reset-password')) app.post(route, createCareResetPassword);
 
 // PUT /care/tenants/:id/license — update license count (developer only)
-app.put(`${PREFIX}/care/tenants/:id/license`, async (c) => {
+const updateCareTenantLicenses = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10975,10 +11000,11 @@ app.put(`${PREFIX}/care/tenants/:id/license`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tenants/:id/license')) app.put(route, updateCareTenantLicenses);
 
 // GET /care/global-applications — list all public job applications
-app.get(`${PREFIX}/care/global-applications`, async (c) => {
+const listCareGlobalApplications = async (c: any) => {
   try {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -10989,7 +11015,8 @@ app.get(`${PREFIX}/care/global-applications`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/global-applications')) app.get(route, listCareGlobalApplications);
 
 
 // SuperAdmin CRUD for public job applications (status updates, view, archive)
@@ -11409,6 +11436,82 @@ app.get(`${PREFIX}/ultimateadmin/support/audit`, async (c) => {
     const logs = await kv.getByPrefix('support-audit:');
     logs.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return c.json(logs.slice(0, 200));
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /ultimateadmin/support/set-platform-user — set role+name for developer/care platform users
+app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    const { userId, name, role } = body;
+    if (!userId || !role) return c.json({ error: 'userId and role are required' }, 400);
+    const ALLOWED_PLATFORM_ROLES = ['developer', 'ultimateadmin', 'customer_care_agent', 'support_manager', 'care'];
+    if (!ALLOWED_PLATFORM_ROLES.includes(role)) {
+      return c.json({ error: `Invalid role. Allowed: ${ALLOWED_PLATFORM_ROLES.join(', ')}` }, 400);
+    }
+    const sb = supabaseAdmin();
+    const { data: authData, error: authErr } = await sb.auth.admin.getUserById(userId);
+    if (authErr || !authData?.user) return c.json({ error: 'User not found in auth' }, 404);
+    const resolvedName = name || authData.user.user_metadata?.name || authData.user.email || '';
+    // Update Supabase auth metadata (fixes the Supabase dashboard display)
+    await sb.auth.admin.updateUserById(userId, {
+      user_metadata: { ...authData.user.user_metadata, name: resolvedName, role },
+    });
+    // Upsert KV employee record so the server role check always resolves correctly
+    const existing = await kv.get(`employee:${userId}`) || {};
+    const updated = {
+      ...existing,
+      userId,
+      id: userId,
+      name: resolvedName,
+      email: authData.user.email || existing.email || '',
+      role,
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`employee:${userId}`, updated);
+    // Audit
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'set_platform_user_role', targetUserId: userId,
+      targetEmail: authData.user.email, newRole: role, newName: resolvedName,
+      timestamp: new Date().toISOString(),
+      description: `Set platform user ${authData.user.email} to role '${role}' by ${access.user.email}`,
+    });
+    return c.json({ success: true, userId, email: authData.user.email, name: resolvedName, role });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (ultimateadmin only)
+app.post(`${PREFIX}/ultimateadmin/support/generate-reset-link`, async (c) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin') return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    const { email } = body;
+    if (!email) return c.json({ error: 'email is required' }, 400);
+    const sb = supabaseAdmin();
+    const { data, error } = await sb.auth.admin.generateLink({
+      type: 'recovery',
+      email: email.toLowerCase().trim(),
+    });
+    if (error) return c.json({ error: error.message }, 400);
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'generate_reset_link', targetEmail: email,
+      timestamp: new Date().toISOString(),
+      description: `Password reset link generated for ${email} by ${access.user.email}`,
+    });
+    return c.json({ success: true, email, resetLink: data?.properties?.action_link || null });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
