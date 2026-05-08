@@ -467,12 +467,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── 2. TRUSTED BY ── */}
-      <FadeSection className="border-y border-black/6 py-10" style={{}}>
+      <FadeSection className="border-y border-black/6 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">Trusted by teams across industries</p>
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
-            {['Nexus Technologies', 'BuildRight', 'MediCare Solutions', 'Alpha Finance', 'EduTrack', 'LogiCo'].map((name, i) => (
-              <span key={i} className="text-sm font-bold text-gray-300 tracking-wide select-none hover:text-gray-400 transition-colors">{name}</span>
+            {['Nexus Technologies', 'BuildRight', 'MediCare Solutions', 'Alpha Finance', 'EduTrack', 'LogiCo'].map((name) => (
+              <span key={name} className="text-sm font-bold text-gray-300 tracking-wide select-none hover:text-gray-400 transition-colors">{name}</span>
             ))}
           </div>
         </div>
@@ -623,9 +623,10 @@ export default function LandingPage() {
 
           {/* Mobile carousel dots */}
           <div className="flex justify-center gap-2 mt-8 md:hidden">
-            {TESTIMONIALS.map((_, i) => (
+            {TESTIMONIALS.map((t, i) => (
               <button
                 key={i}
+                aria-label={`View testimonial ${i + 1}`}
                 onClick={() => setTestimonialIdx(i)}
                 className={`h-1.5 rounded-full transition-all duration-300 ${i === testimonialIdx ? 'w-6 bg-black' : 'w-3 bg-black/20'}`}
               />
