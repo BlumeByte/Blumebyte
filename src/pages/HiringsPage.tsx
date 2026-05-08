@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -19,6 +20,7 @@ interface PublicJob {
   id: string;
   companyName: string;
   roleTitle: string;
+  department?: string;
   employmentType?: string;
   location?: string;
   description?: string;
@@ -271,68 +273,6 @@ function ApplyModal({
   );
 }
 
-// ─── Job Details Modal ────────────────────────────────────────────────────────
-function JobDetailsModal({
-  job,
-  open,
-  onClose,
-  onApply,
-}: {
-  job: PublicJob | null;
-  open: boolean;
-  onClose: () => void;
-  onApply: () => void;
-}) {
-  if (!job) return null;
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-            <DialogTitle className="text-xl">{job.roleTitle || 'Untitled Role'}</DialogTitle>
-            <p className="text-sm text-gray-500 flex items-center gap-1 pt-1">
-              <Building2 className="h-4 w-4" /> {job.companyName || 'Hiring Organization'}
-            </p>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="flex flex-wrap gap-2">
-            {job.location && (
-              <TagChip><MapPin className="h-3 w-3 inline mr-1" />{job.location}</TagChip>
-            )}
-            {job.employmentType && <TagChip>{job.employmentType}</TagChip>}
-            {job.deadline && (
-              <TagChip><Calendar className="h-3 w-3 inline mr-1" />Deadline: {new Date(job.deadline).toLocaleDateString()}</TagChip>
-            )}
-          </div>
-
-          {job.description && (
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Job Description</h3>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{job.description}</p>
-            </div>
-          )}
-          {job.requirements && (
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Requirements</h3>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{job.requirements}</p>
-            </div>
-          )}
-          {job.qualifications && (
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Qualifications</h3>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">{job.qualifications}</p>
-            </div>
-          )}
-        </div>
-        <div className="sticky bottom-0 bg-white pt-4 border-t">
-          <Button onClick={onApply} className="w-full bg-black text-white hover:bg-gray-800">
-            Apply Now
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ─── Job Card ─────────────────────────────────────────────────────────────────
 function JobCard({
   job,
@@ -413,14 +353,15 @@ function JobCard({
 
 // ─── Main Hirings List Page ───────────────────────────────────────────────────
 export default function HiringsPage() {
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState<PublicJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
   const [sortBy, setSortBy] = useState<'latest' | 'deadline' | 'alphabetical'>('latest');
-  const [detailJob, setDetailJob] = useState<PublicJob | null>(null);
   const [applyJob, setApplyJob] = useState<PublicJob | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const mountedRef = useRef(true);
@@ -443,9 +384,11 @@ export default function HiringsPage() {
     setLoading(true);
     if (!isRetry) setError(null);
     try {
+      // HIRING-FIX: Public endpoint now returns { jobs, total }.
       const data = await api('/public/jobs');
+      const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
       if (mountedRef.current) {
-        setJobs(Array.isArray(data) ? data : []);
+        setJobs(nextJobs);
         setError(null);
       }
     } catch (e: any) {
@@ -523,6 +466,11 @@ export default function HiringsPage() {
     new Set(jobs.map((j) => asString(j.employmentType).trim()).filter(Boolean))
   ).sort() as string[];
 
+  // HIRING-FIX: Add department filter options from loaded jobs.
+  const departments = Array.from(
+    new Set(jobs.map((j: any) => asString(j?.department).trim()).filter(Boolean))
+  ).sort() as string[];
+
   // Filter + sort
   const filtered = jobs
     .filter((j) => {
@@ -530,10 +478,12 @@ export default function HiringsPage() {
       const roleTitle = asString(j.roleTitle);
       const companyName = asString(j.companyName);
       const employmentType = asString(j.employmentType);
+      const department = asString((j as any).department);
       const matchSearch = !q || roleTitle.toLowerCase().includes(q) || companyName.toLowerCase().includes(q);
       const matchLocation = !filterLocation || filterLocation === 'all' || j.location === filterLocation;
       const matchType = !filterType || filterType === 'all' || employmentType === filterType;
-      return matchSearch && matchLocation && matchType;
+      const matchDepartment = !filterDepartment || filterDepartment === 'all' || department === filterDepartment;
+      return matchSearch && matchLocation && matchType && matchDepartment;
     })
     .sort((a, b) => {
       if (sortBy === 'latest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -607,6 +557,19 @@ export default function HiringsPage() {
             </SelectContent>
           </Select>
 
+          {/* HIRING-FIX: Department filter */}
+          <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+            <SelectTrigger className="w-44 bg-white">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((d) => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
             <SelectTrigger className="w-40 bg-white">
               <SelectValue placeholder="Sort by" />
@@ -618,8 +581,8 @@ export default function HiringsPage() {
             </SelectContent>
           </Select>
 
-          {(search || (filterLocation && filterLocation !== 'all') || (filterType && filterType !== 'all')) && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); }}>
+          {(search || (filterLocation && filterLocation !== 'all') || (filterType && filterType !== 'all') || (filterDepartment && filterDepartment !== 'all')) && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); setFilterDepartment(''); }}>
               Clear Filters
             </Button>
           )}
@@ -650,11 +613,11 @@ export default function HiringsPage() {
             <h3 className="text-xl font-semibold text-gray-600">No Job Openings</h3>
             <p className="text-sm text-gray-400">
               {jobs.length === 0
-                ? 'There are currently no job openings. Check back later for new opportunities.'
+                ? 'No open positions right now. Check back soon.'
                 : 'No jobs match your current filters. Try adjusting your search criteria.'}
             </p>
             {jobs.length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); }}>
+              <Button variant="outline" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); setFilterDepartment(''); }}>
                 Clear Filters
               </Button>
             )}
@@ -666,7 +629,7 @@ export default function HiringsPage() {
                 key={job.id}
                 job={job}
                 applied={appliedJobIds.includes(job.id)}
-                onDetails={() => setDetailJob(job)}
+                onDetails={() => navigate(`/hirings/${job.id}`)}
                 onApply={() => {
                   if (!appliedJobIds.includes(job.id)) setApplyJob(job);
                 }}
@@ -677,12 +640,6 @@ export default function HiringsPage() {
       </div>
 
       {/* Modals */}
-      <JobDetailsModal
-        job={detailJob}
-        open={!!detailJob}
-        onClose={() => setDetailJob(null)}
-        onApply={() => { setApplyJob(detailJob); setDetailJob(null); }}
-      />
       <ApplyModal
         job={applyJob}
         open={!!applyJob}

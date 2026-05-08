@@ -54,11 +54,20 @@ export default function HiringDetailPage() {
   const [applyOpen, setApplyOpen] = useState(false);
 
   useEffect(() => {
-    if (!jobId) return;
+    // HIRING-FIX: Guard against missing route param and provide stable not-found UI.
+    if (!jobId) {
+      setError('This position is no longer available.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setError(null);
     api(`/public/jobs/${jobId}`)
       .then((data) => { setJob(data); })
-      .catch(() => setError('Job not found or no longer available.'))
+      .catch((err: any) => {
+        if (err?.status === 404) setError('This position is no longer available.');
+        else setError('Unable to load this position right now.');
+      })
       .finally(() => setLoading(false));
   }, [jobId]);
 
@@ -148,7 +157,8 @@ export default function HiringDetailPage() {
           <div className="text-center py-20 space-y-4">
             <AlertCircle className="h-12 w-12 text-gray-300 mx-auto" />
             <p className="text-gray-600">{error}</p>
-            <Button variant="outline" onClick={() => navigate('/hirings')}>Browse all jobs</Button>
+            {/* HIRING-FIX: Back link for unavailable jobs. */}
+            <Button variant="outline" onClick={() => navigate('/hirings')}>Back to all jobs</Button>
           </div>
         ) : job ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">

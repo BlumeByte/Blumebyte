@@ -556,6 +556,8 @@ async function buildPublicJobResponse(job: any) {
     id: job.id,
     companyName,
     roleTitle: job.roleTitle || job.title || 'Untitled Role',
+    // HIRING-FIX: Include department in public payload for client-side filtering.
+    department: typeof job.department === 'string' ? job.department : '',
     employmentType: normalizeEmploymentType(String(job.employmentType || job.type || job.employment_type || '')),
     location: typeof job.location === 'string' ? job.location : '',
     description: typeof job.description === 'string' ? job.description : '',
@@ -10571,41 +10573,47 @@ async function sendEmailNotification(
 
 
 
-// GET /public/jobs — list all active public_global job postings
-app.get(`${PREFIX}/public/jobs`, async (c) => {
+// HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
+const listPublicJobs = async (c: any) => {
   try {
     const all = await kv.getByPrefix("job-posting:");
     const eligible = all.filter(isPublicJobPosting);
 
-    // Build public job objects using Promise.allSettled so one bad company-name
-    // lookup never wipes the entire result set.
     const settled = await Promise.allSettled(eligible.map((j: any) => buildPublicJobResponse(j)));
-
-    const publicJobs = settled
+    const jobs = settled
       .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
-      .map(r => r.value);
+      .map((r) => r.value)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    publicJobs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return c.json(publicJobs);
+    return c.json({ jobs, total: jobs.length });
   } catch (e: any) {
     console.error('Public jobs error:', e);
     return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
   }
-});
+};
 
-// GET /public/jobs/:id — single public job detail
-app.get(`${PREFIX}/public/jobs/:id`, async (c) => {
+// HIRING-FIX: Resolve public job detail by scanning all public postings and return stable 404 payload.
+const getPublicJobDetail = async (c: any) => {
   try {
     const id = c.req.param('id');
-    const job = await kv.get(`job-posting:${id}`);
-    if (!isPublicJobPosting(job)) return c.json({ error: 'Not found' }, 404);
-    const publicJob = await buildPublicJobResponse(job);
-    if (!publicJob) return c.json({ error: 'Not found' }, 404);
+    const all = await kv.getByPrefix("job-posting:");
+    const match = all.find((job: any) => job?.id === id && isPublicJobPosting(job));
+    if (!match) return c.json({ error: 'Job not found' }, 404);
+    const publicJob = await buildPublicJobResponse(match);
+    if (!publicJob) return c.json({ error: 'Job not found' }, 404);
     return c.json(publicJob);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+
+for (const route of [`${PREFIX}/public/jobs`, '/public/jobs']) {
+  app.get(route, listPublicJobs);
+}
+
+for (const route of [`${PREFIX}/public/jobs/:id`, '/public/jobs/:id']) {
+  app.get(route, getPublicJobDetail);
+}
 
 // POST /public/job/apply — submit a public job application
 // Basic rate limiting via KV: max 5 submissions per email per hour
