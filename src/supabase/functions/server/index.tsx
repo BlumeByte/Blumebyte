@@ -11438,6 +11438,15 @@ app.get(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
     });
 
     tenants.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Care agents only see their assigned tenants
+    const normalizedRole = normalizeCareRole(access.role);
+    if (normalizedRole === 'customer_care') {
+      const assigned = await getCareAssignmentsForAgent(access.user.id);
+      const assignedSet = new Set(assigned);
+      return c.json(tenants.filter((t: any) => assignedSet.has(t.id)));
+    }
+
     return c.json(tenants);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
@@ -11525,7 +11534,13 @@ app.get(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    const tickets = await kv.getByPrefix('support-ticket:');
+    let tickets = await kv.getByPrefix('support-ticket:');
+    // Care agents only see tickets for their assigned tenants
+    const normalizedRole = normalizeCareRole(access.role);
+    if (normalizedRole === 'customer_care') {
+      const assigned = await getCareAssignmentsForAgent(access.user.id);
+      tickets = tickets.filter((t: any) => assigned.includes(t.tenantId));
+    }
     tickets.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return c.json(tickets);
   } catch (e: any) {
@@ -12413,6 +12428,140 @@ app.post(`${PREFIX}/care/tickets/:id/escalate`, async (c) => {
     };
     await saveSupportTicket(updated);
     return c.json({ success: true, ticket: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /care/tickets — all support tickets for this care agent's assigned tenants
+app.get(`${PREFIX}/care/tickets`, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const assigned = await getCareAssignmentsForAgent(auth.user.id);
+    if (assigned.length === 0) return c.json([]);
+    const assignedSet = new Set(assigned);
+    const allTickets = await getAllSupportTickets();
+    return c.json(allTickets.filter((t: any) => assignedSet.has(t.tenantId)));
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// GET /developer/platform-users — list all developer and customer care platform users
+app.get(`${PREFIX}/developer/platform-users`, async (c) => {
+  try {
+    await requireDeveloper(c);
+    // Gather from both legacy support-agent: and newer customer_care_users: prefixes
+    const [ccUsers, supportAgents] = await Promise.all([
+      kv.getByPrefix('customer_care_users:'),
+      kv.getByPrefix('support-agent:'),
+    ]);
+    // Also include developer/ultimateadmin accounts from employee records
+    const allEmps = await kv.getByPrefix('employee:');
+    const platformRoles = new Set(['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager']);
+    const devUsers = allEmps.filter((u: any) => platformRoles.has(u.role));
+
+    // Deduplicate by userId/id/email
+    const seen = new Set<string>();
+    const merged = [];
+    for (const u of [...ccUsers, ...supportAgents, ...devUsers]) {
+      const key = u.userId || u.id || u.email;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push({
+        id: u.id || u.userId || key,
+        userId: u.userId || u.id || key,
+        name: u.name || '',
+        email: u.email || '',
+        role: u.role || 'customer_care',
+        status: u.status || 'active',
+        assignedTenants: u.assignedTenants || [],
+        createdAt: u.createdAt || '',
+      });
+    }
+    return c.json(merged);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /developer/platform-users — create a new developer or care account record
+app.post(`${PREFIX}/developer/platform-users`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const body = await c.req.json();
+    if (!body?.email || !body?.name || !body?.role) return c.json({ error: 'email, name and role are required' }, 400);
+    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
+    if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    const id = body.id || body.userId || crypto.randomUUID();
+    const record = {
+      id,
+      userId: body.userId || id,
+      name: body.name,
+      email: String(body.email).toLowerCase(),
+      role: body.role,
+      status: body.status || 'active',
+      assignedTenants: [],
+      createdAt: new Date().toISOString(),
+      createdBy: user.id,
+    };
+    await kv.set(`customer_care_users:${id}`, record);
+    await kv.set(`employee:${id}`, { ...record, updatedAt: new Date().toISOString() });
+    await appendUniqueListValue('customer_care_users', id);
+    await writeDeveloperAudit(user, 'developer_platform_user_create', { userId: id, role: body.role, email: body.email });
+    return c.json(record, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// PUT /developer/platform-users/:id — update a developer or care account
+app.put(`${PREFIX}/developer/platform-users/:id`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
+    if (body.role && !allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    // Update in both KV stores
+    const existing = await kv.get(`customer_care_users:${id}`) || await kv.get(`employee:${id}`) || { id };
+    const updated = { ...existing, ...body, id, updatedAt: new Date().toISOString() };
+    await kv.set(`customer_care_users:${id}`, updated);
+    await kv.set(`employee:${id}`, updated);
+    // Also update Supabase auth metadata if userId provided
+    if (body.role && (existing.userId || id)) {
+      const sb = supabaseAdmin();
+      await sb.auth.admin.updateUserById(existing.userId || id, {
+        user_metadata: { role: body.role, name: updated.name },
+      }).catch(() => {});
+    }
+    await writeDeveloperAudit(user, 'developer_platform_user_update', { targetId: id, changes: body });
+    return c.json(updated);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// DELETE /developer/platform-users/:id — remove a developer or care account
+app.delete(`${PREFIX}/developer/platform-users/:id`, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const id = c.req.param('id');
+    await kv.del(`customer_care_users:${id}`);
+    await removeListValue('customer_care_users', id);
+    await kv.del(`care_assignments:${id}`);
+    await writeDeveloperAudit(user, 'developer_platform_user_delete', { targetId: id });
+    return c.json({ success: true });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);

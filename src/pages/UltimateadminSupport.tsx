@@ -24,13 +24,15 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ROLES = ['customer_care_agent', 'support_manager', 'developer', 'ultimateadmin'];
+const PLATFORM_ROLES = ['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
 
 const SIDEBAR_ITEMS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'tenants', label: 'Tenants', icon: Building2 },
   { id: 'tickets', label: 'Support Tickets', icon: Ticket },
   { id: 'license-issues', label: 'License Issues', icon: Key },
-  { id: 'agents', label: 'Agent Management', icon: Users },
+  { id: 'platform-users', label: 'Platform Users', icon: Users },
+  { id: 'assignments', label: 'Assignments', icon: Activity },
   { id: 'audit', label: 'Audit Trail', icon: BookOpen },
   { id: 'dev-tools', label: 'Developer Tools', icon: Wrench },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -710,6 +712,269 @@ function AgentsPanel({ token }: { token: string }) {
   );
 }
 
+// ─── Platform Users Panel ─────────────────────────────────────────────────────
+function PlatformUsersPanel({ token }: { token: string }) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editUser, setEditUser] = useState<any | null>(null);
+  const [form, setForm] = useState({ name: '', email: '', role: 'customer_care_agent' });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api('/developer/platform-users', { token });
+      setUsers(Array.isArray(data) ? data : []);
+    } catch { toast.error('Failed to load platform users'); }
+    finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const saveUser = async () => {
+    if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
+    setSaving(true);
+    try {
+      if (editUser) {
+        await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body: form });
+        toast.success('User updated');
+      } else {
+        await api('/developer/platform-users', { method: 'POST', token, body: form });
+        toast.success('Platform user created');
+      }
+      setShowCreate(false);
+      setEditUser(null);
+      setForm({ name: '', email: '', role: 'customer_care_agent' });
+      load();
+    } catch { toast.error('Save failed'); }
+    finally { setSaving(false); }
+  };
+
+  const deleteUser = async (u: any) => {
+    if (!confirm(`Delete platform user ${u.email}?`)) return;
+    try {
+      await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
+      toast.success('User removed');
+      load();
+    } catch { toast.error('Delete failed'); }
+  };
+
+  const openEdit = (u: any) => {
+    setEditUser(u);
+    setForm({ name: u.name || '', email: u.email || '', role: u.role || 'customer_care_agent' });
+    setShowCreate(true);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => { setEditUser(null); setForm({ name: '', email: '', role: 'customer_care_agent' }); setShowCreate(true); }}>
+          <UserPlus className="h-3.5 w-3.5 mr-1" />Add Platform User
+        </Button>
+      </div>
+      <p className="text-sm text-gray-500">
+        Platform users (developers and customer care agents) are granted access directly here.
+        They do not need a tenant subscription or license.
+      </p>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+      ) : (
+        <div className="border rounded-lg overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No platform users yet</TableCell></TableRow>}
+              {users.map(u => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium text-sm">{u.name}</TableCell>
+                  <TableCell className="text-sm">{u.email}</TableCell>
+                  <TableCell><StatusBadge status={u.role} /></TableCell>
+                  <TableCell><StatusBadge status={u.status || 'active'} /></TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(u)} title="Edit"><Settings className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteUser(u)} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editUser ? 'Edit Platform User' : 'Add Platform User'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Full Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div><Label>Email *</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} disabled={!!editUser} /></div>
+            <div>
+              <Label>Role</Label>
+              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{PLATFORM_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={saveUser} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}{editUser ? 'Update' : 'Create'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Assignments Panel ────────────────────────────────────────────────────────
+function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[] }) {
+  const [careAgents, setCareAgents] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedAgent, setSelectedAgent] = useState('');
+  const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [agentsData, assignData] = await Promise.all([
+        api('/developer/platform-users', { token }),
+        api('/developer/assignments', { token }),
+      ]);
+      const agents = Array.isArray(agentsData) ? agentsData.filter((u: any) => {
+        const r = u.role || '';
+        return r === 'customer_care' || r === 'customer_care_agent' || r === 'care' || r === 'support' || r === 'support_manager';
+      }) : [];
+      setCareAgents(agents);
+      setAssignments(Array.isArray(assignData) ? assignData : []);
+    } catch { toast.error('Failed to load assignments'); }
+    finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const assignedTenantsForAgent = (agentId: string) =>
+    assignments.filter((a: any) => a.careAgentId === agentId).map((a: any) => a.tenantId);
+
+  const addAssignment = async () => {
+    if (!selectedAgent || selectedTenants.length === 0) return toast.error('Select agent and at least one tenant');
+    setSaving(true);
+    try {
+      await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+      toast.success('Assignment saved');
+      setSelectedAgent('');
+      setSelectedTenants([]);
+      load();
+    } catch { toast.error('Assignment failed'); }
+    finally { setSaving(false); }
+  };
+
+  const removeAssignment = async (assignmentId: string) => {
+    try {
+      await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
+      toast.success('Assignment removed');
+      load();
+    } catch { toast.error('Remove failed'); }
+  };
+
+  const tenantName = (id: string) => tenants.find(t => t.id === id)?.name || id.slice(0, 12) + '…';
+
+  return (
+    <div className="space-y-6">
+      {/* Create new assignment */}
+      <div className="border rounded-lg p-4 space-y-3">
+        <h3 className="font-medium text-sm">Assign Tenants to Care Agent</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label>Care Agent</Label>
+            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Select agent…" /></SelectTrigger>
+              <SelectContent>
+                {careAgents.map(a => <SelectItem key={a.id} value={a.id}>{a.name} ({a.email})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Tenants (comma-separated IDs or select below)</Label>
+            <div className="mt-1 border rounded-lg max-h-40 overflow-y-auto p-2 space-y-1">
+              {tenants.length === 0 && <p className="text-xs text-gray-400">No tenants available</p>}
+              {tenants.map(t => (
+                <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 rounded px-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedTenants.includes(t.id)}
+                    onChange={e => {
+                      setSelectedTenants(prev =>
+                        e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id)
+                      );
+                    }}
+                  />
+                  {t.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+        <Button size="sm" onClick={addAssignment} disabled={saving || !selectedAgent || selectedTenants.length === 0}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+          Assign Selected Tenants
+        </Button>
+      </div>
+
+      {/* Current assignments per agent */}
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+      ) : (
+        <div className="space-y-3">
+          <h3 className="font-medium text-sm text-gray-700">Current Assignments</h3>
+          {careAgents.length === 0 && <p className="text-sm text-gray-400">No care agents found. Add platform users first.</p>}
+          {careAgents.map(agent => {
+            const agentAssignments = assignments.filter((a: any) => a.careAgentId === agent.id);
+            return (
+              <div key={agent.id} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="font-medium text-sm">{agent.name}</p>
+                    <p className="text-xs text-gray-500">{agent.email} · <StatusBadge status={agent.role} /></p>
+                  </div>
+                  <span className="text-xs text-gray-400">{agentAssignments.length} tenant(s)</span>
+                </div>
+                {agentAssignments.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">No tenants assigned</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {agentAssignments.map((a: any) => (
+                      <span key={a.id} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full">
+                        {tenantName(a.tenantId)}
+                        <button
+                          onClick={() => removeAssignment(a.id)}
+                          className="ml-1 text-gray-400 hover:text-red-500"
+                          title="Remove"
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Audit Trail Panel ─────────────────────────────────────────────────────────
 function AuditTrailPanel({ token }: { token: string }) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -907,7 +1172,7 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
             <Shield className="h-4 w-4 text-gray-900" />
           </div>
-          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Customer Care</span>}
+          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Developer Dashboard</span>}
         </div>
 
         <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
@@ -969,7 +1234,7 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
                           { label: 'View Tenants', icon: Building2, section: 'tenants' },
                           { label: 'New Ticket', icon: Ticket, section: 'tickets' },
                           { label: 'License Issues', icon: Key, section: 'license-issues' },
-                          { label: 'Add Agent', icon: UserPlus, section: 'agents' },
+                          { label: 'Platform Users', icon: UserPlus, section: 'platform-users' },
                         ].map(a => (
                           <Button key={a.label} variant="outline" className="h-16 flex-col gap-1" onClick={() => setActiveSection(a.section)}>
                             <a.icon className="h-4 w-4" />
@@ -1003,6 +1268,8 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
               {activeSection === 'tenants' && <TenantsPanel token={token} />}
               {activeSection === 'tickets' && <TicketsPanel token={token} tenants={tenants} />}
               {activeSection === 'license-issues' && <LicenseIssuesPanel tenants={tenants} token={token} onRefresh={loadData} />}
+              {activeSection === 'platform-users' && <PlatformUsersPanel token={token} />}
+              {activeSection === 'assignments' && <AssignmentsPanel token={token} tenants={tenants} />}
               {activeSection === 'agents' && <AgentsPanel token={token} />}
               {activeSection === 'audit' && <AuditTrailPanel token={token} />}
               {activeSection === 'dev-tools' && <DevToolsPanel tenants={tenants} token={token} />}
