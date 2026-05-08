@@ -386,6 +386,7 @@ export default function HiringsPage() {
     try {
       // HIRING-FIX: Public endpoint now returns { jobs, total }.
       const data = await api('/public/jobs');
+      // HIRING-FIX: Keep backward compatibility with older array-only payloads.
       const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
       if (mountedRef.current) {
         setJobs(nextJobs);
