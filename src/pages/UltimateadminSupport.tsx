@@ -1338,7 +1338,7 @@ function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] 
                 onChange={e => setNewMsg(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
               />
-              <Button size="sm" onClick={sendMessage} disabled={sending || !newMsg.trim()}>
+              <Button size="sm" onClick={sendMessage} disabled={sending || !newMsg.trim()} aria-label="Send message">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrendingUp className="h-4 w-4" />}
               </Button>
             </div>

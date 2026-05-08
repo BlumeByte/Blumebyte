@@ -98,7 +98,7 @@ app.post(`${PREFIX}/admin/sync-all-stats`, async (c) => {
     if (!authUser) return c.json({ error: 'Unauthorized' }, 401);
     const profile = await kv.get(`employee:${authUser.id}`);
     const role = profile?.role || authUser.user_metadata?.role || '';
-    if (!['superadmin', 'developer'].includes(role)) {
+    if (!['superadmin', 'ultimateadmin', 'developer'].includes(role)) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const results = await syncAllCompaniesStats();
