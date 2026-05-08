@@ -10574,6 +10574,9 @@ async function sendEmailNotification(
 
 
 
+const compatibleRoutePaths = (path: string) =>
+  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {
   try {
@@ -10611,17 +10614,17 @@ const getPublicJobDetail = async (c: Context) => {
   }
 };
 
-for (const route of [`${PREFIX}/public/jobs`, '/public/jobs']) {
+for (const route of compatibleRoutePaths('/public/jobs')) {
   app.get(route, listPublicJobs);
 }
 
-for (const route of [`${PREFIX}/public/jobs/:id`, '/public/jobs/:id']) {
+for (const route of compatibleRoutePaths('/public/jobs/:id')) {
   app.get(route, getPublicJobDetail);
 }
 
 // POST /public/job/apply — submit a public job application
 // Basic rate limiting via KV: max 5 submissions per email per hour
-app.post(`${PREFIX}/public/job/apply`, async (c) => {
+const applyToPublicJob = async (c: any) => {
   try {
     const body = await c.req.json();
     const { jobId, companyName, roleTitle, fullName, email, phone, qualification, cvMessage, contactDetails } = body;
@@ -10777,11 +10780,10 @@ app.post(`${PREFIX}/public/job/apply`, async (c) => {
     console.error('Public job apply error:', e);
     return c.json({ error: e.message || 'Submission failed' }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/public/job/apply')) app.post(route, applyToPublicJob);
 
 // ============ CUSTOMER CARE / DEVELOPER ENDPOINTS ============
-
-const careRoutePaths = (path: string) => [`${PREFIX}${path}`, path];
 
 // Helper: verify care account access
 async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDeveloper: boolean } | null> {
@@ -10809,7 +10811,7 @@ const verifyCareRouteAccess = async (c: any) => {
     return c.json({ allowed: false }, 403);
   }
 };
-for (const route of careRoutePaths('/care/verify-access')) app.get(route, verifyCareRouteAccess);
+for (const route of compatibleRoutePaths('/care/verify-access')) app.get(route, verifyCareRouteAccess);
 
 // GET /care/profile — care account's own profile
 const getCareProfile = async (c: any) => {
@@ -10826,7 +10828,7 @@ const getCareProfile = async (c: any) => {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 };
-for (const route of careRoutePaths('/care/profile')) app.get(route, getCareProfile);
+for (const route of compatibleRoutePaths('/care/profile')) app.get(route, getCareProfile);
 
 // GET /care/tenants — list all tenant companies
 const listCareTenants = async (c: any) => {
@@ -10867,7 +10869,7 @@ const listCareTenants = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of careRoutePaths('/care/tenants')) app.get(route, listCareTenants);
+for (const route of compatibleRoutePaths('/care/tenants')) app.get(route, listCareTenants);
 
 // GET /care/tenants/:id/users — list users for a tenant
 const listCareTenantUsers = async (c: any) => {
@@ -10896,7 +10898,7 @@ const listCareTenantUsers = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of careRoutePaths('/care/tenants/:id/users')) app.get(route, listCareTenantUsers);
+for (const route of compatibleRoutePaths('/care/tenants/:id/users')) app.get(route, listCareTenantUsers);
 
 // DELETE /care/tenants/:id — delete a tenant (developer only)
 const deleteCareTenant = async (c: any) => {
@@ -10950,7 +10952,7 @@ const deleteCareTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of careRoutePaths('/care/tenants/:id')) app.delete(route, deleteCareTenant);
+for (const route of compatibleRoutePaths('/care/tenants/:id')) app.delete(route, deleteCareTenant);
 
 // POST /care/reset-password — generate a password reset link for a user
 const createCareResetPassword = async (c: any) => {
@@ -10973,7 +10975,7 @@ const createCareResetPassword = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of careRoutePaths('/care/reset-password')) app.post(route, createCareResetPassword);
+for (const route of compatibleRoutePaths('/care/reset-password')) app.post(route, createCareResetPassword);
 
 // PUT /care/tenants/:id/license — update license count (developer only)
 const updateCareTenantLicenses = async (c: any) => {
@@ -10996,7 +10998,7 @@ const updateCareTenantLicenses = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of careRoutePaths('/care/tenants/:id/license')) app.put(route, updateCareTenantLicenses);
+for (const route of compatibleRoutePaths('/care/tenants/:id/license')) app.put(route, updateCareTenantLicenses);
 
 // GET /care/global-applications — list all public job applications
 const listCareGlobalApplications = async (c: any) => {
@@ -11011,7 +11013,7 @@ const listCareGlobalApplications = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of careRoutePaths('/care/global-applications')) app.get(route, listCareGlobalApplications);
+for (const route of compatibleRoutePaths('/care/global-applications')) app.get(route, listCareGlobalApplications);
 
 
 // SuperAdmin CRUD for public job applications (status updates, view, archive)
