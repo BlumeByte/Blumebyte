@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Button } from '../components/ui/button';
-import { Users, BarChart3, Clock, DollarSign, Trophy, UserCheck, Shield, Zap, FileText, Calendar, Award, CheckCircle2, TrendingUp, Star, Target } from 'lucide-react';
+import { Users, BarChart3, Clock, DollarSign, Trophy, UserCheck, Shield, Zap, FileText, Award, CheckCircle2, TrendingUp, Star } from 'lucide-react';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
 function useInView(threshold = 0.15) {
