@@ -57,6 +57,10 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [activatingLicenses, setActivatingLicenses] = useState(false);
 
+  // Renewal state
+  const [renewPlan, setRenewPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [renewLoading, setRenewLoading] = useState(false);
+
   useEffect(() => {
     fetchLicenseInfo();
   }, []);
@@ -271,7 +275,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const handleSyncLicenses = async () => {
     try {
       setSyncing(true);
-      const response = await apiClient.post('/sync-user-licenses', {}, accessToken);
+      const freshToken = await getToken();
+      const response = await apiClient.post('/sync-user-licenses', {}, freshToken);
       
       if (response.ok) {
         const result = await response.json();
@@ -292,6 +297,62 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       toast.error(error.message || 'Failed to sync licenses');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleRenewLicense = async () => {
+    const payWindow = window.open('', '_blank');
+    if (payWindow) {
+      payWindow.document.write(`<html><head><title>Connecting to Paystack...</title>
+        <style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff;margin:0}
+        .s{width:48px;height:48px;border:4px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:24px}
+        @keyframes spin{to{transform:rotate(360deg)}}h2{margin:0 0 8px}p{opacity:.8}</style></head>
+        <body><div class="s"></div><h2>Connecting to Paystack…</h2><p>Preparing your renewal…</p></body></html>`);
+      payWindow.document.close();
+    }
+    try {
+      setRenewLoading(true);
+      const freshToken = await getToken();
+      if (!freshToken) { payWindow?.close(); toast.error('Not authenticated'); return; }
+
+      const licenses = licenseInfo?.purchasedLicenses || MIN_LICENSES;
+      const pricePerUser = renewPlan === 'monthly' ? 6 : 60;
+      const amount = licenses * pricePerUser;
+
+      const response = await apiClient.post('/subscription/renew-license', {
+        licenses,
+        plan: renewPlan,
+        amount,
+        saveCard,
+      }, freshToken);
+
+      if (!response.ok) {
+        const error = await response.json();
+        payWindow?.close();
+        throw new Error(error.error || error.message || 'Failed to initialize renewal');
+      }
+      const data = await response.json();
+      if (data.authorization_url) {
+        if (payWindow && !payWindow.closed) {
+          payWindow.location.href = data.authorization_url;
+        } else {
+          window.location.href = data.authorization_url;
+        }
+        if (data.reference) {
+          setPendingReference(data.reference);
+          setPaymentWindowOpened(true);
+          setPaymentCompleted(false);
+          if (payWindow) paymentWindowRef.current = payWindow;
+          startPaymentPolling(data.reference);
+        }
+      } else {
+        payWindow?.close();
+        throw new Error('No payment URL received');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to start renewal');
+    } finally {
+      setRenewLoading(false);
     }
   };
 
@@ -343,7 +404,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       if (currentActiveUsers > newTotalLicenses) {
         // Need to select which users to keep active — fetch users first
         setFetchingUsers(true);
-        const usersResponse = await apiClient.get('/subscription/all-users', accessToken);
+        const freshToken = await getToken();
+        const usersResponse = await apiClient.get('/subscription/all-users', freshToken);
         
         if (!usersResponse.ok) {
           payWindow?.close();
@@ -374,6 +436,13 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     try {
       setLoading(true);
       
+      // Always get a fresh token to avoid stale auth errors
+      const freshToken = await getToken();
+      if (!freshToken) {
+        payWindow?.close();
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
       const pricePerUser = selectedPlan === 'monthly' ? 6 : 60;
       // Ensure additionalLicenses is a valid integer (guard against NaN from bad input)
       const safeLicenses = Number.isFinite(additionalLicenses) ? Math.max(MIN_LICENSES, Math.round(additionalLicenses)) : MIN_LICENSES;
@@ -392,7 +461,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         ...(selectedUserIds.length > 0 && { selectedUserIds }),
       };
 
-      const response = await apiClient.post(endpoint, payload, accessToken);
+      const response = await apiClient.post(endpoint, payload, freshToken);
 
       if (!response.ok) {
         const error = await response.json();
@@ -932,6 +1001,78 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           </div>
         </CardContent>
       </Card>
+
+      {/* Renew License — shown when license is expired or near expiry */}
+      {licenseInfo && (licenseInfo.licenseStatus === 'expired' || licenseInfo.status === 'expired' || (licenseInfo.expiresAt && new Date(licenseInfo.expiresAt) < new Date())) && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-800">
+              <TrendingUp className="w-5 h-5" />
+              Renew Your License
+            </CardTitle>
+            <p className="text-sm text-orange-700">
+              Your license has expired. Renew now to restore access for your team.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Card
+                className={`cursor-pointer transition-all ${renewPlan === 'monthly' ? 'ring-2 ring-orange-500 shadow-lg' : 'hover:shadow-md'}`}
+                onClick={() => setRenewPlan('monthly')}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-semibold">Monthly</p>
+                      <p className="text-xs text-muted-foreground">Pay as you go</p>
+                    </div>
+                    {renewPlan === 'monthly' && <CheckCircle className="w-5 h-5 text-orange-500" />}
+                  </div>
+                  <p className="text-2xl font-bold">$6</p>
+                  <p className="text-xs text-muted-foreground">per license/month</p>
+                </CardContent>
+              </Card>
+              <Card
+                className={`cursor-pointer transition-all relative ${renewPlan === 'yearly' ? 'ring-2 ring-orange-500 shadow-lg' : 'hover:shadow-md'}`}
+                onClick={() => setRenewPlan('yearly')}
+              >
+                <div className="absolute -top-2 -right-2">
+                  <Badge className="bg-green-600 text-white">
+                    <TrendingUp className="w-3 h-3 mr-1" />Save 20%
+                  </Badge>
+                </div>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-semibold">Yearly</p>
+                      <p className="text-xs text-muted-foreground">Best value</p>
+                    </div>
+                    {renewPlan === 'yearly' && <CheckCircle className="w-5 h-5 text-orange-500" />}
+                  </div>
+                  <p className="text-2xl font-bold">$5<span className="text-base text-muted-foreground">/month</span></p>
+                  <p className="text-xs text-muted-foreground">billed annually at $60/year</p>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="bg-orange-100 rounded-lg p-3 text-sm text-orange-800">
+              Renewing <strong>{licenseInfo.purchasedLicenses || MIN_LICENSES} license(s)</strong> for{' '}
+              <strong>${(licenseInfo.purchasedLicenses || MIN_LICENSES) * (renewPlan === 'monthly' ? 6 : 60)}</strong>{' '}
+              ({renewPlan})
+            </div>
+            <Button
+              onClick={handleRenewLicense}
+              disabled={renewLoading}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {renewLoading ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
+              ) : (
+                <><CreditCard className="w-4 h-4 mr-2" />Renew License</>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* User License Selector Dialog */}
       {showUserSelector && (

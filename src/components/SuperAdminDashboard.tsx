@@ -26,7 +26,7 @@ import {
   Award, Target, MessageSquare, GitMerge, UserCheck, BookOpen, Archive,
   MessageCircle, Send, Mail, User, Download, Upload, ArrowUpRight,
   Eye, Star, MapPin, GraduationCap, Gavel, Shield, Heart, Zap,
-  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Printer, Filter, LogOut, Play, CreditCard, Activity
+  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Printer, Filter, LogOut, Play, CreditCard, Activity, Menu
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { NotificationsBell } from './NotificationsBell';
@@ -487,6 +487,7 @@ export function SuperAdminDashboard() {
   const { darkMode, toggleUserDarkMode } = useDarkMode();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [selectedCompanyName, setSelectedCompanyName] = useState<string>('All Companies');
 
@@ -606,7 +607,15 @@ export function SuperAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <aside className={`${collapsed ? 'w-[72px]' : 'w-60'} bg-card border-r border-border flex flex-col fixed h-screen z-30 transition-all duration-200 overflow-hidden`}>
+      {/* Mobile overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      <aside className={`${collapsed ? 'w-[72px]' : 'w-60'} bg-card border-r border-border flex flex-col fixed h-screen z-50 md:z-30 transition-all duration-200 overflow-hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className={`p-3 flex items-center ${collapsed ? 'justify-center' : 'justify-between'} flex-shrink-0`}>
           {collapsed ? (
             <button onClick={() => setCollapsed(false)} className="w-10 h-10 rounded-xl flex items-center justify-center hover:scale-105 transition-transform overflow-hidden" style={brandGradientStyle(branding.primaryColor)} title="Expand sidebar">
@@ -637,7 +646,7 @@ export function SuperAdminDashboard() {
                     const Icon = item.icon;
                     const active = activeSection === item.id;
                     return (
-                      <button key={item.id} onClick={() => { setActiveSection(item.id); scrollToTop(); }}
+                      <button key={item.id} onClick={() => { setActiveSection(item.id); scrollToTop(); setMobileMenuOpen(false); }}
                         title={collapsed ? item.label : undefined}
                         className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
                         style={active ? { backgroundColor: branding.primaryColor + '15', color: branding.primaryColor } : undefined}>
@@ -673,21 +682,31 @@ export function SuperAdminDashboard() {
         </div>
       </aside>
 
-      <div className={`flex-1 ${collapsed ? 'ml-[72px]' : 'ml-60'} transition-all duration-200 min-w-0`}>
-        <div className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-6 py-2.5 flex items-center justify-between gap-3">
-          <CompanySwitcher 
-            accessToken={accessToken}
-            currentCompanyId={selectedCompanyId}
-            onCompanySwitch={(companyId, companyName) => {
-              clearAllCache();
-              setSelectedCompanyId(companyId);
-              setSelectedCompanyName(companyName);
-            }}
-          />
-          <div className="flex items-center gap-3">
+      <div className={`flex-1 ${collapsed ? 'md:ml-[72px]' : 'md:ml-60'} transition-all duration-200 min-w-0`}>
+        <div className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-4 md:px-6 py-2.5 flex items-center justify-between gap-3">
+          {/* Hamburger on mobile */}
+          <button
+            className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 flex-shrink-0"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <CompanySwitcher 
+              accessToken={accessToken}
+              currentCompanyId={selectedCompanyId}
+              onCompanySwitch={(companyId, companyName) => {
+                clearAllCache();
+                setSelectedCompanyId(companyId);
+                setSelectedCompanyName(companyName);
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
             <SubscriptionBadge />
             <NotificationsBell />
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Super Admin</Badge>
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 hidden sm:inline-flex">Super Admin</Badge>
           </div>
         </div>
         <SelectedCompanyContext.Provider value={{ selectedCompanyId, selectedCompanyName }}>

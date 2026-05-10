@@ -7112,6 +7112,86 @@ app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) =>
   }
 });
 
+// POST /subscription/renew-license — renew an existing subscription via Paystack
+app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    const { licenses, plan, saveCard } = body;
+
+    if (!licenses || !plan) {
+      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
+    }
+    if (!['monthly', 'yearly'].includes(plan)) {
+      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
+    }
+
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment gateway not configured' }, 500);
+    }
+
+    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const amount = Number(licenses) * pricePerUser;
+
+    const reference = `RENEW_${user.id}_${Date.now()}`;
+    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
+
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: user.email,
+        amount: amount * 100,
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          userId: user.id,
+          plan,
+          userCount: licenses,
+          isRenewal: true,
+          saveCard: saveCard !== false,
+          custom_fields: [
+            { display_name: 'Transaction Type', variable_name: 'type', value: 'renewal' },
+            { display_name: 'Plan', variable_name: 'plan', value: plan },
+            { display_name: 'Licenses', variable_name: 'user_count', value: String(licenses) },
+          ],
+        },
+      }),
+    });
+
+    const paystackData = await paystackResponse.json();
+    if (!paystackData.status) {
+      return c.json({ error: paystackData.message || 'Failed to initialize renewal payment' }, 500);
+    }
+
+    await kv.set(`pending-subscription:${reference}`, {
+      userId: user.id,
+      plan,
+      userCount: licenses,
+      amount,
+      reference,
+      isRenewal: true,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
+      authorization_url: paystackData.data.authorization_url,
+      access_code: paystackData.data.access_code,
+      reference: paystackData.data.reference,
+    });
+  } catch (e: any) {
+    console.error('Error in renew-license:', e);
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // Verify Paystack payment
 app.post(`${PREFIX}/subscription/verify`, async (c) => {
   try {

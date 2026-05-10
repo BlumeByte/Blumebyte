@@ -19,7 +19,7 @@ import {
   BarChart3, Briefcase, Ticket, Key, Activity, FileText, UserPlus,
   ChevronRight, ChevronLeft, Wrench, Bell, Lock, Unlock, PanelLeftClose,
   PanelLeftOpen, AlertTriangle, BookOpen, MessageSquare, Server, Zap,
-  TrendingUp
+  TrendingUp, Menu, X as XIcon
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1536,6 +1536,7 @@ WHERE email IN ('your-email@example.com', 'care-agent@example.com');`}</pre>
 function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const [activeSection, setActiveSection] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [myProfile, setMyProfile] = useState<{ email: string; name: string; role: string } | null>(null);
@@ -1544,16 +1545,18 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [metricsData, tenantsData, profileData] = await Promise.all([
+      const [metricsResult, tenantsResult, profileResult] = await Promise.allSettled([
         api('/ultimateadmin/support/metrics', { token }),
         api('/ultimateadmin/support/tenants', { token }),
         api('/ultimateadmin/support/verify', { token }),
       ]);
-      setMetrics(metricsData);
-      setTenants(Array.isArray(tenantsData) ? tenantsData : []);
-      setMyProfile(profileData);
+      if (metricsResult.status === 'fulfilled') setMetrics(metricsResult.value);
+      if (tenantsResult.status === 'fulfilled') setTenants(Array.isArray(tenantsResult.value) ? tenantsResult.value : []);
+      if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
+      // Only show error if tenants failed (core data)
+      if (tenantsResult.status === 'rejected') toast.error('Failed to load tenant data');
     } catch {
-      toast.error('Failed to load dashboard data');
+      toast.error('Unexpected error loading dashboard');
     } finally {
       setLoading(false);
     }
@@ -1571,20 +1574,43 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} transition-all duration-200 bg-gray-950 text-gray-200 flex flex-col shrink-0`}>
+      <aside className={`
+        ${sidebarCollapsed ? 'w-16' : 'w-56'}
+        transition-all duration-200 bg-gray-950 text-gray-200 flex flex-col shrink-0
+        fixed md:relative h-screen z-50 md:z-auto
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-800">
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
             <Shield className="h-4 w-4 text-gray-900" />
           </div>
           {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Ultimateadmin</span>}
+          {/* Close button on mobile */}
+          {!sidebarCollapsed && (
+            <button
+              className="ml-auto md:hidden text-gray-400 hover:text-white"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close menu"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
           {SIDEBAR_ITEMS.map(item => (
             <button
               key={item.id}
-              onClick={() => setActiveSection(item.id)}
+              onClick={() => { setActiveSection(item.id); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeSection === item.id ? 'bg-white text-gray-900 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
             >
               <item.icon className="h-4 w-4 shrink-0" />
@@ -1596,7 +1622,7 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
         <div className="border-t border-gray-800 p-2 space-y-1">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white text-sm"
+            className="hidden md:flex w-full items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white text-sm"
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             {!sidebarCollapsed && <span>Collapse</span>}
@@ -1612,18 +1638,28 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-          <div>
-            <h1 className="font-semibold text-gray-900">{sectionTitle}</h1>
-            {myProfile && <p className="text-xs text-gray-500">{myProfile.email} · <StatusBadge status={myProfile.role} /></p>}
+      <main className="flex-1 overflow-auto min-w-0">
+        <header className="bg-white border-b px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            {/* Hamburger on mobile */}
+            <button
+              className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="font-semibold text-gray-900">{sectionTitle}</h1>
+              {myProfile && <p className="text-xs text-gray-500 hidden sm:block">{myProfile.email} · <StatusBadge status={myProfile.role} /></p>}
+            </div>
           </div>
           <Button variant="outline" size="sm" onClick={loadData}>
             <RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh
           </Button>
         </header>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-6">
           {loading ? (
             <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>
           ) : (
