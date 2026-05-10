@@ -338,7 +338,7 @@ async function requireRole(c: any, roles: string[]) {
 const requireSuperAdmin = (c: any) => requireRole(c, ["superadmin"]);
 const requireAdminOrAbove = (c: any) => requireRole(c, ["superadmin", "admin"]);
 const requireManagerOrAbove = (c: any) => requireRole(c, ["superadmin", "admin", "manager"]);
-const CUSTOMER_CARE_ROLES = ["customer_care", "customer-care", "customer_care_agent", "care", "support", "support_manager"];
+const CUSTOMER_CARE_ROLES = ["customer_care", "customer-care"];
 const requireDeveloper = (c: any) => requireRole(c, ["developer", "ultimateadmin"]);
 const requireCustomerCare = (c: any) => requireRole(c, CUSTOMER_CARE_ROLES);
 
@@ -11015,8 +11015,8 @@ async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDe
   const profile = await kv.get(`employee:${data.user.id}`);
   const isDeveloper = profile?.role === 'developer' || profile?.isPlatformAdmin === true;
   const role = profile?.role || data.user.user_metadata?.role || '';
-  const normalizedRole = role === 'customer-care' ? 'customer_care' : role;
-  const isCare = normalizedRole === 'customer_care' || normalizedRole === 'customer_care_agent' || normalizedRole === 'care' || normalizedRole === 'support' || normalizedRole === 'support_manager';
+  const normalizedRole = normalizeCareRole(role);
+  const isCare = normalizedRole === 'customer_care';
   if (!isDeveloper && !isCare) return null;
   return { user: data.user, profile, isDeveloper };
 }
@@ -11299,7 +11299,7 @@ app.delete(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
 // ============ ULTIMATEADMIN SUPPORT DASHBOARD ENDPOINTS ============
 
 // Helper: allowed support roles (KV or user_metadata)
-const SUPPORT_ROLES = new Set(['ultimateadmin', 'developer', 'customer_care_agent', 'support_manager', 'care', 'support']);
+const SUPPORT_ROLES = new Set(['ultimateadmin', 'developer', 'customer_care']);
 
 async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
   const token = extractUserToken(c);
@@ -11309,13 +11309,14 @@ async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: 
   if (error || !data?.user) return null;
   const profile = await kv.get(`employee:${data.user.id}`);
   const role: string = profile?.role || data.user.user_metadata?.role || '';
-  const allowed = SUPPORT_ROLES.has(role) || profile?.isPlatformAdmin === true;
+  const normalizedRole = normalizeCareRole(role);
+  const allowed = SUPPORT_ROLES.has(normalizedRole) || profile?.isPlatformAdmin === true;
   if (!allowed) return null;
-  return { user: data.user, profile, role };
+  return { user: data.user, profile, role: normalizedRole };
 }
 
 // GET /ultimateadmin/support/verify
-app.get(`${PREFIX}/ultimateadmin/support/verify`, async (c) => {
+const verifyUltimateadminSupport = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ allowed: false }, 403);
@@ -11323,10 +11324,13 @@ app.get(`${PREFIX}/ultimateadmin/support/verify`, async (c) => {
   } catch {
     return c.json({ allowed: false }, 403);
   }
-});
+};
+for (const route of [`${PREFIX}/ultimateadmin/support/verify`, `${PREFIX}/support/verify`]) {
+  app.get(route, verifyUltimateadminSupport);
+}
 
 // GET /ultimateadmin/support/metrics — overview counts
-app.get(`${PREFIX}/ultimateadmin/support/metrics`, async (c) => {
+const getUltimateadminSupportMetrics = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11379,10 +11383,13 @@ app.get(`${PREFIX}/ultimateadmin/support/metrics`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of [`${PREFIX}/ultimateadmin/support/metrics`, `${PREFIX}/support/metrics`]) {
+  app.get(route, getUltimateadminSupportMetrics);
+}
 
 // GET /ultimateadmin/support/tenants — all tenants with stats
-app.get(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
+const listUltimateadminSupportTenants = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11466,7 +11473,10 @@ app.get(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of [`${PREFIX}/ultimateadmin/support/tenants`, `${PREFIX}/support/tenants`]) {
+  app.get(route, listUltimateadminSupportTenants);
+}
 
 // GET /ultimateadmin/support/tenants/:id/users
 app.get(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
@@ -11671,13 +11681,13 @@ app.post(`${PREFIX}/ultimateadmin/support/agents`, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'support_manager' && !access.profile?.isPlatformAdmin) {
+    if (access.role !== 'ultimateadmin' && !access.profile?.isPlatformAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const body = await c.req.json();
     const id = crypto.randomUUID();
     const agent = {
-      id, name: body.name || '', email: body.email || '', role: body.role || 'customer_care_agent',
+      id, name: body.name || '', email: body.email || '', role: body.role || 'customer_care',
       assignedTenants: body.assignedTenants || [], status: 'active',
       openTickets: 0, resolvedTickets: 0,
       createdAt: new Date().toISOString(), createdBy: access.user.email,
@@ -11728,7 +11738,7 @@ app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
     const body = await c.req.json();
     const { userId, name, role } = body;
     if (!userId || !role) return c.json({ error: 'userId and role are required' }, 400);
-    const ALLOWED_PLATFORM_ROLES = ['developer', 'ultimateadmin', 'customer_care_agent', 'support_manager', 'care'];
+    const ALLOWED_PLATFORM_ROLES = ['developer', 'ultimateadmin', 'customer_care'];
     if (!ALLOWED_PLATFORM_ROLES.includes(role)) {
       return c.json({ error: `Invalid role. Allowed: ${ALLOWED_PLATFORM_ROLES.join(', ')}` }, 400);
     }
@@ -12019,7 +12029,7 @@ app.post(`${PREFIX}/ultimateadmin/chat/send`, async (c) => {
 // ── Ultimateadmin canonical aliases for /developer/* endpoints ─────────────────
 // Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
 
-app.get(`${PREFIX}/ultimateadmin/platform-users`, async (c) => {
+for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platform-users`]) app.get(route, async (c) => {
   // Delegate to the same logic as /developer/platform-users
   try {
     const access = await verifyUltimateAdminAccess(c);
@@ -12032,7 +12042,7 @@ app.get(`${PREFIX}/ultimateadmin/platform-users`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/ultimateadmin/platform-users`, async (c) => {
+for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platform-users`]) app.post(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12041,7 +12051,9 @@ app.post(`${PREFIX}/ultimateadmin/platform-users`, async (c) => {
     if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
     const sb = supabaseAdmin();
     const password = body.password || generateTempPassword();
-    const role = body.role || 'customer_care';
+    const role = normalizeCareRole(body.role || 'customer_care');
+    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+    if (!allowedRoles.includes(role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
     const { data: authData, error: authErr } = await sb.auth.admin.createUser({
       email: body.email.toLowerCase().trim(), password,
       user_metadata: { role, name: body.name },
@@ -12068,7 +12080,7 @@ app.post(`${PREFIX}/ultimateadmin/platform-users`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/ultimateadmin/platform-users/:id`, async (c) => {
+for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/platform-users/:id`]) app.put(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12077,6 +12089,11 @@ app.put(`${PREFIX}/ultimateadmin/platform-users/:id`, async (c) => {
     const body = await c.req.json();
     const existing = await kv.get(`platform_user:${userId}`);
     if (!existing) return c.json({ error: 'User not found' }, 404);
+    if (body.role) {
+      body.role = normalizeCareRole(body.role);
+      const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+      if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    }
     const updated = { ...existing, ...body, id: userId, updatedAt: new Date().toISOString() };
     await kv.set(`platform_user:${userId}`, updated);
     // Update Supabase user_metadata role if role changed
@@ -12090,7 +12107,7 @@ app.put(`${PREFIX}/ultimateadmin/platform-users/:id`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/ultimateadmin/platform-users/:id`, async (c) => {
+for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/platform-users/:id`]) app.delete(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12106,7 +12123,7 @@ app.delete(`${PREFIX}/ultimateadmin/platform-users/:id`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/ultimateadmin/assignments`, async (c) => {
+for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignments`]) app.get(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12118,7 +12135,7 @@ app.get(`${PREFIX}/ultimateadmin/assignments`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/ultimateadmin/assignments`, async (c) => {
+for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignments`]) app.post(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12143,7 +12160,7 @@ app.post(`${PREFIX}/ultimateadmin/assignments`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/ultimateadmin/assignments/:id`, async (c) => {
+for (const route of [`${PREFIX}/ultimateadmin/assignments/:id`, `${PREFIX}/assignments/:id`]) app.delete(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12194,7 +12211,7 @@ async function writeDeveloperAudit(actor: any, action: string, details: any = {}
 
 function normalizeCareRole(role: string) {
   if (role === 'customer-care') return 'customer_care';
-  if (role === 'customer_care_agent' || role === 'care' || role === 'support') return 'customer_care';
+  if (role === 'customer_care_agent' || role === 'care' || role === 'support' || role === 'support_manager') return 'customer_care';
   return role;
 }
 
@@ -12884,7 +12901,7 @@ app.get(`${PREFIX}/developer/platform-users`, async (c) => {
     ]);
     // Also include developer/ultimateadmin accounts from employee records
     const allEmps = await kv.getByPrefix('employee:');
-    const platformRoles = new Set(['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager']);
+    const platformRoles = new Set(['developer', 'ultimateadmin', 'customer_care']);
     const devUsers = allEmps.filter((u: any) => platformRoles.has(u.role));
 
     // Deduplicate by userId/id/email
@@ -12894,12 +12911,13 @@ app.get(`${PREFIX}/developer/platform-users`, async (c) => {
       const key = u.userId || u.id || u.email;
       if (!key || seen.has(key)) continue;
       seen.add(key);
+      const normalizedRole = normalizeCareRole(u.role || 'customer_care');
       merged.push({
         id: u.id || u.userId || key,
         userId: u.userId || u.id || key,
         name: u.name || '',
         email: u.email || '',
-        role: u.role || 'customer_care',
+        role: normalizedRole,
         status: u.status || 'active',
         assignedTenants: u.assignedTenants || [],
         createdAt: u.createdAt || '',
@@ -12919,15 +12937,16 @@ app.post(`${PREFIX}/developer/platform-users`, async (c) => {
     const { user } = await requireDeveloper(c);
     const body = await c.req.json();
     if (!body?.email || !body?.name || !body?.role) return c.json({ error: 'email, name and role are required' }, 400);
-    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
-    if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+    const normalizedRole = normalizeCareRole(body.role);
+    if (!allowedRoles.includes(normalizedRole)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
     const id = body.id || body.userId || crypto.randomUUID();
     const record = {
       id,
       userId: body.userId || id,
       name: body.name,
       email: String(body.email).toLowerCase(),
-      role: body.role,
+      role: normalizedRole,
       status: body.status || 'active',
       assignedTenants: [],
       createdAt: new Date().toISOString(),
@@ -12936,7 +12955,7 @@ app.post(`${PREFIX}/developer/platform-users`, async (c) => {
     await kv.set(`customer_care_users:${id}`, record);
     await kv.set(`employee:${id}`, { ...record, updatedAt: new Date().toISOString() });
     await appendUniqueListValue('customer_care_users', id);
-    await writeDeveloperAudit(user, 'developer_platform_user_create', { userId: id, role: body.role, email: body.email });
+    await writeDeveloperAudit(user, 'developer_platform_user_create', { userId: id, role: normalizedRole, email: body.email });
     return c.json(record, 201);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
@@ -12951,8 +12970,11 @@ app.put(`${PREFIX}/developer/platform-users/:id`, async (c) => {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
     const body = await c.req.json();
-    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
-    if (body.role && !allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+    if (body.role) {
+      body.role = normalizeCareRole(body.role);
+      if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    }
     // Update in both KV stores
     const existing = await kv.get(`customer_care_users:${id}`) || await kv.get(`employee:${id}`) || { id };
     const updated = { ...existing, ...body, id, updatedAt: new Date().toISOString() };

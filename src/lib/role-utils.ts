@@ -1,4 +1,4 @@
-export const CUSTOMER_CARE_ROLES = ['customer_care', 'customer-care', 'customer_care_agent', 'care', 'support', 'support_manager'] as const;
+export const CUSTOMER_CARE_ROLES = ['customer_care', 'customer-care'] as const;
 
 export function isCustomerCareRole(role: string | null | undefined): boolean {
   if (!role) return false;
