@@ -11308,9 +11308,21 @@ async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: 
   const { data, error } = await sb.auth.getUser(token);
   if (error || !data?.user) return null;
   const profile = await kv.get(`employee:${data.user.id}`);
-  const role: string = profile?.role || data.user.user_metadata?.role || '';
-  const normalizedRole = normalizeCareRole(role);
-  const allowed = SUPPORT_ROLES.has(normalizedRole) || profile?.isPlatformAdmin === true;
+  const profileRole = normalizeCareRole(profile?.role || '');
+  const metadataRole = normalizeCareRole(data.user.user_metadata?.role || '');
+  const isPlatformAdmin = profile?.isPlatformAdmin === true;
+  // Prevent stale KV roles from downgrading platform owners.
+  const normalizedRole =
+    isPlatformAdmin
+      ? 'ultimateadmin'
+      : (profileRole === 'ultimateadmin' || metadataRole === 'ultimateadmin')
+      ? 'ultimateadmin'
+      : (profileRole === 'developer' || metadataRole === 'developer')
+      ? 'developer'
+      : (profileRole === 'customer_care' || metadataRole === 'customer_care')
+      ? 'customer_care'
+      : profileRole || metadataRole;
+  const allowed = SUPPORT_ROLES.has(normalizedRole) || isPlatformAdmin;
   if (!allowed) return null;
   return { user: data.user, profile, role: normalizedRole };
 }
@@ -12035,8 +12047,33 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platfo
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
-    const users = await kv.getByPrefix('platform_user:');
-    return c.json(users);
+    // Merge canonical and legacy records so ultimateadmin can see all platform users.
+    const [platformUsers, customerCareUsers, supportAgents, allEmployees] = await Promise.all([
+      kv.getByPrefix('platform_user:'),
+      kv.getByPrefix('customer_care_users:'),
+      kv.getByPrefix('support-agent:'),
+      kv.getByPrefix('employee:'),
+    ]);
+    const allowedPlatformRoles = new Set(['developer', 'ultimateadmin', 'customer_care']);
+    const employeePlatformUsers = allEmployees.filter((u: any) => allowedPlatformRoles.has(normalizeCareRole(u?.role || '')));
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const u of [...platformUsers, ...customerCareUsers, ...supportAgents, ...employeePlatformUsers]) {
+      const key = u?.userId || u?.id || u?.email;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push({
+        id: u.id || u.userId || key,
+        userId: u.userId || u.id || key,
+        name: u.name || '',
+        email: u.email || '',
+        role: normalizeCareRole(u.role || 'customer_care'),
+        status: u.status || 'active',
+        assignedTenants: u.assignedTenants || [],
+        createdAt: u.createdAt || '',
+      });
+    }
+    return c.json(merged);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
