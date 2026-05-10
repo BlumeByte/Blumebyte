@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../lib/api-client';
+import { api, invalidateCache } from '../lib/api-client';
 import { useAuth } from '../lib/auth-context';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -83,7 +83,6 @@ export default function CustomerCareDashboard() {
   const { user, sessionLoading, getToken, logout } = useAuth();
   // tri-state: null = verifying, true = authenticated, false = unauthenticated
   const [authState, setAuthState] = useState<boolean | null>(null);
-  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -99,7 +98,6 @@ export default function CustomerCareDashboard() {
         return;
       }
       setSupportSession();
-      setToken(t);
       setAuthState(true);
     });
   }, [sessionLoading, user, getToken]);
@@ -124,7 +122,7 @@ export default function CustomerCareDashboard() {
     return null;
   }
 
-  return <SupportDashboard token={token!} onLogout={handleLogout} />;
+  return <SupportDashboard onLogout={handleLogout} />;
 }
 // ─── Metrics Cards ────────────────────────────────────────────────────────────
 function MetricsCards({ metrics }: { metrics: Metrics }) {
@@ -170,7 +168,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Tenants Panel ─────────────────────────────────────────────────────────────
-function TenantsPanel({ token }: { token: string }) {
+function TenantsPanel() {
+  const { getToken } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -189,14 +188,17 @@ function TenantsPanel({ token }: { token: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      // Invalidate cache so mutations (create/update/delete) always fetch fresh data
+      invalidateCache('/ultimateadmin/support/tenants', token);
       const data = await api('/ultimateadmin/support/tenants', { token });
       setTenants(Array.isArray(data) ? data : []);
-    } catch {
-      toast.error('Failed to load tenants');
+    } catch (e: any) {
+      toast.error('Failed to load tenants: ' + (e.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -209,22 +211,24 @@ function TenantsPanel({ token }: { token: string }) {
   const loadUsers = async (tenant: Tenant) => {
     setSelected(tenant);
     try {
+      const token = await getToken();
       const data = await api(`/ultimateadmin/support/tenants/${tenant.id}/users`, { token });
       setTenantUsers(Array.isArray(data) ? data : []);
       setShowUsers(true);
-    } catch { toast.error('Failed to load users'); }
+    } catch (e: any) { toast.error('Failed to load users: ' + (e.message || '')); }
   };
 
   const toggleSuspend = async (tenant: Tenant) => {
     const isSuspended = tenant.licenseStatus === 'suspended';
     setActionLoading(tenant.id);
     try {
+      const token = await getToken();
       await api(`/ultimateadmin/support/tenants/${tenant.id}/suspend`, {
         method: 'POST', token, body: { restore: isSuspended },
       });
       toast.success(isSuspended ? 'Tenant restored' : 'Tenant suspended');
       load();
-    } catch { toast.error('Action failed'); }
+    } catch (e: any) { toast.error('Action failed: ' + (e.message || '')); }
     finally { setActionLoading(null); }
   };
 
@@ -232,6 +236,7 @@ function TenantsPanel({ token }: { token: string }) {
     if (!selected) return;
     setActionLoading('license');
     try {
+      const token = await getToken();
       const body: any = {};
       if (licenseForm.purchasedLicenses) body.purchasedLicenses = Number(licenseForm.purchasedLicenses);
       if (licenseForm.status) body.status = licenseForm.status;
@@ -246,7 +251,7 @@ function TenantsPanel({ token }: { token: string }) {
       toast.success('License updated');
       setLicenseDialog(false);
       load();
-    } catch { toast.error('License update failed'); }
+    } catch (e: any) { toast.error('License update failed: ' + (e.message || '')); }
     finally { setActionLoading(null); }
   };
 
@@ -254,6 +259,7 @@ function TenantsPanel({ token }: { token: string }) {
     if (!createForm.name.trim()) return toast.error('Company name required');
     setSaving(true);
     try {
+      const token = await getToken();
       await api('/ultimateadmin/support/tenants', {
         method: 'POST', token, body: createForm,
       });
@@ -270,6 +276,7 @@ function TenantsPanel({ token }: { token: string }) {
     if (!createUserForm.name.trim() || !createUserForm.email.trim()) return toast.error('Name and email required');
     setSaving(true);
     try {
+      const token = await getToken();
       const result = await api(`/ultimateadmin/support/tenants/${selected.id}/users`, {
         method: 'POST', token, body: createUserForm,
       });
@@ -501,7 +508,8 @@ function TenantsPanel({ token }: { token: string }) {
 }
 
 // ─── Tickets Panel ─────────────────────────────────────────────────────────────
-function TicketsPanel({ token, tenants }: { token: string; tenants: Tenant[] }) {
+function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
+  const { getToken } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -515,11 +523,13 @@ function TicketsPanel({ token, tenants }: { token: string; tenants: Tenant[] }) 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      invalidateCache('/ultimateadmin/support/tickets', token);
       const data = await api('/ultimateadmin/support/tickets', { token });
       setTickets(Array.isArray(data) ? data : []);
-    } catch { toast.error('Failed to load tickets'); }
+    } catch (e: any) { toast.error('Failed to load tickets: ' + (e.message || '')); }
     finally { setLoading(false); }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -527,34 +537,37 @@ function TicketsPanel({ token, tenants }: { token: string; tenants: Tenant[] }) 
     if (!form.subject.trim()) return toast.error('Subject required');
     setSaving(true);
     try {
+      const token = await getToken();
       await api('/ultimateadmin/support/tickets', { method: 'POST', token, body: form });
       toast.success('Ticket created');
       setShowCreate(false);
       setForm({ tenantId: '', tenantName: '', issueType: 'general', priority: 'medium', subject: '', description: '' });
       load();
-    } catch { toast.error('Failed to create ticket'); }
+    } catch (e: any) { toast.error('Failed to create ticket: ' + (e.message || '')); }
     finally { setSaving(false); }
   };
 
   const updateTicket = async (id: string, patch: any) => {
     try {
+      const token = await getToken();
       await api(`/ultimateadmin/support/tickets/${id}`, { method: 'PUT', token, body: patch });
       toast.success('Ticket updated');
       load();
       setSelected(null);
-    } catch { toast.error('Update failed'); }
+    } catch (e: any) { toast.error('Update failed: ' + (e.message || '')); }
   };
 
   const addNote = async () => {
     if (!selected || !noteText.trim()) return;
     setSaving(true);
     try {
+      const token = await getToken();
       await api(`/ultimateadmin/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } });
       toast.success('Note added');
       setNoteText('');
       load();
       setSelected(null);
-    } catch { toast.error('Failed to add note'); }
+    } catch (e: any) { toast.error('Failed to add note: ' + (e.message || '')); }
     finally { setSaving(false); }
   };
 
@@ -612,7 +625,7 @@ function TicketsPanel({ token, tenants }: { token: string; tenants: Tenant[] }) 
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => setSelected(t)}><Eye className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="ghost" className="text-red-500" onClick={() => api(`/ultimateadmin/support/tickets/${t.id}`, { method: 'DELETE', token }).then(() => { toast.success('Deleted'); load(); })}>
+                      <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => { const token = await getToken(); api(`/ultimateadmin/support/tickets/${t.id}`, { method: 'DELETE', token }).then(() => { toast.success('Deleted'); load(); }); }}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -710,7 +723,7 @@ function TicketsPanel({ token, tenants }: { token: string; tenants: Tenant[] }) 
 }
 
 // ─── License Issues Panel ─────────────────────────────────────────────────────
-function LicenseIssuesPanel({ tenants, token, onRefresh }: { tenants: Tenant[]; token: string; onRefresh: () => void }) {
+function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefresh: () => void }) {
   const problematic = tenants.filter(t => t.licenseStatus !== 'active' && t.licenseStatus !== 'unknown');
 
   return (
@@ -746,7 +759,8 @@ function LicenseIssuesPanel({ tenants, token, onRefresh }: { tenants: Tenant[]; 
 }
 
 // ─── Agents Panel ─────────────────────────────────────────────────────────────
-function AgentsPanel({ token }: { token: string }) {
+function AgentsPanel() {
+  const { getToken } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -756,11 +770,13 @@ function AgentsPanel({ token }: { token: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      invalidateCache('/ultimateadmin/support/agents', token);
       const data = await api('/ultimateadmin/support/agents', { token });
       setAgents(Array.isArray(data) ? data : []);
-    } catch { toast.error('Failed to load agents'); }
+    } catch (e: any) { toast.error('Failed to load agents: ' + (e.message || '')); }
     finally { setLoading(false); }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -768,21 +784,23 @@ function AgentsPanel({ token }: { token: string }) {
     if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
     setSaving(true);
     try {
+      const token = await getToken();
       await api('/ultimateadmin/support/agents', { method: 'POST', token, body: form });
       toast.success('Agent created');
       setShowCreate(false);
       setForm({ name: '', email: '', role: 'customer_care' });
       load();
-    } catch { toast.error('Failed to create agent'); }
+    } catch (e: any) { toast.error('Failed to create agent: ' + (e.message || '')); }
     finally { setSaving(false); }
   };
 
   const toggleStatus = async (agent: Agent) => {
     try {
+      const token = await getToken();
       await api(`/ultimateadmin/support/agents/${agent.id}`, { method: 'PUT', token, body: { status: agent.status === 'active' ? 'inactive' : 'active' } });
       toast.success('Agent updated');
       load();
-    } catch { toast.error('Update failed'); }
+    } catch (e: any) { toast.error('Update failed: ' + (e.message || '')); }
   };
 
   return (
@@ -849,7 +867,8 @@ function AgentsPanel({ token }: { token: string }) {
 }
 
 // ─── Platform Users Panel ─────────────────────────────────────────────────────
-function PlatformUsersPanel({ token }: { token: string }) {
+function PlatformUsersPanel() {
+  const { getToken } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -860,11 +879,13 @@ function PlatformUsersPanel({ token }: { token: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      invalidateCache('/ultimateadmin/platform-users', token);
       const data = await api('/ultimateadmin/platform-users', { token });
       setUsers(Array.isArray(data) ? data : []);
-    } catch { toast.error('Failed to load platform users'); }
+    } catch (e: any) { toast.error('Failed to load platform users: ' + (e.message || '')); }
     finally { setLoading(false); }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -872,6 +893,7 @@ function PlatformUsersPanel({ token }: { token: string }) {
     if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
     setSaving(true);
     try {
+      const token = await getToken();
       if (editUser) {
         await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body: form });
         toast.success('User updated');
@@ -883,17 +905,18 @@ function PlatformUsersPanel({ token }: { token: string }) {
       setEditUser(null);
       setForm({ name: '', email: '', role: 'customer_care_agent' });
       load();
-    } catch { toast.error('Save failed'); }
+    } catch (e: any) { toast.error('Save failed: ' + (e.message || '')); }
     finally { setSaving(false); }
   };
 
   const deleteUser = async (u: any) => {
     if (!confirm(`Delete platform user ${u.email}?`)) return;
     try {
+      const token = await getToken();
       await api(`/ultimateadmin/platform-users/${u.id}`, { method: 'DELETE', token });
       toast.success('User removed');
       load();
-    } catch { toast.error('Delete failed'); }
+    } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
   };
 
   const openEdit = (u: any) => {
@@ -973,7 +996,8 @@ function PlatformUsersPanel({ token }: { token: string }) {
 }
 
 // ─── Assignments Panel ────────────────────────────────────────────────────────
-function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[] }) {
+function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
+  const { getToken } = useAuth();
   const [careAgents, setCareAgents] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -984,6 +1008,9 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      invalidateCache('/ultimateadmin/platform-users', token);
+      invalidateCache('/ultimateadmin/assignments', token);
       const [agentsData, assignData] = await Promise.all([
         api('/ultimateadmin/platform-users', { token }),
         api('/ultimateadmin/assignments', { token }),
@@ -994,9 +1021,9 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
       }) : [];
       setCareAgents(agents);
       setAssignments(Array.isArray(assignData) ? assignData : []);
-    } catch { toast.error('Failed to load assignments'); }
+    } catch (e: any) { toast.error('Failed to load assignments: ' + (e.message || '')); }
     finally { setLoading(false); }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1004,21 +1031,23 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
     if (!selectedAgent || selectedTenants.length === 0) return toast.error('Select agent and at least one tenant');
     setSaving(true);
     try {
+      const token = await getToken();
       await api('/ultimateadmin/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
       toast.success('Assignment saved');
       setSelectedAgent('');
       setSelectedTenants([]);
       load();
-    } catch { toast.error('Assignment failed'); }
+    } catch (e: any) { toast.error('Assignment failed: ' + (e.message || '')); }
     finally { setSaving(false); }
   };
 
   const removeAssignment = async (assignmentId: string) => {
     try {
+      const token = await getToken();
       await api(`/ultimateadmin/assignments/${assignmentId}`, { method: 'DELETE', token });
       toast.success('Assignment removed');
       load();
-    } catch { toast.error('Remove failed'); }
+    } catch (e: any) { toast.error('Remove failed: ' + (e.message || '')); }
   };
 
   const tenantName = (id: string) => tenants.find(t => t.id === id)?.name || id.slice(0, 12) + '…';
@@ -1109,7 +1138,8 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
 }
 
 // ─── All Users Panel ──────────────────────────────────────────────────────────
-function AllUsersPanel({ token, tenants }: { token: string; tenants: Tenant[] }) {
+function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
+  const { getToken } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -1118,11 +1148,13 @@ function AllUsersPanel({ token, tenants }: { token: string; tenants: Tenant[] })
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      invalidateCache('/ultimateadmin/users', token);
       const data = await api('/ultimateadmin/users', { token });
       setUsers(Array.isArray(data) ? data : []);
-    } catch { toast.error('Failed to load users'); }
+    } catch (e: any) { toast.error('Failed to load users: ' + (e.message || '')); }
     finally { setLoading(false); }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1187,7 +1219,8 @@ function AllUsersPanel({ token, tenants }: { token: string; tenants: Tenant[] })
 }
 
 // ─── Global Chat Panel ────────────────────────────────────────────────────────
-function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] }) {
+function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
+  const { getToken } = useAuth();
   const [threads, setThreads] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1203,15 +1236,18 @@ function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] 
   const loadThreads = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      invalidateCache('/ultimateadmin/chat/threads', token);
+      invalidateCache('/ultimateadmin/users', token);
       const [threadData, userData] = await Promise.all([
         api('/ultimateadmin/chat/threads', { token }),
         api('/ultimateadmin/users', { token }),
       ]);
       setThreads(Array.isArray(threadData) ? threadData : []);
       setAllUsers(Array.isArray(userData) ? userData : []);
-    } catch { toast.error('Failed to load chat'); }
+    } catch (e: any) { toast.error('Failed to load chat: ' + (e.message || '')); }
     finally { setLoading(false); }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
@@ -1219,9 +1255,10 @@ function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] 
     setActiveThread(thread);
     setMsgLoading(true);
     try {
+      const token = await getToken();
       const data = await api(`/ultimateadmin/chat/threads/${thread.id}`, { token });
       setMessages(Array.isArray(data.messages) ? data.messages : []);
-    } catch { toast.error('Failed to load messages'); }
+    } catch (e: any) { toast.error('Failed to load messages: ' + (e.message || '')); }
     finally { setMsgLoading(false); }
   };
 
@@ -1230,6 +1267,7 @@ function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] 
     if (!activeThread && !recipient) return toast.error('Select a recipient');
     setSending(true);
     try {
+      const token = await getToken();
       const selectedUser = allUsers.find(u => u.id === recipient || u.email === recipient);
       const body: any = {
         message: newMsg.trim(),
@@ -1247,12 +1285,14 @@ function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] 
         setShowNewChat(false);
         setRecipient('');
         // Find and open the new thread
-        const freshThreads = await api('/ultimateadmin/chat/threads', { token });
+        const freshToken = await getToken();
+        const freshThreads = await api('/ultimateadmin/chat/threads', { token: freshToken });
         const newThread = freshThreads.find((t: any) => t.id === result.threadId);
         if (newThread) loadThread(newThread);
       } else {
         // Refresh messages
-        const data = await api(`/ultimateadmin/chat/threads/${activeThread.id}`, { token });
+        const refreshToken = await getToken();
+        const data = await api(`/ultimateadmin/chat/threads/${activeThread.id}`, { token: refreshToken });
         setMessages(Array.isArray(data.messages) ? data.messages : []);
       }
     } catch (e: any) { toast.error(e.message || 'Failed to send message'); }
@@ -1374,18 +1414,21 @@ function GlobalChatPanel({ token, tenants }: { token: string; tenants: Tenant[] 
     </div>
   );
 }
-function AuditTrailPanel({ token }: { token: string }) {
+function AuditTrailPanel() {
+  const { getToken } = useAuth();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      invalidateCache('/ultimateadmin/support/audit', token);
       const data = await api('/ultimateadmin/support/audit', { token });
       setLogs(Array.isArray(data) ? data : []);
-    } catch { toast.error('Failed to load audit logs'); }
+    } catch (e: any) { toast.error('Failed to load audit logs: ' + (e.message || '')); }
     finally { setLoading(false); }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1428,7 +1471,8 @@ function AuditTrailPanel({ token }: { token: string }) {
 }
 
 // ─── Developer Tools Panel ────────────────────────────────────────────────────
-function DevToolsPanel({ tenants, token }: { tenants: Tenant[]; token: string }) {
+function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
+  const { getToken } = useAuth();
   const [selectedTenant, setSelectedTenant] = useState('');
   const [running, setRunning] = useState<string | null>(null);
 
@@ -1436,11 +1480,12 @@ function DevToolsPanel({ tenants, token }: { tenants: Tenant[]; token: string })
     if (!selectedTenant) return toast.error('Select a tenant first');
     setRunning(action);
     try {
+      const token = await getToken();
       const result = await api(`/ultimateadmin/support/repair/${selectedTenant}`, {
         method: 'POST', token, body: { action },
       });
       toast.success(`✓ ${action} executed for ${result.tenantId}`);
-    } catch { toast.error('Repair action failed'); }
+    } catch (e: any) { toast.error('Repair action failed: ' + (e.message || '')); }
     finally { setRunning(null); }
   };
 
@@ -1533,7 +1578,8 @@ WHERE email IN ('your-email@example.com', 'care-agent@example.com');`}</pre>
 }
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
-function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
+function SupportDashboard({ onLogout }: { onLogout: () => void }) {
+  const { getToken } = useAuth();
   const [activeSection, setActiveSection] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1545,6 +1591,11 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const token = await getToken();
+      // Invalidate caches so auto-refresh always fetches fresh data from the server
+      invalidateCache('/ultimateadmin/support/metrics', token);
+      invalidateCache('/ultimateadmin/support/tenants', token);
+      invalidateCache('/ultimateadmin/support/verify', token);
       const [metricsResult, tenantsResult, profileResult] = await Promise.allSettled([
         api('/ultimateadmin/support/metrics', { token }),
         api('/ultimateadmin/support/tenants', { token }),
@@ -1560,7 +1611,7 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [getToken]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1708,16 +1759,16 @@ function SupportDashboard({ token, onLogout }: { token: string; onLogout: () => 
                 </div>
               )}
 
-              {activeSection === 'tenants' && <TenantsPanel token={token} />}
-              {activeSection === 'users' && <AllUsersPanel token={token} tenants={tenants} />}
-              {activeSection === 'chat' && <GlobalChatPanel token={token} tenants={tenants} />}
-              {activeSection === 'tickets' && <TicketsPanel token={token} tenants={tenants} />}
-              {activeSection === 'license-issues' && <LicenseIssuesPanel tenants={tenants} token={token} onRefresh={loadData} />}
-              {activeSection === 'platform-users' && <PlatformUsersPanel token={token} />}
-              {activeSection === 'assignments' && <AssignmentsPanel token={token} tenants={tenants} />}
-              {activeSection === 'agents' && <AgentsPanel token={token} />}
-              {activeSection === 'audit' && <AuditTrailPanel token={token} />}
-              {activeSection === 'dev-tools' && <DevToolsPanel tenants={tenants} token={token} />}
+              {activeSection === 'tenants' && <TenantsPanel />}
+              {activeSection === 'users' && <AllUsersPanel tenants={tenants} />}
+              {activeSection === 'chat' && <GlobalChatPanel tenants={tenants} />}
+              {activeSection === 'tickets' && <TicketsPanel tenants={tenants} />}
+              {activeSection === 'license-issues' && <LicenseIssuesPanel tenants={tenants} onRefresh={loadData} />}
+              {activeSection === 'platform-users' && <PlatformUsersPanel />}
+              {activeSection === 'assignments' && <AssignmentsPanel tenants={tenants} />}
+              {activeSection === 'agents' && <AgentsPanel />}
+              {activeSection === 'audit' && <AuditTrailPanel />}
+              {activeSection === 'dev-tools' && <DevToolsPanel tenants={tenants} />}
               {activeSection === 'settings' && <SettingsPanel myProfile={myProfile} />}
             </>
           )}
