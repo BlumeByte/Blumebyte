@@ -1,18 +1,18 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Black background -->
-  <rect width="64" height="64" rx="10" fill="black"/>
+  <!-- Rich brown / amber background matching brand primary #7C5A1A -->
+  <rect width="64" height="64" rx="12" fill="#7C5A1A"/>
 
-  <!-- Bold "B" letterform, optimised for legibility at 16–180px -->
+  <!-- Bold "B" lettermark, tuned for clarity at 16-180px -->
   <!-- Vertical stem -->
-  <rect x="10" y="8" width="11" height="48" rx="2" fill="white"/>
+  <rect x="10" y="9" width="10" height="46" rx="2.5" fill="white"/>
 
-  <!-- Top bowl (solid, wider at right) -->
-  <path d="M21 8 H38 C50 8 56 14 56 22 C56 30 50 35 38 35 H21 Z" fill="white"/>
-  <!-- Top bowl inner cutout -->
-  <path d="M21 14 H37 C45 14 49 18 49 22 C49 26 45 29 37 29 H21 Z" fill="black"/>
+  <!-- Top bowl -->
+  <path d="M20 9 H36 C48 9 54 15 54 23 C54 31 48 36 36 36 H20 Z" fill="white"/>
+  <!-- Top bowl cutout -->
+  <path d="M20 15 H35 C44 15 48 19 48 23 C48 27 44 30 35 30 H20 Z" fill="#7C5A1A"/>
 
-  <!-- Bottom bowl (solid, slightly wider than top) -->
-  <path d="M21 35 H40 C53 35 59 42 59 49 C59 55 53 56 40 56 H21 Z" fill="white"/>
-  <!-- Bottom bowl inner cutout -->
-  <path d="M21 41 H39 C48 41 52 44 52 49 C52 53 48 53 39 50 H21 Z" fill="black"/>
+  <!-- Bottom bowl (slightly taller/wider for visual weight) -->
+  <path d="M20 36 H38 C51 36 57 42.5 57 50 C57 56 51 55 38 55 H20 Z" fill="white"/>
+  <!-- Bottom bowl cutout -->
+  <path d="M20 42 H37 C46 42 51 45 51 50 C51 54 46 54 37 49 H20 Z" fill="#7C5A1A"/>
 </svg>

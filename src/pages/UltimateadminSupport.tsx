@@ -23,8 +23,8 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ROLES = ['customer_care_agent', 'support_manager', 'ultimateadmin'];
-const PLATFORM_ROLES = ['ultimateadmin', 'customer_care', 'customer_care_agent', 'care', 'support', 'support_manager'];
+const ROLES = ['ultimateadmin', 'customer_care'];
+const PLATFORM_ROLES = ['ultimateadmin', 'customer_care'];
 
 const SIDEBAR_ITEMS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -750,7 +750,7 @@ function AgentsPanel({ token }: { token: string }) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', role: 'customer_care_agent' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'customer_care' });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -771,7 +771,7 @@ function AgentsPanel({ token }: { token: string }) {
       await api('/ultimateadmin/support/agents', { method: 'POST', token, body: form });
       toast.success('Agent created');
       setShowCreate(false);
-      setForm({ name: '', email: '', role: 'customer_care_agent' });
+      setForm({ name: '', email: '', role: 'customer_care' });
       load();
     } catch { toast.error('Failed to create agent'); }
     finally { setSaving(false); }
@@ -898,14 +898,14 @@ function PlatformUsersPanel({ token }: { token: string }) {
 
   const openEdit = (u: any) => {
     setEditUser(u);
-    setForm({ name: u.name || '', email: u.email || '', role: u.role || 'customer_care_agent' });
+    setForm({ name: u.name || '', email: u.email || '', role: u.role || 'customer_care' });
     setShowCreate(true);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => { setEditUser(null); setForm({ name: '', email: '', role: 'customer_care_agent' }); setShowCreate(true); }}>
+        <Button size="sm" onClick={() => { setEditUser(null); setForm({ name: '', email: '', role: 'customer_care' }); setShowCreate(true); }}>
           <UserPlus className="h-3.5 w-3.5 mr-1" />Add Platform User
         </Button>
       </div>
@@ -990,7 +990,7 @@ function AssignmentsPanel({ token, tenants }: { token: string; tenants: Tenant[]
       ]);
       const agents = Array.isArray(agentsData) ? agentsData.filter((u: any) => {
         const r = u.role || '';
-        return r === 'customer_care' || r === 'customer_care_agent' || r === 'care' || r === 'support' || r === 'support_manager';
+        return r === 'customer_care';
       }) : [];
       setCareAgents(agents);
       setAssignments(Array.isArray(assignData) ? assignData : []);

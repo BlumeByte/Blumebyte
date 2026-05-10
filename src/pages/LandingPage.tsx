@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../components/ui/button';
-import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, DollarSign, UserCheck, Trophy, ChevronDown, Star, TrendingUp, Award, MessageSquare, BookOpen } from 'lucide-react';
+import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, DollarSign, UserCheck, Trophy, ChevronDown, Star, TrendingUp, Award, MessageSquare, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
@@ -238,6 +238,299 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   );
 }
 
+// ─── HR Image Carousel (scroll + button driven) ───────────────────────────────
+const HR_SLIDES = [
+  {
+    id: 'team',
+    label: 'Team Management',
+    bg: '#f0f4ff',
+    accentColor: '#3b5bdb',
+    illustration: (
+      <svg viewBox="0 0 480 300" className="w-full h-full" aria-hidden="true">
+        <rect width="480" height="300" fill="#f0f4ff" rx="16" />
+        {/* Desk */}
+        <rect x="60" y="190" width="360" height="14" rx="4" fill="#c8d6ff" />
+        <rect x="100" y="204" width="12" height="50" rx="3" fill="#b0c0f0" />
+        <rect x="368" y="204" width="12" height="50" rx="3" fill="#b0c0f0" />
+        {/* Monitor */}
+        <rect x="180" y="120" width="120" height="72" rx="8" fill="#3b5bdb" />
+        <rect x="190" y="130" width="100" height="52" rx="5" fill="#6c8bff" />
+        <rect x="225" y="192" width="30" height="8" rx="2" fill="#3b5bdb" />
+        <rect x="210" y="200" width="60" height="5" rx="2" fill="#c8d6ff" />
+        {/* People */}
+        {[100, 200, 320].map((x, i) => (
+          <g key={i}>
+            <circle cx={x + 20} cy={90} r={22} fill={['#ffb3ba', '#b3e0ff', '#b3ffcc'][i]} />
+            <rect x={x} y={114} width="40" height="72" rx="8" fill={['#ff6b80', '#3b9bdb', '#2db87d'][i]} />
+            <rect x={x + 12} y={170} width="7" height="30" rx="3" fill={['#ff6b80', '#3b9bdb', '#2db87d'][i]} />
+            <rect x={x + 22} y={170} width="7" height="30" rx="3" fill={['#ff6b80', '#3b9bdb', '#2db87d'][i]} />
+          </g>
+        ))}
+        {/* Chat bubbles */}
+        <rect x="310" y="50" width="100" height="36" rx="12" fill="white" opacity="0.9" />
+        <text x="360" y="73" textAnchor="middle" fontSize="11" fill="#3b5bdb" fontWeight="600">Team Chat</text>
+        <rect x="70" y="55" width="90" height="36" rx="12" fill="white" opacity="0.9" />
+        <text x="115" y="78" textAnchor="middle" fontSize="11" fill="#e63946" fontWeight="600">Leave OK ✓</text>
+      </svg>
+    ),
+  },
+  {
+    id: 'payroll',
+    label: 'Payroll Processing',
+    bg: '#fff7e6',
+    accentColor: '#7C5A1A',
+    illustration: (
+      <svg viewBox="0 0 480 300" className="w-full h-full" aria-hidden="true">
+        <rect width="480" height="300" fill="#fff7e6" rx="16" />
+        {/* Document */}
+        <rect x="140" y="40" width="200" height="240" rx="12" fill="white" stroke="#f0d8a0" strokeWidth="2" />
+        <rect x="160" y="70" width="160" height="8" rx="4" fill="#f0c050" />
+        <rect x="160" y="90" width="120" height="6" rx="3" fill="#f5e0a0" />
+        {[110, 130, 150, 170, 190, 210, 230].map((y, i) => (
+          <g key={i}>
+            <rect x="160" y={y} width="70" height="5" rx="2" fill="#f0e0c0" />
+            <rect x="270" y={y} width="50" height="5" rx="2" fill={i === 6 ? '#7C5A1A' : '#f0e0c0'} />
+          </g>
+        ))}
+        <rect x="155" y="250" width="170" height="18" rx="6" fill="#7C5A1A" />
+        <text x="240" y="263" textAnchor="middle" fontSize="11" fill="white" fontWeight="700">Process Payroll</text>
+        {/* Coins */}
+        {[[80, 140], [380, 110], [390, 180], [70, 200]].map(([cx, cy], i) => (
+          <g key={i}>
+            <circle cx={cx} cy={cy} r={18} fill="#ffd700" />
+            <text x={cx} y={cy + 5} textAnchor="middle" fontSize="14" fill="#7C5A1A" fontWeight="900">$</text>
+          </g>
+        ))}
+        {/* Check */}
+        <circle cx="390" cy="60" r="22" fill="#22c55e" opacity="0.9" />
+        <text x="390" y="67" textAnchor="middle" fontSize="20" fill="white" fontWeight="700">✓</text>
+      </svg>
+    ),
+  },
+  {
+    id: 'performance',
+    label: 'Performance Reviews',
+    bg: '#f0fff4',
+    accentColor: '#16a34a',
+    illustration: (
+      <svg viewBox="0 0 480 300" className="w-full h-full" aria-hidden="true">
+        <rect width="480" height="300" fill="#f0fff4" rx="16" />
+        {/* Background circles */}
+        <circle cx="240" cy="150" r="110" fill="#bbf7d0" opacity="0.4" />
+        {/* Chart bars */}
+        {[
+          [110, 200, 80, '#dcfce7', '#16a34a'],
+          [170, 200, 120, '#bbf7d0', '#16a34a'],
+          [230, 200, 150, '#86efac', '#15803d'],
+          [290, 200, 100, '#bbf7d0', '#16a34a'],
+          [350, 200, 170, '#4ade80', '#166534'],
+        ].map(([x, y, h, fill, stroke], i) => (
+          <g key={i}>
+            <rect x={Number(x)} y={Number(y) - Number(h)} width="40" height={Number(h)} rx="6" fill={String(fill)} stroke={String(stroke)} strokeWidth="1.5" />
+          </g>
+        ))}
+        {/* X-axis */}
+        <rect x="100" y="200" width="280" height="3" rx="2" fill="#86efac" />
+        {/* Stars */}
+        {[130, 190, 250, 310, 370].map((x, i) => (
+          <text key={i} x={x} y="230" textAnchor="middle" fontSize="16" fill="#fbbf24">★</text>
+        ))}
+        {/* Trophy */}
+        <text x="362" y="45" fontSize="48" textAnchor="middle">🏆</text>
+        {/* Labels */}
+        <rect x="140" y="35" width="200" height="36" rx="10" fill="white" opacity="0.9" />
+        <text x="240" y="58" textAnchor="middle" fontSize="13" fill="#166534" fontWeight="700">Performance Dashboard</text>
+        {/* Up arrow */}
+        <polygon points="60,160 80,120 100,160" fill="#4ade80" />
+        <text x="80" y="110" textAnchor="middle" fontSize="11" fill="#166534" fontWeight="700">+24%</text>
+      </svg>
+    ),
+  },
+  {
+    id: 'recruitment',
+    label: 'Recruitment Pipeline',
+    bg: '#fdf4ff',
+    accentColor: '#9333ea',
+    illustration: (
+      <svg viewBox="0 0 480 300" className="w-full h-full" aria-hidden="true">
+        <rect width="480" height="300" fill="#fdf4ff" rx="16" />
+        {/* Funnel */}
+        <polygon points="120,50 360,50 300,130 180,130" fill="#e9d5ff" stroke="#9333ea" strokeWidth="2" />
+        <polygon points="180,135 300,135 270,200 210,200" fill="#c4b5fd" stroke="#9333ea" strokeWidth="2" />
+        <polygon points="210,205 270,205 255,255 225,255" fill="#a78bfa" stroke="#9333ea" strokeWidth="2" />
+        {/* Candidate dots */}
+        {[[150,30],[200,30],[250,30],[300,30],[350,30]].map(([cx,cy],i) => (
+          <circle key={i} cx={cx} cy={cy} r={14} fill={['#f9a8d4','#93c5fd','#6ee7b7','#fde68a','#c4b5fd'][i]} />
+        ))}
+        {/* Approved badge */}
+        <circle cx="380" cy="250" r="32" fill="#9333ea" />
+        <text x="380" y="256" textAnchor="middle" fontSize="22" fill="white" fontWeight="700">✓</text>
+        {/* Label */}
+        <rect x="100" y="265" width="160" height="26" rx="8" fill="white" opacity="0.9" />
+        <text x="180" y="282" textAnchor="middle" fontSize="11" fill="#9333ea" fontWeight="700">5 Candidates Screened</text>
+        {/* Magnifier */}
+        <circle cx="50" cy="200" r="28" fill="none" stroke="#9333ea" strokeWidth="4" />
+        <line x1="68" y1="220" x2="85" y2="238" stroke="#9333ea" strokeWidth="4" strokeLinecap="round" />
+        <circle cx="50" cy="200" r="14" fill="#e9d5ff" />
+      </svg>
+    ),
+  },
+  {
+    id: 'attendance',
+    label: 'Time & Attendance',
+    bg: '#eff6ff',
+    accentColor: '#2563eb',
+    illustration: (
+      <svg viewBox="0 0 480 300" className="w-full h-full" aria-hidden="true">
+        <rect width="480" height="300" fill="#eff6ff" rx="16" />
+        {/* Clock */}
+        <circle cx="240" cy="145" r="100" fill="white" stroke="#2563eb" strokeWidth="4" />
+        <circle cx="240" cy="145" r="90" fill="none" stroke="#dbeafe" strokeWidth="2" />
+        {/* Hour ticks */}
+        {Array.from({length:12}).map((_,i) => {
+          const angle = (i * 30 - 90) * Math.PI / 180;
+          const x1 = 240 + 80 * Math.cos(angle);
+          const y1 = 145 + 80 * Math.sin(angle);
+          const x2 = 240 + 90 * Math.cos(angle);
+          const y2 = 145 + 90 * Math.sin(angle);
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#93c5fd" strokeWidth={i % 3 === 0 ? 3 : 1.5} strokeLinecap="round" />;
+        })}
+        {/* Hour hand - 9 o'clock */}
+        <line x1="240" y1="145" x2="180" y2="145" stroke="#1d4ed8" strokeWidth="5" strokeLinecap="round" />
+        {/* Minute hand - 12 o'clock */}
+        <line x1="240" y1="145" x2="240" y2="80" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" />
+        {/* Center dot */}
+        <circle cx="240" cy="145" r="6" fill="#2563eb" />
+        {/* Check-in cards */}
+        <rect x="30" y="80" width="120" height="50" rx="10" fill="white" stroke="#dbeafe" strokeWidth="2" />
+        <text x="90" y="100" textAnchor="middle" fontSize="10" fill="#6b7280">Clock In</text>
+        <text x="90" y="120" textAnchor="middle" fontSize="14" fill="#16a34a" fontWeight="700">09:02 AM</text>
+        <rect x="330" y="200" width="120" height="50" rx="10" fill="white" stroke="#dbeafe" strokeWidth="2" />
+        <text x="390" y="220" textAnchor="middle" fontSize="10" fill="#6b7280">Clock Out</text>
+        <text x="390" y="240" textAnchor="middle" fontSize="14" fill="#dc2626" fontWeight="700">06:00 PM</text>
+        {/* Status line */}
+        <rect x="100" y="260" width="280" height="20" rx="8" fill="#dbeafe" />
+        <rect x="100" y="260" width="210" height="20" rx="8" fill="#2563eb" />
+        <text x="240" y="275" textAnchor="middle" fontSize="10" fill="white" fontWeight="700">Attendance: 94% ↑</text>
+      </svg>
+    ),
+  },
+];
+
+function HRImageCarousel() {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastScrollTime = useRef(0);
+  const total = HR_SLIDES.length;
+
+  const goNext = useCallback(() => setActiveIdx(i => (i + 1) % total), [total]);
+  const goPrev = useCallback(() => setActiveIdx(i => (i - 1 + total) % total), [total]);
+
+  // Scroll wheel drives image changes
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      const now = Date.now();
+      if (now - lastScrollTime.current < 600) return;
+      lastScrollTime.current = now;
+      if (Math.abs(e.deltaY) < 20) return;
+      e.preventDefault();
+      if (e.deltaY > 0) goNext(); else goPrev();
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [goNext, goPrev]);
+
+  const slide = HR_SLIDES[activeIdx];
+
+  return (
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <FadeSection className="text-center mb-10">
+        <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">HR in Action</span>
+        <h2 className="text-3xl md:text-4xl font-bold mt-3 mb-4 text-mint-black">See every HR process come alive</h2>
+        <p className="text-base text-gray-500 max-w-xl mx-auto">Scroll or tap through core workflows — from payroll to recruitment, everything flows smoothly.</p>
+      </FadeSection>
+
+      <div ref={containerRef} className="relative rounded-3xl overflow-hidden select-none" style={{ touchAction: 'pan-y' }}>
+        {/* Image area */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={slide.id}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+            className="relative overflow-hidden rounded-3xl"
+            style={{ background: slide.bg, height: 340 }}
+          >
+            <div className="absolute inset-0 p-6">
+              {slide.illustration}
+            </div>
+
+            {/* Slide label badge */}
+            <div className="absolute top-5 left-5 px-4 py-1.5 rounded-full text-xs font-bold text-white shadow-md"
+              style={{ background: slide.accentColor }}>
+              {slide.label}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Prev/Next buttons */}
+        <button
+          onClick={goPrev}
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 border border-black/10 shadow flex items-center justify-center hover:bg-white transition-colors z-10"
+          aria-label="Previous"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-700" />
+        </button>
+        <button
+          onClick={goNext}
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 border border-black/10 shadow flex items-center justify-center hover:bg-white transition-colors z-10"
+          aria-label="Next"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-700" />
+        </button>
+      </div>
+
+      {/* Dot navigation */}
+      <div className="flex justify-center gap-2 mt-6">
+        {HR_SLIDES.map((s, i) => (
+          <button
+            key={s.id}
+            onClick={() => setActiveIdx(i)}
+            aria-label={`View ${s.label}`}
+            className="rounded-full transition-all duration-300"
+            style={{
+              width: i === activeIdx ? 28 : 10,
+              height: 10,
+              background: i === activeIdx ? slide.accentColor : '#d1d5db',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Slide titles row */}
+      <div className="flex justify-center gap-3 mt-5 flex-wrap">
+        {HR_SLIDES.map((s, i) => (
+          <button
+            key={s.id}
+            onClick={() => setActiveIdx(i)}
+            className="text-xs font-semibold px-3 py-1 rounded-full border transition-all duration-200"
+            style={{
+              borderColor: i === activeIdx ? s.accentColor : '#e5e7eb',
+              color: i === activeIdx ? s.accentColor : '#9ca3af',
+              background: i === activeIdx ? `${s.accentColor}12` : 'transparent',
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ─── Section fade wrapper ─────────────────────────────────────────────────────
 function FadeSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const { ref, visible } = useInView();
@@ -256,26 +549,26 @@ function FadeSection({ children, className = '', delay = 0 }: { children: React.
   );
 }
 
-// ─── Testimonial data ─────────────────────────────────────────────────────────
+// ─── Testimonial data (companies kept anonymous) ──────────────────────────────
 const TESTIMONIALS = [
   {
-    name: 'Aisha Mensah',
+    name: 'A. M.',
     role: 'HR Director',
-    company: 'Nexus Technologies',
+    company: 'Anonymous',
     quote: 'Blumebyte transformed how we manage our 200-person team. Payroll that used to take 3 days now takes 30 minutes.',
     rating: 5,
   },
   {
-    name: 'Kwame Asante',
+    name: 'K. A.',
     role: 'CEO',
-    company: 'BuildRight',
+    company: 'Anonymous',
     quote: 'The attendance tracking and leave management alone saved us countless hours every month. Incredible platform.',
     rating: 5,
   },
   {
-    name: 'Fatima Al-Hassan',
+    name: 'F. A.',
     role: 'Operations Manager',
-    company: 'MediCare Solutions',
+    company: 'Anonymous',
     quote: 'From recruitment to performance reviews, everything is in one place. Our HR team loves it.',
     rating: 5,
   },
@@ -470,8 +763,8 @@ export default function LandingPage() {
       <FadeSection className="border-y border-black/6 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">Trusted by teams across industries</p>
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
-            {['Nexus Technologies', 'BuildRight', 'MediCare Solutions', 'Alpha Finance', 'EduTrack', 'LogiCo'].map((name) => (
+          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
+            {['Kube', 'MotionTrix', 'Legacy', 'EvoCakes', 'BeadMatics', 'GitHub', 'Supabase', 'Vercel', 'Bluehost'].map((name) => (
               <span key={name} className="text-sm font-bold text-gray-300 tracking-wide select-none hover:text-gray-400 transition-colors">{name}</span>
             ))}
           </div>
@@ -525,7 +818,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 5. FEATURES BENTO GRID ── */}
+      {/* ── 5. HR IMAGES CAROUSEL ── */}
+      <HRImageCarousel />
+
+      {/* ── 6. FEATURES BENTO GRID ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <FadeSection className="text-center mb-14">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Full Platform</span>
@@ -608,12 +904,12 @@ export default function LandingPage() {
                   </div>
                   <p className="text-sm text-gray-700 leading-relaxed flex-1 mb-5">"{t.quote}"</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                      {t.name.split(' ').map(n => n[0]).join('')}
+                    <div className="w-9 h-9 rounded-full bg-black/10 flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
+                      <Users className="w-4 h-4" />
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-mint-black">{t.name}</div>
-                      <div className="text-xs text-gray-500">{t.role} · {t.company}</div>
+                      <div className="text-xs text-gray-500">{t.role} · Verified Customer</div>
                     </div>
                   </div>
                 </div>
