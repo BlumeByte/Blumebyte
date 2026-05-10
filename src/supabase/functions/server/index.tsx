@@ -12030,7 +12030,7 @@ app.post(`${PREFIX}/ultimateadmin/chat/send`, async (c) => {
 // Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
 
 for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platform-users`]) app.get(route, async (c) => {
-  // Delegate to the same logic as /developer/platform-users
+  // Return platform user records for canonical and legacy-compatible paths
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
