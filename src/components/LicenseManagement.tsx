@@ -31,6 +31,8 @@ interface LicenseManagementProps {
 
 export function LicenseManagement({ onClose, requiredLicenses }: LicenseManagementProps) {
   const MIN_LICENSES = 2; // Minimum purchase quantity enforced by the server
+  const PRICE_MONTHLY = 6;  // USD per license/month
+  const PRICE_YEARLY = 60;  // USD per license/year
   const { branding } = useBranding();
   const { accessToken, getToken } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -316,7 +318,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       if (!freshToken) { payWindow?.close(); toast.error('Not authenticated'); return; }
 
       const licenses = licenseInfo?.purchasedLicenses || MIN_LICENSES;
-      const pricePerUser = renewPlan === 'monthly' ? 6 : 60;
+      const pricePerUser = renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
       const amount = licenses * pricePerUser;
 
       const response = await apiClient.post('/subscription/renew-license', {
@@ -443,7 +445,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         throw new Error('Not authenticated. Please log in again.');
       }
 
-      const pricePerUser = selectedPlan === 'monthly' ? 6 : 60;
+      const pricePerUser = selectedPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
       // Ensure additionalLicenses is a valid integer (guard against NaN from bad input)
       const safeLicenses = Number.isFinite(additionalLicenses) ? Math.max(MIN_LICENSES, Math.round(additionalLicenses)) : MIN_LICENSES;
       const totalAmount = safeLicenses * pricePerUser;
@@ -556,9 +558,15 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     }
   };
 
-  const pricePerUser = selectedPlan === 'monthly' ? 6 : 60;
+  const pricePerUser = selectedPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
   const totalCost = additionalLicenses * pricePerUser;
   const monthlyEquivalent = selectedPlan === 'yearly' ? (totalCost / 12).toFixed(2) : totalCost;
+
+  const isLicenseExpired = licenseInfo != null && (
+    licenseInfo.licenseStatus === 'expired' ||
+    licenseInfo.status === 'expired' ||
+    (licenseInfo.expiresAt && new Date(licenseInfo.expiresAt) < new Date())
+  );
 
   const usagePercentage = licenseInfo && licenseInfo.purchasedLicenses > 0
     ? Math.min((licenseInfo.usedLicenses / licenseInfo.purchasedLicenses) * 100, 100)
@@ -739,7 +747,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                       <CheckCircle className="w-5 h-5 text-blue-500" />
                     )}
                   </div>
-                  <p className="text-2xl font-bold">$6</p>
+                  <p className="text-2xl font-bold">${PRICE_MONTHLY}</p>
                   <p className="text-xs text-muted-foreground">per license/month</p>
                 </CardContent>
               </Card>
@@ -769,9 +777,9 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                       <CheckCircle className="w-5 h-5 text-blue-500" />
                     )}
                   </div>
-                  <p className="text-2xl font-bold">$5<span className="text-base text-muted-foreground">/month</span></p>
-                  <p className="text-xs text-muted-foreground">billed annually at $60/year</p>
-                  <p className="text-xs text-green-600 font-medium mt-1">Save $12/year per license</p>
+                  <p className="text-2xl font-bold">${Math.round(PRICE_YEARLY / 12)}<span className="text-base text-muted-foreground">/month</span></p>
+                  <p className="text-xs text-muted-foreground">billed annually at ${PRICE_YEARLY}/year</p>
+                  <p className="text-xs text-green-600 font-medium mt-1">Save ${PRICE_MONTHLY * 12 - PRICE_YEARLY}/year per license</p>
                 </CardContent>
               </Card>
             </div>
@@ -814,7 +822,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             {selectedPlan === 'yearly' && (
               <div className="flex justify-between items-center text-green-600">
                 <span className="text-sm">Annual savings</span>
-                <span className="font-semibold">-${additionalLicenses * 12}</span>
+                <span className="font-semibold">-${additionalLicenses * (PRICE_MONTHLY * 12 - PRICE_YEARLY)}</span>
               </div>
             )}
             <Separator />
@@ -1003,7 +1011,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       </Card>
 
       {/* Renew License — shown when license is expired or near expiry */}
-      {licenseInfo && (licenseInfo.licenseStatus === 'expired' || licenseInfo.status === 'expired' || (licenseInfo.expiresAt && new Date(licenseInfo.expiresAt) < new Date())) && (
+      {licenseInfo && isLicenseExpired && (
         <Card className="border-orange-200 bg-orange-50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-orange-800">
@@ -1028,7 +1036,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                     </div>
                     {renewPlan === 'monthly' && <CheckCircle className="w-5 h-5 text-orange-500" />}
                   </div>
-                  <p className="text-2xl font-bold">$6</p>
+                  <p className="text-2xl font-bold">${PRICE_MONTHLY}</p>
                   <p className="text-xs text-muted-foreground">per license/month</p>
                 </CardContent>
               </Card>
@@ -1049,14 +1057,14 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                     </div>
                     {renewPlan === 'yearly' && <CheckCircle className="w-5 h-5 text-orange-500" />}
                   </div>
-                  <p className="text-2xl font-bold">$5<span className="text-base text-muted-foreground">/month</span></p>
-                  <p className="text-xs text-muted-foreground">billed annually at $60/year</p>
+                  <p className="text-2xl font-bold">${Math.round(PRICE_YEARLY / 12)}<span className="text-base text-muted-foreground">/month</span></p>
+                  <p className="text-xs text-muted-foreground">billed annually at ${PRICE_YEARLY}/year</p>
                 </CardContent>
               </Card>
             </div>
             <div className="bg-orange-100 rounded-lg p-3 text-sm text-orange-800">
               Renewing <strong>{licenseInfo.purchasedLicenses || MIN_LICENSES} license(s)</strong> for{' '}
-              <strong>${(licenseInfo.purchasedLicenses || MIN_LICENSES) * (renewPlan === 'monthly' ? 6 : 60)}</strong>{' '}
+              <strong>${(licenseInfo.purchasedLicenses || MIN_LICENSES) * (renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY)}</strong>{' '}
               ({renewPlan})
             </div>
             <Button
