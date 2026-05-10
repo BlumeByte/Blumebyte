@@ -1590,27 +1590,22 @@ function SupportDashboard({ onLogout }: { onLogout: () => void }) {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    try {
-      const token = await getToken();
-      // Invalidate caches so auto-refresh always fetches fresh data from the server
-      invalidateCache('/ultimateadmin/support/metrics', token);
-      invalidateCache('/ultimateadmin/support/tenants', token);
-      invalidateCache('/ultimateadmin/support/verify', token);
-      const [metricsResult, tenantsResult, profileResult] = await Promise.allSettled([
-        api('/ultimateadmin/support/metrics', { token }),
-        api('/ultimateadmin/support/tenants', { token }),
-        api('/ultimateadmin/support/verify', { token }),
-      ]);
-      if (metricsResult.status === 'fulfilled') setMetrics(metricsResult.value);
-      if (tenantsResult.status === 'fulfilled') setTenants(Array.isArray(tenantsResult.value) ? tenantsResult.value : []);
-      if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
-      // Only show error if tenants failed (core data)
-      if (tenantsResult.status === 'rejected') toast.error('Failed to load tenant data');
-    } catch {
-      toast.error('Unexpected error loading dashboard');
-    } finally {
-      setLoading(false);
-    }
+    const token = await getToken();
+    // Invalidate caches so auto-refresh always fetches fresh data from the server
+    invalidateCache('/ultimateadmin/support/metrics', token);
+    invalidateCache('/ultimateadmin/support/tenants', token);
+    invalidateCache('/ultimateadmin/support/verify', token);
+    const [metricsResult, tenantsResult, profileResult] = await Promise.allSettled([
+      api('/ultimateadmin/support/metrics', { token }),
+      api('/ultimateadmin/support/tenants', { token }),
+      api('/ultimateadmin/support/verify', { token }),
+    ]);
+    if (metricsResult.status === 'fulfilled') setMetrics(metricsResult.value);
+    if (tenantsResult.status === 'fulfilled') setTenants(Array.isArray(tenantsResult.value) ? tenantsResult.value : []);
+    if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
+    // Only show error if tenants failed (core data)
+    if (tenantsResult.status === 'rejected') toast.error('Failed to load tenant data');
+    setLoading(false);
   }, [getToken]);
 
   useEffect(() => { loadData(); }, [loadData]);
