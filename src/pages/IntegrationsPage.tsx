@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Plug, Users, Calendar, MessageSquare, FileText, DollarSign, Mail, Video, Database, Cloud, Shield, CheckCircle2 } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
-import { SharedNavigation } from '../components/SharedNavigation';
+import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
 export default function IntegrationsPage() {
   const navigate = useNavigate();
@@ -117,8 +116,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="min-h-screen public-page-bg">
-      {/* Navigation */}
-      <SharedNavigation />
+      <PublicNavbar />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden">
@@ -282,12 +280,7 @@ export default function IntegrationsPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-white py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-gray-600">© 2026 Blumebyte. All rights reserved.</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

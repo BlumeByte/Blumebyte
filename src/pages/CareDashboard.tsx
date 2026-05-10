@@ -17,7 +17,6 @@ import {
   Ticket, MessageSquare, Send
 } from 'lucide-react';
 import { api } from '../lib/api-client';
-import { supabase } from '../lib/supabase-client';
 import { isCustomerCareRole } from '../lib/role-utils';
 import { useAuth } from '../lib/auth-context';
 
@@ -40,11 +39,6 @@ interface TenantUser {
   role: string;
   status: string;
   companyId?: string;
-}
-
-async function getCareToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data?.session?.access_token ?? null;
 }
 
 // ─── Tenant Row ───────────────────────────────────────────────────────────────
@@ -85,7 +79,7 @@ function TenantRow({
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function CareDashboard() {
   const navigate = useNavigate();
-  const { user, sessionLoading } = useAuth();
+  const { user, sessionLoading, getToken, logout } = useAuth();
   // Tri-state: null = checking, false = not authenticated, true = authenticated
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [careProfile, setCareProfile] = useState<any>(null);
@@ -118,6 +112,10 @@ export default function CareDashboard() {
 
   // Care agents are NOT developers — developers have their own dashboard at /developer.
   // The delete and license-edit actions are developer-only and not shown here.
+
+  const getCareToken = useCallback(async () => {
+    return await getToken();
+  }, [getToken]);
 
   const loadProfile = useCallback(async () => {
     if (!user) {
@@ -243,6 +241,21 @@ export default function CareDashboard() {
     }
   };
 
+  const handleResolveTicket = async (ticketId: string) => {
+    const token = await getCareToken();
+    if (!token) return;
+    try {
+      await api(`/care/tickets/${ticketId}/resolve`, { method: 'POST', token, body: {} });
+      toast.success('Ticket resolved and chat closed');
+      loadTickets();
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket((prev: any) => prev ? { ...prev, status: 'resolved', chatClosed: true } : prev);
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to resolve ticket');
+    }
+  };
+
   useEffect(() => {
     if (sessionLoading) return;
     if (!user) {
@@ -310,7 +323,7 @@ export default function CareDashboard() {
   );
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await logout();
     setAuthenticated(false);
     navigate('/login', { replace: true });
   };
@@ -595,6 +608,16 @@ export default function CareDashboard() {
                                         Escalate
                                       </Button>
                                     )}
+                                    {t.status !== 'resolved' && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-green-700 hover:border-green-300"
+                                        onClick={() => handleResolveTicket(t.id)}
+                                      >
+                                        Resolve
+                                      </Button>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -673,6 +696,16 @@ export default function CareDashboard() {
             </div>
           )}
           <DialogFooter>
+            {selectedTicket?.status !== 'resolved' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-green-700 hover:border-green-300"
+                onClick={() => selectedTicket?.id && handleResolveTicket(selectedTicket.id)}
+              >
+                Mark Solved
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setTicketDetailOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>

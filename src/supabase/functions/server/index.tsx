@@ -338,7 +338,7 @@ async function requireRole(c: any, roles: string[]) {
 const requireSuperAdmin = (c: any) => requireRole(c, ["superadmin"]);
 const requireAdminOrAbove = (c: any) => requireRole(c, ["superadmin", "admin"]);
 const requireManagerOrAbove = (c: any) => requireRole(c, ["superadmin", "admin", "manager"]);
-const CUSTOMER_CARE_ROLES = ["customer_care", "customer-care", "customer_care_agent", "care", "support"];
+const CUSTOMER_CARE_ROLES = ["customer_care", "customer-care", "customer_care_agent", "care", "support", "support_manager"];
 const requireDeveloper = (c: any) => requireRole(c, ["developer", "ultimateadmin"]);
 const requireCustomerCare = (c: any) => requireRole(c, CUSTOMER_CARE_ROLES);
 
@@ -504,7 +504,7 @@ function normalizeEmploymentType(raw: string): string {
 }
 
 // --- Active statuses for public job visibility ---
-const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'published', 'live']);
+const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'published', 'live', 'approved', 'posted', 'hiring', 'recruiting', 'accepting_applications']);
 const JOB_PUBLIC_VISIBILITIES = new Set([
   'public_global',
   'public',
@@ -11016,7 +11016,7 @@ async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDe
   const isDeveloper = profile?.role === 'developer' || profile?.isPlatformAdmin === true;
   const role = profile?.role || data.user.user_metadata?.role || '';
   const normalizedRole = role === 'customer-care' ? 'customer_care' : role;
-  const isCare = normalizedRole === 'customer_care' || normalizedRole === 'customer_care_agent' || normalizedRole === 'care' || normalizedRole === 'support';
+  const isCare = normalizedRole === 'customer_care' || normalizedRole === 'customer_care_agent' || normalizedRole === 'care' || normalizedRole === 'support' || normalizedRole === 'support_manager';
   if (!isDeveloper && !isCare) return null;
   return { user: data.user, profile, isDeveloper };
 }
@@ -12689,7 +12689,7 @@ app.get(`${PREFIX}/care/tenant/:id`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/care/tenant/:id/users`, async (c) => {
+const listCareTenantUsersV2 = async (c: any) => {
   try {
     const tenantId = c.req.param('id');
     await requireCareTenantAccess(c, tenantId);
@@ -12701,9 +12701,10 @@ app.get(`${PREFIX}/care/tenant/:id/users`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tenant/:id/users')) app.get(route, listCareTenantUsersV2);
 
-app.get(`${PREFIX}/care/tenant/:id/tickets`, async (c) => {
+const listCareTenantTicketsV2 = async (c: any) => {
   try {
     const tenantId = c.req.param('id');
     await requireCareTenantAccess(c, tenantId);
@@ -12714,9 +12715,10 @@ app.get(`${PREFIX}/care/tenant/:id/tickets`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tenant/:id/tickets')) app.get(route, listCareTenantTicketsV2);
 
-app.post(`${PREFIX}/care/tickets`, async (c) => {
+const createCareTicket = async (c: any) => {
   try {
     const auth = await requireCustomerCare(c);
     const body = await c.req.json();
@@ -12747,9 +12749,10 @@ app.post(`${PREFIX}/care/tickets`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tickets')) app.post(route, createCareTicket);
 
-app.get(`${PREFIX}/care/tickets/:id`, async (c) => {
+const getCareTicketById = async (c: any) => {
   try {
     const auth = await requireCustomerCare(c);
     const ticketId = c.req.param('id');
@@ -12764,9 +12767,10 @@ app.get(`${PREFIX}/care/tickets/:id`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tickets/:id')) app.get(route, getCareTicketById);
 
-app.post(`${PREFIX}/care/tickets/:id/comment`, async (c) => {
+const commentOnCareTicket = async (c: any) => {
   try {
     const auth = await requireCustomerCare(c);
     const ticketId = c.req.param('id');
@@ -12776,6 +12780,9 @@ app.post(`${PREFIX}/care/tickets/:id/comment`, async (c) => {
     if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
     const assigned = await isTenantAssignedToCareAgent(auth.user.id, ticket.tenantId);
     if (!assigned) return c.json({ error: 'Forbidden' }, 403);
+    if (ticket.status === 'resolved' || ticket.chatClosed === true) {
+      return c.json({ error: 'Ticket is already resolved and chat is closed' }, 400);
+    }
     const comments = await kv.get(`ticket_comments:${ticketId}`) || [];
     const entry = {
       id: crypto.randomUUID(),
@@ -12794,9 +12801,10 @@ app.post(`${PREFIX}/care/tickets/:id/comment`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tickets/:id/comment')) app.post(route, commentOnCareTicket);
 
-app.post(`${PREFIX}/care/tickets/:id/escalate`, async (c) => {
+const escalateCareTicket = async (c: any) => {
   try {
     const auth = await requireCustomerCare(c);
     const ticketId = c.req.param('id');
@@ -12819,10 +12827,37 @@ app.post(`${PREFIX}/care/tickets/:id/escalate`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tickets/:id/escalate')) app.post(route, escalateCareTicket);
+
+const resolveCareTicket = async (c: any) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const ticketId = c.req.param('id');
+    const ticket = await getSupportTicketById(ticketId);
+    if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+    const assigned = await isTenantAssignedToCareAgent(auth.user.id, ticket.tenantId);
+    if (!assigned) return c.json({ error: 'Forbidden' }, 403);
+    const updated = {
+      ...ticket,
+      status: 'resolved',
+      resolvedAt: new Date().toISOString(),
+      resolvedBy: auth.user.id,
+      chatClosed: true,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveSupportTicket(updated);
+    return c.json({ success: true, ticket: updated });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+};
+for (const route of compatibleRoutePaths('/care/tickets/:id/resolve')) app.post(route, resolveCareTicket);
 
 // GET /care/tickets — all support tickets for this care agent's assigned tenants
-app.get(`${PREFIX}/care/tickets`, async (c) => {
+const listCareTickets = async (c: any) => {
   try {
     const auth = await requireCustomerCare(c);
     const assigned = await getCareAssignmentsForAgent(auth.user.id);
@@ -12835,7 +12870,8 @@ app.get(`${PREFIX}/care/tickets`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/care/tickets')) app.get(route, listCareTickets);
 
 // GET /developer/platform-users — list all developer and customer care platform users
 app.get(`${PREFIX}/developer/platform-users`, async (c) => {

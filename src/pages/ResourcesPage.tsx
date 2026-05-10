@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Book, FileText, Briefcase, Calendar, Users, Award, Video, Download, ArrowRight, Play, Trophy } from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
-import { SharedNavigation } from '../components/SharedNavigation';
+import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
 
 export default function ResourcesPage() {
   const navigate = useNavigate();
@@ -105,21 +104,20 @@ export default function ResourcesPage() {
 
   return (
     <div className="min-h-screen public-page-bg">
-      {/* Navigation */}
-      <SharedNavigation />
+      <PublicNavbar />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-purple-50 py-20">
+      <section className="bg-gradient-to-br from-gray-950 via-gray-900 to-black py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
+            <div className="inline-flex items-center gap-2 bg-red-100/90 text-red-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
               <Play className="h-4 w-4" />
               Watch & Learn on YouTube
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-black">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-white">
               Resources for HR Success
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-xl text-gray-300 mb-8">
               Access comprehensive guides, templates, webinars, and tools on our YouTube channel to elevate your HR game
             </p>
             <div className="flex gap-4 justify-center">
@@ -174,7 +172,7 @@ export default function ResourcesPage() {
       </section>
 
       {/* YouTube Stats Section */}
-      <section className="bg-gradient-to-br from-red-50 to-orange-50 py-20">
+      <section className="bg-gradient-to-br from-red-50/80 to-orange-50/80 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -227,12 +225,7 @@ export default function ResourcesPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-white py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-gray-600">© 2026 Blumebyte. All rights reserved.</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
