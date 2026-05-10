@@ -552,21 +552,21 @@ function FadeSection({ children, className = '', delay = 0 }: { children: React.
 // ─── Testimonial data (companies kept anonymous) ──────────────────────────────
 const TESTIMONIALS = [
   {
-    name: 'A.M.',
+    name: 'A. M.',
     role: 'HR Director',
     company: 'Anonymous',
     quote: 'Blumebyte transformed how we manage our 200-person team. Payroll that used to take 3 days now takes 30 minutes.',
     rating: 5,
   },
   {
-    name: 'K.A.',
+    name: 'K. A.',
     role: 'CEO',
     company: 'Anonymous',
     quote: 'The attendance tracking and leave management alone saved us countless hours every month. Incredible platform.',
     rating: 5,
   },
   {
-    name: 'F.A.',
+    name: 'F. A.',
     role: 'Operations Manager',
     company: 'Anonymous',
     quote: 'From recruitment to performance reviews, everything is in one place. Our HR team loves it.',

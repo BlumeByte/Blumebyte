@@ -14,5 +14,5 @@
   <!-- Bottom bowl (slightly taller/wider for visual weight) -->
   <path d="M20 36 H38 C51 36 57 42.5 57 50 C57 56 51 55 38 55 H20 Z" fill="white"/>
   <!-- Bottom bowl cutout -->
-  <path d="M20 42 H37 C46 42 51 45 51 50 C51 54 46 49 37 49 H20 Z" fill="#7C5A1A"/>
+  <path d="M20 42 H37 C46 42 51 45 51 50 C51 54 46 54 37 49 H20 Z" fill="#7C5A1A"/>
 </svg>
