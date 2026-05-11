@@ -518,26 +518,26 @@ export default function HiringsPage() {
   }, [fetchJobs]);
 
   // Filter + sort (automatic relevance while typing; otherwise latest first)
+  const normalizedSearch = normalizeSearchTerm(search);
+  const typedLocation = normalizeSearchTerm(filterLocation);
+  const typedType = normalizeSearchTerm(filterType);
+  const typedDepartment = normalizeSearchTerm(filterDepartment);
+
   const filtered = jobs
     .filter((j) => {
-      const q = normalizeSearchTerm(search);
       const location = normalizeSearchTerm(j.location);
       const employmentType = normalizeSearchTerm(j.employmentType);
       const department = normalizeSearchTerm(j.department);
-      const typedLocation = normalizeSearchTerm(filterLocation);
-      const typedType = normalizeSearchTerm(filterType);
-      const typedDepartment = normalizeSearchTerm(filterDepartment);
-      const matchSearch = !q || getSearchScore(j, q) > 0;
+      const matchSearch = !normalizedSearch || getSearchScore(j, normalizedSearch) > 0;
       const matchLocation = !typedLocation || location.includes(typedLocation);
       const matchType = !typedType || employmentType.includes(typedType);
       const matchDepartment = !typedDepartment || department.includes(typedDepartment);
       return matchSearch && matchLocation && matchType && matchDepartment;
     })
     .sort((a, b) => {
-      const q = normalizeSearchTerm(search);
       const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (!q) return timeDiff;
-      const scoreDiff = getSearchScore(b, q) - getSearchScore(a, q);
+      if (!normalizedSearch) return timeDiff;
+      const scoreDiff = getSearchScore(b, normalizedSearch) - getSearchScore(a, normalizedSearch);
       if (scoreDiff !== 0) return scoreDiff;
       if (timeDiff !== 0) return timeDiff;
       return asString(a.roleTitle).localeCompare(asString(b.roleTitle));
