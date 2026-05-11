@@ -73,7 +73,7 @@ export default function HiringDetailPage() {
         }
       }
       if (notFound) setError('This position is no longer available.');
-      else setError(lastError?.message ? 'Unable to load this position right now.' : 'Unable to load this position right now.');
+      else setError('Unable to load this position right now.');
     };
 
     // HIRING-FIX: Guard against missing route param and provide stable not-found UI.

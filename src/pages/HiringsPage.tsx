@@ -468,7 +468,7 @@ export default function HiringsPage() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchJobs, fetchPublicJobsFromAnyEndpoint]);
+  }, [fetchJobs]);
 
   // Unique locations for filter
   const locations = Array.from(
