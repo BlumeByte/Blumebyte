@@ -329,7 +329,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         const data = await response.json();
         setLicenseInfo({
           ...data,
-          endDate: data.endDate || data.expiresAt || data.subscriptionEndDate || null,
+          endDate: data.endDate ?? null,
         });
       }
     } catch (error) {

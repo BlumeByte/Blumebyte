@@ -530,10 +530,16 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       const expectedAmount = Number(pendingLicense.amountSmallestUnit || 0);
       if (expectedAmount > 0 && Number(paystackData.data?.amount || 0) !== expectedAmount) {
-        return c.json({ success: false, message: 'Payment amount mismatch' }, 400);
+        return c.json({
+          success: false,
+          message: `Payment amount mismatch: expected ${expectedAmount}, received ${Number(paystackData.data?.amount || 0)}`,
+        }, 400);
       }
       if (pendingLicense.currency && paystackData.data?.currency && paystackData.data.currency !== pendingLicense.currency) {
-        return c.json({ success: false, message: 'Payment currency mismatch' }, 400);
+        return c.json({
+          success: false,
+          message: `Payment currency mismatch: expected ${pendingLicense.currency}, received ${paystackData.data.currency}`,
+        }, 400);
       }
       
       // Get or create subscription
