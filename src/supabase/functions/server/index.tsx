@@ -519,6 +519,7 @@ const JOB_PUBLIC_VISIBILITIES = new Set([
   'public_job_board',
   'public_appears_on_job_board',
 ]);
+const JOB_TRUTHY_PUBLIC_VALUES = new Set(['true', '1', 'yes', 'on', 'public', 'public_global']);
 
 function normalizeJobStatus(raw: any): string {
   return String(raw ?? '')
@@ -571,7 +572,6 @@ function isPublicJobPosting(job: any): boolean {
     job.jobBoardVisibility ||
     job.publishVisibility
   );
-  const truthyPublicValues = new Set(['true', '1', 'yes', 'on', 'public', 'public_global']);
   // If a posting is explicitly marked public, it should appear on hirings even when
   // other private/internal visibility fields are also present.
   const isExplicitlyPublic = [
@@ -584,7 +584,7 @@ function isPublicJobPosting(job: any): boolean {
   ].some((value) => {
     if (value === true) return true;
     const normalized = normalizeJobVisibility(value);
-    return !!normalized && truthyPublicValues.has(normalized);
+    return !!normalized && JOB_TRUTHY_PUBLIC_VALUES.has(normalized);
   });
   const isPublicByVisibility = !!visibility && JOB_PUBLIC_VISIBILITIES.has(visibility);
   if (!isExplicitlyPublic && !isPublicByVisibility) return false;
