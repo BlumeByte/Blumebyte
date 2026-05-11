@@ -64,7 +64,6 @@ import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
 import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { LanguageSelector } from './LanguageSelector';
-import { NotificationSettings } from './NotificationSettings';
 import { useDarkMode } from '../lib/dark-mode-context';
 import { supabase } from '../lib/supabase';
 
@@ -93,7 +92,7 @@ function itemMatchesCompany(item: any, selectedId: string, selectedName: string)
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
-  { id: 'companies', label: 'Companies', icon: Building2, group: 'organization' },
+  // 'companies' module is intentionally hidden — each tenant has exactly one company
   { id: 'branches', label: 'Branches', icon: GitBranch, group: 'organization' },
   { id: 'departments', label: 'Departments', icon: FolderTree, group: 'organization' },
   { id: 'assets', label: 'Assets', icon: Briefcase, group: 'assets' },
@@ -566,17 +565,10 @@ export function SuperAdminDashboard() {
             <h2 className="text-2xl font-bold mb-6">Language</h2>
             <LanguageSettingsCard />
           </div>
-          
+
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">Working Hours Configuration</h2>
             <WorkingHoursConfig />
-          </div>
-
-          <div className="border-t pt-8">
-            <h2 className="text-2xl font-bold mb-6">Notification Preferences</h2>
-            <div className="max-w-xl">
-              <NotificationSettings />
-            </div>
           </div>
         </div>
       );
@@ -766,7 +758,6 @@ function LanguageSettingsCard() {
           </p>
         </CardContent>
       </Card>
-      <NotificationSettings />
     </div>
   );
 }
@@ -1059,7 +1050,6 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
 
   const statCards = [
     { label: 'Total Users', value: stats.users, icon: Users, color: 'blue', bg: 'bg-blue-100', text: 'text-blue-600' },
-    { label: 'Companies', value: stats.companies, icon: Building2, color: 'green', bg: 'bg-green-100', text: 'text-green-600' },
     { label: 'Departments', value: stats.departments, icon: FolderTree, color: 'purple', bg: 'bg-purple-100', text: 'text-purple-600' },
     { label: 'Branches', value: stats.branches, icon: GitBranch, color: 'indigo', bg: 'bg-indigo-100', text: 'text-indigo-600' },
     { label: 'Assets', value: stats.assets, icon: Briefcase, color: 'orange', bg: 'bg-orange-100', text: 'text-orange-600' },
@@ -1070,7 +1060,6 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
 
   const quickActions = [
     { label: 'Create User', icon: UserPlus, action: 'usermanagement', color: 'bg-blue-500' },
-    { label: 'Add Company', icon: Building2, action: 'companies', color: 'bg-green-500' },
     { label: 'View Reports', icon: BarChart3, action: 'hr-reports', color: 'bg-purple-500' },
     { label: 'Manage Leave', icon: CalendarDays, action: 'leave-management', color: 'bg-amber-500' },
     { label: 'Automation', icon: Zap, action: 'automation', color: 'bg-cyan-500' },

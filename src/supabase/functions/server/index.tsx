@@ -10807,7 +10807,9 @@ for (const route of [`${PREFIX}/notification-preferences`, '/notification-prefer
   app.post(route, writeNotificationPreferences);
 }
 
-// Helper: send email notification to a user if they have the pref enabled
+// Helper: send email notification to a user if they have the pref enabled.
+// Default behaviour (no stored prefs): ALWAYS send. Users who have explicitly
+// set a specific pref to false are the only ones skipped.
 async function sendEmailNotification(
   recipientId: string,
   recipientEmail: string,
@@ -10819,18 +10821,13 @@ async function sendEmailNotification(
   try {
     if (!recipientEmail) return;
 
-    // Check user's notification preferences
-    const prefs = await kv.get(`notif-prefs:${recipientId}`);
-
-    // If user has explicitly set preferences, check the specific pref key
-    if (prefs) {
-      // If a specific pref key is given, check it
-      if (prefKey && prefs[prefKey] === false) return;
-      // If user explicitly has email prefs but all email ones are off, skip
-      const allEmailOff = EMAIL_PREF_KEYS.every(k => prefs[k] === false);
-      if (allEmailOff) return;
-    }
-    // Default (no prefs stored): send email
+    // Only skip if the user has explicitly opted out of this specific pref.
+    // If no prefs are stored at all, we always send (notifications on by default).
+    const prefs = await kv.get(`notif-prefs:${recipientId}`).catch((err: any) => {
+      console.warn('sendEmailNotification: failed to read notif-prefs from KV', err?.message || err);
+      return null;
+    });
+    if (prefs && prefKey && prefs[prefKey] === false) return;
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
@@ -10854,8 +10851,7 @@ async function sendEmailNotification(
               <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
               ${htmlBody}
               <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
-                You received this email because you have email notifications enabled in your Blumebyte account settings.
-                You can turn off email notifications in your dashboard under Settings → Notification Settings.
+                You received this email because you are a Blumebyte HR user and email notifications are active for your account.
               </p>
             </div>
           </div>

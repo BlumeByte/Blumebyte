@@ -44,7 +44,6 @@ import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 import { LanguageSelector } from './LanguageSelector';
-import { NotificationSettings } from './NotificationSettings';
 import { useDarkMode } from '../lib/dark-mode-context';
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -2245,7 +2244,6 @@ function AdminSettings() {
           </p>
         </CardContent>
       </Card>
-      <NotificationSettings />
     </div>
   );
 }

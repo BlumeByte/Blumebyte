@@ -33,7 +33,6 @@ import { useCurrency } from '../lib/currency-context';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { LanguageSelector } from './LanguageSelector';
-import { NotificationSettings } from './NotificationSettings';
 import { OvertimeExpenseTab } from './portal/OvertimeExpenseTab';
 import { useDarkMode } from '../lib/dark-mode-context';
 export function EmployeeDashboard() {
@@ -159,7 +158,6 @@ export function EmployeeDashboard() {
                   </p>
                 </CardContent>
               </Card>
-              <NotificationSettings />
             </div>
           </TabsContent>
         </Tabs>

@@ -38,7 +38,6 @@ import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
 import { ManagerOvertimeExpenseApproval } from './ManagerOvertimeExpenseApproval';
 import { LanguageSelector } from './LanguageSelector';
 import { useDarkMode } from '../lib/dark-mode-context';
-import { NotificationSettings } from './NotificationSettings';
 function TeamTab() {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
@@ -848,7 +847,6 @@ function ManagerSettingsView() {
           </p>
         </CardContent>
       </Card>
-      <NotificationSettings />
     </div>
   );
 }
