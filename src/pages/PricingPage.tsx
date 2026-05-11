@@ -12,7 +12,7 @@ export default function PricingPage() {
   const pricingPlans = [
     {
       name: 'Monthly Plan',
-      price: '$6',
+      price: '$2.59',
       period: '/employee/month',
       billingCycle: 'Billed monthly',
       description: 'Perfect for companies wanting flexibility',
@@ -37,9 +37,9 @@ export default function PricingPage() {
     },
     {
       name: 'Yearly Plan',
-      price: '$5',
+      price: '$3.59',
       period: '/employee/month',
-      billingCycle: 'Billed annually at $60/employee',
+      billingCycle: 'Billed annually at $43.08/employee',
       description: 'Best value for growing companies',
       features: [
         'Operations and Compliance',
@@ -62,7 +62,6 @@ export default function PricingPage() {
         'Quarterly Business Reviews',
       ],
       popular: true,
-      savings: 'Save 17%',
     },
     {
       name: 'Enterprise',

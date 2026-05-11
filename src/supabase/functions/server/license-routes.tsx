@@ -269,7 +269,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Always compute amount server-side from the canonical price list — never trust client-provided amount
-      const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
+      const pricePerLicense = plan === 'monthly' ? 2.59 : 43.08; // $2.59/mo or $43.08/yr ($3.59/mo billed annually)
       const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -615,7 +615,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Calculate renewal amount
-      const pricePerLicense = subscription.plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr
+      const pricePerLicense = subscription.plan === 'monthly' ? 2.59 : 43.08; // $2.59/mo or $43.08/yr
       const amount = subscription.purchasedLicenses * pricePerLicense;
       
       // Convert USD to GHS for Paystack
@@ -900,7 +900,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Always compute amount server-side from the canonical price list — never trust client-provided amount
-      const pricePerLicense = plan === 'monthly' ? 6 : 60; // $6/mo or $60/yr — matches PricingPage & LicenseManagement
+      const pricePerLicense = plan === 'monthly' ? 2.59 : 43.08; // $2.59/mo or $43.08/yr ($3.59/mo billed annually)
       const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');

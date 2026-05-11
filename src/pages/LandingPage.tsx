@@ -583,7 +583,7 @@ export default function LandingPage() {
   const pricingPlans = [
     {
       name: 'Monthly',
-      price: billingAnnual ? '$5' : '$6',
+      price: billingAnnual ? '$3.59' : '$2.59',
       period: '/employee/month',
       billingCycle: billingAnnual ? 'Billed annually' : 'Billed monthly',
       description: 'For growing teams',
@@ -601,12 +601,11 @@ export default function LandingPage() {
     },
     {
       name: 'Business',
-      price: billingAnnual ? '$5' : '$6',
+      price: billingAnnual ? '$3.59' : '$2.59',
       period: '/employee/month',
-      billingCycle: billingAnnual ? 'Billed annually · Save 17%' : 'Billed monthly',
+      billingCycle: billingAnnual ? 'Billed annually' : 'Billed monthly',
       description: 'Best value for scale',
       popular: true,
-      savings: billingAnnual ? 'Save 17%' : undefined,
       features: [
         'Everything in Monthly',
         'Advanced Analytics',
@@ -639,7 +638,7 @@ export default function LandingPage() {
   ];
 
   const faqs = [
-    { q: 'How is pricing calculated?', a: 'Pricing is per active employee per month. The minimum purchase is 2 licenses. Annual billing gives you 17% off.' },
+    { q: 'How is pricing calculated?', a: 'Pricing is per active employee per month. The minimum purchase is 2 licenses.' },
     { q: 'Is there a free trial?', a: 'Yes — get full access to all features for 14 days with no credit card required.' },
     { q: 'Can I upgrade or downgrade my plan?', a: 'Absolutely. You can change plans at any time; adjustments take effect at the next billing cycle.' },
     { q: 'What payment methods are accepted?', a: 'We accept all major credit cards and bank transfers via Paystack.' },
@@ -951,7 +950,6 @@ export default function LandingPage() {
             </button>
             <span className={`text-sm font-medium flex items-center gap-1.5 ${billingAnnual ? 'text-mint-black' : 'text-gray-400'}`}>
               Annual
-              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full">Save 17%</span>
             </span>
           </FadeSection>
 

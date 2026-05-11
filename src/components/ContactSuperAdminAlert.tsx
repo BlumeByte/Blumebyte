@@ -83,7 +83,7 @@ export function ContactSuperAdminAlert({ reason, onDismiss }: ContactSuperAdminA
           <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
             <p className="text-xs text-yellow-900">
               <strong>Note:</strong> SuperAdmin can purchase additional licenses from the Settings → License Management page. 
-              Licenses are $5/month or $48/year per user.
+              Licenses are $2.59/month or $43.08/year per user.
             </p>
           </div>
         )}

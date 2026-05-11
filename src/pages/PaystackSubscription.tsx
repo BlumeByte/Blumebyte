@@ -156,7 +156,7 @@ export default function PaystackSubscription() {
             Choose Your Plan
           </h2>
           <p className="text-muted-foreground">
-            Starting at just $5 per employee/month
+            Starting at just $2.59 per employee/month
           </p>
         </div>
 

@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Alert, AlertDescription } from './ui/alert';
 import { Separator } from './ui/separator';
@@ -31,8 +30,8 @@ interface LicenseManagementProps {
 
 export function LicenseManagement({ onClose, requiredLicenses }: LicenseManagementProps) {
   const MIN_LICENSES = 2; // Minimum purchase quantity enforced by the server
-  const PRICE_MONTHLY = 6;  // USD per license/month
-  const PRICE_YEARLY = 60;  // USD per license/year
+  const PRICE_MONTHLY = 2.59;  // USD per license/month
+  const PRICE_YEARLY = 43.08;  // USD per license/year ($3.59/month billed annually)
   const { branding } = useBranding();
   const { accessToken, getToken } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -747,7 +746,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                       <CheckCircle className="w-5 h-5 text-blue-500" />
                     )}
                   </div>
-                  <p className="text-2xl font-bold">${PRICE_MONTHLY}</p>
+                  <p className="text-2xl font-bold">${PRICE_MONTHLY.toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">per license/month</p>
                 </CardContent>
               </Card>
@@ -761,25 +760,18 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                 }`}
                 onClick={() => setSelectedPlan('yearly')}
               >
-                <div className="absolute -top-2 -right-2">
-                  <Badge className="bg-green-600 text-white">
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                    Save 20%
-                  </Badge>
-                </div>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <p className="font-semibold">Yearly</p>
-                      <p className="text-xs text-muted-foreground">Best value</p>
+                      <p className="text-xs text-muted-foreground">Billed annually</p>
                     </div>
                     {selectedPlan === 'yearly' && (
                       <CheckCircle className="w-5 h-5 text-blue-500" />
                     )}
                   </div>
-                  <p className="text-2xl font-bold">${Math.round(PRICE_YEARLY / 12)}<span className="text-base text-muted-foreground">/month</span></p>
-                  <p className="text-xs text-muted-foreground">billed annually at ${PRICE_YEARLY}/year</p>
-                  <p className="text-xs text-green-600 font-medium mt-1">Save ${PRICE_MONTHLY * 12 - PRICE_YEARLY}/year per license</p>
+                  <p className="text-2xl font-bold">${(PRICE_YEARLY / 12).toFixed(2)}<span className="text-base text-muted-foreground">/month</span></p>
+                  <p className="text-xs text-muted-foreground">billed annually at ${PRICE_YEARLY.toFixed(2)}/year</p>
                 </CardContent>
               </Card>
             </div>
@@ -816,15 +808,9 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Price per license</span>
               <span className="font-semibold">
-                ${pricePerUser}/{selectedPlan === 'monthly' ? 'month' : 'year'}
+                ${pricePerUser.toFixed(2)}/{selectedPlan === 'monthly' ? 'month' : 'year'}
               </span>
             </div>
-            {selectedPlan === 'yearly' && (
-              <div className="flex justify-between items-center text-green-600">
-                <span className="text-sm">Annual savings</span>
-                <span className="font-semibold">-${additionalLicenses * (PRICE_MONTHLY * 12 - PRICE_YEARLY)}</span>
-              </div>
-            )}
             <Separator />
             <div className="flex justify-between items-center text-lg">
               <span className="font-bold">Total</span>
@@ -834,10 +820,10 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                   WebkitBackgroundClip: 'text', 
                   WebkitTextFillColor: 'transparent' 
                 }}>
-                  ${totalCost}
+                  ${totalCost.toFixed(2)}
                 </span>
                 {selectedPlan === 'yearly' && (
-                  <p className="text-xs text-muted-foreground">${monthlyEquivalent}/month</p>
+                  <p className="text-xs text-muted-foreground">${Number(monthlyEquivalent).toFixed(2)}/month</p>
                 )}
               </div>
             </div>
@@ -1036,7 +1022,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                     </div>
                     {renewPlan === 'monthly' && <CheckCircle className="w-5 h-5 text-orange-500" />}
                   </div>
-                  <p className="text-2xl font-bold">${PRICE_MONTHLY}</p>
+                  <p className="text-2xl font-bold">${PRICE_MONTHLY.toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">per license/month</p>
                 </CardContent>
               </Card>
@@ -1044,27 +1030,22 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                 className={`cursor-pointer transition-all relative ${renewPlan === 'yearly' ? 'ring-2 ring-orange-500 shadow-lg' : 'hover:shadow-md'}`}
                 onClick={() => setRenewPlan('yearly')}
               >
-                <div className="absolute -top-2 -right-2">
-                  <Badge className="bg-green-600 text-white">
-                    <TrendingUp className="w-3 h-3 mr-1" />Save 20%
-                  </Badge>
-                </div>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <p className="font-semibold">Yearly</p>
-                      <p className="text-xs text-muted-foreground">Best value</p>
+                        <p className="text-xs text-muted-foreground">Billed annually</p>
                     </div>
                     {renewPlan === 'yearly' && <CheckCircle className="w-5 h-5 text-orange-500" />}
                   </div>
-                  <p className="text-2xl font-bold">${Math.round(PRICE_YEARLY / 12)}<span className="text-base text-muted-foreground">/month</span></p>
-                  <p className="text-xs text-muted-foreground">billed annually at ${PRICE_YEARLY}/year</p>
+                  <p className="text-2xl font-bold">${(PRICE_YEARLY / 12).toFixed(2)}<span className="text-base text-muted-foreground">/month</span></p>
+                  <p className="text-xs text-muted-foreground">billed annually at ${PRICE_YEARLY.toFixed(2)}/year</p>
                 </CardContent>
               </Card>
             </div>
             <div className="bg-orange-100 rounded-lg p-3 text-sm text-orange-800">
               Renewing <strong>{licenseInfo.purchasedLicenses || MIN_LICENSES} license(s)</strong> for{' '}
-              <strong>${(licenseInfo.purchasedLicenses || MIN_LICENSES) * (renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY)}</strong>{' '}
+              <strong>${((licenseInfo.purchasedLicenses || MIN_LICENSES) * (renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY)).toFixed(2)}</strong>{' '}
               ({renewPlan})
             </div>
             <Button

@@ -6841,7 +6841,7 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     }
     
     // Always compute amount server-side — never trust client-provided amount
-    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
     const amount = userCount * pricePerUser;
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -6862,7 +6862,7 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount: amount * 100, // Paystack expects amount in kobo (cents)
+        amount: Math.round(amount * 100), // Paystack expects amount in kobo (cents)
         reference,
         callback_url: callbackUrl,
         metadata: {
@@ -6973,7 +6973,7 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
     }
 
     // Always compute amount server-side from canonical price list — never trust client-provided amount
-    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
     const amount = licenses * pricePerUser;
 
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -6992,7 +6992,7 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount: amount * 100,
+        amount: Math.round(amount * 100),
         reference,
         callback_url: callbackUrl,
         metadata: {
@@ -7052,7 +7052,7 @@ app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) =>
     }
 
     // Always compute amount server-side from canonical price list
-    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
     const amount = licenses * pricePerUser;
 
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -7071,7 +7071,7 @@ app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) =>
       },
       body: JSON.stringify({
         email: user.email,
-        amount: amount * 100,
+        amount: Math.round(amount * 100),
         reference,
         callback_url: callbackUrl,
         metadata: {
@@ -7131,7 +7131,7 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
       return c.json({ error: 'Payment gateway not configured' }, 500);
     }
 
-    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
     const amount = Number(licenses) * pricePerUser;
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
@@ -7145,7 +7145,7 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount: amount * 100,
+        amount: Math.round(amount * 100),
         reference,
         callback_url: callbackUrl,
         metadata: {
@@ -8952,7 +8952,7 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       },
       body: JSON.stringify({
         email: userProfile.email,
-        amount: amount * 100, // Paystack expects amount in kobo
+        amount: Math.round(amount * 100), // Paystack expects amount in kobo
         reference: reference,
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`,
         metadata: {
@@ -9095,7 +9095,7 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
       },
       body: JSON.stringify({
         email: userProfile.email,
-        amount: amount * 100,
+        amount: Math.round(amount * 100),
         reference: reference,
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-license-upgrade?reference=${reference}`,
         metadata: {
