@@ -5,7 +5,7 @@ import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { useAuth } from '../lib/auth-context';
-import { api } from '../lib/api-client';
+import { api, invalidateCache } from '../lib/api-client';
 import { toast } from 'sonner';
 
 interface NotificationPrefs {
@@ -75,11 +75,15 @@ export function NotificationSettings() {
     try {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
-      await api('/notification-preferences', {
+      const result = await api('/notification-preferences', {
         method: 'PUT',
         token,
         body: prefs,
       });
+      // Invalidate GET cache so the next read returns the freshly saved data
+      invalidateCache('/notification-preferences', token);
+      // Sync local state with what the server confirmed
+      if (result?.prefs) setPrefs({ ...DEFAULT_PREFS, ...result.prefs });
       localStorage.setItem('notification_sound_enabled', String(prefs.notificationSoundEnabled));
       toast.success('Notification preferences saved');
     } catch (e: any) {
@@ -88,7 +92,7 @@ export function NotificationSettings() {
       if (!e?.message || e.message === 'Not authenticated' || e.status === 401) {
         toast.error('Please sign in again to save preferences');
       } else {
-        toast.error('Failed to save preferences. Please try again.');
+        toast.error('Failed to save preferences: ' + (e.message || 'Please try again.'));
       }
     } finally {
       setSaving(false);

@@ -21,7 +21,7 @@ import {
   Copy, RefreshCw, PanelLeftClose, PanelLeftOpen, AlertCircle, Settings,
   Clock, CheckCircle, MessageCircle, User, UserCheck, Upload, FileText, Download, LogOut, Camera,
   UserCog, XCircle, Zap, GitMerge, Target, ClipboardList, FileCheck, BarChart3, Eye, EyeOff, ChevronUp, ChevronDown, Play,
-  MessageSquare, BookOpen, GraduationCap, CreditCard, ExternalLink, Globe
+  MessageSquare, BookOpen, GraduationCap, CreditCard, ExternalLink, Globe, Menu
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { NotificationsBell } from './NotificationsBell';
@@ -44,7 +44,6 @@ import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
 import { LanguageSelector } from './LanguageSelector';
-import { NotificationSettings } from './NotificationSettings';
 import { useDarkMode } from '../lib/dark-mode-context';
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -104,10 +103,19 @@ export function AdminDashboard() {
   const { branding, refresh: refreshBranding } = useBranding();
   const [activeTab, setActiveTab] = useState('overview');
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background flex">
-      <aside className={`${collapsed ? 'w-[72px]' : 'w-56'} bg-card border-r border-border flex flex-col fixed h-screen z-30 transition-all duration-200 overflow-hidden`}>
+      {/* Mobile overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      <aside className={`${collapsed ? 'w-[72px]' : 'w-56'} bg-card border-r border-border flex flex-col fixed h-screen z-50 md:z-30 transition-all duration-200 overflow-hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className={`p-3 flex items-center ${collapsed ? 'justify-center' : 'justify-between'} flex-shrink-0`}>
           {collapsed ? (
             <button onClick={() => setCollapsed(false)} className="w-10 h-10 rounded-xl flex items-center justify-center hover:scale-105 transition-transform overflow-hidden" style={brandGradientStyle(branding.primaryColor)} title="Expand sidebar">
@@ -136,7 +144,7 @@ export function AdminDashboard() {
               const Icon = t.icon;
               const active = activeTab === t.id;
               return (
-                <button key={t.id} onClick={() => { setActiveTab(t.id); scrollToTop(); }}
+                <button key={t.id} onClick={() => { setActiveTab(t.id); scrollToTop(); setMobileMenuOpen(false); }}
                   aria-label={t.label}
                   title={collapsed ? t.label : undefined}
                   className={`w-full flex items-center gap-2.5 rounded-lg transition-colors ${collapsed ? 'justify-center p-2.5' : 'px-3 py-2'} ${active ? '' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
@@ -168,12 +176,21 @@ export function AdminDashboard() {
         </div>
       </aside>
 
-      <div className={`flex-1 ${collapsed ? 'ml-[72px]' : 'ml-56'} transition-all duration-200 min-w-0`}>
-        <header className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-6 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">{TABS.find(t => t.id === activeTab)?.label}</h1>
+      <div className={`flex-1 ${collapsed ? 'md:ml-[72px]' : 'md:ml-56'} transition-all duration-200 min-w-0`}>
+        <header className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-4 md:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-semibold">{TABS.find(t => t.id === activeTab)?.label}</h1>
+          </div>
           <div className="flex items-center gap-3">
             <NotificationsBell />
-            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Admin</Badge>
+            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hidden sm:inline-flex">Admin</Badge>
           </div>
         </header>
         <main className="p-6">
@@ -2227,7 +2244,6 @@ function AdminSettings() {
           </p>
         </CardContent>
       </Card>
-      <NotificationSettings />
     </div>
   );
 }

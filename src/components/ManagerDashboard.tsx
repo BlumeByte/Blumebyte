@@ -16,7 +16,7 @@ import {
   LayoutDashboard, Users, UserPlus, CalendarDays, Clock, Megaphone,
   Loader2, Plus, X, CheckCircle, Copy, AlertCircle, MessageCircle, Pencil, Search,
   Trash2, User, Settings, Briefcase, LogOut, FolderTree, GitMerge, Target,
-  ClipboardList, FileCheck, GraduationCap, BarChart3, UserCheck, Eye, RefreshCw, ChevronUp, ChevronDown
+  ClipboardList, FileCheck, GraduationCap, BarChart3, UserCheck, Eye, RefreshCw, ChevronUp, ChevronDown, Menu
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { MessagesModal } from './MessagesModal';
@@ -38,7 +38,6 @@ import { ManagerAnnouncementsModule } from './ManagerAnnouncementsModule';
 import { ManagerOvertimeExpenseApproval } from './ManagerOvertimeExpenseApproval';
 import { LanguageSelector } from './LanguageSelector';
 import { useDarkMode } from '../lib/dark-mode-context';
-import { NotificationSettings } from './NotificationSettings';
 function TeamTab() {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
@@ -415,6 +414,7 @@ export function ManagerDashboard() {
   const { user, accessToken, logout } = useAuth();
   const { branding } = useBranding();
   const [activeTab, setActiveTab] = useState('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [stats, setStats] = useState<any>({});
   const [loadingStats, setLoadingStats] = useState(true);
@@ -457,13 +457,22 @@ export function ManagerDashboard() {
 
   const handleNavigation = (section: string) => {
     setActiveTab(section);
+    setMobileMenuOpen(false);
     scrollToTop();
   };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+      {/* Mobile overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-56 bg-card border-r border-border flex flex-col fixed h-screen">
+      <aside className={`w-56 bg-card border-r border-border flex flex-col fixed h-screen z-50 md:z-30 transition-transform duration-200 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-4 border-b">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
@@ -486,7 +495,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'overview' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('overview')}
+            onClick={() => handleNavigation('overview')}
           >
             <LayoutDashboard className="w-4 h-4 mr-2" />
             Overview
@@ -494,7 +503,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'team' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('team')}
+            onClick={() => handleNavigation('team')}
           >
             <Users className="w-4 h-4 mr-2" />
             My Team
@@ -502,7 +511,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'departments' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('departments')}
+            onClick={() => handleNavigation('departments')}
           >
             <FolderTree className="w-4 h-4 mr-2" />
             Departments
@@ -512,7 +521,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'attendance' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('attendance')}
+            onClick={() => handleNavigation('attendance')}
           >
             <Clock className="w-4 h-4 mr-2" />
             Clock In/Out
@@ -520,7 +529,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'workflows' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('workflows')}
+            onClick={() => handleNavigation('workflows')}
           >
             <GitMerge className="w-4 h-4 mr-2" />
             Workflows
@@ -528,7 +537,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'performance' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('performance')}
+            onClick={() => handleNavigation('performance')}
           >
             <Target className="w-4 h-4 mr-2" />
             Performance
@@ -536,7 +545,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'disciplinary' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('disciplinary')}
+            onClick={() => handleNavigation('disciplinary')}
           >
             <AlertCircle className="w-4 h-4 mr-2" />
             Disciplinary
@@ -544,7 +553,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'compliance' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('compliance')}
+            onClick={() => handleNavigation('compliance')}
           >
             <FileCheck className="w-4 h-4 mr-2" />
             Compliance
@@ -552,7 +561,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'tasks' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('tasks')}
+            onClick={() => handleNavigation('tasks')}
           >
             <ClipboardList className="w-4 h-4 mr-2" />
             Tasks
@@ -560,7 +569,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'feedback' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('feedback')}
+            onClick={() => handleNavigation('feedback')}
           >
             <UserCheck className="w-4 h-4 mr-2" />
             360° Feedback
@@ -568,7 +577,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'training' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('training')}
+            onClick={() => handleNavigation('training')}
           >
             <GraduationCap className="w-4 h-4 mr-2" />
             Training
@@ -576,7 +585,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'overtime-expenses' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('overtime-expenses')}
+            onClick={() => handleNavigation('overtime-expenses')}
           >
             <Clock className="w-4 h-4 mr-2" />
             OT & Expenses
@@ -584,7 +593,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'reports' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('reports')}
+            onClick={() => handleNavigation('reports')}
           >
             <BarChart3 className="w-4 h-4 mr-2" />
             Reports
@@ -592,7 +601,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'advanced-reports' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('advanced-reports')}
+            onClick={() => handleNavigation('advanced-reports')}
           >
             <BarChart3 className="w-4 h-4 mr-2" />
             Advanced Reports
@@ -600,7 +609,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'meetings' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('meetings')}
+            onClick={() => handleNavigation('meetings')}
           >
             <Users className="w-4 h-4 mr-2" />
             Meetings
@@ -608,7 +617,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'announcements' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('announcements')}
+            onClick={() => handleNavigation('announcements')}
           >
             <Megaphone className="w-4 h-4 mr-2" />
             Announcements
@@ -616,7 +625,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'messages' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('messages')}
+            onClick={() => handleNavigation('messages')}
           >
             <MessageCircle className="w-4 h-4 mr-2" />
             Messages
@@ -624,7 +633,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'self-service' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('self-service')}
+            onClick={() => handleNavigation('self-service')}
           >
             <Briefcase className="w-4 h-4 mr-2" />
             Self Service
@@ -632,7 +641,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'profile' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('profile')}
+            onClick={() => handleNavigation('profile')}
           >
             <User className="w-4 h-4 mr-2" />
             My Profile
@@ -640,7 +649,7 @@ export function ManagerDashboard() {
           <Button
             variant={activeTab === 'settings' ? 'default' : 'ghost'}
             className="w-full justify-start text-sm h-9"
-            onClick={() => setActiveTab('settings')}
+            onClick={() => handleNavigation('settings')}
           >
             <Settings className="w-4 h-4 mr-2" />
             Settings
@@ -661,33 +670,42 @@ export function ManagerDashboard() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 ml-56 transition-all duration-200 min-w-0">
-        <header className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-6 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">
-            {activeTab === 'overview' && 'Overview'}
-            {activeTab === 'team' && 'My Team'}
-            {activeTab === 'departments' && 'Departments'}
-            {activeTab === 'attendance' && 'Clock In/Out'}
-            {activeTab === 'workflows' && 'Workflows'}
-            {activeTab === 'performance' && 'Performance Reviews'}
-            {activeTab === 'disciplinary' && 'Disciplinary'}
-            {activeTab === 'compliance' && 'Labour Compliance'}
-            {activeTab === 'tasks' && 'Task Assignments'}
-            {activeTab === 'feedback' && '360° Feedback'}
-            {activeTab === 'training' && 'Training'}
-            {activeTab === 'overtime-expenses' && 'OT & Expenses'}
-            {activeTab === 'reports' && 'Reports'}
-            {activeTab === 'advanced-reports' && 'Advanced Reports'}
-            {activeTab === 'meetings' && 'Meetings'}
-            {activeTab === 'announcements' && 'Announcements'}
-            {activeTab === 'messages' && 'Messages'}
-            {activeTab === 'self-service' && 'Self Service'}
-            {activeTab === 'profile' && 'My Profile'}
-            {activeTab === 'settings' && 'Settings'}
-          </h1>
+      <div className="flex-1 md:ml-56 transition-all duration-200 min-w-0">
+        <header className="sticky top-0 z-20 bg-card/80 backdrop-blur border-b border-border px-4 md:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-semibold">
+              {activeTab === 'overview' && 'Overview'}
+              {activeTab === 'team' && 'My Team'}
+              {activeTab === 'departments' && 'Departments'}
+              {activeTab === 'attendance' && 'Clock In/Out'}
+              {activeTab === 'workflows' && 'Workflows'}
+              {activeTab === 'performance' && 'Performance Reviews'}
+              {activeTab === 'disciplinary' && 'Disciplinary'}
+              {activeTab === 'compliance' && 'Labour Compliance'}
+              {activeTab === 'tasks' && 'Task Assignments'}
+              {activeTab === 'feedback' && '360° Feedback'}
+              {activeTab === 'training' && 'Training'}
+              {activeTab === 'overtime-expenses' && 'OT & Expenses'}
+              {activeTab === 'reports' && 'Reports'}
+              {activeTab === 'advanced-reports' && 'Advanced Reports'}
+              {activeTab === 'meetings' && 'Meetings'}
+              {activeTab === 'announcements' && 'Announcements'}
+              {activeTab === 'messages' && 'Messages'}
+              {activeTab === 'self-service' && 'Self Service'}
+              {activeTab === 'profile' && 'My Profile'}
+              {activeTab === 'settings' && 'Settings'}
+            </h1>
+          </div>
           <div className="flex items-center gap-3">
             <NotificationsBell />
-            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">Manager</Badge>
+            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 hidden sm:inline-flex">Manager</Badge>
           </div>
         </header>
         <main className="p-6">
@@ -743,7 +761,7 @@ export function ManagerDashboard() {
                       <Button
                         key={link.label}
                         className={`${link.color} text-white h-auto py-4 flex flex-col items-center gap-2`}
-                        onClick={() => setActiveTab(link.tab)}
+                        onClick={() => handleNavigation(link.tab)}
                       >
                         <Icon className="w-5 h-5" />
                         <span className="text-xs">{link.label}</span>
@@ -829,7 +847,6 @@ function ManagerSettingsView() {
           </p>
         </CardContent>
       </Card>
-      <NotificationSettings />
     </div>
   );
 }

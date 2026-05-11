@@ -122,14 +122,11 @@ export default function PaystackSubscription() {
     setLoading(true);
 
     try {
-      const pricePerLicense = 1500; // ₦1,500 per additional license
-      const totalAmount = additionalLicenses * pricePerLicense;
-
       const response = await api('/subscription/upgrade-licenses', {
         method: 'POST',
         body: JSON.stringify({
           additionalLicenses,
-          amount: totalAmount,
+          plan: 'monthly', // server computes amount server-side
         }),
       });
 
@@ -156,7 +153,7 @@ export default function PaystackSubscription() {
             Choose Your Plan
           </h2>
           <p className="text-muted-foreground">
-            Starting at just $5 per employee/month
+            Starting at just $2.59 per employee/month
           </p>
         </div>
 

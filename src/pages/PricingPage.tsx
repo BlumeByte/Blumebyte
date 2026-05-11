@@ -1,10 +1,207 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Play, RotateCcw, Trophy, Zap } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { SharedNavigation } from '../components/SharedNavigation';
+
+// ─── Snake Mini-Game ──────────────────────────────────────────────────────────
+const GRID = 16;
+const CELL = 16;
+const CANVAS = GRID * CELL;
+const GAME_TICK_MS = 135;
+
+type Point = { x: number; y: number };
+
+function SnakeMiniGame() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef({
+    snake: [{ x: 8, y: 8 }] as Point[],
+    dir: { x: 1, y: 0 } as Point,
+    nextDir: { x: 1, y: 0 } as Point,
+    food: { x: 4, y: 4 } as Point,
+    score: 0,
+    running: false,
+    over: false,
+    intervalId: null as ReturnType<typeof setInterval> | null,
+  });
+  const [displayScore, setDisplayScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const [started, setStarted] = useState(false);
+
+  const randomFood = (snake: Point[]): Point => {
+    let pos: Point;
+    do {
+      pos = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) };
+    } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+    return pos;
+  };
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const s = stateRef.current;
+    ctx.clearRect(0, 0, CANVAS, CANVAS);
+    ctx.fillStyle = 'rgba(124,90,26,0.07)';
+    for (let x = 0; x < GRID; x++) {
+      for (let y = 0; y < GRID; y++) {
+        ctx.beginPath();
+        ctx.arc(x * CELL + CELL / 2, y * CELL + CELL / 2, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(s.food.x * CELL + CELL / 2, s.food.y * CELL + CELL / 2, CELL / 2 - 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = `bold ${CELL - 4}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$', s.food.x * CELL + CELL / 2, s.food.y * CELL + CELL / 2 + 1);
+    s.snake.forEach((seg, i) => {
+      const isHead = i === 0;
+      const alpha = isHead ? 1 : 0.85 - (i / s.snake.length) * 0.4;
+      ctx.fillStyle = isHead ? '#7C5A1A' : `rgba(124,90,26,${alpha})`;
+      const r = isHead ? CELL / 2 - 1 : CELL / 2 - 2;
+      ctx.beginPath();
+      ctx.roundRect(seg.x * CELL + 2, seg.y * CELL + 2, CELL - 4, CELL - 4, r);
+      ctx.fill();
+    });
+  }, []);
+
+  const tick = useCallback(() => {
+    const s = stateRef.current;
+    if (!s.running) return;
+    s.dir = s.nextDir;
+    const head = s.snake[0];
+    const next: Point = { x: (head.x + s.dir.x + GRID) % GRID, y: (head.y + s.dir.y + GRID) % GRID };
+    if (s.snake.some(seg => seg.x === next.x && seg.y === next.y)) {
+      s.running = false;
+      s.over = true;
+      if (s.intervalId) clearInterval(s.intervalId);
+      setGameOver(true);
+      draw();
+      return;
+    }
+    s.snake = [next, ...s.snake];
+    if (next.x === s.food.x && next.y === s.food.y) {
+      s.score += 1;
+      s.food = randomFood(s.snake);
+      setDisplayScore(s.score);
+    } else {
+      s.snake = s.snake.slice(0, -1);
+    }
+    draw();
+  }, [draw]);
+
+  const startGame = useCallback(() => {
+    const s = stateRef.current;
+    if (s.intervalId) clearInterval(s.intervalId);
+    s.snake = [{ x: 8, y: 8 }];
+    s.dir = { x: 1, y: 0 };
+    s.nextDir = { x: 1, y: 0 };
+    s.food = randomFood(s.snake);
+    s.score = 0;
+    s.running = true;
+    s.over = false;
+    setDisplayScore(0);
+    setGameOver(false);
+    setStarted(true);
+    draw();
+    s.intervalId = setInterval(tick, GAME_TICK_MS);
+  }, [draw, tick]);
+
+  useEffect(() => {
+    draw();
+    return () => { if (stateRef.current.intervalId) clearInterval(stateRef.current.intervalId); };
+  }, [draw]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const s = stateRef.current;
+      if (!s.running) return;
+      const map: Record<string, Point> = {
+        ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+        ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
+        w: { x: 0, y: -1 }, s: { x: 0, y: 1 },
+        a: { x: -1, y: 0 }, d: { x: 1, y: 0 },
+      };
+      const nd = map[e.key];
+      if (!nd) return;
+      if (nd.x !== -s.dir.x || nd.y !== -s.dir.y) s.nextDir = nd;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart.current) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current.x;
+    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    const s = stateRef.current;
+    if (!s.running) return;
+    let nd: Point;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      nd = dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 };
+    } else {
+      nd = dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 };
+    }
+    if (nd.x !== -s.dir.x || nd.y !== -s.dir.y) s.nextDir = nd;
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-3 select-none">
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          width={CANVAS}
+          height={CANVAS}
+          className="rounded-2xl border-2 border-black/10 shadow-xl cursor-default"
+          style={{ background: 'rgba(255,255,255,0.97)', touchAction: 'none' }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        />
+        {!started && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl"
+            style={{ background: 'rgba(255,255,255,0.92)' }}>
+            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center mb-3 shadow-lg">
+              <Play className="w-6 h-6 text-white ml-0.5" />
+            </div>
+            <p className="text-sm font-bold text-gray-800 mb-0.5">Catch the Payslip!</p>
+            <p className="text-xs text-gray-500 mb-4">Arrows / WASD to move</p>
+            <Button size="sm" onClick={startGame} className="bg-primary text-white hover:bg-primary/90 text-xs px-4">
+              Play
+            </Button>
+          </div>
+        )}
+        {gameOver && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl"
+            style={{ background: 'rgba(255,255,255,0.92)' }}>
+            <p className="text-sm font-bold text-gray-800 mb-1">Game Over!</p>
+            <p className="text-2xl font-black text-primary mb-4">{displayScore} pts</p>
+            <Button size="sm" onClick={startGame} className="bg-primary text-white hover:bg-primary/90 text-xs px-4 flex items-center gap-1.5">
+              <RotateCcw className="w-3 h-3" /> Play Again
+            </Button>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-4 text-xs text-gray-500">
+        <span>Score: <span className="font-bold text-primary">{displayScore}</span></span>
+        {started && !gameOver && <span className="text-[10px]">Arrows / WASD / swipe</span>}
+      </div>
+    </div>
+  );
+}
+
 
 export default function PricingPage() {
   const navigate = useNavigate();
@@ -12,7 +209,7 @@ export default function PricingPage() {
   const pricingPlans = [
     {
       name: 'Monthly Plan',
-      price: '$6',
+      price: '$3.59',
       period: '/employee/month',
       billingCycle: 'Billed monthly',
       description: 'Perfect for companies wanting flexibility',
@@ -37,9 +234,9 @@ export default function PricingPage() {
     },
     {
       name: 'Yearly Plan',
-      price: '$5',
+      price: '$2.59',
       period: '/employee/month',
-      billingCycle: 'Billed annually at $60/employee',
+      billingCycle: 'Billed annually at $31.08/employee',
       description: 'Best value for growing companies',
       features: [
         'Operations and Compliance',
@@ -62,7 +259,6 @@ export default function PricingPage() {
         'Quarterly Business Reviews',
       ],
       popular: true,
-      savings: 'Save 17%',
     },
     {
       name: 'Enterprise',
@@ -91,7 +287,7 @@ export default function PricingPage() {
     },
     {
       question: 'How is pricing calculated?',
-      answer: 'Pricing is per employee per month. The minimum purchase is 2 licenses.'
+      answer: 'Pricing is per employee per month. Monthly plan is $3.59/employee/month. Annual plan is $2.59/employee/month ($31.08/employee/year). Minimum purchase is 2 licenses.'
     },
     {
       question: 'Can I change plans later?',
@@ -118,13 +314,33 @@ export default function PricingPage() {
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center max-w-3xl mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-10">
           <h1 className="text-4xl md:text-5xl font-bold mb-6 text-mint-black">
             Simple, Transparent Pricing
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             No hidden fees. No surprises. Just powerful HR management at an affordable price.
           </p>
+        </div>
+
+        {/* Mini Game */}
+        <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 justify-center">
+          <div className="flex-1 text-center md:text-left space-y-4 max-w-sm">
+            <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-semibold text-gray-600 shadow-sm">
+              <span className="text-base">🎮</span> Take a break
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-mint-black">Catch the Payslip!</h2>
+            <p className="text-gray-500 text-sm">
+              Guide your HR agent to collect payslips before your team notices. Use arrow keys, WASD, or swipe on mobile.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center md:justify-start text-xs text-gray-400">
+              <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5 text-amber-500" /> Beat your high score</span>
+              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 text-primary" /> Instant play, no download</span>
+            </div>
+          </div>
+          <div className="flex-shrink-0">
+            <SnakeMiniGame />
+          </div>
         </div>
       </section>
 

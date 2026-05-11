@@ -6,6 +6,7 @@ import { cors } from "npm:hono@4.7.7/cors";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
+import { usdToPaystackAmount } from "./currency-utils.tsx";
 import { performProductionCleanup } from "./production-cleanup.tsx";
 import { migrateCompanyKeys } from "./migration-company-keys.tsx";
 import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-stats.tsx";
@@ -40,9 +41,11 @@ const _allowedOrigins = (() => {
   }
   return [
     ...stringOrigins,
-    // Also allow Supabase-hosted previews and Vercel deploys
+    // Also allow Supabase-hosted previews, Vercel deploys, and blumebyte.com domains
     /^https:\/\/.*\.supabase\.co$/,
     /^https:\/\/.*\.vercel\.app$/,
+    /^https:\/\/blumebyte\.com$/,
+    /^https:\/\/.*\.blumebyte\.com$/,
   ];
 })();
 
@@ -428,6 +431,10 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
     if (data?.user?.user_metadata?.assignedCompanies?.length) {
       scope.push(...data.user.user_metadata.assignedCompanies);
     }
+    // Also check companyId in auth metadata (set during registration)
+    if (data?.user?.user_metadata?.companyId && !scope.includes(data.user.user_metadata.companyId)) {
+      scope.push(data.user.user_metadata.companyId);
+    }
   }
   
   // 3. CRITICAL: Also add company/companyId field (handles legacy data with company names)
@@ -647,12 +654,16 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
     return [];
   }
   
+  const scopeLower = assignedCompanies.map((s: string) => s.toLowerCase());
+  
   // Filter items by company for ALL roles
   const filtered = items.filter((item: any) => {
-    const itemCompany = item.company || item.companyId || item.companyName;
-    if (!itemCompany) return false; // STRICT: Exclude items without company assignment
-    // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
-    return assignedCompanies.some(ac => ac.toLowerCase() === itemCompany.toLowerCase());
+    const itemCompanyId = (item.company || item.companyId || '').toLowerCase();
+    const itemCompanyName = (item.companyName || '').toLowerCase();
+    if (!itemCompanyId && !itemCompanyName) return false; // STRICT: Exclude items without company assignment
+    // CASE-INSENSITIVE comparison: match on companyId OR companyName against scope
+    return scopeLower.some(ac => (itemCompanyId && ac === itemCompanyId) || (itemCompanyName && ac === itemCompanyName));
+  });
   });
   
   return filtered;
@@ -669,15 +680,17 @@ async function filterEmployeesByCompany(employees: any[], userId: string, role: 
     return [];
   }
   
+  const scopeLower = scope.map((s: string) => s.toLowerCase());
+  
   // Filter by company for ALL roles
   const filtered = employees.filter((e: any) => {
-    const empCompany = e.company || e.companyId;
-    if (!empCompany) {
+    const empCompanyId = (e.company || e.companyId || '').toLowerCase();
+    const empCompanyName = (e.companyName || '').toLowerCase();
+    if (!empCompanyId && !empCompanyName) {
       return false; // Exclude employees without company
     }
-    // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
-    const included = scope.some(s => s.toLowerCase() === empCompany.toLowerCase());
-    return included;
+    // CASE-INSENSITIVE comparison: match on companyId OR companyName
+    return scopeLower.some(s => (empCompanyId && s === empCompanyId) || (empCompanyName && s === empCompanyName));
   });
   
   return filtered;
@@ -6841,7 +6854,8 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     }
     
     // Always compute amount server-side — never trust client-provided amount
-    const pricePerUser = plan === 'monthly' ? 6 : 60;
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
     const amount = userCount * pricePerUser;
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -6862,7 +6876,7 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount: amount * 100, // Paystack expects amount in kobo (cents)
+        amount: Math.round(amount * 100), // Paystack expects amount in kobo (cents)
         reference,
         callback_url: callbackUrl,
         metadata: {
@@ -6957,13 +6971,17 @@ app.get(`${PREFIX}/subscription/all-users`, async (c) => {
   }
 });
 
-// POST /subscription/purchase-licenses — alias for /subscription/initialize used by LicenseManagement.
-// Accepts { licenses, plan } and delegates to the same Paystack flow.
-app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
+// NOTE: POST /subscription/purchase-licenses and POST /subscription/purchase-licenses-with-selection
+// are both handled by license-routes.tsx (registered via addLicenseRoutes above).
+// Those implementations use usdToPaystackAmount() for proper currency conversion.
+// The duplicate handlers that were previously here have been removed to avoid confusion.
+
+// POST /subscription/renew-license — renew an existing subscription via Paystack
+app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
-    const { licenses, plan } = body;
+    const { licenses, plan, saveCard } = body;
 
     if (!licenses || !plan) {
       return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
@@ -6972,17 +6990,20 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
 
-    // Always compute amount server-side from canonical price list — never trust client-provided amount
-    const pricePerUser = plan === 'monthly' ? 6 : 60;
-    const amount = licenses * pricePerUser;
-
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
       return c.json({ error: 'Payment gateway not configured' }, 500);
     }
 
-    const reference = `SUB_${user.id}_${Date.now()}`;
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
+    const amount = Number(licenses) * pricePerUser;
+
+    const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
+
+    // Convert USD amount to the configured Paystack currency (GHS/NGN/USD)
+    const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
 
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -6992,16 +7013,21 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount: amount * 100,
+        amount: amountSmallestUnit,
+        currency,
         reference,
         callback_url: callbackUrl,
         metadata: {
           userId: user.id,
           plan,
           userCount: licenses,
+          isRenewal: true,
+          saveCard: saveCard !== false,
+          amountUsd: amount,
           custom_fields: [
-            { display_name: 'Subscription Plan', variable_name: 'plan', value: plan },
-            { display_name: 'User Count', variable_name: 'user_count', value: String(licenses) },
+            { display_name: 'Transaction Type', variable_name: 'type', value: 'renewal' },
+            { display_name: 'Plan', variable_name: 'plan', value: plan },
+            { display_name: 'Licenses', variable_name: 'user_count', value: String(licenses) },
           ],
         },
       }),
@@ -7009,8 +7035,7 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
 
     const paystackData = await paystackResponse.json();
     if (!paystackData.status) {
-      console.error('Paystack initialization failed:', paystackData);
-      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
+      return c.json({ error: paystackData.message || 'Failed to initialize renewal payment' }, 500);
     }
 
     await kv.set(`pending-subscription:${reference}`, {
@@ -7019,6 +7044,7 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
       userCount: licenses,
       amount,
       reference,
+      isRenewal: true,
       status: 'pending',
       createdAt: new Date().toISOString(),
     });
@@ -7029,83 +7055,7 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
       reference: paystackData.data.reference,
     });
   } catch (e: any) {
-    console.error('Error in purchase-licenses:', e);
-    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
-    return c.json({ error: e.message }, 500);
-  }
-});
-
-// POST /subscription/purchase-licenses-with-selection — same as purchase-licenses but
-// with explicit user IDs to activate after payment.
-app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) => {
-  try {
-    const { user } = await requireSuperAdmin(c);
-    const body = await c.req.json();
-    const { licenses, plan, selectedUserIds } = body;
-
-    if (!licenses || !plan) {
-      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
-    }
-    if (!['monthly', 'yearly'].includes(plan)) {
-      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
-    }
-
-    // Always compute amount server-side from canonical price list
-    const pricePerUser = plan === 'monthly' ? 6 : 60;
-    const amount = licenses * pricePerUser;
-
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!paystackSecretKey) {
-      return c.json({ error: 'Payment gateway not configured' }, 500);
-    }
-
-    const reference = `SUB_${user.id}_${Date.now()}`;
-    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: user.email,
-        amount: amount * 100,
-        reference,
-        callback_url: callbackUrl,
-        metadata: {
-          userId: user.id,
-          plan,
-          userCount: licenses,
-          selectedUserIds: selectedUserIds || [],
-        },
-      }),
-    });
-
-    const paystackData = await paystackResponse.json();
-    if (!paystackData.status) {
-      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
-    }
-
-    await kv.set(`pending-subscription:${reference}`, {
-      userId: user.id,
-      plan,
-      userCount: licenses,
-      amount,
-      reference,
-      selectedUserIds: selectedUserIds || [],
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    });
-
-    return c.json({
-      authorization_url: paystackData.data.authorization_url,
-      access_code: paystackData.data.access_code,
-      reference: paystackData.data.reference,
-    });
-  } catch (e: any) {
-    console.error('Error in purchase-licenses-with-selection:', e);
+    console.error('Error in renew-license:', e);
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
@@ -7577,7 +7527,7 @@ app.get(`${PREFIX}/assets`, async (c) => {
 // ========================================
 
 // Send a chat message
-app.post(`${PREFIX}/chat/send`, async (c) => {
+const sendChatMessage = async (c: any) => {
   try {
     const authUser = await requireAuth(c);
     const { message } = await c.req.json();
@@ -7589,7 +7539,7 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
     // Get user profile for name and company - use employee: key for consistency
     const userProfile = await kv.get(`employee:${authUser.user.id}`);
     const userName = userProfile?.name || authUser.user.user_metadata?.name || authUser.user.email?.split('@')[0] || 'Anonymous';
-    const companyId = userProfile?.companyId;
+    const companyId = userProfile?.companyId || userProfile?.company;
 
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
@@ -7628,16 +7578,17 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ error: 'Failed to send message' }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/chat/send')) app.post(route, sendChatMessage);
 
 // Get chat messages (Company-scoped)
-app.get(`${PREFIX}/chat/messages`, async (c) => {
+const getChatMessages = async (c: any) => {
   try {
     const authUser = await requireAuth(c);
     
     // Get user profile to find company - use employee: key for consistency
     const userProfile = await kv.get(`employee:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const companyId = userProfile?.companyId || userProfile?.company;
 
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
@@ -7664,7 +7615,8 @@ app.get(`${PREFIX}/chat/messages`, async (c) => {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ error: 'Failed to fetch messages' }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/chat/messages')) app.get(route, getChatMessages);
 
 // ========================================
 // EMPLOYEE SELF-SERVICE PORTAL ENDPOINTS
@@ -8872,7 +8824,7 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       },
       body: JSON.stringify({
         email: userProfile.email,
-        amount: amount * 100, // Paystack expects amount in kobo
+        amount: Math.round(amount * 100), // Paystack expects amount in kobo
         reference: reference,
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`,
         metadata: {
@@ -8988,7 +8940,13 @@ app.get(`${PREFIX}/subscription/verify-payment`, async (c) => {
 app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const { additionalLicenses, amount } = await c.req.json();
+    // Accept plan for server-side amount calculation; fall back to 'monthly'
+    const { additionalLicenses, plan: clientPlan } = await c.req.json();
+    const plan = ['monthly', 'yearly'].includes(clientPlan) ? clientPlan : 'monthly';
+
+    if (!additionalLicenses || Number(additionalLicenses) < 1) {
+      return c.json({ error: 'additionalLicenses must be a positive number' }, 400);
+    }
 
     const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
     const companyId = userProfile?.companyId;
@@ -8999,6 +8957,12 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
 
     const company = await kv.get(`company_by_id:${companyId}`);
     
+    // Always compute amount server-side — never trust client-provided amount
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const effectivePlan = plan || company?.subscription?.plan || 'monthly';
+    const pricePerLicense = effectivePlan === 'monthly' ? 3.59 : 31.08;
+    const amountUsd = Number(additionalLicenses) * pricePerLicense;
+
     // Create payment reference
     const reference = `LIC_${companyId.slice(0, 8)}_${Date.now()}`;
 
@@ -9006,6 +8970,9 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
     if (!paystackSecretKey) {
       return c.json({ error: 'Payment system not configured' }, 500);
     }
+
+    // Convert USD to configured Paystack currency
+    const { amountSmallestUnit: upgradeAmountSmallestUnit, currency: upgradeCurrency } = await usdToPaystackAmount(amountUsd);
 
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -9015,14 +8982,17 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
       },
       body: JSON.stringify({
         email: userProfile.email,
-        amount: amount * 100,
+        amount: upgradeAmountSmallestUnit,
+        currency: upgradeCurrency,
         reference: reference,
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-license-upgrade?reference=${reference}`,
         metadata: {
           companyId: companyId,
-          companyName: company.name,
-          additionalLicenses: additionalLicenses,
+          companyName: company?.name || '',
+          additionalLicenses: Number(additionalLicenses),
           userId: authUser.user.id,
+          plan: effectivePlan,
+          amountUsd,
         },
       }),
     });
@@ -9033,12 +9003,13 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
       return c.json({ error: data.message || 'Failed to initialize payment' }, 400);
     }
 
-    // Store pending payment
+    // Store pending payment (use server-computed amount)
     await kv.set(`pending_license:${reference}`, {
       reference,
       companyId,
-      additionalLicenses,
-      amount,
+      additionalLicenses: Number(additionalLicenses),
+      amount: amountUsd,
+      plan: effectivePlan,
       userId: authUser.user.id,
       createdAt: new Date().toISOString(),
     });
@@ -10725,7 +10696,9 @@ for (const route of [`${PREFIX}/notification-preferences`, '/notification-prefer
   app.post(route, writeNotificationPreferences);
 }
 
-// Helper: send email notification to a user if they have the pref enabled
+// Helper: send email notification to a user if they have the pref enabled.
+// Default behaviour (no stored prefs): ALWAYS send. Users who have explicitly
+// set a specific pref to false are the only ones skipped.
 async function sendEmailNotification(
   recipientId: string,
   recipientEmail: string,
@@ -10737,18 +10710,13 @@ async function sendEmailNotification(
   try {
     if (!recipientEmail) return;
 
-    // Check user's notification preferences
-    const prefs = await kv.get(`notif-prefs:${recipientId}`);
-
-    // If user has explicitly set preferences, check the specific pref key
-    if (prefs) {
-      // If a specific pref key is given, check it
-      if (prefKey && prefs[prefKey] === false) return;
-      // If user explicitly has email prefs but all email ones are off, skip
-      const allEmailOff = EMAIL_PREF_KEYS.every(k => prefs[k] === false);
-      if (allEmailOff) return;
-    }
-    // Default (no prefs stored): send email
+    // Only skip if the user has explicitly opted out of this specific pref.
+    // If no prefs are stored at all, we always send (notifications on by default).
+    const prefs = await kv.get(`notif-prefs:${recipientId}`).catch((err: any) => {
+      console.warn('sendEmailNotification: failed to read notif-prefs from KV', err?.message || err);
+      return null;
+    });
+    if (prefs && prefKey && prefs[prefKey] === false) return;
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
@@ -10772,8 +10740,7 @@ async function sendEmailNotification(
               <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
               ${htmlBody}
               <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
-                You received this email because you have email notifications enabled in your Blumebyte account settings.
-                You can turn off email notifications in your dashboard under Settings → Notification Settings.
+                You received this email because you are a Blumebyte HR user and email notifications are active for your account.
               </p>
             </div>
           </div>
@@ -10796,6 +10763,9 @@ async function sendEmailNotification(
 // This prevents route mismatches across different Supabase function URL/path forwarding modes.
 const compatibleRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+
+const compatibleRoutePathsForAliases = (...paths: string[]) =>
+  Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
 
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {
@@ -11337,7 +11307,7 @@ const verifyUltimateadminSupport = async (c: any) => {
     return c.json({ allowed: false }, 403);
   }
 };
-for (const route of [`${PREFIX}/ultimateadmin/support/verify`, `${PREFIX}/support/verify`]) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/verify', '/support/verify')) {
   app.get(route, verifyUltimateadminSupport);
 }
 
@@ -11396,7 +11366,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of [`${PREFIX}/ultimateadmin/support/metrics`, `${PREFIX}/support/metrics`]) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/metrics', '/support/metrics')) {
   app.get(route, getUltimateadminSupportMetrics);
 }
 
@@ -11486,12 +11456,12 @@ const listUltimateadminSupportTenants = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of [`${PREFIX}/ultimateadmin/support/tenants`, `${PREFIX}/support/tenants`]) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants')) {
   app.get(route, listUltimateadminSupportTenants);
 }
 
 // GET /ultimateadmin/support/tenants/:id/users
-app.get(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
+const listUltimateadminSupportTenantUsers = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11510,10 +11480,11 @@ app.get(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/users')) app.get(route, listUltimateadminSupportTenantUsers);
 
 // POST /ultimateadmin/support/tenants/:id/suspend
-app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/suspend`, async (c) => {
+const suspendUltimateadminSupportTenant = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11535,10 +11506,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/suspend`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/suspend')) app.post(route, suspendUltimateadminSupportTenant);
 
 // PUT /ultimateadmin/support/tenants/:id/license
-app.put(`${PREFIX}/ultimateadmin/support/tenants/:id/license`, async (c) => {
+const updateUltimateadminSupportTenantLicense = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11595,10 +11567,11 @@ app.put(`${PREFIX}/ultimateadmin/support/tenants/:id/license`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/license')) app.put(route, updateUltimateadminSupportTenantLicense);
 
 // GET /ultimateadmin/support/tickets
-app.get(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
+const listUltimateadminSupportTickets = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11614,10 +11587,11 @@ app.get(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets')) app.get(route, listUltimateadminSupportTickets);
 
 // POST /ultimateadmin/support/tickets
-app.post(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
+const createUltimateadminSupportTicket = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11638,10 +11612,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets')) app.post(route, createUltimateadminSupportTicket);
 
 // PUT /ultimateadmin/support/tickets/:id
-app.put(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
+const updateUltimateadminSupportTicket = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11661,10 +11636,11 @@ app.put(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets/:id')) app.put(route, updateUltimateadminSupportTicket);
 
 // DELETE /ultimateadmin/support/tickets/:id
-app.delete(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
+const deleteUltimateadminSupportTicket = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11674,7 +11650,8 @@ app.delete(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
 
 // GET /ultimateadmin/support/agents
 app.get(`${PREFIX}/ultimateadmin/support/agents`, async (c) => {
@@ -11729,7 +11706,7 @@ app.put(`${PREFIX}/ultimateadmin/support/agents/:id`, async (c) => {
 });
 
 // GET /ultimateadmin/support/audit — audit trail
-app.get(`${PREFIX}/ultimateadmin/support/audit`, async (c) => {
+const listUltimateadminSupportAudit = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11739,10 +11716,11 @@ app.get(`${PREFIX}/ultimateadmin/support/audit`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/audit')) app.get(route, listUltimateadminSupportAudit);
 
 // POST /ultimateadmin/support/set-platform-user — set role+name for developer/care platform users
-app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
+const setUltimateadminPlatformUser = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11787,10 +11765,11 @@ app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/set-platform-user')) app.post(route, setUltimateadminPlatformUser);
 
 // POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (ultimateadmin only)
-app.post(`${PREFIX}/ultimateadmin/support/generate-reset-link`, async (c) => {
+const generateUltimateadminResetLink = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11815,10 +11794,11 @@ app.post(`${PREFIX}/ultimateadmin/support/generate-reset-link`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/generate-reset-link')) app.post(route, generateUltimateadminResetLink);
 
 // POST /ultimateadmin/support/repair/:tenantId — run quick repair actions
-app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
+const repairUltimateadminTenant = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11838,10 +11818,11 @@ app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/repair/:tenantId')) app.post(route, repairUltimateadminTenant);
 
 // POST /ultimateadmin/support/tenants — create a new tenant without payment
-app.post(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
+const createUltimateadminSupportTenant = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11887,10 +11868,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants')) app.post(route, createUltimateadminSupportTenant);
 
 // POST /ultimateadmin/support/tenants/:id/users — create a user for a tenant without payment
-app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
+const createUltimateadminSupportTenantUser = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11935,10 +11917,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/users')) app.post(route, createUltimateadminSupportTenantUser);
 
 // GET /ultimateadmin/users — all users across all tenants
-app.get(`${PREFIX}/ultimateadmin/users`, async (c) => {
+const listUltimateadminUsers = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11952,13 +11935,14 @@ app.get(`${PREFIX}/ultimateadmin/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/users')) app.get(route, listUltimateadminUsers);
 
 // ── Ultimateadmin Global Chat ───────────────────────────────────────────────────
 // Ultimateadmin can chat with any tenant user directly
 
 // GET /ultimateadmin/chat/threads — list all chat threads
-app.get(`${PREFIX}/ultimateadmin/chat/threads`, async (c) => {
+const listUltimateadminChatThreads = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11969,10 +11953,11 @@ app.get(`${PREFIX}/ultimateadmin/chat/threads`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/chat/threads')) app.get(route, listUltimateadminChatThreads);
 
 // GET /ultimateadmin/chat/threads/:threadId — get thread messages
-app.get(`${PREFIX}/ultimateadmin/chat/threads/:threadId`, async (c) => {
+const getUltimateadminChatThread = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11986,10 +11971,11 @@ app.get(`${PREFIX}/ultimateadmin/chat/threads/:threadId`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/chat/threads/:threadId')) app.get(route, getUltimateadminChatThread);
 
 // POST /ultimateadmin/chat/send — send a message to a tenant user (creates thread if needed)
-app.post(`${PREFIX}/ultimateadmin/chat/send`, async (c) => {
+const sendUltimateadminChatMessage = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12036,12 +12022,13 @@ app.post(`${PREFIX}/ultimateadmin/chat/send`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/chat/send')) app.post(route, sendUltimateadminChatMessage);
 
 // ── Ultimateadmin canonical aliases for /developer/* endpoints ─────────────────
 // Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platform-users`]) app.get(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users', '/platform-users')) app.get(route, async (c) => {
   // Return platform user records for canonical and legacy-compatible paths
   try {
     const access = await verifyUltimateAdminAccess(c);
@@ -12079,7 +12066,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platfo
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platform-users`]) app.post(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users', '/platform-users')) app.post(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12117,7 +12104,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platfo
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/platform-users/:id`]) app.put(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users/:id', '/platform-users/:id')) app.put(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12144,7 +12131,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/pl
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/platform-users/:id`]) app.delete(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users/:id', '/platform-users/:id')) app.delete(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12160,7 +12147,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/pl
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignments`]) app.get(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments', '/assignments')) app.get(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12172,7 +12159,7 @@ for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignmen
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignments`]) app.post(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments', '/assignments')) app.post(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12197,7 +12184,7 @@ for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignmen
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/assignments/:id`, `${PREFIX}/assignments/:id`]) app.delete(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments/:id', '/assignments/:id')) app.delete(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);

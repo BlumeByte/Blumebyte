@@ -347,28 +347,28 @@ export default function CareDashboard() {
       <div className="bg-primary text-primary-foreground">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <Shield className="h-6 w-6" />
-              <span className="font-semibold">Blumebyte Customer Care</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <Shield className="h-5 w-5 flex-shrink-0" />
+              <span className="font-semibold truncate text-sm md:text-base">Blumebyte Customer Care</span>
               {careProfile && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs hidden sm:inline-flex flex-shrink-0">
                   Support Agent
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-300">{careProfile?.name || careProfile?.email}</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-sm text-gray-300 hidden md:inline truncate max-w-[150px]">{careProfile?.name || careProfile?.email}</span>
               <Button size="sm" variant="ghost" className="text-white hover:bg-white/10" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-1" /> Sign Out
+                <LogOut className="h-4 w-4" /><span className="hidden sm:inline ml-1">Sign Out</span>
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
           {[
             { label: 'Total Tenants', value: tenants.length, icon: Building2 },
             { label: 'Active Tenants', value: tenants.filter((t) => t.status !== 'inactive').length, icon: CheckCircle },
@@ -376,13 +376,13 @@ export default function CareDashboard() {
             { label: 'Applications', value: applications.length, icon: Briefcase },
           ].map((s) => (
             <Card key={s.label}>
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <s.icon className="h-5 w-5 text-gray-600" />
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="w-8 h-8 md:w-9 md:h-9 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <s.icon className="h-4 w-4 md:h-5 md:w-5 text-gray-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{s.value}</p>
+                    <p className="text-xl md:text-2xl font-bold">{s.value}</p>
                     <p className="text-xs text-gray-500">{s.label}</p>
                   </div>
                 </div>
@@ -393,10 +393,10 @@ export default function CareDashboard() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
+          <TabsList className="mb-6 w-full sm:w-auto">
             <TabsTrigger value="tenants"><Building2 className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
-            <TabsTrigger value="tickets"><Ticket className="h-4 w-4 mr-1" />Support Tickets</TabsTrigger>
-            <TabsTrigger value="applications"><Briefcase className="h-4 w-4 mr-1" />Global Hiring Apps</TabsTrigger>
+            <TabsTrigger value="tickets"><Ticket className="h-4 w-4 mr-1" />Tickets</TabsTrigger>
+            <TabsTrigger value="applications"><Briefcase className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Global Hiring </span>Apps</TabsTrigger>
           </TabsList>
 
           {/* Tenants Tab */}

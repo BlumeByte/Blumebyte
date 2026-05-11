@@ -33,7 +33,6 @@ import { useCurrency } from '../lib/currency-context';
 import { UserLicenseAlert } from './LicenseStatusBanner';
 import { TrainingManagement } from './TrainingManagement';
 import { LanguageSelector } from './LanguageSelector';
-import { NotificationSettings } from './NotificationSettings';
 import { OvertimeExpenseTab } from './portal/OvertimeExpenseTab';
 import { useDarkMode } from '../lib/dark-mode-context';
 export function EmployeeDashboard() {
@@ -54,50 +53,52 @@ export function EmployeeDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 bg-card border-b border-border px-6 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-card border-b border-border px-4 md:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0" style={brandGradientStyle(branding.primaryColor)}>
             {branding.logoUrl ? <img src={branding.logoUrl} alt="" className="w-full h-full object-contain p-0.5" /> : <span className="text-white font-bold text-sm">{branding.companyName?.[0] || 'B'}</span>}
           </div>
-          <div><h1 className="text-sm font-semibold">{branding.companyName} HRIS</h1><p className="text-[10px] text-gray-400">Employee Portal</p></div>
+          <div className="hidden sm:block"><h1 className="text-sm font-semibold">{branding.companyName} HRIS</h1><p className="text-[10px] text-gray-400">Employee Portal</p></div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <NotificationsBell />
-          <Badge variant="outline" className="bg-gray-100 text-gray-700">Employee</Badge>
+          <Badge variant="outline" className="bg-gray-100 text-gray-700 hidden sm:inline-flex">Employee</Badge>
           {user?.profileImageUrl ? (
-            <img src={user.profileImageUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover border border-gray-200" />
+            <img src={user.profileImageUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover border border-gray-200 flex-shrink-0" />
           ) : (
-            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold">{user?.name?.[0]}</div>
+            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold flex-shrink-0">{user?.name?.[0]}</div>
           )}
-          <span className="text-sm text-gray-600">{user?.name}</span>
-          <Button variant="ghost" size="sm" onClick={logout} className="text-gray-500 hover:text-red-500 hover:bg-red-50" title="Log Out"><LogOut className="w-4 h-4 mr-1" /><span className="text-xs">Log Out</span></Button>
+          <span className="text-sm text-gray-600 hidden md:inline">{user?.name}</span>
+          <Button variant="ghost" size="sm" onClick={logout} className="text-gray-500 hover:text-red-500 hover:bg-red-50" title="Log Out"><LogOut className="w-4 h-4" /><span className="text-xs hidden sm:inline ml-1">Log Out</span></Button>
         </div>
       </header>
-      <main className="p-6 max-w-5xl mx-auto">
+      <main className="p-4 md:p-6 max-w-5xl mx-auto">
         {/* License Status Alert for Non-SuperAdmin Users */}
         <UserLicenseAlert />
         
         <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); scrollToTop(); }} className="space-y-6">
-          <TabsList className="flex flex-wrap gap-1 w-full max-w-5xl h-auto">
-            <TabsTrigger value="overview"><LayoutDashboard className="w-4 h-4 mr-1" />Overview</TabsTrigger>
-            <TabsTrigger value="profile"><User className="w-4 h-4 mr-1" />Profile</TabsTrigger>
-            <TabsTrigger value="attendance"><Clock className="w-4 h-4 mr-1" />Attendance</TabsTrigger>
-            <TabsTrigger value="leave"><CalendarDays className="w-4 h-4 mr-1" />Leave</TabsTrigger>
-            <TabsTrigger value="tasks"><ListTodo className="w-4 h-4 mr-1" />Tasks</TabsTrigger>
-            <TabsTrigger value="onboarding"><ClipboardCheck className="w-4 h-4 mr-1" />Onboarding</TabsTrigger>
-            <TabsTrigger value="reviews"><Star className="w-4 h-4 mr-1" />Reviews</TabsTrigger>
-            <TabsTrigger value="disciplinary"><AlertCircle className="w-4 h-4 mr-1" />Disciplinary</TabsTrigger>
-            <TabsTrigger value="compliance"><FileCheck className="w-4 h-4 mr-1" />Compliance</TabsTrigger>
-            <TabsTrigger value="overtime-expenses"><DollarSign className="w-4 h-4 mr-1" />OT & Expenses</TabsTrigger>
-            <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
-            <TabsTrigger value="meetings"><Video className="w-4 h-4 mr-1" />Meetings</TabsTrigger>
-            <TabsTrigger value="messages"><MessageCircle className="w-4 h-4 mr-1" />Messages</TabsTrigger>
-            <TabsTrigger value="questionnaires"><ClipboardList className="w-4 h-4 mr-1" />Questionnaires</TabsTrigger>
-            <TabsTrigger value="self-service"><Briefcase className="w-4 h-4 mr-1" />Jobs</TabsTrigger>
-            <TabsTrigger value="my-profile"><User className="w-4 h-4 mr-1" />My Profile</TabsTrigger>
-            <TabsTrigger value="announcements"><Megaphone className="w-4 h-4 mr-1" />News</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-1" />Settings</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+            <TabsList className="flex w-max gap-1 h-auto pb-1">
+              <TabsTrigger value="overview"><LayoutDashboard className="w-4 h-4 mr-1" />Overview</TabsTrigger>
+              <TabsTrigger value="profile"><User className="w-4 h-4 mr-1" />Profile</TabsTrigger>
+              <TabsTrigger value="attendance"><Clock className="w-4 h-4 mr-1" />Attendance</TabsTrigger>
+              <TabsTrigger value="leave"><CalendarDays className="w-4 h-4 mr-1" />Leave</TabsTrigger>
+              <TabsTrigger value="tasks"><ListTodo className="w-4 h-4 mr-1" />Tasks</TabsTrigger>
+              <TabsTrigger value="onboarding"><ClipboardCheck className="w-4 h-4 mr-1" />Onboarding</TabsTrigger>
+              <TabsTrigger value="reviews"><Star className="w-4 h-4 mr-1" />Reviews</TabsTrigger>
+              <TabsTrigger value="disciplinary"><AlertCircle className="w-4 h-4 mr-1" />Disciplinary</TabsTrigger>
+              <TabsTrigger value="compliance"><FileCheck className="w-4 h-4 mr-1" />Compliance</TabsTrigger>
+              <TabsTrigger value="overtime-expenses"><DollarSign className="w-4 h-4 mr-1" />OT & Expenses</TabsTrigger>
+              <TabsTrigger value="training"><GraduationCap className="w-4 h-4 mr-1" />Training</TabsTrigger>
+              <TabsTrigger value="meetings"><Video className="w-4 h-4 mr-1" />Meetings</TabsTrigger>
+              <TabsTrigger value="messages"><MessageCircle className="w-4 h-4 mr-1" />Messages</TabsTrigger>
+              <TabsTrigger value="questionnaires"><ClipboardList className="w-4 h-4 mr-1" />Questionnaires</TabsTrigger>
+              <TabsTrigger value="self-service"><Briefcase className="w-4 h-4 mr-1" />Jobs</TabsTrigger>
+              <TabsTrigger value="my-profile"><User className="w-4 h-4 mr-1" />My Profile</TabsTrigger>
+              <TabsTrigger value="announcements"><Megaphone className="w-4 h-4 mr-1" />News</TabsTrigger>
+              <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-1" />Settings</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview"><EmpOverview onNavigate={setActiveTab} /></TabsContent>
           <TabsContent value="profile"><EmpProfile /></TabsContent>
@@ -157,7 +158,6 @@ export function EmployeeDashboard() {
                   </p>
                 </CardContent>
               </Card>
-              <NotificationSettings />
             </div>
           </TabsContent>
         </Tabs>
