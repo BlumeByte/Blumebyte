@@ -543,6 +543,13 @@ export default function HiringsPage() {
       return asString(a.roleTitle).localeCompare(asString(b.roleTitle));
     });
 
+  const clearAllFilters = () => {
+    setSearch('');
+    setFilterLocation('');
+    setFilterType('');
+    setFilterDepartment('');
+  };
+
   return (
     <div className="min-h-screen public-page-bg flex flex-col">
       <PublicNavbar />
@@ -601,7 +608,7 @@ export default function HiringsPage() {
           />
 
           {(search || filterLocation || filterType || filterDepartment) && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); setFilterDepartment(''); }}>
+            <Button variant="ghost" size="sm" onClick={clearAllFilters}>
               Clear Filters
             </Button>
           )}
@@ -636,7 +643,7 @@ export default function HiringsPage() {
                 : 'No jobs match your current filters. Try adjusting your search criteria.'}
             </p>
             {jobs.length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); setFilterDepartment(''); }}>
+              <Button variant="outline" size="sm" onClick={clearAllFilters}>
                 Clear Filters
               </Button>
             )}
