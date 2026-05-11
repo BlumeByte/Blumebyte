@@ -44,6 +44,12 @@ interface ApplyFormData {
 const MAX_CV_CHARS = 4000;
 const APPLIED_JOBS_STORAGE_KEY = 'public_hiring_applied_jobs';
 const PUBLIC_JOB_ENDPOINTS = ['/public/jobs', '/public/job-openings', '/hirings/jobs'];
+const SEARCH_SCORE_EXACT = 250;
+const SEARCH_SCORE_PREFIX = 180;
+const SEARCH_SCORE_CONTAINS = 120;
+const SEARCH_SCORE_WORD_EXACT = 120;
+const SEARCH_SCORE_WORD_PREFIX = 80;
+const SEARCH_SCORE_WORD_CONTAINS = 40;
 
 function loadAppliedJobs(): string[] {
   try {
@@ -82,14 +88,14 @@ function getSearchScore(job: PublicJob, query: string): number {
 
   let score = 0;
   for (const field of fields) {
-    if (field === q) score += 250;
-    if (field.startsWith(q)) score += 180;
-    if (field.includes(q)) score += 120;
+    if (field === q) score += SEARCH_SCORE_EXACT;
+    if (field.startsWith(q)) score += SEARCH_SCORE_PREFIX;
+    if (field.includes(q)) score += SEARCH_SCORE_CONTAINS;
     for (const word of words) {
       if (!word) continue;
-      if (field === word) score += 120;
-      else if (field.startsWith(word)) score += 80;
-      else if (field.includes(word)) score += 40;
+      if (field === word) score += SEARCH_SCORE_WORD_EXACT;
+      else if (field.startsWith(word)) score += SEARCH_SCORE_WORD_PREFIX;
+      else if (field.includes(word)) score += SEARCH_SCORE_WORD_CONTAINS;
     }
   }
   return score;
@@ -428,7 +434,10 @@ export default function HiringsPage() {
     }
     if (merged.size > 0) return Array.from(merged.values());
     if (hadSuccess) return [];
-    throw lastError instanceof Error ? lastError : new Error('Failed to load public jobs');
+    if (lastError instanceof Error) {
+      throw new Error(`Failed to load public jobs from endpoints (${PUBLIC_JOB_ENDPOINTS.join(', ')}): ${lastError.message}`);
+    }
+    throw new Error(`Failed to load public jobs from endpoints (${PUBLIC_JOB_ENDPOINTS.join(', ')})`);
   }, []);
 
   const fetchJobs = useCallback(async (isRetry = false) => {
