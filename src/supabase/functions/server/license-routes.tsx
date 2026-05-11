@@ -192,6 +192,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           ? `${subscription.cardAuthorization.expMonth}/${subscription.cardAuthorization.expYear}`
           : null,
         cardBrand: subscription?.cardAuthorization?.brand,
+        autoRenew: subscription?.autoRenew !== false, // default true if card saved
       });
     } catch (e: any) {
       console.error('Error fetching license info:', e);
@@ -269,7 +270,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Always compute amount server-side from the canonical price list — never trust client-provided amount
-      const pricePerLicense = plan === 'monthly' ? 2.59 : 43.08; // $2.59/mo or $43.08/yr ($3.59/mo billed annually)
+      // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+      const pricePerLicense = plan === 'monthly' ? 3.59 : 31.08;
       const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -309,9 +311,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         }),
       });
       
-      // Log the response status for debugging
-      
-      // Check if the response is OK before parsing JSON
       if (!paystackResponse.ok) {
         const errorText = await paystackResponse.text();
         console.error('Paystack API error response:', errorText);
@@ -614,8 +613,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         return c.json({ error: 'Payment gateway not configured' }, 500);
       }
       
-      // Calculate renewal amount
-      const pricePerLicense = subscription.plan === 'monthly' ? 2.59 : 43.08; // $2.59/mo or $43.08/yr
+      // Calculate renewal amount: Monthly $3.59/user/month | Yearly $2.59/user/month = $31.08/year
+      const pricePerLicense = subscription.plan === 'monthly' ? 3.59 : 31.08;
       const amount = subscription.purchasedLicenses * pricePerLicense;
       
       // Convert USD to GHS for Paystack
@@ -900,7 +899,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Always compute amount server-side from the canonical price list — never trust client-provided amount
-      const pricePerLicense = plan === 'monthly' ? 2.59 : 43.08; // $2.59/mo or $43.08/yr ($3.59/mo billed annually)
+      // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+      const pricePerLicense = plan === 'monthly' ? 3.59 : 31.08;
       const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -1065,6 +1065,48 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       console.error('Error checking payment status:', e);
       if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
       return c.json({ status: 'error', message: e.message }, 500);
+    }
+  });
+
+  // ── Card management ──────────────────────────────────────────────────────────
+
+  // DELETE /subscription/card — remove saved card (disables auto-renewal)
+  app.delete(`${PREFIX}/subscription/card`, async (c: any) => {
+    try {
+      const { user } = await requireSuperAdmin(c);
+      const subscription = await kv.get(`subscription:${user.id}`);
+      if (!subscription) return c.json({ error: 'No subscription found' }, 404);
+      const updated = { ...subscription };
+      delete updated.cardAuthorization;
+      updated.autoRenew = false;
+      await kv.set(`subscription:${user.id}`, updated);
+      await logAudit({ userId: user.id, userName: user.email || 'Unknown', action: 'UPDATE', resourceType: 'subscription-card', resourceId: user.id, details: { action: 'remove_card' } });
+      return c.json({ success: true, message: 'Saved card removed. Auto-renewal disabled.' });
+    } catch (e: any) {
+      if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+      if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  // PATCH /subscription/auto-renew — toggle auto-renewal on or off
+  app.patch(`${PREFIX}/subscription/auto-renew`, async (c: any) => {
+    try {
+      const { user } = await requireSuperAdmin(c);
+      const { enabled } = await c.req.json();
+      const subscription = await kv.get(`subscription:${user.id}`);
+      if (!subscription) return c.json({ error: 'No subscription found' }, 404);
+      if (enabled && !subscription.cardAuthorization) {
+        return c.json({ error: 'No card saved. Please save a card before enabling auto-renewal.' }, 400);
+      }
+      const updated = { ...subscription, autoRenew: !!enabled };
+      await kv.set(`subscription:${user.id}`, updated);
+      await logAudit({ userId: user.id, userName: user.email || 'Unknown', action: 'UPDATE', resourceType: 'subscription-auto-renew', resourceId: user.id, details: { autoRenew: !!enabled } });
+      return c.json({ success: true, autoRenew: !!enabled });
+    } catch (e: any) {
+      if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+      if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+      return c.json({ error: e.message }, 500);
     }
   });
 }

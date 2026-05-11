@@ -164,4 +164,12 @@ export const apiClient = {
       headers: authHeaders(token, false),
     });
   },
+
+  async patch(path: string, body: any, token?: string | null): Promise<Response> {
+    return fetch(`${BASE}${path}`, {
+      method: 'PATCH',
+      headers: authHeaders(token, true),
+      body: JSON.stringify(body),
+    });
+  },
 };

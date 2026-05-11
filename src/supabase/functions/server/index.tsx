@@ -6,6 +6,7 @@ import { cors } from "npm:hono@4.7.7/cors";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import * as kv from "./kv_store.tsx";
 import { addLicenseRoutes } from "./license-routes.tsx";
+import { usdToPaystackAmount } from "./currency-utils.tsx";
 import { performProductionCleanup } from "./production-cleanup.tsx";
 import { migrateCompanyKeys } from "./migration-company-keys.tsx";
 import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-stats.tsx";
@@ -6841,7 +6842,8 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     }
     
     // Always compute amount server-side — never trust client-provided amount
-    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
     const amount = userCount * pricePerUser;
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -6973,68 +6975,9 @@ app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
     }
 
     // Always compute amount server-side from canonical price list — never trust client-provided amount
-    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
     const amount = licenses * pricePerUser;
-
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!paystackSecretKey) {
-      return c.json({ error: 'Payment gateway not configured' }, 500);
-    }
-
-    const reference = `SUB_${user.id}_${Date.now()}`;
-    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: user.email,
-        amount: Math.round(amount * 100),
-        reference,
-        callback_url: callbackUrl,
-        metadata: {
-          userId: user.id,
-          plan,
-          userCount: licenses,
-          custom_fields: [
-            { display_name: 'Subscription Plan', variable_name: 'plan', value: plan },
-            { display_name: 'User Count', variable_name: 'user_count', value: String(licenses) },
-          ],
-        },
-      }),
-    });
-
-    const paystackData = await paystackResponse.json();
-    if (!paystackData.status) {
-      console.error('Paystack initialization failed:', paystackData);
-      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
-    }
-
-    await kv.set(`pending-subscription:${reference}`, {
-      userId: user.id,
-      plan,
-      userCount: licenses,
-      amount,
-      reference,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    });
-
-    return c.json({
-      authorization_url: paystackData.data.authorization_url,
-      access_code: paystackData.data.access_code,
-      reference: paystackData.data.reference,
-    });
-  } catch (e: any) {
-    console.error('Error in purchase-licenses:', e);
-    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
-    return c.json({ error: e.message }, 500);
-  }
-});
 
 // POST /subscription/purchase-licenses-with-selection — same as purchase-licenses but
 // with explicit user IDs to activate after payment.
@@ -7052,7 +6995,8 @@ app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) =>
     }
 
     // Always compute amount server-side from canonical price list
-    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
     const amount = licenses * pricePerUser;
 
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -7131,7 +7075,8 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
       return c.json({ error: 'Payment gateway not configured' }, 500);
     }
 
-    const pricePerUser = plan === 'monthly' ? 2.59 : 43.08;
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
     const amount = Number(licenses) * pricePerUser;
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
@@ -9070,7 +9015,13 @@ app.get(`${PREFIX}/subscription/verify-payment`, async (c) => {
 app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const { additionalLicenses, amount } = await c.req.json();
+    // Accept plan for server-side amount calculation; fall back to 'monthly'
+    const { additionalLicenses, plan: clientPlan } = await c.req.json();
+    const plan = ['monthly', 'yearly'].includes(clientPlan) ? clientPlan : 'monthly';
+
+    if (!additionalLicenses || Number(additionalLicenses) < 1) {
+      return c.json({ error: 'additionalLicenses must be a positive number' }, 400);
+    }
 
     const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
     const companyId = userProfile?.companyId;
@@ -9081,6 +9032,12 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
 
     const company = await kv.get(`company_by_id:${companyId}`);
     
+    // Always compute amount server-side — never trust client-provided amount
+    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    const effectivePlan = plan || company?.subscription?.plan || 'monthly';
+    const pricePerLicense = effectivePlan === 'monthly' ? 3.59 : 31.08;
+    const amountUsd = Number(additionalLicenses) * pricePerLicense;
+
     // Create payment reference
     const reference = `LIC_${companyId.slice(0, 8)}_${Date.now()}`;
 
@@ -9088,6 +9045,9 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
     if (!paystackSecretKey) {
       return c.json({ error: 'Payment system not configured' }, 500);
     }
+
+    // Convert USD to configured Paystack currency
+    const { amountSmallestUnit: upgradeAmountSmallestUnit, currency: upgradeCurrency } = await usdToPaystackAmount(amountUsd);
 
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -9097,14 +9057,17 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
       },
       body: JSON.stringify({
         email: userProfile.email,
-        amount: Math.round(amount * 100),
+        amount: upgradeAmountSmallestUnit,
+        currency: upgradeCurrency,
         reference: reference,
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-license-upgrade?reference=${reference}`,
         metadata: {
           companyId: companyId,
-          companyName: company.name,
-          additionalLicenses: additionalLicenses,
+          companyName: company?.name || '',
+          additionalLicenses: Number(additionalLicenses),
           userId: authUser.user.id,
+          plan: effectivePlan,
+          amountUsd,
         },
       }),
     });
@@ -9115,12 +9078,13 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
       return c.json({ error: data.message || 'Failed to initialize payment' }, 400);
     }
 
-    // Store pending payment
+    // Store pending payment (use server-computed amount)
     await kv.set(`pending_license:${reference}`, {
       reference,
       companyId,
-      additionalLicenses,
-      amount,
+      additionalLicenses: Number(additionalLicenses),
+      amount: amountUsd,
+      plan: effectivePlan,
       userId: authUser.user.id,
       createdAt: new Date().toISOString(),
     });

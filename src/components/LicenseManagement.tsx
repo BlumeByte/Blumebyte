@@ -30,8 +30,8 @@ interface LicenseManagementProps {
 
 export function LicenseManagement({ onClose, requiredLicenses }: LicenseManagementProps) {
   const MIN_LICENSES = 2; // Minimum purchase quantity enforced by the server
-  const PRICE_MONTHLY = 2.59;  // USD per license/month
-  const PRICE_YEARLY = 43.08;  // USD per license/year ($3.59/month billed annually)
+  const PRICE_MONTHLY = 3.59;  // USD per license/month
+  const PRICE_YEARLY = 31.08;  // USD per license/year ($2.59/month billed annually)
   const { branding } = useBranding();
   const { accessToken, getToken } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -61,6 +61,10 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   // Renewal state
   const [renewPlan, setRenewPlan] = useState<'monthly' | 'yearly'>('monthly');
   const [renewLoading, setRenewLoading] = useState(false);
+
+  // Card management state
+  const [removingCard, setRemovingCard] = useState(false);
+  const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
 
   useEffect(() => {
     fetchLicenseInfo();
@@ -357,6 +361,39 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     }
   };
 
+  const handleRemoveCard = async () => {
+    if (!window.confirm('Remove saved card? Auto-renewal will be disabled.')) return;
+    setRemovingCard(true);
+    try {
+      const freshToken = await getToken();
+      if (!freshToken) { toast.error('Not authenticated'); return; }
+      const response = await apiClient.delete('/subscription/card', freshToken);
+      if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Failed to remove card'); }
+      toast.success('Card removed. Auto-renewal disabled.');
+      fetchLicenseInfo();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to remove card');
+    } finally {
+      setRemovingCard(false);
+    }
+  };
+
+  const handleToggleAutoRenew = async (enable: boolean) => {
+    setTogglingAutoRenew(true);
+    try {
+      const freshToken = await getToken();
+      if (!freshToken) { toast.error('Not authenticated'); return; }
+      const response = await apiClient.patch('/subscription/auto-renew', { enabled: enable }, freshToken);
+      if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Failed to update auto-renewal'); }
+      toast.success(enable ? 'Auto-renewal enabled.' : 'Auto-renewal disabled.');
+      fetchLicenseInfo();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update auto-renewal');
+    } finally {
+      setTogglingAutoRenew(false);
+    }
+  };
+
   const handlePurchaseLicenses = async () => {
     if (additionalLicenses < MIN_LICENSES) {
       toast.error(`Minimum purchase is ${MIN_LICENSES} licenses`);
@@ -626,11 +663,41 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             )}
 
             {licenseInfo.cardSaved && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <div>
-                  <p className="font-medium text-foreground">Auto-renewal enabled</p>
-                  <p className="text-xs">Card ending in {licenseInfo.cardLast4} • Expires {licenseInfo.cardExpiry}</p>
+              <div className="space-y-2 bg-muted p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {licenseInfo.autoRenew !== false ? 'Auto-renewal enabled' : 'Auto-renewal paused'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {licenseInfo.cardBrand ? `${licenseInfo.cardBrand} ` : ''}Card ending in {licenseInfo.cardLast4} • Expires {licenseInfo.cardExpiry}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-muted-foreground"
+                      disabled={togglingAutoRenew}
+                      onClick={() => handleToggleAutoRenew(licenseInfo.autoRenew === false)}
+                      title={licenseInfo.autoRenew !== false ? 'Pause auto-renewal' : 'Enable auto-renewal'}
+                    >
+                      {togglingAutoRenew ? <Loader2 className="w-3 h-3 animate-spin" /> : (licenseInfo.autoRenew !== false ? 'Pause' : 'Enable')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={removingCard}
+                      onClick={handleRemoveCard}
+                      title="Remove saved card"
+                    >
+                      {removingCard ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Remove card'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

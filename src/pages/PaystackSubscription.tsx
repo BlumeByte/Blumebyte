@@ -122,14 +122,11 @@ export default function PaystackSubscription() {
     setLoading(true);
 
     try {
-      const pricePerLicense = 1500; // ₦1,500 per additional license
-      const totalAmount = additionalLicenses * pricePerLicense;
-
       const response = await api('/subscription/upgrade-licenses', {
         method: 'POST',
         body: JSON.stringify({
           additionalLicenses,
-          amount: totalAmount,
+          plan: 'monthly', // server computes amount server-side
         }),
       });
 
