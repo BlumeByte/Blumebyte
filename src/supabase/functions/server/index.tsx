@@ -529,6 +529,7 @@ const JOB_TRUTHY_PUBLIC_VALUES = new Set([
   'public_global',
   'publicglobal',
 ]);
+const PUBLIC_HIRING_KV_PREFIXES = ['job-posting:', 'recruitment:'];
 
 function normalizeJobStatus(raw: any): string {
   return String(raw ?? '')
@@ -544,6 +545,25 @@ function normalizeJobVisibility(raw: any): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
+}
+
+function getJobVisibilityValue(job: any): string {
+  return normalizeJobVisibility(
+    job?.visibilityType ||
+    job?.visibility ||
+    job?.publicVisibility ||
+    job?.jobBoardVisibility ||
+    job?.publishVisibility
+  );
+}
+
+function getRecordTimestamp(item: any): number {
+  const timestamp = item?.updatedAt || item?.createdAt || item?.created_at;
+  return timestamp ? new Date(timestamp).getTime() : Number.NEGATIVE_INFINITY;
+}
+
+function sortTextValues(values: Set<string>) {
+  return Array.from(values).sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 function escapeHtml(text: string): string {
@@ -574,13 +594,7 @@ function parseEmailList(...values: any[]): string[] {
 
 function isPublicJobPosting(job: any): boolean {
   if (!job || typeof job !== 'object') return false;
-  const visibility = normalizeJobVisibility(
-    job.visibilityType ||
-    job.visibility ||
-    job.publicVisibility ||
-    job.jobBoardVisibility ||
-    job.publishVisibility
-  );
+  const visibility = getJobVisibilityValue(job);
   // If a posting is explicitly marked public, it should appear on hirings even when
   // other private/internal visibility fields are also present.
   const isExplicitlyPublic = [
@@ -632,8 +646,59 @@ async function buildPublicJobResponse(job: any) {
     salaryRange: typeof job.salaryRange === 'string' ? job.salaryRange : '',
     deadline: job.deadline || null,
     createdAt: job.createdAt || job.created_at || new Date().toISOString(),
-    visibilityType: normalizeJobVisibility(job.visibilityType),
+    visibilityType: getJobVisibilityValue(job),
     status: normalizeJobStatus(job.status),
+  };
+}
+
+async function listPublicHiringRecords() {
+  const settled = await Promise.allSettled(PUBLIC_HIRING_KV_PREFIXES.map((prefix) => kv.getByPrefix(prefix)));
+  const merged = new Map<string, any>();
+
+  for (const result of settled) {
+    if (result.status !== 'fulfilled' || !Array.isArray(result.value)) continue;
+    for (const item of result.value) {
+      if (!item?.id || !isPublicJobPosting(item)) continue;
+      const existing = merged.get(item.id);
+      const nextUpdatedAt = getRecordTimestamp(item);
+      const existingUpdatedAt = existing ? getRecordTimestamp(existing) : -1;
+      if (!existing || nextUpdatedAt >= existingUpdatedAt) {
+        merged.set(item.id, item);
+      }
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
+async function getPublicHiringRecordById(id: string) {
+  for (const prefix of PUBLIC_HIRING_KV_PREFIXES) {
+    const direct = await kv.get(`${prefix}${id}`);
+    if (isPublicJobPosting(direct)) return direct;
+  }
+
+  const all = await listPublicHiringRecords();
+  return all.find((item: any) => item?.id === id) || null;
+}
+
+function buildPublicHiringFilters(jobs: any[]) {
+  const companies = new Set<string>();
+  const departments = new Set<string>();
+  const employmentTypes = new Set<string>();
+  const locations = new Set<string>();
+
+  for (const job of jobs) {
+    if (job.companyName) companies.add(job.companyName);
+    if (job.department) departments.add(job.department);
+    if (job.employmentType) employmentTypes.add(job.employmentType);
+    if (job.location) locations.add(job.location);
+  }
+
+  return {
+    companies: sortTextValues(companies),
+    departments: sortTextValues(departments),
+    employmentTypes: sortTextValues(employmentTypes),
+    locations: sortTextValues(locations),
   };
 }
 
@@ -10798,16 +10863,22 @@ const compatibleRoutePathsForAliases = (...paths: string[]) =>
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {
   try {
-    const all = await kv.getByPrefix("job-posting:");
-    const eligible = all.filter(isPublicJobPosting);
-
-    const settled = await Promise.allSettled(eligible.map((j: any) => buildPublicJobResponse(j)));
+    const eligible = await listPublicHiringRecords();
+    const settled = await Promise.allSettled(eligible.map((job: any) => buildPublicJobResponse(job)));
     const jobs = settled
       .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
       .map((r) => r.value)
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return c.json({ jobs, total: jobs.length });
+    return c.json({
+      jobs,
+      total: jobs.length,
+      filters: buildPublicHiringFilters(jobs),
+      summary: {
+        totalJobs: jobs.length,
+        totalCompanies: new Set(jobs.map((job: any) => job.companyName).filter(Boolean)).size,
+      },
+    });
   } catch (e: any) {
     console.error('Public jobs error:', e);
     return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
@@ -10818,11 +10889,7 @@ const listPublicJobs = async (c: Context) => {
 const getPublicJobDetail = async (c: Context) => {
   try {
     const id = c.req.param('id');
-    let match = await kv.get(`job-posting:${id}`);
-    if (!isPublicJobPosting(match)) {
-      const all = await kv.getByPrefix("job-posting:");
-      match = all.find((job: any) => job?.id === id && isPublicJobPosting(job));
-    }
+    const match = await getPublicHiringRecordById(id);
     if (!match) return c.json({ error: 'Job not found' }, 404);
     const publicJob = await buildPublicJobResponse(match);
     if (!publicJob) return c.json({ error: 'Job not found' }, 404);
@@ -10832,11 +10899,11 @@ const getPublicJobDetail = async (c: Context) => {
   }
 };
 
-for (const route of compatibleRoutePathsForAliases('/public/jobs', '/public/job-openings', '/hirings/jobs')) {
+for (const route of compatibleRoutePathsForAliases('/public/hirings', '/public/jobs', '/public/job-openings', '/hirings/jobs')) {
   app.get(route, listPublicJobs);
 }
 
-for (const route of compatibleRoutePathsForAliases('/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
+for (const route of compatibleRoutePathsForAliases('/public/hirings/:id', '/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
   app.get(route, getPublicJobDetail);
 }
 
@@ -10859,7 +10926,7 @@ const applyToPublicJob = async (c: any) => {
     }
 
     // Verify job exists and is public
-    const job = await kv.get(`job-posting:${jobId}`);
+    const job = await getPublicHiringRecordById(jobId);
     if (!isPublicJobPosting(job)) {
       return c.json({ error: 'Job not found or no longer accepting applications' }, 404);
     }
@@ -10999,7 +11066,7 @@ const applyToPublicJob = async (c: any) => {
     return c.json({ error: e.message || 'Submission failed' }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/public/job/apply')) app.post(route, applyToPublicJob);
+for (const route of compatibleRoutePathsForAliases('/public/hirings/apply', '/public/job/apply')) app.post(route, applyToPublicJob);
 
 // ============ CUSTOMER CARE / DEVELOPER ENDPOINTS ============
 
