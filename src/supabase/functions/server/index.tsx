@@ -519,7 +519,15 @@ const JOB_PUBLIC_VISIBILITIES = new Set([
   'public_job_board',
   'public_appears_on_job_board',
 ]);
-const JOB_TRUTHY_PUBLIC_VALUES = new Set(['true', '1', 'yes', 'on', 'public', 'public_global']);
+const JOB_TRUTHY_PUBLIC_VALUES = new Set([
+  'true',
+  '1',
+  'yes',
+  'on',
+  'public',
+  'public_global',
+  'publicglobal',
+]);
 
 function normalizeJobStatus(raw: any): string {
   return String(raw ?? '')
