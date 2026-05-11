@@ -18,7 +18,7 @@ interface ChatMessage {
 
 const FAQ_RESPONSES: Record<string, { answer: string; links?: { text: string; url: string }[] }> = {
   pricing: {
-    answer: "Blumebyte offers flexible pricing: $2.59/month per employee for monthly billing or $3.59/month per employee for yearly billing. All plans include full access to our comprehensive HR management features.",
+    answer: "Blumebyte offers flexible pricing: $3.55/month per employee for monthly billing or $2.55/month per employee for yearly billing, billed annually at $30.60 per employee. All plans include full access to our comprehensive HR management features.",
     links: [
       { text: "View Pricing Details", url: "/#pricing" },
       { text: "Get Started", url: "/company-signup" }

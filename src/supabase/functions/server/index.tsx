@@ -6854,8 +6854,8 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     }
     
     // Always compute amount server-side — never trust client-provided amount
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
+    // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
+    const pricePerUser = plan === 'monthly' ? 3.55 : 30.60;
     const amount = userCount * pricePerUser;
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -6995,8 +6995,8 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
       return c.json({ error: 'Payment gateway not configured' }, 500);
     }
 
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
+    // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
+    const pricePerUser = plan === 'monthly' ? 3.55 : 30.60;
     const amount = Number(licenses) * pricePerUser;
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
@@ -8958,9 +8958,9 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
     const company = await kv.get(`company_by_id:${companyId}`);
     
     // Always compute amount server-side — never trust client-provided amount
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
     const effectivePlan = plan || company?.subscription?.plan || 'monthly';
-    const pricePerLicense = effectivePlan === 'monthly' ? 3.59 : 31.08;
+    const pricePerLicense = effectivePlan === 'monthly' ? 3.55 : 30.60;
     const amountUsd = Number(additionalLicenses) * pricePerLicense;
 
     // Create payment reference

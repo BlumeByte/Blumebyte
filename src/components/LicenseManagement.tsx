@@ -30,8 +30,8 @@ interface LicenseManagementProps {
 
 export function LicenseManagement({ onClose, requiredLicenses }: LicenseManagementProps) {
   const MIN_LICENSES = 2; // Minimum purchase quantity enforced by the server
-  const PRICE_MONTHLY = 3.59;  // USD per license/month
-  const PRICE_YEARLY = 31.08;  // USD per license/year ($2.59/month billed annually)
+  const PRICE_MONTHLY = 3.55;  // USD per license/month
+  const PRICE_YEARLY = 30.6;  // USD per license/year ($2.55/month billed annually)
   const { branding } = useBranding();
   const { accessToken, getToken } = useAuth();
   const [loading, setLoading] = useState(false);

@@ -209,7 +209,7 @@ export default function PricingPage() {
   const pricingPlans = [
     {
       name: 'Monthly Plan',
-      price: '$3.59',
+      price: '$3.55',
       period: '/employee/month',
       billingCycle: 'Billed monthly',
       description: 'Perfect for companies wanting flexibility',
@@ -234,9 +234,9 @@ export default function PricingPage() {
     },
     {
       name: 'Yearly Plan',
-      price: '$2.59',
+      price: '$2.55',
       period: '/employee/month',
-      billingCycle: 'Billed annually at $31.08/employee',
+      billingCycle: 'Billed annually at $30.60/employee',
       description: 'Best value for growing companies',
       features: [
         'Operations and Compliance',
@@ -287,7 +287,7 @@ export default function PricingPage() {
     },
     {
       question: 'How is pricing calculated?',
-      answer: 'Pricing is per employee per month. Monthly plan is $3.59/employee/month. Annual plan is $2.59/employee/month ($31.08/employee/year). Minimum purchase is 2 licenses.'
+      answer: 'Pricing is per employee per month. Monthly plan is $3.55/employee/month. Annual plan is $2.55/employee/month ($30.60/employee/year). Minimum purchase is 2 licenses.'
     },
     {
       question: 'Can I change plans later?',
