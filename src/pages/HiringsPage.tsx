@@ -314,7 +314,7 @@ export default function HiringsPage() {
 
         <div className="relative z-10 max-w-4xl mx-auto text-center space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold">Find Your Next Opportunity</h1>
-          <p className="text-lg text-gray-300" aria-live="polite">
+          <p className="text-lg text-gray-300">
             {summary.totalCompanies > 0
               ? `Browse ${summary.totalJobs} open roles from ${summary.totalCompanies} companies hiring through Blumebyte HR`
               : 'Browse live job openings published by Blumebyte tenants'}
@@ -374,7 +374,7 @@ export default function HiringsPage() {
           </span>
         </div>
         <p id="public-hiring-filter-help" className="sr-only">
-          Start typing to filter the public hiring list with server-provided suggestions.
+          Select one of the suggested values or type your own filter text.
         </p>
 
         <datalist id="public-hiring-locations">

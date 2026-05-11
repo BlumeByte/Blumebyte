@@ -529,7 +529,7 @@ const JOB_TRUTHY_PUBLIC_VALUES = new Set([
   'public_global',
   'publicglobal',
 ]);
-const PUBLIC_HIRING_PREFIXES = ['job-posting:', 'recruitment:'];
+const PUBLIC_HIRING_KV_PREFIXES = ['job-posting:', 'recruitment:'];
 
 function normalizeJobStatus(raw: any): string {
   return String(raw ?? '')
@@ -563,7 +563,7 @@ function getRecordTimestamp(item: any): number {
 }
 
 function sortTextValues(values: Set<string>) {
-  return Array.from(values).sort((a, b) => a.localeCompare(b));
+  return Array.from(values).sort((a, b) => a.localeCompare(b, 'en'));
 }
 
 function escapeHtml(text: string): string {
@@ -652,7 +652,7 @@ async function buildPublicJobResponse(job: any) {
 }
 
 async function listPublicHiringRecords() {
-  const settled = await Promise.allSettled(PUBLIC_HIRING_PREFIXES.map((prefix) => kv.getByPrefix(prefix)));
+  const settled = await Promise.allSettled(PUBLIC_HIRING_KV_PREFIXES.map((prefix) => kv.getByPrefix(prefix)));
   const merged = new Map<string, any>();
 
   for (const result of settled) {
@@ -672,7 +672,7 @@ async function listPublicHiringRecords() {
 }
 
 async function getPublicHiringRecordById(id: string) {
-  for (const prefix of PUBLIC_HIRING_PREFIXES) {
+  for (const prefix of PUBLIC_HIRING_KV_PREFIXES) {
     const direct = await kv.get(`${prefix}${id}`);
     if (isPublicJobPosting(direct)) return direct;
   }
