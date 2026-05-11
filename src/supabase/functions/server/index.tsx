@@ -547,6 +547,24 @@ function normalizeJobVisibility(raw: any): string {
     .replace(/^_+|_+$/g, '');
 }
 
+function getJobVisibilityValue(job: any): string {
+  return normalizeJobVisibility(
+    job?.visibilityType ||
+    job?.visibility ||
+    job?.publicVisibility ||
+    job?.jobBoardVisibility ||
+    job?.publishVisibility
+  );
+}
+
+function getRecordTimestamp(item: any): number {
+  return new Date(item?.updatedAt || item?.createdAt || item?.created_at || 0).getTime();
+}
+
+function sortTextValues(values: Set<string>) {
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
+}
+
 function escapeHtml(text: string): string {
   return String(text || '')
     .replace(/&/g, '&amp;')
@@ -575,13 +593,7 @@ function parseEmailList(...values: any[]): string[] {
 
 function isPublicJobPosting(job: any): boolean {
   if (!job || typeof job !== 'object') return false;
-  const visibility = normalizeJobVisibility(
-    job.visibilityType ||
-    job.visibility ||
-    job.publicVisibility ||
-    job.jobBoardVisibility ||
-    job.publishVisibility
-  );
+  const visibility = getJobVisibilityValue(job);
   // If a posting is explicitly marked public, it should appear on hirings even when
   // other private/internal visibility fields are also present.
   const isExplicitlyPublic = [
@@ -633,13 +645,7 @@ async function buildPublicJobResponse(job: any) {
     salaryRange: typeof job.salaryRange === 'string' ? job.salaryRange : '',
     deadline: job.deadline || null,
     createdAt: job.createdAt || job.created_at || new Date().toISOString(),
-    visibilityType: normalizeJobVisibility(
-      job.visibilityType ||
-      job.visibility ||
-      job.publicVisibility ||
-      job.jobBoardVisibility ||
-      job.publishVisibility
-    ),
+    visibilityType: getJobVisibilityValue(job),
     status: normalizeJobStatus(job.status),
   };
 }
@@ -653,10 +659,8 @@ async function listPublicHiringRecords() {
     for (const item of result.value) {
       if (!item?.id || !isPublicJobPosting(item)) continue;
       const existing = merged.get(item.id);
-      const nextUpdatedAt = new Date(item.updatedAt || item.createdAt || item.created_at || 0).getTime();
-      const existingUpdatedAt = existing
-        ? new Date(existing.updatedAt || existing.createdAt || existing.created_at || 0).getTime()
-        : -1;
+      const nextUpdatedAt = getRecordTimestamp(item);
+      const existingUpdatedAt = existing ? getRecordTimestamp(existing) : -1;
       if (!existing || nextUpdatedAt >= existingUpdatedAt) {
         merged.set(item.id, item);
       }
@@ -689,13 +693,11 @@ function buildPublicHiringFilters(jobs: any[]) {
     if (job.location) locations.add(job.location);
   }
 
-  const sortValues = (values: Set<string>) => Array.from(values).sort((a, b) => a.localeCompare(b));
-
   return {
-    companies: sortValues(companies),
-    departments: sortValues(departments),
-    employmentTypes: sortValues(employmentTypes),
-    locations: sortValues(locations),
+    companies: sortTextValues(companies),
+    departments: sortTextValues(departments),
+    employmentTypes: sortTextValues(employmentTypes),
+    locations: sortTextValues(locations),
   };
 }
 

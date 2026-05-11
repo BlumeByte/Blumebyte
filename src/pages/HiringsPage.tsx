@@ -314,7 +314,7 @@ export default function HiringsPage() {
 
         <div className="relative z-10 max-w-4xl mx-auto text-center space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold">Find Your Next Opportunity</h1>
-          <p className="text-lg text-gray-300">
+          <p className="text-lg text-gray-300" aria-live="polite">
             {summary.totalCompanies > 0
               ? `Browse ${summary.totalJobs} open roles from ${summary.totalCompanies} companies hiring through Blumebyte HR`
               : 'Browse live job openings published by Blumebyte tenants'}
@@ -341,6 +341,7 @@ export default function HiringsPage() {
             placeholder="Type location filter"
             className="w-44 bg-white"
             list="public-hiring-locations"
+            aria-describedby="public-hiring-filter-help"
           />
           <Input
             value={filterType}
@@ -348,6 +349,7 @@ export default function HiringsPage() {
             placeholder="Type job type filter"
             className="w-44 bg-white"
             list="public-hiring-types"
+            aria-describedby="public-hiring-filter-help"
           />
           <Input
             value={filterDepartment}
@@ -355,6 +357,7 @@ export default function HiringsPage() {
             placeholder="Type department filter"
             className="w-52 bg-white"
             list="public-hiring-departments"
+            aria-describedby="public-hiring-filter-help"
           />
 
           {(search || filterLocation || filterType || filterDepartment) && (
@@ -367,6 +370,9 @@ export default function HiringsPage() {
             {filtered.length} {filtered.length === 1 ? 'job' : 'jobs'} found
           </span>
         </div>
+        <p id="public-hiring-filter-help" className="sr-only">
+          Start typing to filter the public hiring list with server-provided suggestions.
+        </p>
 
         <datalist id="public-hiring-locations">
           {filters.locations.map((location) => <option key={location} value={location} />)}
