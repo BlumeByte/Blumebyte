@@ -7657,7 +7657,7 @@ app.get(`${PREFIX}/assets`, async (c) => {
 // ========================================
 
 // Send a chat message
-app.post(`${PREFIX}/chat/send`, async (c) => {
+const sendChatMessage = async (c: any) => {
   try {
     const authUser = await requireAuth(c);
     const { message } = await c.req.json();
@@ -7669,7 +7669,7 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
     // Get user profile for name and company - use employee: key for consistency
     const userProfile = await kv.get(`employee:${authUser.user.id}`);
     const userName = userProfile?.name || authUser.user.user_metadata?.name || authUser.user.email?.split('@')[0] || 'Anonymous';
-    const companyId = userProfile?.companyId;
+    const companyId = userProfile?.companyId || userProfile?.company;
 
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
@@ -7708,16 +7708,17 @@ app.post(`${PREFIX}/chat/send`, async (c) => {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ error: 'Failed to send message' }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/chat/send')) app.post(route, sendChatMessage);
 
 // Get chat messages (Company-scoped)
-app.get(`${PREFIX}/chat/messages`, async (c) => {
+const getChatMessages = async (c: any) => {
   try {
     const authUser = await requireAuth(c);
     
     // Get user profile to find company - use employee: key for consistency
     const userProfile = await kv.get(`employee:${authUser.user.id}`);
-    const companyId = userProfile?.companyId;
+    const companyId = userProfile?.companyId || userProfile?.company;
 
     if (!companyId) {
       return c.json({ error: 'User not associated with a company' }, 400);
@@ -7744,7 +7745,8 @@ app.get(`${PREFIX}/chat/messages`, async (c) => {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ error: 'Failed to fetch messages' }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/chat/messages')) app.get(route, getChatMessages);
 
 // ========================================
 // EMPLOYEE SELF-SERVICE PORTAL ENDPOINTS
@@ -10877,6 +10879,9 @@ async function sendEmailNotification(
 const compatibleRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
 
+const compatibleRoutePathsForAliases = (...paths: string[]) =>
+  Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
+
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {
   try {
@@ -11417,7 +11422,7 @@ const verifyUltimateadminSupport = async (c: any) => {
     return c.json({ allowed: false }, 403);
   }
 };
-for (const route of [`${PREFIX}/ultimateadmin/support/verify`, `${PREFIX}/support/verify`]) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/verify', '/support/verify')) {
   app.get(route, verifyUltimateadminSupport);
 }
 
@@ -11476,7 +11481,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of [`${PREFIX}/ultimateadmin/support/metrics`, `${PREFIX}/support/metrics`]) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/metrics', '/support/metrics')) {
   app.get(route, getUltimateadminSupportMetrics);
 }
 
@@ -11566,12 +11571,12 @@ const listUltimateadminSupportTenants = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of [`${PREFIX}/ultimateadmin/support/tenants`, `${PREFIX}/support/tenants`]) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants')) {
   app.get(route, listUltimateadminSupportTenants);
 }
 
 // GET /ultimateadmin/support/tenants/:id/users
-app.get(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
+const listUltimateadminSupportTenantUsers = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11590,10 +11595,11 @@ app.get(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/users')) app.get(route, listUltimateadminSupportTenantUsers);
 
 // POST /ultimateadmin/support/tenants/:id/suspend
-app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/suspend`, async (c) => {
+const suspendUltimateadminSupportTenant = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11615,10 +11621,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/suspend`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/suspend')) app.post(route, suspendUltimateadminSupportTenant);
 
 // PUT /ultimateadmin/support/tenants/:id/license
-app.put(`${PREFIX}/ultimateadmin/support/tenants/:id/license`, async (c) => {
+const updateUltimateadminSupportTenantLicense = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11675,10 +11682,11 @@ app.put(`${PREFIX}/ultimateadmin/support/tenants/:id/license`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/license')) app.put(route, updateUltimateadminSupportTenantLicense);
 
 // GET /ultimateadmin/support/tickets
-app.get(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
+const listUltimateadminSupportTickets = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11694,10 +11702,11 @@ app.get(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets')) app.get(route, listUltimateadminSupportTickets);
 
 // POST /ultimateadmin/support/tickets
-app.post(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
+const createUltimateadminSupportTicket = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11718,10 +11727,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tickets`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets')) app.post(route, createUltimateadminSupportTicket);
 
 // PUT /ultimateadmin/support/tickets/:id
-app.put(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
+const updateUltimateadminSupportTicket = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11741,10 +11751,11 @@ app.put(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets/:id')) app.put(route, updateUltimateadminSupportTicket);
 
 // DELETE /ultimateadmin/support/tickets/:id
-app.delete(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
+const deleteUltimateadminSupportTicket = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11754,7 +11765,8 @@ app.delete(`${PREFIX}/ultimateadmin/support/tickets/:id`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
 
 // GET /ultimateadmin/support/agents
 app.get(`${PREFIX}/ultimateadmin/support/agents`, async (c) => {
@@ -11809,7 +11821,7 @@ app.put(`${PREFIX}/ultimateadmin/support/agents/:id`, async (c) => {
 });
 
 // GET /ultimateadmin/support/audit — audit trail
-app.get(`${PREFIX}/ultimateadmin/support/audit`, async (c) => {
+const listUltimateadminSupportAudit = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11819,10 +11831,11 @@ app.get(`${PREFIX}/ultimateadmin/support/audit`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/audit')) app.get(route, listUltimateadminSupportAudit);
 
 // POST /ultimateadmin/support/set-platform-user — set role+name for developer/care platform users
-app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
+const setUltimateadminPlatformUser = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11867,10 +11880,11 @@ app.post(`${PREFIX}/ultimateadmin/support/set-platform-user`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/set-platform-user')) app.post(route, setUltimateadminPlatformUser);
 
 // POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (ultimateadmin only)
-app.post(`${PREFIX}/ultimateadmin/support/generate-reset-link`, async (c) => {
+const generateUltimateadminResetLink = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11895,10 +11909,11 @@ app.post(`${PREFIX}/ultimateadmin/support/generate-reset-link`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/generate-reset-link')) app.post(route, generateUltimateadminResetLink);
 
 // POST /ultimateadmin/support/repair/:tenantId — run quick repair actions
-app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
+const repairUltimateadminTenant = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11918,10 +11933,11 @@ app.post(`${PREFIX}/ultimateadmin/support/repair/:tenantId`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/repair/:tenantId')) app.post(route, repairUltimateadminTenant);
 
 // POST /ultimateadmin/support/tenants — create a new tenant without payment
-app.post(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
+const createUltimateadminSupportTenant = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -11967,10 +11983,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tenants`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants')) app.post(route, createUltimateadminSupportTenant);
 
 // POST /ultimateadmin/support/tenants/:id/users — create a user for a tenant without payment
-app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
+const createUltimateadminSupportTenantUser = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12015,10 +12032,11 @@ app.post(`${PREFIX}/ultimateadmin/support/tenants/:id/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/users')) app.post(route, createUltimateadminSupportTenantUser);
 
 // GET /ultimateadmin/users — all users across all tenants
-app.get(`${PREFIX}/ultimateadmin/users`, async (c) => {
+const listUltimateadminUsers = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12032,13 +12050,14 @@ app.get(`${PREFIX}/ultimateadmin/users`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/users')) app.get(route, listUltimateadminUsers);
 
 // ── Ultimateadmin Global Chat ───────────────────────────────────────────────────
 // Ultimateadmin can chat with any tenant user directly
 
 // GET /ultimateadmin/chat/threads — list all chat threads
-app.get(`${PREFIX}/ultimateadmin/chat/threads`, async (c) => {
+const listUltimateadminChatThreads = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12049,10 +12068,11 @@ app.get(`${PREFIX}/ultimateadmin/chat/threads`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/chat/threads')) app.get(route, listUltimateadminChatThreads);
 
 // GET /ultimateadmin/chat/threads/:threadId — get thread messages
-app.get(`${PREFIX}/ultimateadmin/chat/threads/:threadId`, async (c) => {
+const getUltimateadminChatThread = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12066,10 +12086,11 @@ app.get(`${PREFIX}/ultimateadmin/chat/threads/:threadId`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/chat/threads/:threadId')) app.get(route, getUltimateadminChatThread);
 
 // POST /ultimateadmin/chat/send — send a message to a tenant user (creates thread if needed)
-app.post(`${PREFIX}/ultimateadmin/chat/send`, async (c) => {
+const sendUltimateadminChatMessage = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12116,12 +12137,13 @@ app.post(`${PREFIX}/ultimateadmin/chat/send`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/chat/send')) app.post(route, sendUltimateadminChatMessage);
 
 // ── Ultimateadmin canonical aliases for /developer/* endpoints ─────────────────
 // Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platform-users`]) app.get(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users', '/platform-users')) app.get(route, async (c) => {
   // Return platform user records for canonical and legacy-compatible paths
   try {
     const access = await verifyUltimateAdminAccess(c);
@@ -12159,7 +12181,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platfo
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platform-users`]) app.post(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users', '/platform-users')) app.post(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12197,7 +12219,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users`, `${PREFIX}/platfo
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/platform-users/:id`]) app.put(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users/:id', '/platform-users/:id')) app.put(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12224,7 +12246,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/pl
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/platform-users/:id`]) app.delete(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users/:id', '/platform-users/:id')) app.delete(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12240,7 +12262,7 @@ for (const route of [`${PREFIX}/ultimateadmin/platform-users/:id`, `${PREFIX}/pl
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignments`]) app.get(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments', '/assignments')) app.get(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12252,7 +12274,7 @@ for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignmen
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignments`]) app.post(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments', '/assignments')) app.post(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12277,7 +12299,7 @@ for (const route of [`${PREFIX}/ultimateadmin/assignments`, `${PREFIX}/assignmen
   }
 });
 
-for (const route of [`${PREFIX}/ultimateadmin/assignments/:id`, `${PREFIX}/assignments/:id`]) app.delete(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments/:id', '/assignments/:id')) app.delete(route, async (c) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
