@@ -41,9 +41,11 @@ const _allowedOrigins = (() => {
   }
   return [
     ...stringOrigins,
-    // Also allow Supabase-hosted previews and Vercel deploys
+    // Also allow Supabase-hosted previews, Vercel deploys, and blumebyte.com domains
     /^https:\/\/.*\.supabase\.co$/,
     /^https:\/\/.*\.vercel\.app$/,
+    /^https:\/\/blumebyte\.com$/,
+    /^https:\/\/.*\.blumebyte\.com$/,
   ];
 })();
 
@@ -429,6 +431,10 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
     if (data?.user?.user_metadata?.assignedCompanies?.length) {
       scope.push(...data.user.user_metadata.assignedCompanies);
     }
+    // Also check companyId in auth metadata (set during registration)
+    if (data?.user?.user_metadata?.companyId && !scope.includes(data.user.user_metadata.companyId)) {
+      scope.push(data.user.user_metadata.companyId);
+    }
   }
   
   // 3. CRITICAL: Also add company/companyId field (handles legacy data with company names)
@@ -648,12 +654,16 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
     return [];
   }
   
+  const scopeLower = assignedCompanies.map((s: string) => s.toLowerCase());
+  
   // Filter items by company for ALL roles
   const filtered = items.filter((item: any) => {
-    const itemCompany = item.company || item.companyId || item.companyName;
-    if (!itemCompany) return false; // STRICT: Exclude items without company assignment
-    // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
-    return assignedCompanies.some(ac => ac.toLowerCase() === itemCompany.toLowerCase());
+    const itemCompanyId = (item.company || item.companyId || '').toLowerCase();
+    const itemCompanyName = (item.companyName || '').toLowerCase();
+    if (!itemCompanyId && !itemCompanyName) return false; // STRICT: Exclude items without company assignment
+    // CASE-INSENSITIVE comparison: match on companyId OR companyName against scope
+    return scopeLower.some(ac => (itemCompanyId && ac === itemCompanyId) || (itemCompanyName && ac === itemCompanyName));
+  });
   });
   
   return filtered;
@@ -670,15 +680,17 @@ async function filterEmployeesByCompany(employees: any[], userId: string, role: 
     return [];
   }
   
+  const scopeLower = scope.map((s: string) => s.toLowerCase());
+  
   // Filter by company for ALL roles
   const filtered = employees.filter((e: any) => {
-    const empCompany = e.company || e.companyId;
-    if (!empCompany) {
+    const empCompanyId = (e.company || e.companyId || '').toLowerCase();
+    const empCompanyName = (e.companyName || '').toLowerCase();
+    if (!empCompanyId && !empCompanyName) {
       return false; // Exclude employees without company
     }
-    // CASE-INSENSITIVE comparison to handle "BLUMEBYTE" vs "blumebyte"
-    const included = scope.some(s => s.toLowerCase() === empCompany.toLowerCase());
-    return included;
+    // CASE-INSENSITIVE comparison: match on companyId OR companyName
+    return scopeLower.some(s => (empCompanyId && s === empCompanyId) || (empCompanyName && s === empCompanyName));
   });
   
   return filtered;
@@ -6959,102 +6971,10 @@ app.get(`${PREFIX}/subscription/all-users`, async (c) => {
   }
 });
 
-// POST /subscription/purchase-licenses — alias for /subscription/initialize used by LicenseManagement.
-// Accepts { licenses, plan } and delegates to the same Paystack flow.
-app.post(`${PREFIX}/subscription/purchase-licenses`, async (c) => {
-  try {
-    const { user } = await requireSuperAdmin(c);
-    const body = await c.req.json();
-    const { licenses, plan } = body;
-
-    if (!licenses || !plan) {
-      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
-    }
-    if (!['monthly', 'yearly'].includes(plan)) {
-      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
-    }
-
-    // Always compute amount server-side from canonical price list — never trust client-provided amount
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
-    const amount = licenses * pricePerUser;
-
-// POST /subscription/purchase-licenses-with-selection — same as purchase-licenses but
-// with explicit user IDs to activate after payment.
-app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c) => {
-  try {
-    const { user } = await requireSuperAdmin(c);
-    const body = await c.req.json();
-    const { licenses, plan, selectedUserIds } = body;
-
-    if (!licenses || !plan) {
-      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
-    }
-    if (!['monthly', 'yearly'].includes(plan)) {
-      return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
-    }
-
-    // Always compute amount server-side from canonical price list
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
-    const amount = licenses * pricePerUser;
-
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!paystackSecretKey) {
-      return c.json({ error: 'Payment gateway not configured' }, 500);
-    }
-
-    const reference = `SUB_${user.id}_${Date.now()}`;
-    const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: user.email,
-        amount: Math.round(amount * 100),
-        reference,
-        callback_url: callbackUrl,
-        metadata: {
-          userId: user.id,
-          plan,
-          userCount: licenses,
-          selectedUserIds: selectedUserIds || [],
-        },
-      }),
-    });
-
-    const paystackData = await paystackResponse.json();
-    if (!paystackData.status) {
-      return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
-    }
-
-    await kv.set(`pending-subscription:${reference}`, {
-      userId: user.id,
-      plan,
-      userCount: licenses,
-      amount,
-      reference,
-      selectedUserIds: selectedUserIds || [],
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    });
-
-    return c.json({
-      authorization_url: paystackData.data.authorization_url,
-      access_code: paystackData.data.access_code,
-      reference: paystackData.data.reference,
-    });
-  } catch (e: any) {
-    console.error('Error in purchase-licenses-with-selection:', e);
-    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
-    return c.json({ error: e.message }, 500);
-  }
-});
+// NOTE: POST /subscription/purchase-licenses and POST /subscription/purchase-licenses-with-selection
+// are both handled by license-routes.tsx (registered via addLicenseRoutes above).
+// Those implementations use usdToPaystackAmount() for proper currency conversion.
+// The duplicate handlers that were previously here have been removed to avoid confusion.
 
 // POST /subscription/renew-license — renew an existing subscription via Paystack
 app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
@@ -7082,6 +7002,9 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
     const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
 
+    // Convert USD amount to the configured Paystack currency (GHS/NGN/USD)
+    const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
+
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -7090,7 +7013,8 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount: Math.round(amount * 100),
+        amount: amountSmallestUnit,
+        currency,
         reference,
         callback_url: callbackUrl,
         metadata: {
@@ -7099,6 +7023,7 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
           userCount: licenses,
           isRenewal: true,
           saveCard: saveCard !== false,
+          amountUsd: amount,
           custom_fields: [
             { display_name: 'Transaction Type', variable_name: 'type', value: 'renewal' },
             { display_name: 'Plan', variable_name: 'plan', value: plan },

@@ -65,6 +65,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   // Card management state
   const [removingCard, setRemovingCard] = useState(false);
   const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
+  const [changingCard, setChangingCard] = useState(false);
 
   useEffect(() => {
     fetchLicenseInfo();
@@ -378,6 +379,23 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     }
   };
 
+  const handleChangeCard = async () => {
+    if (!window.confirm('To change your payment card, we\'ll remove the current card. Your next payment (renewal or new license purchase) will prompt you to enter the new card details. Make sure to check "Save card for auto-renewal" to keep the new card saved.\n\nRemove current card now?')) return;
+    setChangingCard(true);
+    try {
+      const freshToken = await getToken();
+      if (!freshToken) { toast.error('Not authenticated'); return; }
+      const response = await apiClient.delete('/subscription/card', freshToken);
+      if (!response.ok) { const err = await response.json(); throw new Error(err.error || 'Failed to remove card'); }
+      toast.success('Card removed. Please make your next payment with the new card and check "Save card for auto-renewal" to save it.');
+      fetchLicenseInfo();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to change card');
+    } finally {
+      setChangingCard(false);
+    }
+  };
+
   const handleToggleAutoRenew = async (enable: boolean) => {
     setTogglingAutoRenew(true);
     try {
@@ -604,6 +622,14 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     (licenseInfo.expiresAt && new Date(licenseInfo.expiresAt) < new Date())
   );
 
+  // Show renewal section when expired OR expiring within 14 days
+  const isLicenseExpiringSoon = licenseInfo != null && !isLicenseExpired && (
+    licenseInfo.expiresAt && (() => {
+      const daysLeft = (new Date(licenseInfo.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+      return daysLeft <= 14;
+    })()
+  );
+
   const usagePercentage = licenseInfo && licenseInfo.purchasedLicenses > 0
     ? Math.min((licenseInfo.usedLicenses / licenseInfo.purchasedLicenses) * 100, 100)
     : 0;
@@ -690,6 +716,16 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      disabled={changingCard}
+                      onClick={handleChangeCard}
+                      title="Change saved card"
+                    >
+                      {changingCard ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Change card'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
                       disabled={removingCard}
                       onClick={handleRemoveCard}
@@ -742,7 +778,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           <CardDescription>
             {requiredLicenses 
               ? `You need at least ${requiredLicenses} more license(s) to proceed`
-              : 'Add more user licenses to your subscription'}
+              : 'Add more user seats to your existing subscription (extends total capacity, not renewal period)'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1063,16 +1099,18 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         </CardContent>
       </Card>
 
-      {/* Renew License — shown when license is expired or near expiry */}
-      {licenseInfo && isLicenseExpired && (
-        <Card className="border-orange-200 bg-orange-50">
+      {/* Renew License — shown when license is expired or expiring within 14 days */}
+      {licenseInfo && (isLicenseExpired || isLicenseExpiringSoon) && (
+        <Card className={isLicenseExpired ? "border-orange-200 bg-orange-50" : "border-yellow-200 bg-yellow-50"}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-800">
+            <CardTitle className={`flex items-center gap-2 ${isLicenseExpired ? 'text-orange-800' : 'text-yellow-800'}`}>
               <TrendingUp className="w-5 h-5" />
-              Renew Your License
+              {isLicenseExpired ? 'Renew Your License' : 'License Expiring Soon'}
             </CardTitle>
-            <p className="text-sm text-orange-700">
-              Your license has expired. Renew now to restore access for your team.
+            <p className={`text-sm ${isLicenseExpired ? 'text-orange-700' : 'text-yellow-700'}`}>
+              {isLicenseExpired
+                ? 'Your license has expired. Renew now to restore access for your team.'
+                : `Your license expires on ${new Date(licenseInfo.expiresAt).toLocaleDateString()}. Renew early to avoid interruption.`}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
