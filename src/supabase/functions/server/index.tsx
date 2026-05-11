@@ -512,12 +512,22 @@ function normalizeEmploymentType(raw: string): string {
 
 // --- Active statuses for public job visibility ---
 const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'published', 'live', 'approved', 'posted', 'hiring', 'recruiting', 'accepting_applications']);
+const JOB_EXPLICITLY_HIDDEN_STATUSES = new Set(['draft', 'inactive', 'closed', 'filled', 'archived', 'deleted', 'expired', 'cancelled']);
 const JOB_PUBLIC_VISIBILITIES = new Set([
   'public_global',
   'public',
   'global',
   'public_job_board',
   'public_appears_on_job_board',
+]);
+const JOB_TRUTHY_PUBLIC_VALUES = new Set([
+  'true',
+  '1',
+  'yes',
+  'on',
+  'public',
+  'public_global',
+  'publicglobal',
 ]);
 
 function normalizeJobStatus(raw: any): string {
@@ -564,17 +574,35 @@ function parseEmailList(...values: any[]): string[] {
 
 function isPublicJobPosting(job: any): boolean {
   if (!job || typeof job !== 'object') return false;
-  const visibility = normalizeJobVisibility(job.visibilityType);
-  // Backward compatibility: older public jobs may not have visibilityType at all,
-  // and some records may store label-like visibility strings.
-  if (visibility) {
-    const looksPublic = JOB_PUBLIC_VISIBILITIES.has(visibility);
-    if (!looksPublic) return false;
-  }
+  const visibility = normalizeJobVisibility(
+    job.visibilityType ||
+    job.visibility ||
+    job.publicVisibility ||
+    job.jobBoardVisibility ||
+    job.publishVisibility
+  );
+  // If a posting is explicitly marked public, it should appear on hirings even when
+  // other private/internal visibility fields are also present.
+  const isExplicitlyPublic = [
+    job.isPublic,
+    job.public,
+    job.publishToJobBoard,
+    job.showOnJobBoard,
+    job.showOnWebsite,
+    job.isPublished,
+  ].some((value) => {
+    if (value === true) return true;
+    const normalized = normalizeJobVisibility(value);
+    return !!normalized && JOB_TRUTHY_PUBLIC_VALUES.has(normalized);
+  });
+  const isPublicByVisibility = !!visibility && JOB_PUBLIC_VISIBILITIES.has(visibility);
+  if (!isExplicitlyPublic && !isPublicByVisibility) return false;
   const status = normalizeJobStatus(job.status);
-  // Backward compatibility: older public jobs may have missing status.
-  if (status && !JOB_ACTIVE_STATUSES.has(status)) return false;
-  return true;
+  // Backward compatibility: old public postings may be missing status entirely.
+  if (!status) return true;
+  if (JOB_ACTIVE_STATUSES.has(status)) return true;
+  if (isExplicitlyPublic && !JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return true;
+  return false;
 }
 
 async function buildPublicJobResponse(job: any) {
@@ -6854,8 +6882,8 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     }
     
     // Always compute amount server-side — never trust client-provided amount
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
+    // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
+    const pricePerUser = plan === 'monthly' ? 3.55 : 30.60;
     const amount = userCount * pricePerUser;
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -6995,8 +7023,8 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
       return c.json({ error: 'Payment gateway not configured' }, 500);
     }
 
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-    const pricePerUser = plan === 'monthly' ? 3.59 : 31.08;
+    // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
+    const pricePerUser = plan === 'monthly' ? 3.55 : 30.60;
     const amount = Number(licenses) * pricePerUser;
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
@@ -8958,9 +8986,9 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
     const company = await kv.get(`company_by_id:${companyId}`);
     
     // Always compute amount server-side — never trust client-provided amount
-    // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
+    // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
     const effectivePlan = plan || company?.subscription?.plan || 'monthly';
-    const pricePerLicense = effectivePlan === 'monthly' ? 3.59 : 31.08;
+    const pricePerLicense = effectivePlan === 'monthly' ? 3.55 : 30.60;
     const amountUsd = Number(additionalLicenses) * pricePerLicense;
 
     // Create payment reference
@@ -10804,11 +10832,11 @@ const getPublicJobDetail = async (c: Context) => {
   }
 };
 
-for (const route of compatibleRoutePaths('/public/jobs')) {
+for (const route of compatibleRoutePathsForAliases('/public/jobs', '/public/job-openings', '/hirings/jobs')) {
   app.get(route, listPublicJobs);
 }
 
-for (const route of compatibleRoutePaths('/public/jobs/:id')) {
+for (const route of compatibleRoutePathsForAliases('/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
   app.get(route, getPublicJobDetail);
 }
 

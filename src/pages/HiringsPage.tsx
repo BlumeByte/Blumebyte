@@ -5,7 +5,6 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import {
   Search, MapPin, Briefcase, Building2,
@@ -44,6 +43,13 @@ interface ApplyFormData {
 
 const MAX_CV_CHARS = 4000;
 const APPLIED_JOBS_STORAGE_KEY = 'public_hiring_applied_jobs';
+const PUBLIC_JOB_ENDPOINTS = ['/public/jobs', '/public/job-openings', '/hirings/jobs'];
+const SEARCH_SCORE_EXACT = 250;
+const SEARCH_SCORE_PREFIX = 180;
+const SEARCH_SCORE_CONTAINS = 120;
+const SEARCH_SCORE_WORD_EXACT = 120;
+const SEARCH_SCORE_WORD_PREFIX = 80;
+const SEARCH_SCORE_WORD_CONTAINS = 40;
 
 function loadAppliedJobs(): string[] {
   try {
@@ -62,6 +68,37 @@ function saveAppliedJobs(jobIds: string[]) {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function normalizeSearchTerm(value: unknown): string {
+  return asString(value).toLowerCase().trim();
+}
+
+function getSearchScore(job: PublicJob, query: string): number {
+  const q = normalizeSearchTerm(query);
+  if (!q) return 0;
+
+  const role = normalizeSearchTerm(job.roleTitle);
+  const company = normalizeSearchTerm(job.companyName);
+  const department = normalizeSearchTerm(job.department);
+  const location = normalizeSearchTerm(job.location);
+  const type = normalizeSearchTerm(job.employmentType);
+  const fields = [role, company, department, location, type].filter(Boolean);
+  const words = q.split(/\s+/).filter(Boolean);
+
+  let score = 0;
+  for (const field of fields) {
+    if (field === q) score += SEARCH_SCORE_EXACT;
+    if (field.startsWith(q)) score += SEARCH_SCORE_PREFIX;
+    if (field.includes(q)) score += SEARCH_SCORE_CONTAINS;
+    for (const word of words) {
+      if (!word) continue;
+      if (field === word) score += SEARCH_SCORE_WORD_EXACT;
+      else if (field.startsWith(word)) score += SEARCH_SCORE_WORD_PREFIX;
+      else if (field.includes(word)) score += SEARCH_SCORE_WORD_CONTAINS;
+    }
+  }
+  return score;
 }
 
 // ─── Job Card Skeleton ────────────────────────────────────────────────────────
@@ -361,7 +398,6 @@ export default function HiringsPage() {
   const [filterLocation, setFilterLocation] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
-  const [sortBy, setSortBy] = useState<'latest' | 'deadline' | 'alphabetical'>('latest');
   const [applyJob, setApplyJob] = useState<PublicJob | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const mountedRef = useRef(true);
@@ -377,6 +413,33 @@ export default function HiringsPage() {
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const fetchPublicJobsFromAnyEndpoint = useCallback(async () => {
+    let lastError: unknown = null;
+    let hadSuccess = false;
+    const merged = new Map<string, PublicJob>();
+    for (const path of PUBLIC_JOB_ENDPOINTS) {
+      try {
+        const data = await api(path);
+        hadSuccess = true;
+        const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
+        for (const rawJob of nextJobs) {
+          const job = rawJob as PublicJob;
+          if (!job?.id) continue;
+          merged.set(job.id, job);
+        }
+      } catch (error) {
+        lastError = error;
+        invalidateCache(path);
+      }
+    }
+    if (merged.size > 0) return Array.from(merged.values());
+    if (hadSuccess) return [];
+    if (lastError instanceof Error) {
+      throw new Error(`Failed to load public jobs from endpoints (${PUBLIC_JOB_ENDPOINTS.join(', ')}): ${lastError.message}`);
+    }
+    throw new Error(`Failed to load public jobs from endpoints (${PUBLIC_JOB_ENDPOINTS.join(', ')})`);
+  }, []);
+
   const fetchJobs = useCallback(async (isRetry = false) => {
     if (!mountedRef.current) return;
     // Clear any pending retry timer before starting a new fetch
@@ -384,10 +447,7 @@ export default function HiringsPage() {
     setLoading(true);
     if (!isRetry) setError(null);
     try {
-      // HIRING-FIX: Public endpoint now returns { jobs, total }.
-      const data = await api('/public/jobs');
-      // HIRING-FIX: Keep backward compatibility with older array-only payloads.
-      const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
+      const nextJobs = await fetchPublicJobsFromAnyEndpoint();
       if (mountedRef.current) {
         setJobs(nextJobs);
         setError(null);
@@ -399,7 +459,7 @@ export default function HiringsPage() {
         // On first failure, silently retry once after 3 s before surfacing the error
         retryTimerRef.current = setTimeout(() => {
           retryTimerRef.current = null;
-          invalidateCache('/public/jobs');
+          PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
           fetchJobs(true);
         }, 3000);
       } else {
@@ -422,7 +482,7 @@ export default function HiringsPage() {
       // Skip the poll while the tab is hidden — the visibilitychange handler
       // will trigger a fresh fetch as soon as the user returns to the page.
       if (document.visibilityState !== 'visible') return;
-      invalidateCache('/public/jobs');
+      PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
       fetchJobs();
     }, 60000);
     return () => clearInterval(iv);
@@ -432,7 +492,7 @@ export default function HiringsPage() {
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        invalidateCache('/public/jobs');
+        PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
         fetchJobs();
       }
     };
@@ -444,7 +504,7 @@ export default function HiringsPage() {
   useEffect(() => {
     const refetch = () => {
       // Bust the cache so the next fetch always gets fresh data from the server
-      invalidateCache('/public/jobs');
+      PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
       fetchJobs();
     };
     const channel = supabase
@@ -457,44 +517,38 @@ export default function HiringsPage() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchJobs]);
 
-  // Unique locations for filter
-  const locations = Array.from(
-    new Set(jobs.map((j) => asString(j.location).trim()).filter(Boolean))
-  ) as string[];
+  // Filter + sort (automatic relevance while typing; otherwise latest first)
+  const normalizedSearch = normalizeSearchTerm(search);
+  const typedLocation = normalizeSearchTerm(filterLocation);
+  const typedType = normalizeSearchTerm(filterType);
+  const typedDepartment = normalizeSearchTerm(filterDepartment);
 
-  // Unique employment types for filter — only show types that exist in the loaded jobs
-  const employmentTypes = Array.from(
-    new Set(jobs.map((j) => asString(j.employmentType).trim()).filter(Boolean))
-  ).sort() as string[];
-
-  // HIRING-FIX: Add department filter options from loaded jobs.
-  const departments = Array.from(
-    new Set(jobs.map((j) => asString(j.department).trim()).filter(Boolean))
-  ).sort() as string[];
-
-  // Filter + sort
   const filtered = jobs
     .filter((j) => {
-      const q = search.toLowerCase();
-      const roleTitle = asString(j.roleTitle);
-      const companyName = asString(j.companyName);
-      const employmentType = asString(j.employmentType);
-      const department = asString(j.department);
-      const matchSearch = !q || roleTitle.toLowerCase().includes(q) || companyName.toLowerCase().includes(q);
-      const matchLocation = !filterLocation || filterLocation === 'all' || j.location === filterLocation;
-      const matchType = !filterType || filterType === 'all' || employmentType === filterType;
-      const matchDepartment = !filterDepartment || filterDepartment === 'all' || department === filterDepartment;
+      const location = normalizeSearchTerm(j.location);
+      const employmentType = normalizeSearchTerm(j.employmentType);
+      const department = normalizeSearchTerm(j.department);
+      const matchSearch = !normalizedSearch || getSearchScore(j, normalizedSearch) > 0;
+      const matchLocation = !typedLocation || location.includes(typedLocation);
+      const matchType = !typedType || employmentType.includes(typedType);
+      const matchDepartment = !typedDepartment || department.includes(typedDepartment);
       return matchSearch && matchLocation && matchType && matchDepartment;
     })
     .sort((a, b) => {
-      if (sortBy === 'latest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (sortBy === 'deadline') {
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      }
-      return a.roleTitle.localeCompare(b.roleTitle);
+      const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (!normalizedSearch) return timeDiff;
+      const scoreDiff = getSearchScore(b, normalizedSearch) - getSearchScore(a, normalizedSearch);
+      if (scoreDiff !== 0) return scoreDiff;
+      if (timeDiff !== 0) return timeDiff;
+      return asString(a.roleTitle).localeCompare(asString(b.roleTitle));
     });
+
+  const clearAllFilters = () => {
+    setSearch('');
+    setFilterLocation('');
+    setFilterType('');
+    setFilterDepartment('');
+  };
 
   return (
     <div className="min-h-screen public-page-bg flex flex-col">
@@ -534,56 +588,27 @@ export default function HiringsPage() {
       {/* Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-wrap gap-3 items-center">
-          <Select value={filterLocation} onValueChange={setFilterLocation}>
-            <SelectTrigger className="w-40 bg-white">
-              <SelectValue placeholder="Location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((l) => (
-                <SelectItem key={l} value={l}>{l}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            placeholder="Type location filter"
+            className="w-44 bg-white"
+          />
+          <Input
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            placeholder="Type job type filter"
+            className="w-44 bg-white"
+          />
+          <Input
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
+            placeholder="Type department filter"
+            className="w-52 bg-white"
+          />
 
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-40 bg-white">
-              <SelectValue placeholder="Job Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {employmentTypes.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* HIRING-FIX: Department filter */}
-          <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-            <SelectTrigger className="w-44 bg-white">
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-            <SelectTrigger className="w-40 bg-white">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="latest">Latest</SelectItem>
-              <SelectItem value="deadline">Deadline</SelectItem>
-              <SelectItem value="alphabetical">Alphabetical</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {(search || (filterLocation && filterLocation !== 'all') || (filterType && filterType !== 'all') || (filterDepartment && filterDepartment !== 'all')) && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); setFilterDepartment(''); }}>
+          {(search || filterLocation || filterType || filterDepartment) && (
+            <Button variant="ghost" size="sm" onClick={clearAllFilters}>
               Clear Filters
             </Button>
           )}
@@ -618,7 +643,7 @@ export default function HiringsPage() {
                 : 'No jobs match your current filters. Try adjusting your search criteria.'}
             </p>
             {jobs.length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); setFilterDepartment(''); }}>
+              <Button variant="outline" size="sm" onClick={clearAllFilters}>
                 Clear Filters
               </Button>
             )}

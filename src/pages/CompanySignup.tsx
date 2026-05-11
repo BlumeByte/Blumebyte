@@ -40,8 +40,8 @@ export default function CompanySignup() {
   const USD_TO_GHS = 15.5;
 
   // Pricing calculation in USD first, then convert to GHS
-  // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month billed as $31.08/year
-  const pricePerLicenseUSD = formData.billingCycle === 'monthly' ? 3.59 : 2.59;
+  // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month billed as $30.60/year
+  const pricePerLicenseUSD = formData.billingCycle === 'monthly' ? 3.55 : 2.55;
   const pricePerLicenseGHS = pricePerLicenseUSD * USD_TO_GHS;
   const billingPeriod = formData.billingCycle === 'yearly' ? 12 : 1;
   const totalAmountUSD = formData.licenses * pricePerLicenseUSD * billingPeriod;
@@ -608,9 +608,9 @@ export default function CompanySignup() {
                     disabled={loading || paymentWindowOpened}
                   >
                     <div className="font-semibold">Monthly</div>
-                    <div className="text-2xl font-bold mt-1">$3.59<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
+                    <div className="text-2xl font-bold mt-1">$3.55<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
                     <div className="text-xs text-gray-600 mt-1">Billed monthly</div>
-                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(3.59 * USD_TO_GHS).toFixed(2)} GHS</div>
+                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(3.55 * USD_TO_GHS).toFixed(2)} GHS</div>
                   </button>
 
                   <button
@@ -624,9 +624,9 @@ export default function CompanySignup() {
                     disabled={loading || paymentWindowOpened}
                   >
                     <div className="font-semibold">Yearly</div>
-                    <div className="text-2xl font-bold mt-1">$2.59<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
-                    <div className="text-xs text-gray-600 mt-1">Billed annually ($31.08/user/year)</div>
-                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(2.59 * USD_TO_GHS).toFixed(2)} GHS</div>
+                    <div className="text-2xl font-bold mt-1">$2.55<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
+                    <div className="text-xs text-gray-600 mt-1">Billed annually ($30.60/user/year)</div>
+                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(2.55 * USD_TO_GHS).toFixed(2)} GHS</div>
                   </button>
                 </div>
               </div>

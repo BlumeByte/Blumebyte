@@ -13,6 +13,7 @@ import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png'
 import { api } from '../lib/api-client';
 
 const MAX_CV_CHARS = 4000;
+const PUBLIC_JOB_DETAIL_ENDPOINTS = ['/public/jobs', '/public/job-openings', '/hirings/jobs'];
 
 interface PublicJob {
   id: string;
@@ -54,6 +55,27 @@ export default function HiringDetailPage() {
   const [applyOpen, setApplyOpen] = useState(false);
 
   useEffect(() => {
+    const loadJob = async () => {
+      let notFound = false;
+      let lastError: unknown = null;
+      for (const path of PUBLIC_JOB_DETAIL_ENDPOINTS) {
+        try {
+          const data = await api(`${path}/${jobId}`);
+          setJob(data);
+          setError(null);
+          return;
+        } catch (err: any) {
+          lastError = err;
+          if (err?.status === 404) {
+            notFound = true;
+            continue;
+          }
+        }
+      }
+      if (notFound) setError('This position is no longer available.');
+      else setError('Unable to load this position right now.');
+    };
+
     // HIRING-FIX: Guard against missing route param and provide stable not-found UI.
     if (!jobId) {
       setError('This position is no longer available.');
@@ -62,13 +84,7 @@ export default function HiringDetailPage() {
     }
     setLoading(true);
     setError(null);
-    api(`/public/jobs/${jobId}`)
-      .then((data) => { setJob(data); })
-      .catch((err: any) => {
-        if (err?.status === 404) setError('This position is no longer available.');
-        else setError('Unable to load this position right now.');
-      })
-      .finally(() => setLoading(false));
+    loadJob().finally(() => setLoading(false));
   }, [jobId]);
 
   // ─── Apply Form ───────────────────────────────────────────────────────────

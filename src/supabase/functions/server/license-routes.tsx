@@ -270,8 +270,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Always compute amount server-side from the canonical price list — never trust client-provided amount
-      // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-      const pricePerLicense = plan === 'monthly' ? 3.59 : 31.08;
+      // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
+      const pricePerLicense = plan === 'monthly' ? 3.55 : 30.60;
       const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -613,8 +613,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         return c.json({ error: 'Payment gateway not configured' }, 500);
       }
       
-      // Calculate renewal amount: Monthly $3.59/user/month | Yearly $2.59/user/month = $31.08/year
-      const pricePerLicense = subscription.plan === 'monthly' ? 3.59 : 31.08;
+      // Calculate renewal amount: Monthly $3.55/user/month | Yearly $2.55/user/month = $30.60/year
+      const pricePerLicense = subscription.plan === 'monthly' ? 3.55 : 30.60;
       const amount = subscription.purchasedLicenses * pricePerLicense;
       
       // Convert USD to GHS for Paystack
@@ -899,8 +899,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Always compute amount server-side from the canonical price list — never trust client-provided amount
-      // Monthly: $3.59/user/month  |  Yearly: $2.59/user/month = $31.08/user/year
-      const pricePerLicense = plan === 'monthly' ? 3.59 : 31.08;
+      // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
+      const pricePerLicense = plan === 'monthly' ? 3.55 : 30.60;
       const amount = licenses * pricePerLicense;
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');

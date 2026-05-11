@@ -110,8 +110,8 @@ export default function TermsConditions() {
               <h4 className="font-semibold text-foreground">2.1 Subscription Plans</h4>
               <p>We offer the following subscription plans:</p>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li><strong>Monthly Plan:</strong> $3.59 per employee per month, billed monthly</li>
-                <li><strong>Yearly Plan:</strong> $2.59 per employee per month, billed annually ($31.08/employee/year)</li>
+                <li><strong>Monthly Plan:</strong> $3.55 per employee per month, billed monthly</li>
+                <li><strong>Yearly Plan:</strong> $2.55 per employee per month, billed annually ($30.60/employee/year)</li>
                 <li><strong>Custom Plan:</strong> Pricing determined on a case-by-case basis</li>
               </ul>
 
