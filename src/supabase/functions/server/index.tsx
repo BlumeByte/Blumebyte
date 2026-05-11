@@ -616,8 +616,7 @@ function isPublicJobPosting(job: any): boolean {
   if (!status) return true;
   if (JOB_ACTIVE_STATUSES.has(status)) return true;
   // Public visibility should continue to expose postings unless they are explicitly hidden.
-  if (isPublicByVisibility && !JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return true;
-  if (isExplicitlyPublic && !JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return true;
+  if ((isPublicByVisibility || isExplicitlyPublic) && !JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return true;
   return false;
 }
 
