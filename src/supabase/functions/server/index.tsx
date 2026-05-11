@@ -564,12 +564,22 @@ function parseEmailList(...values: any[]): string[] {
 
 function isPublicJobPosting(job: any): boolean {
   if (!job || typeof job !== 'object') return false;
-  const visibility = normalizeJobVisibility(job.visibilityType);
+  const visibility = normalizeJobVisibility(
+    job.visibilityType ||
+    job.visibility ||
+    job.publicVisibility ||
+    job.jobBoardVisibility ||
+    job.publishVisibility
+  );
   // Backward compatibility: older public jobs may not have visibilityType at all,
   // and some records may store label-like visibility strings.
   if (visibility) {
     const looksPublic = JOB_PUBLIC_VISIBILITIES.has(visibility);
     if (!looksPublic) return false;
+  } else {
+    const isExplicitlyPublic = [job.isPublic, job.public, job.publishToJobBoard, job.showOnJobBoard, job.showOnWebsite]
+      .some((value) => value === true || value === 'true');
+    if (!isExplicitlyPublic) return false;
   }
   const status = normalizeJobStatus(job.status);
   // Backward compatibility: older public jobs may have missing status.
@@ -10804,11 +10814,11 @@ const getPublicJobDetail = async (c: Context) => {
   }
 };
 
-for (const route of compatibleRoutePaths('/public/jobs')) {
+for (const route of compatibleRoutePathsForAliases('/public/jobs', '/public/job-openings', '/hirings/jobs')) {
   app.get(route, listPublicJobs);
 }
 
-for (const route of compatibleRoutePaths('/public/jobs/:id')) {
+for (const route of compatibleRoutePathsForAliases('/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
   app.get(route, getPublicJobDetail);
 }
 

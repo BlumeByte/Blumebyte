@@ -44,6 +44,7 @@ interface ApplyFormData {
 
 const MAX_CV_CHARS = 4000;
 const APPLIED_JOBS_STORAGE_KEY = 'public_hiring_applied_jobs';
+const PUBLIC_JOB_ENDPOINTS = ['/public/jobs', '/public/job-openings', '/hirings/jobs'];
 
 function loadAppliedJobs(): string[] {
   try {
@@ -377,6 +378,21 @@ export default function HiringsPage() {
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const fetchPublicJobsFromAnyEndpoint = useCallback(async () => {
+    let lastError: unknown = null;
+    for (const path of PUBLIC_JOB_ENDPOINTS) {
+      try {
+        const data = await api(path);
+        const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
+        return nextJobs;
+      } catch (error) {
+        lastError = error;
+        invalidateCache(path);
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('Failed to load public jobs');
+  }, []);
+
   const fetchJobs = useCallback(async (isRetry = false) => {
     if (!mountedRef.current) return;
     // Clear any pending retry timer before starting a new fetch
@@ -384,10 +400,7 @@ export default function HiringsPage() {
     setLoading(true);
     if (!isRetry) setError(null);
     try {
-      // HIRING-FIX: Public endpoint now returns { jobs, total }.
-      const data = await api('/public/jobs');
-      // HIRING-FIX: Keep backward compatibility with older array-only payloads.
-      const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
+      const nextJobs = await fetchPublicJobsFromAnyEndpoint();
       if (mountedRef.current) {
         setJobs(nextJobs);
         setError(null);
@@ -399,7 +412,7 @@ export default function HiringsPage() {
         // On first failure, silently retry once after 3 s before surfacing the error
         retryTimerRef.current = setTimeout(() => {
           retryTimerRef.current = null;
-          invalidateCache('/public/jobs');
+          PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
           fetchJobs(true);
         }, 3000);
       } else {
@@ -422,7 +435,7 @@ export default function HiringsPage() {
       // Skip the poll while the tab is hidden — the visibilitychange handler
       // will trigger a fresh fetch as soon as the user returns to the page.
       if (document.visibilityState !== 'visible') return;
-      invalidateCache('/public/jobs');
+      PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
       fetchJobs();
     }, 60000);
     return () => clearInterval(iv);
@@ -432,7 +445,7 @@ export default function HiringsPage() {
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        invalidateCache('/public/jobs');
+        PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
         fetchJobs();
       }
     };
@@ -444,7 +457,7 @@ export default function HiringsPage() {
   useEffect(() => {
     const refetch = () => {
       // Bust the cache so the next fetch always gets fresh data from the server
-      invalidateCache('/public/jobs');
+      PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
       fetchJobs();
     };
     const channel = supabase
@@ -455,7 +468,7 @@ export default function HiringsPage() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchJobs]);
+  }, [fetchJobs, fetchPublicJobsFromAnyEndpoint]);
 
   // Unique locations for filter
   const locations = Array.from(
