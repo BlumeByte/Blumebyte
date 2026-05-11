@@ -57,7 +57,7 @@ export default function HiringDetailPage() {
   useEffect(() => {
     const loadJob = async () => {
       let notFound = false;
-      let lastError: any = null;
+      let lastError: unknown = null;
       for (const path of PUBLIC_JOB_DETAIL_ENDPOINTS) {
         try {
           const data = await api(`${path}/${jobId}`);
@@ -84,7 +84,6 @@ export default function HiringDetailPage() {
     }
     setLoading(true);
     setError(null);
-    setJob(null);
     loadJob().finally(() => setLoading(false));
   }, [jobId]);
 

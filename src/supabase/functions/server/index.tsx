@@ -577,6 +577,7 @@ function isPublicJobPosting(job: any): boolean {
     const looksPublic = JOB_PUBLIC_VISIBILITIES.has(visibility);
     if (!looksPublic) return false;
   } else {
+    // Some older dashboard records persisted public flags as strings instead of booleans.
     const isExplicitlyPublic = [job.isPublic, job.public, job.publishToJobBoard, job.showOnJobBoard, job.showOnWebsite]
       .some((value) => value === true || value === 'true');
     if (!isExplicitlyPublic) return false;
