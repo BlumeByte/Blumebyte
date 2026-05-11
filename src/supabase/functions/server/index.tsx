@@ -558,7 +558,8 @@ function getJobVisibilityValue(job: any): string {
 }
 
 function getRecordTimestamp(item: any): number {
-  return new Date(item?.updatedAt || item?.createdAt || item?.created_at || 0).getTime();
+  const timestamp = item?.updatedAt || item?.createdAt || item?.created_at;
+  return timestamp ? new Date(timestamp).getTime() : Number.NEGATIVE_INFINITY;
 }
 
 function sortTextValues(values: Set<string>) {

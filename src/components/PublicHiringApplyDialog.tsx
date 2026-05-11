@@ -7,6 +7,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import {
+  DEFAULT_PUBLIC_HIRING_COMPANY_NAME,
   MAX_PUBLIC_HIRING_CV_CHARS,
   markPublicHiringApplied,
   type PublicHiring,
@@ -154,7 +155,7 @@ export function PublicHiringApplyDialog({
             </div>
             <h3 className="text-lg font-semibold text-gray-900">Application submitted successfully!</h3>
             <p className="text-sm text-gray-500">
-              Thank you for applying to <strong>{job?.roleTitle || 'Untitled Role'}</strong> at <strong>{job?.companyName || 'Hiring Organization'}</strong>.
+              Thank you for applying to <strong>{job?.roleTitle || 'Untitled Role'}</strong> at <strong>{job?.companyName || DEFAULT_PUBLIC_HIRING_COMPANY_NAME}</strong>.
               You will be contacted if selected.
             </p>
             <Button onClick={onClose} className="bg-primary text-primary-foreground hover:bg-primary/90">Close</Button>

@@ -61,6 +61,7 @@ export const MAX_PUBLIC_HIRING_CV_CHARS = 4000;
 export const APPLIED_PUBLIC_HIRINGS_STORAGE_KEY = 'public_hiring_applied_jobs';
 export const PUBLIC_HIRINGS_ENDPOINT = '/public/hirings';
 export const PUBLIC_HIRING_APPLICATION_ENDPOINT = '/public/hirings/apply';
+export const DEFAULT_PUBLIC_HIRING_COMPANY_NAME = 'Hiring Organization';
 
 const EMPTY_FILTERS: PublicHiringFilters = {
   companies: [],
@@ -71,7 +72,10 @@ const EMPTY_FILTERS: PublicHiringFilters = {
 
 function ensureStringArray(value: unknown): string[] {
   return Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    ? value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
     : [];
 }
 

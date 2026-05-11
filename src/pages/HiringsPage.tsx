@@ -325,7 +325,7 @@ export default function HiringsPage() {
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by job title, company, department, or location…"
+              placeholder="Search by job title, company, department, or location..."
               aria-label="Search jobs by title, company, department, or location"
               className="w-full pl-10 pr-4 py-3 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm"
             />
@@ -341,6 +341,7 @@ export default function HiringsPage() {
             placeholder="Type location filter"
             className="w-44 bg-white"
             list="public-hiring-locations"
+            aria-label="Filter jobs by location"
             aria-describedby="public-hiring-filter-help"
           />
           <Input
@@ -349,6 +350,7 @@ export default function HiringsPage() {
             placeholder="Type job type filter"
             className="w-44 bg-white"
             list="public-hiring-types"
+            aria-label="Filter jobs by employment type"
             aria-describedby="public-hiring-filter-help"
           />
           <Input
@@ -357,6 +359,7 @@ export default function HiringsPage() {
             placeholder="Type department filter"
             className="w-52 bg-white"
             list="public-hiring-departments"
+            aria-label="Filter jobs by department"
             aria-describedby="public-hiring-filter-help"
           />
 

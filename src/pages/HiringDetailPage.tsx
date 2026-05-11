@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { PublicFooter, PublicNavbar } from '../components/PublicNavFooter';
 import { PublicHiringApplyDialog } from '../components/PublicHiringApplyDialog';
 import {
+  DEFAULT_PUBLIC_HIRING_COMPANY_NAME,
   fetchPublicHiringDetail,
   hasAppliedToPublicHiring,
   type PublicHiring,
@@ -84,7 +85,7 @@ export default function HiringDetailPage() {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{job.roleTitle}</h1>
                 <p className="text-gray-600 mt-1 flex items-center gap-1">
-                  <Building2 className="h-4 w-4" /> {job.companyName || 'Hiring Organization'}
+                  <Building2 className="h-4 w-4" /> {job.companyName || DEFAULT_PUBLIC_HIRING_COMPANY_NAME}
                 </p>
               </div>
             </div>
