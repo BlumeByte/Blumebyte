@@ -380,7 +380,12 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   };
 
   const handleChangeCard = async () => {
-    if (!window.confirm('To change your payment card, we\'ll remove the current card. Your next payment (renewal or new license purchase) will prompt you to enter the new card details. Make sure to check "Save card for auto-renewal" to keep the new card saved.\n\nRemove current card now?')) return;
+    if (!window.confirm(
+      'This will remove your current saved card and disable auto-renewal.\n\n' +
+      'To use a new card: make your next payment (renewal or license purchase) ' +
+      'and check "Save card for auto-renewal" to save the new card.\n\n' +
+      'Remove current card now?'
+    )) return;
     setChangingCard(true);
     try {
       const freshToken = await getToken();
@@ -616,17 +621,19 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const totalCost = additionalLicenses * pricePerUser;
   const monthlyEquivalent = selectedPlan === 'yearly' ? (totalCost / 12).toFixed(2) : totalCost;
 
+  const EXPIRY_WARNING_DAYS = 14; // Show renewal section this many days before expiry
+
   const isLicenseExpired = licenseInfo != null && (
     licenseInfo.licenseStatus === 'expired' ||
     licenseInfo.status === 'expired' ||
     (licenseInfo.expiresAt && new Date(licenseInfo.expiresAt) < new Date())
   );
 
-  // Show renewal section when expired OR expiring within 14 days
+  // Show renewal section when expired OR expiring within EXPIRY_WARNING_DAYS days
   const isLicenseExpiringSoon = licenseInfo != null && !isLicenseExpired && (
     licenseInfo.expiresAt && (() => {
       const daysLeft = (new Date(licenseInfo.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-      return daysLeft <= 14;
+      return daysLeft <= EXPIRY_WARNING_DAYS;
     })()
   );
 
