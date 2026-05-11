@@ -571,17 +571,23 @@ function isPublicJobPosting(job: any): boolean {
     job.jobBoardVisibility ||
     job.publishVisibility
   );
-  // Backward compatibility: older public jobs may not have visibilityType at all,
-  // and some records may store label-like visibility strings.
-  if (visibility) {
-    const looksPublic = JOB_PUBLIC_VISIBILITIES.has(visibility);
-    if (!looksPublic) return false;
-  } else {
-    // Some older dashboard records persisted public flags as strings instead of booleans.
-    const isExplicitlyPublic = [job.isPublic, job.public, job.publishToJobBoard, job.showOnJobBoard, job.showOnWebsite]
-      .some((value) => value === true || value === 'true');
-    if (!isExplicitlyPublic) return false;
-  }
+  const truthyPublicValues = new Set(['true', '1', 'yes', 'on', 'public', 'public_global']);
+  // If a posting is explicitly marked public, it should appear on hirings even when
+  // other private/internal visibility fields are also present.
+  const isExplicitlyPublic = [
+    job.isPublic,
+    job.public,
+    job.publishToJobBoard,
+    job.showOnJobBoard,
+    job.showOnWebsite,
+    job.isPublished,
+  ].some((value) => {
+    if (value === true) return true;
+    const normalized = normalizeJobVisibility(value);
+    return !!normalized && truthyPublicValues.has(normalized);
+  });
+  const isPublicByVisibility = !!visibility && JOB_PUBLIC_VISIBILITIES.has(visibility);
+  if (!isExplicitlyPublic && !isPublicByVisibility) return false;
   const status = normalizeJobStatus(job.status);
   // Backward compatibility: older public jobs may have missing status.
   if (status && !JOB_ACTIVE_STATUSES.has(status)) return false;
