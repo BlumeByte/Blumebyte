@@ -584,9 +584,9 @@ export default function LandingPage() {
   const pricingPlans = [
     {
       name: 'Monthly',
-      price: billingAnnual ? '$3.59' : '$2.59',
+      price: billingAnnual ? '$2.59' : '$3.59',
       period: '/employee/month',
-      billingCycle: billingAnnual ? 'Billed annually' : 'Billed monthly',
+      billingCycle: billingAnnual ? 'Billed annually ($31.08/year)' : 'Billed monthly',
       description: 'For growing teams',
       features: [
         'People Management',
@@ -602,9 +602,9 @@ export default function LandingPage() {
     },
     {
       name: 'Business',
-      price: billingAnnual ? '$3.59' : '$2.59',
+      price: billingAnnual ? '$2.59' : '$3.59',
       period: '/employee/month',
-      billingCycle: billingAnnual ? 'Billed annually' : 'Billed monthly',
+      billingCycle: billingAnnual ? 'Billed annually ($31.08/year)' : 'Billed monthly',
       description: 'Best value for scale',
       popular: true,
       features: [
