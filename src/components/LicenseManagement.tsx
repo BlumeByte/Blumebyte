@@ -327,7 +327,10 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const response = await apiClient.get('/subscription/license-info', accessToken);
       if (response.ok) {
         const data = await response.json();
-        setLicenseInfo(data);
+        setLicenseInfo({
+          ...data,
+          endDate: data.endDate || data.expiresAt || data.subscriptionEndDate || null,
+        });
       }
     } catch (error) {
       console.error('Error fetching license info:', error);
@@ -682,7 +685,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
 
   const EXPIRY_WARNING_DAYS = 14; // Show renewal section this many days before expiry
 
-  const licenseExpiryDate = licenseInfo?.endDate || licenseInfo?.expiresAt || licenseInfo?.subscriptionEndDate || null;
+  const licenseExpiryDate = licenseInfo?.endDate || null;
 
   const isLicenseExpired = licenseInfo != null && (
     licenseInfo.licenseStatus === 'expired' ||

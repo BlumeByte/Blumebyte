@@ -5,7 +5,7 @@ import { recalculateCompanyStats } from './sync-company-stats.tsx';
 
 const PREFIX = '/make-server-668731fc';
 
-function getCanonicalPurchasedLicenses(subscription: any): number {
+function getCanonicalSubscriptionLicenses(subscription: any): number {
   return Number(
     subscription?.purchasedLicenses ??
     subscription?.userCount ??
@@ -14,12 +14,12 @@ function getCanonicalPurchasedLicenses(subscription: any): number {
   ) || 0;
 }
 
-async function syncCompanyLicenseMirror(userId: string, subscription: any) {
+async function syncCompanySubscriptionMirror(userId: string, subscription: any) {
   const employee = await kv.get(`employee:${userId}`);
   const companyId = employee?.companyId || employee?.company;
   if (!companyId) return null;
 
-  const purchasedLicenses = getCanonicalPurchasedLicenses(subscription);
+  const purchasedLicenses = getCanonicalSubscriptionLicenses(subscription);
   const mirroredSubscription = {
     ...subscription,
     userId,
@@ -53,7 +53,7 @@ async function syncCompanyLicenseMirror(userId: string, subscription: any) {
   try {
     await recalculateCompanyStats(companyId);
   } catch (error) {
-    console.error('Failed to sync company license mirror:', error);
+    console.error('Failed to sync company subscription mirror:', error);
   }
 
   return companyId;
@@ -396,6 +396,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         plan,
         licenses,
         amount,
+        amountSmallestUnit,
+        currency,
         saveCard,
         reference,
         status: 'pending',
@@ -526,9 +528,13 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       // Mark as processing immediately to prevent concurrent double-crediting
       await kv.set(`pending-license:${reference}`, { ...pendingLicense, status: 'processing' });
       
-      // Note: We don't verify the exact amount because it was converted from USD to GHS
-      // Paystack will have the GHS amount, and exchange rates may vary slightly
-      // We verify the payment was successful, which is sufficient
+      const expectedAmount = Number(pendingLicense.amountSmallestUnit || 0);
+      if (expectedAmount > 0 && Number(paystackData.data?.amount || 0) !== expectedAmount) {
+        return c.json({ success: false, message: 'Payment amount mismatch' }, 400);
+      }
+      if (pendingLicense.currency && paystackData.data?.currency && paystackData.data.currency !== pendingLicense.currency) {
+        return c.json({ success: false, message: 'Payment currency mismatch' }, 400);
+      }
       
       // Get or create subscription
       const subscription = await kv.get(`subscription:${pendingLicense.userId}`) || {
@@ -571,7 +577,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       await kv.set(`subscription:${pendingLicense.userId}`, subscription);
-      await syncCompanyLicenseMirror(pendingLicense.userId, subscription);
+      await syncCompanySubscriptionMirror(pendingLicense.userId, subscription);
       await kv.del(`pending-license:${reference}`);
       
       // Handle user selection and deactivation if selectedUserIds were provided
@@ -736,7 +742,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       subscription.lastPaymentReference = paystackData.data.reference;
       
       await kv.set(`subscription:${user.id}`, subscription);
-      await syncCompanyLicenseMirror(user.id, subscription);
+      await syncCompanySubscriptionMirror(user.id, subscription);
       
       await logAudit({
         userId: user.id,
@@ -882,7 +888,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         }
 
         await kv.set(`subscription:${userId}`, subscription);
-        await syncCompanyLicenseMirror(userId, subscription);
+        await syncCompanySubscriptionMirror(userId, subscription);
 
         // Record History
         const transaction = {
@@ -1032,6 +1038,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         plan,
         licenses,
         amount,
+        amountSmallestUnit,
+        currency,
         saveCard,
         selectedUserIds: selectedUserIds || [],
         reference,
@@ -1079,7 +1087,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           status: 'completed',
           alreadyProcessed: true,
           paymentType: subscription?.paymentReference === reference ? 'renewal' : 'license',
-          totalLicenses: getCanonicalPurchasedLicenses(subscription),
+          totalLicenses: getCanonicalSubscriptionLicenses(subscription),
           plan: subscription.plan,
         });
       }

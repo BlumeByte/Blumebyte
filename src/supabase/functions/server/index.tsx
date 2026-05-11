@@ -7190,6 +7190,8 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
       plan,
       userCount: licenses,
       amount,
+      amountSmallestUnit,
+      currency,
       reference,
       isRenewal: true,
       status: 'pending',
@@ -7249,8 +7251,13 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
       return c.json({ success: false, message: 'Subscription record not found' }, 404);
     }
     
-    // The stored amount is in USD, but Paystack may charge in a converted currency.
-    // A successful transaction for the expected reference is sufficient here.
+    const expectedAmount = Number(pendingSubscription.amountSmallestUnit || 0);
+    if (expectedAmount > 0 && Number(paystackData.data?.amount || 0) !== expectedAmount) {
+      return c.json({ success: false, message: 'Payment amount mismatch' }, 400);
+    }
+    if (pendingSubscription.currency && paystackData.data?.currency && paystackData.data.currency !== pendingSubscription.currency) {
+      return c.json({ success: false, message: 'Payment currency mismatch' }, 400);
+    }
     
     // Calculate subscription dates
     const startDate = new Date();
