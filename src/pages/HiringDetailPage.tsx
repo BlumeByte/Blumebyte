@@ -1,42 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { AlertCircle, ArrowLeft, Building2, Calendar, Loader2, MapPin } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Label } from '../components/ui/label';
-import { Input } from '../components/ui/input';
-import { Textarea } from '../components/ui/textarea';
-import { toast } from 'sonner';
+import { PublicFooter, PublicNavbar } from '../components/PublicNavFooter';
+import { PublicHiringApplyDialog } from '../components/PublicHiringApplyDialog';
 import {
-  ArrowLeft, Building2, MapPin, Calendar, Loader2, AlertCircle
-} from 'lucide-react';
-import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
-import { api } from '../lib/api-client';
-
-const MAX_CV_CHARS = 4000;
-const PUBLIC_JOB_DETAIL_ENDPOINTS = ['/public/jobs', '/public/job-openings', '/hirings/jobs'];
-
-interface PublicJob {
-  id: string;
-  companyName: string;
-  roleTitle: string;
-  employmentType?: string;
-  location?: string;
-  description?: string;
-  requirements?: string;
-  qualifications?: string;
-  salaryRange?: string;
-  deadline?: string;
-  createdAt: string;
-}
-
-interface ApplyFormData {
-  fullName: string;
-  email: string;
-  phone: string;
-  contactDetails: string;
-  qualification: string;
-  cvMessage: string;
-}
+  fetchPublicHiringDetail,
+  hasAppliedToPublicHiring,
+  type PublicHiring,
+} from '../lib/public-hiring';
 
 function TagChip({ children }: { children: React.ReactNode }) {
   return (
@@ -49,122 +21,50 @@ function TagChip({ children }: { children: React.ReactNode }) {
 export default function HiringDetailPage() {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
-  const [job, setJob] = useState<PublicJob | null>(null);
+  const [job, setJob] = useState<PublicHiring | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
+  const [applied, setApplied] = useState(false);
+
+  useEffect(() => {
+    setApplied(jobId ? hasAppliedToPublicHiring(jobId) : false);
+  }, [jobId]);
 
   useEffect(() => {
     const loadJob = async () => {
-      let notFound = false;
-      let lastError: unknown = null;
-      for (const path of PUBLIC_JOB_DETAIL_ENDPOINTS) {
-        try {
-          const data = await api(`${path}/${jobId}`);
-          setJob(data);
-          setError(null);
-          return;
-        } catch (err: any) {
-          lastError = err;
-          if (err?.status === 404) {
-            notFound = true;
-            continue;
-          }
-        }
+      if (!jobId) {
+        setError('This position is no longer available.');
+        setLoading(false);
+        return;
       }
-      if (notFound) setError('This position is no longer available.');
-      else setError('Unable to load this position right now.');
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const nextJob = await fetchPublicHiringDetail(jobId);
+        setJob(nextJob);
+      } catch (err: any) {
+        setJob(null);
+        setError(err?.status === 404 ? 'This position is no longer available.' : 'Unable to load this position right now.');
+      } finally {
+        setLoading(false);
+      }
     };
 
-    // HIRING-FIX: Guard against missing route param and provide stable not-found UI.
-    if (!jobId) {
-      setError('This position is no longer available.');
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    loadJob().finally(() => setLoading(false));
+    loadJob();
   }, [jobId]);
 
-  // ─── Apply Form ───────────────────────────────────────────────────────────
-  const [form, setForm] = useState<ApplyFormData>({
-    fullName: '', email: '', phone: '', contactDetails: '', qualification: '', cvMessage: ''
-  });
-  const [errors, setErrors] = useState<Partial<ApplyFormData>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  const validate = (): boolean => {
-    const e: Partial<ApplyFormData> = {};
-    if (!form.fullName.trim()) e.fullName = 'Full name is required';
-    if (!form.email.trim()) e.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Please enter a valid email';
-    if (!form.phone.trim()) e.phone = 'Phone number is required';
-    else if (!/^\+?[\d\s\-().]{7,15}$/.test(form.phone)) e.phone = 'Please enter a valid phone number';
-    if (!form.contactDetails.trim()) e.contactDetails = 'Contact details are required';
-    if (!form.qualification.trim()) e.qualification = 'Qualification is required';
-    if (!form.cvMessage.trim()) e.cvMessage = 'CV message is required';
-    else if (form.cvMessage.length > MAX_CV_CHARS) e.cvMessage = `Maximum ${MAX_CV_CHARS} characters`;
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate() || !job) return;
-    setSubmitting(true);
-    try {
-      await api('/public/job/apply', {
-        method: 'POST',
-        body: {
-          jobId: job.id,
-          companyName: job.companyName,
-          roleTitle: job.roleTitle,
-          fullName: form.fullName,
-          email: form.email,
-          phone: form.phone,
-          contactDetails: form.contactDetails,
-          qualification: form.qualification,
-          cvMessage: form.cvMessage,
-        },
-      });
-      setSubmitted(true);
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to submit. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const inputField = (key: keyof ApplyFormData, label: string, type = 'text') => (
-    <div className="space-y-1">
-      <Label htmlFor={key}>{label} <span className="text-red-500">*</span></Label>
-      <Input
-        id={key}
-        type={type}
-        value={form[key]}
-        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-        className={errors[key] ? 'border-red-400' : ''}
-      />
-      {errors[key] && <p className="text-xs text-red-500">{errors[key]}</p>}
-    </div>
-  );
-
   return (
-    <div className="min-h-screen public-page-bg">
-      {/* Nav */}
-      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <img src={logoImage} alt="Blumebyte" className="h-8 cursor-pointer" onClick={() => navigate('/')} />
-            <Button variant="ghost" size="sm" onClick={() => navigate('/hirings')}>
-              <ArrowLeft className="h-4 w-4 mr-1" /> All Jobs
-            </Button>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen public-page-bg flex flex-col">
+      <PublicNavbar />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-1 w-full">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/hirings')} className="mb-6">
+          <ArrowLeft className="h-4 w-4 mr-1" /> All Jobs
+        </Button>
+
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
@@ -173,12 +73,10 @@ export default function HiringDetailPage() {
           <div className="text-center py-20 space-y-4">
             <AlertCircle className="h-12 w-12 text-gray-300 mx-auto" />
             <p className="text-gray-600">{error}</p>
-            {/* HIRING-FIX: Back link for unavailable jobs. */}
             <Button variant="outline" onClick={() => navigate('/hirings')}>Back to all jobs</Button>
           </div>
         ) : job ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-            {/* Header */}
             <div className="flex items-start gap-4 mb-6">
               <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shrink-0">
                 <Building2 className="h-7 w-7 text-white" />
@@ -186,14 +84,14 @@ export default function HiringDetailPage() {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{job.roleTitle}</h1>
                 <p className="text-gray-600 mt-1 flex items-center gap-1">
-                  <Building2 className="h-4 w-4" /> {job.companyName}
+                  <Building2 className="h-4 w-4" /> {job.companyName || 'Hiring Organization'}
                 </p>
               </div>
             </div>
 
-            {/* Tags */}
             <div className="flex flex-wrap gap-2 mb-8">
               {job.location && <TagChip><MapPin className="h-3 w-3 inline mr-0.5" />{job.location}</TagChip>}
+              {job.department && <TagChip>{job.department}</TagChip>}
               {job.employmentType && <TagChip>{job.employmentType}</TagChip>}
               {job.salaryRange && <TagChip>{job.salaryRange}</TagChip>}
               {job.deadline && (
@@ -204,7 +102,6 @@ export default function HiringDetailPage() {
               )}
             </div>
 
-            {/* Sections */}
             {job.description && (
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3">Job Description</h2>
@@ -224,83 +121,28 @@ export default function HiringDetailPage() {
               </div>
             )}
 
-            {/* CTA */}
             <div className="border-t pt-6 mt-6">
               <Button
                 size="lg"
-                className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={applied}
+                className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-slate-200 disabled:text-blue-700"
                 onClick={() => setApplyOpen(true)}
               >
-                Apply for this position
+                {applied ? 'Already Applied' : 'Apply for this position'}
               </Button>
             </div>
           </div>
         ) : null}
       </div>
 
-      {/* Apply Modal */}
-      <Dialog open={applyOpen} onOpenChange={(v) => { if (!v) { setApplyOpen(false); setSubmitted(false); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{submitted ? 'Application Submitted!' : `Apply — ${job?.roleTitle}`}</DialogTitle>
-          </DialogHeader>
-          {submitted ? (
-            <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold">Application submitted successfully!</h3>
-              <p className="text-sm text-gray-500">You will be contacted if selected.</p>
-              <Button onClick={() => { setApplyOpen(false); setSubmitted(false); }} className="bg-primary text-primary-foreground hover:bg-primary/90">Close</Button>
-            </div>
-          ) : submitting ? (
-            <div className="flex flex-col items-center gap-3 py-10">
-              <Loader2 className="w-8 h-8 animate-spin text-black" />
-              <p className="text-sm text-gray-500">Submitting application…</p>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4 py-2">
-                {inputField('fullName', 'Full Name')}
-                {inputField('email', 'Email Address', 'email')}
-                {inputField('phone', 'Phone Number', 'tel')}
-                {inputField('contactDetails', 'Contact Details (LinkedIn / alternate contact)')}
-                {inputField('qualification', 'Qualifications')}
-                <div className="space-y-1">
-                  <Label htmlFor="cvMessage">CV / Cover Letter <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    id="cvMessage"
-                    rows={6}
-                    maxLength={MAX_CV_CHARS}
-                    value={form.cvMessage}
-                    onChange={(e) => setForm((f) => ({ ...f, cvMessage: e.target.value }))}
-                    placeholder="Paste or type your CV / cover letter here..."
-                    className={errors.cvMessage ? 'border-red-400' : ''}
-                  />
-                  <div className="flex justify-between text-xs text-gray-400">
-                    <span className={errors.cvMessage ? 'text-red-500' : ''}>{errors.cvMessage || ' '}</span>
-                    <span className={form.cvMessage.length > MAX_CV_CHARS ? 'text-red-500' : ''}>
-                      {form.cvMessage.length} / {MAX_CV_CHARS}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setApplyOpen(false)}>Cancel</Button>
-                <Button onClick={handleSubmit} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  Submit Application
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <PublicHiringApplyDialog
+        job={job}
+        open={applyOpen}
+        onClose={() => setApplyOpen(false)}
+        onApplied={() => setApplied(true)}
+      />
 
-      <footer className="border-t bg-white py-6 text-center text-sm text-gray-400">
-        © {new Date().getFullYear()} Blumebyte HR. All rights reserved.
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

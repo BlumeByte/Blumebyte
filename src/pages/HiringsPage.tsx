@@ -1,70 +1,26 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { AlertCircle, Briefcase, Calendar, Clock3, DollarSign, Eye, MapPin, RefreshCw, Search } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
-import { toast } from 'sonner';
-import {
-  Search, MapPin, Briefcase, Building2,
-  Loader2, AlertCircle, RefreshCw, Calendar, Clock3, Eye, DollarSign
-} from 'lucide-react';
-import { api, invalidateCache } from '../lib/api-client';
+import { PublicFooter, PublicNavbar } from '../components/PublicNavFooter';
+import { PublicHiringApplyDialog } from '../components/PublicHiringApplyDialog';
 import { supabase } from '../lib/supabase';
-import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
+import {
+  fetchPublicHiringCatalog,
+  getEmptyPublicHiringFilters,
+  invalidatePublicHiringCache,
+  loadAppliedPublicHiringIds,
+  type PublicHiring,
+  type PublicHiringCatalog,
+} from '../lib/public-hiring';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface PublicJob {
-  id: string;
-  companyName: string;
-  roleTitle: string;
-  department?: string;
-  employmentType?: string;
-  location?: string;
-  description?: string;
-  requirements?: string;
-  qualifications?: string;
-  salaryRange?: string;
-  deadline?: string;
-  createdAt: string;
-  visibilityType: string;
-  status: string;
-}
-
-interface ApplyFormData {
-  fullName: string;
-  email: string;
-  phone: string;
-  contactDetails: string;
-  qualification: string;
-  cvMessage: string;
-}
-
-const MAX_CV_CHARS = 4000;
-const APPLIED_JOBS_STORAGE_KEY = 'public_hiring_applied_jobs';
-const PUBLIC_JOB_ENDPOINTS = ['/public/jobs', '/public/job-openings', '/hirings/jobs'];
 const SEARCH_SCORE_EXACT = 250;
 const SEARCH_SCORE_PREFIX = 180;
 const SEARCH_SCORE_CONTAINS = 120;
 const SEARCH_SCORE_WORD_EXACT = 120;
 const SEARCH_SCORE_WORD_PREFIX = 80;
 const SEARCH_SCORE_WORD_CONTAINS = 40;
-
-function loadAppliedJobs(): string[] {
-  try {
-    const stored = JSON.parse(localStorage.getItem(APPLIED_JOBS_STORAGE_KEY) || '[]');
-    return Array.isArray(stored) ? stored : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveAppliedJobs(jobIds: string[]) {
-  try {
-    localStorage.setItem(APPLIED_JOBS_STORAGE_KEY, JSON.stringify(jobIds));
-  } catch {}
-}
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -74,9 +30,9 @@ function normalizeSearchTerm(value: unknown): string {
   return asString(value).toLowerCase().trim();
 }
 
-function getSearchScore(job: PublicJob, query: string): number {
-  const q = normalizeSearchTerm(query);
-  if (!q) return 0;
+function getSearchScore(job: PublicHiring, query: string): number {
+  const normalizedQuery = normalizeSearchTerm(query);
+  if (!normalizedQuery) return 0;
 
   const role = normalizeSearchTerm(job.roleTitle);
   const company = normalizeSearchTerm(job.companyName);
@@ -84,13 +40,13 @@ function getSearchScore(job: PublicJob, query: string): number {
   const location = normalizeSearchTerm(job.location);
   const type = normalizeSearchTerm(job.employmentType);
   const fields = [role, company, department, location, type].filter(Boolean);
-  const words = q.split(/\s+/).filter(Boolean);
+  const words = normalizedQuery.split(/\s+/).filter(Boolean);
 
   let score = 0;
   for (const field of fields) {
-    if (field === q) score += SEARCH_SCORE_EXACT;
-    if (field.startsWith(q)) score += SEARCH_SCORE_PREFIX;
-    if (field.includes(q)) score += SEARCH_SCORE_CONTAINS;
+    if (field === normalizedQuery) score += SEARCH_SCORE_EXACT;
+    if (field.startsWith(normalizedQuery)) score += SEARCH_SCORE_PREFIX;
+    if (field.includes(normalizedQuery)) score += SEARCH_SCORE_CONTAINS;
     for (const word of words) {
       if (!word) continue;
       if (field === word) score += SEARCH_SCORE_WORD_EXACT;
@@ -98,10 +54,10 @@ function getSearchScore(job: PublicJob, query: string): number {
       else if (field.includes(word)) score += SEARCH_SCORE_WORD_CONTAINS;
     }
   }
+
   return score;
 }
 
-// ─── Job Card Skeleton ────────────────────────────────────────────────────────
 function JobCardSkeleton() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 animate-pulse">
@@ -122,202 +78,13 @@ function JobCardSkeleton() {
   );
 }
 
-// ─── Tag Chip ─────────────────────────────────────────────────────────────────
-function TagChip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-      {children}
-    </span>
-  );
-}
-
-// ─── Apply Modal ─────────────────────────────────────────────────────────────
-function ApplyModal({
-  job,
-  open,
-  onClose,
-  onApplied,
-}: {
-  job: PublicJob | null;
-  open: boolean;
-  onClose: () => void;
-  onApplied: (jobId: string) => void;
-}) {
-  const [form, setForm] = useState<ApplyFormData>({
-    fullName: '',
-    email: '',
-    phone: '',
-    contactDetails: '',
-    qualification: '',
-    cvMessage: '',
-  });
-  const [errors, setErrors] = useState<Partial<ApplyFormData>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  const reset = () => {
-    setForm({ fullName: '', email: '', phone: '', contactDetails: '', qualification: '', cvMessage: '' });
-    setErrors({});
-    setSubmitted(false);
-    setSubmitting(false);
-  };
-
-  useEffect(() => {
-    if (!open) reset();
-  }, [open]);
-
-  const validate = (): boolean => {
-    const e: Partial<ApplyFormData> = {};
-    if (!form.fullName.trim()) e.fullName = 'Full name is required';
-    if (!form.email.trim()) e.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Please enter a valid email';
-    if (!form.phone.trim()) e.phone = 'Phone number is required';
-    else if (!/^\+?[\d\s\-().]{7,15}$/.test(form.phone)) e.phone = 'Please enter a valid phone number';
-    if (!form.contactDetails.trim()) e.contactDetails = 'Contact details are required';
-    if (!form.qualification.trim()) e.qualification = 'Qualification is required';
-    if (!form.cvMessage.trim()) e.cvMessage = 'CV message is required';
-    else if (form.cvMessage.length > MAX_CV_CHARS) e.cvMessage = `Maximum ${MAX_CV_CHARS} characters`;
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate() || !job) return;
-    setSubmitting(true);
-    try {
-      await api('/public/job/apply', {
-        method: 'POST',
-        body: {
-          jobId: job.id,
-          companyName: job.companyName,
-          roleTitle: job.roleTitle,
-          fullName: form.fullName,
-          email: form.email,
-          phone: form.phone,
-          contactDetails: form.contactDetails,
-          qualification: form.qualification,
-          cvMessage: form.cvMessage,
-        },
-      });
-      if (job?.id) {
-        onApplied(job.id);
-        const next = Array.from(new Set([...loadAppliedJobs(), job.id]));
-        saveAppliedJobs(next);
-      }
-      setSubmitted(true);
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to submit application. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const field = (
-    key: keyof ApplyFormData,
-    label: string,
-    type: 'input' | 'textarea' = 'input',
-    inputType = 'text'
-  ) => (
-    <div className="space-y-1">
-      <Label htmlFor={key}>{label} <span className="text-red-500">*</span></Label>
-      {type === 'textarea' ? (
-        <>
-          <Textarea
-            id={key}
-            rows={6}
-            maxLength={MAX_CV_CHARS}
-            value={form[key]}
-            onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-            placeholder="Paste or type your CV / cover letter here..."
-            className={errors[key] ? 'border-red-400' : ''}
-          />
-          <div className="flex justify-between text-xs text-gray-400">
-            <span className={errors[key] ? 'text-red-500' : ''}>{errors[key] || ' '}</span>
-            <span className={form[key].length > MAX_CV_CHARS ? 'text-red-500' : ''}>
-              {form[key].length} / {MAX_CV_CHARS}
-            </span>
-          </div>
-        </>
-      ) : (
-        <>
-          <Input
-            id={key}
-            type={inputType}
-            value={form[key]}
-            onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-            className={errors[key] ? 'border-red-400' : ''}
-          />
-          {errors[key] && <p className="text-xs text-red-500">{errors[key]}</p>}
-        </>
-      )}
-    </div>
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {submitted ? 'Application Submitted!' : `Apply — ${job?.roleTitle || 'Untitled Role'}`}
-          </DialogTitle>
-        </DialogHeader>
-
-        {submitted ? (
-          <div className="py-8 text-center space-y-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">Application submitted successfully!</h3>
-            <p className="text-sm text-gray-500">
-              Thank you for applying to <strong>{job?.roleTitle || 'Untitled Role'}</strong> at <strong>{job?.companyName || 'Hiring Organization'}</strong>.
-              You will be contacted if selected.
-            </p>
-            <Button onClick={onClose} className="bg-primary text-primary-foreground hover:bg-primary/90">Close</Button>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-4 py-2">
-              {submitting ? (
-                <div className="flex flex-col items-center gap-3 py-10">
-                  <Loader2 className="w-8 h-8 animate-spin text-black" />
-                  <p className="text-sm text-gray-500">Submitting application…</p>
-                </div>
-              ) : (
-                <>
-                  {field('fullName', 'Full Name')}
-                  {field('email', 'Email Address', 'input', 'email')}
-                  {field('phone', 'Phone Number', 'input', 'tel')}
-                  {field('contactDetails', 'Contact Details (LinkedIn / alternate contact)')}
-                  {field('qualification', 'Qualifications')}
-                  {field('cvMessage', 'CV / Cover Letter', 'textarea')}
-                </>
-              )}
-            </div>
-            {!submitting && (
-              <DialogFooter>
-                <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                <Button onClick={handleSubmit} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  Submit Application
-                </Button>
-              </DialogFooter>
-            )}
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Job Card ─────────────────────────────────────────────────────────────────
 function JobCard({
   job,
   applied,
   onDetails,
   onApply,
 }: {
-  job: PublicJob;
+  job: PublicHiring;
   applied: boolean;
   onDetails: () => void;
   onApply: () => void;
@@ -326,6 +93,7 @@ function JobCard({
   const applyButtonClass = applied
     ? 'flex-1 bg-slate-200 text-blue-700 hover:bg-slate-300'
     : 'flex-1 bg-primary text-primary-foreground hover:bg-primary/90';
+
   return (
     <div className="bg-slate-950 text-slate-200 rounded-2xl border border-slate-700/70 shadow-lg hover:shadow-xl transition-all duration-200 p-5 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
       <div className="flex items-start justify-between gap-3">
@@ -370,17 +138,12 @@ function JobCard({
         Posted {new Date(job.createdAt).toLocaleDateString()}
       </div>
 
-      <div className="flex gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="flex gap-2 mt-auto" onClick={(event) => event.stopPropagation()}>
         <Button variant="outline" size="sm" className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700" onClick={onDetails}>
           <Eye className="h-4 w-4 mr-1" />
           Details
         </Button>
-        <Button
-          size="sm"
-          disabled={applied}
-          className={applyButtonClass}
-          onClick={onApply}
-        >
+        <Button size="sm" disabled={applied} className={applyButtonClass} onClick={onApply}>
           {applied ? 'Applied' : 'Apply'}
         </Button>
       </div>
@@ -388,78 +151,53 @@ function JobCard({
   );
 }
 
-// ─── Main Hirings List Page ───────────────────────────────────────────────────
 export default function HiringsPage() {
   const navigate = useNavigate();
-  const [jobs, setJobs] = useState<PublicJob[]>([]);
+  const mountedRef = useRef(true);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [catalog, setCatalog] = useState<PublicHiringCatalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
-  const [applyJob, setApplyJob] = useState<PublicJob | null>(null);
+  const [applyJob, setApplyJob] = useState<PublicHiring | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
-  const mountedRef = useRef(true);
 
   useEffect(() => {
-    setAppliedJobIds(loadAppliedJobs());
+    setAppliedJobIds(loadAppliedPublicHiringIds());
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
-
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchPublicJobsFromAnyEndpoint = useCallback(async () => {
-    let lastError: unknown = null;
-    let hadSuccess = false;
-    const merged = new Map<string, PublicJob>();
-    for (const path of PUBLIC_JOB_ENDPOINTS) {
-      try {
-        const data = await api(path);
-        hadSuccess = true;
-        const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
-        for (const rawJob of nextJobs) {
-          const job = rawJob as PublicJob;
-          if (!job?.id) continue;
-          merged.set(job.id, job);
-        }
-      } catch (error) {
-        lastError = error;
-        invalidateCache(path);
-      }
-    }
-    if (merged.size > 0) return Array.from(merged.values());
-    if (hadSuccess) return [];
-    if (lastError instanceof Error) {
-      throw new Error(`Failed to load public jobs from endpoints (${PUBLIC_JOB_ENDPOINTS.join(', ')}): ${lastError.message}`);
-    }
-    throw new Error(`Failed to load public jobs from endpoints (${PUBLIC_JOB_ENDPOINTS.join(', ')})`);
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const fetchJobs = useCallback(async (isRetry = false) => {
     if (!mountedRef.current) return;
-    // Clear any pending retry timer before starting a new fetch
-    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+
     setLoading(true);
     if (!isRetry) setError(null);
+
     try {
-      const nextJobs = await fetchPublicJobsFromAnyEndpoint();
-      if (mountedRef.current) {
-        setJobs(nextJobs);
-        setError(null);
-      }
-    } catch (e: any) {
+      const nextCatalog = await fetchPublicHiringCatalog();
       if (!mountedRef.current) return;
-      console.error('Failed to load public jobs:', e?.message);
+      setCatalog(nextCatalog);
+      setError(null);
+    } catch (err: any) {
+      if (!mountedRef.current) return;
+      console.error('Failed to load public jobs:', err?.message);
       if (!isRetry) {
-        // On first failure, silently retry once after 3 s before surfacing the error
         retryTimerRef.current = setTimeout(() => {
           retryTimerRef.current = null;
-          PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
+          invalidatePublicHiringCache();
           fetchJobs(true);
         }, 3000);
       } else {
@@ -471,42 +209,42 @@ export default function HiringsPage() {
   }, []);
 
   useEffect(() => {
-    return () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current); };
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
   }, []);
 
-  useEffect(() => { fetchJobs(); }, [fetchJobs]);
-
-  // ── Periodic polling: re-fetch every 60 s as fallback when realtime fails ──
   useEffect(() => {
-    const iv = setInterval(() => {
-      // Skip the poll while the tab is hidden — the visibilitychange handler
-      // will trigger a fresh fetch as soon as the user returns to the page.
-      if (document.visibilityState !== 'visible') return;
-      PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
-      fetchJobs();
-    }, 60000);
-    return () => clearInterval(iv);
+    fetchJobs();
   }, [fetchJobs]);
 
-  // ── Refetch when the tab regains focus / visibility ────────────────────────
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      invalidatePublicHiringCache();
+      fetchJobs();
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchJobs]);
+
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
-        fetchJobs();
-      }
+      if (document.visibilityState !== 'visible') return;
+      invalidatePublicHiringCache();
+      fetchJobs();
     };
+
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [fetchJobs]);
 
-  // ── Supabase Realtime: re-fetch when job postings change ───────────────────
   useEffect(() => {
     const refetch = () => {
-      // Bust the cache so the next fetch always gets fresh data from the server
-      PUBLIC_JOB_ENDPOINTS.forEach((path) => invalidateCache(path));
+      invalidatePublicHiringCache();
       fetchJobs();
     };
+
     const channel = supabase
       .channel('realtime:job-posting')
       .on('broadcast', { event: 'INSERT' }, refetch)
@@ -514,34 +252,43 @@ export default function HiringsPage() {
       .on('broadcast', { event: 'DELETE' }, refetch)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchJobs]);
 
-  // Filter + sort (automatic relevance while typing; otherwise latest first)
+  const jobs = catalog?.jobs ?? [];
+  const filters = catalog?.filters ?? getEmptyPublicHiringFilters();
+  const summary = catalog?.summary ?? { totalJobs: jobs.length, totalCompanies: 0 };
+
   const normalizedSearch = normalizeSearchTerm(search);
   const typedLocation = normalizeSearchTerm(filterLocation);
   const typedType = normalizeSearchTerm(filterType);
   const typedDepartment = normalizeSearchTerm(filterDepartment);
 
-  const filtered = jobs
-    .filter((j) => {
-      const location = normalizeSearchTerm(j.location);
-      const employmentType = normalizeSearchTerm(j.employmentType);
-      const department = normalizeSearchTerm(j.department);
-      const matchSearch = !normalizedSearch || getSearchScore(j, normalizedSearch) > 0;
-      const matchLocation = !typedLocation || location.includes(typedLocation);
-      const matchType = !typedType || employmentType.includes(typedType);
-      const matchDepartment = !typedDepartment || department.includes(typedDepartment);
-      return matchSearch && matchLocation && matchType && matchDepartment;
-    })
-    .sort((a, b) => {
-      const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (!normalizedSearch) return timeDiff;
-      const scoreDiff = getSearchScore(b, normalizedSearch) - getSearchScore(a, normalizedSearch);
-      if (scoreDiff !== 0) return scoreDiff;
-      if (timeDiff !== 0) return timeDiff;
-      return asString(a.roleTitle).localeCompare(asString(b.roleTitle));
-    });
+  const filtered = useMemo(
+    () =>
+      jobs
+        .filter((job) => {
+          const location = normalizeSearchTerm(job.location);
+          const employmentType = normalizeSearchTerm(job.employmentType);
+          const department = normalizeSearchTerm(job.department);
+          const matchSearch = !normalizedSearch || getSearchScore(job, normalizedSearch) > 0;
+          const matchLocation = !typedLocation || location.includes(typedLocation);
+          const matchType = !typedType || employmentType.includes(typedType);
+          const matchDepartment = !typedDepartment || department.includes(typedDepartment);
+          return matchSearch && matchLocation && matchType && matchDepartment;
+        })
+        .sort((a, b) => {
+          const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          if (!normalizedSearch) return timeDiff;
+          const scoreDiff = getSearchScore(b, normalizedSearch) - getSearchScore(a, normalizedSearch);
+          if (scoreDiff !== 0) return scoreDiff;
+          if (timeDiff !== 0) return timeDiff;
+          return asString(a.roleTitle).localeCompare(asString(b.roleTitle));
+        }),
+    [jobs, normalizedSearch, typedDepartment, typedLocation, typedType],
+  );
 
   const clearAllFilters = () => {
     setSearch('');
@@ -554,9 +301,7 @@ export default function HiringsPage() {
     <div className="min-h-screen public-page-bg flex flex-col">
       <PublicNavbar />
 
-      {/* Hero */}
       <section className="relative text-white py-16 px-4 overflow-hidden">
-        {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
             src="https://images.pexels.com/photos/5439438/pexels-photo-5439438.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080"
@@ -566,45 +311,50 @@ export default function HiringsPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/70 to-gray-900/80" />
         </div>
+
         <div className="relative z-10 max-w-4xl mx-auto text-center space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold">Find Your Next Opportunity</h1>
           <p className="text-lg text-gray-300">
-            Browse job openings from organizations hiring through Blumebyte HR
+            {summary.totalCompanies > 0
+              ? `Browse ${summary.totalJobs} open roles from ${summary.totalCompanies} companies hiring through Blumebyte HR`
+              : 'Browse live job openings published by Blumebyte tenants'}
           </p>
           <div className="relative max-w-xl mx-auto mt-6">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" aria-hidden="true" />
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by job title or company…"
-              aria-label="Search jobs by title or company"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by job title, company, department, or location…"
+              aria-label="Search jobs by title, company, department, or location"
               className="w-full pl-10 pr-4 py-3 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/30 text-sm"
             />
           </div>
         </div>
       </section>
 
-      {/* Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-wrap gap-3 items-center">
           <Input
             value={filterLocation}
-            onChange={(e) => setFilterLocation(e.target.value)}
+            onChange={(event) => setFilterLocation(event.target.value)}
             placeholder="Type location filter"
             className="w-44 bg-white"
+            list="public-hiring-locations"
           />
           <Input
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={(event) => setFilterType(event.target.value)}
             placeholder="Type job type filter"
             className="w-44 bg-white"
+            list="public-hiring-types"
           />
           <Input
             value={filterDepartment}
-            onChange={(e) => setFilterDepartment(e.target.value)}
+            onChange={(event) => setFilterDepartment(event.target.value)}
             placeholder="Type department filter"
             className="w-52 bg-white"
+            list="public-hiring-departments"
           />
 
           {(search || filterLocation || filterType || filterDepartment) && (
@@ -617,19 +367,34 @@ export default function HiringsPage() {
             {filtered.length} {filtered.length === 1 ? 'job' : 'jobs'} found
           </span>
         </div>
+
+        <datalist id="public-hiring-locations">
+          {filters.locations.map((location) => <option key={location} value={location} />)}
+        </datalist>
+        <datalist id="public-hiring-types">
+          {filters.employmentTypes.map((employmentType) => <option key={employmentType} value={employmentType} />)}
+        </datalist>
+        <datalist id="public-hiring-departments">
+          {filters.departments.map((department) => <option key={department} value={department} />)}
+        </datalist>
       </div>
 
-      {/* Jobs Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 flex-1">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)}
+            {Array.from({ length: 6 }).map((_, index) => <JobCardSkeleton key={index} />)}
           </div>
         ) : error ? (
           <div className="text-center py-20 space-y-4">
             <AlertCircle className="h-12 w-12 text-gray-300 mx-auto" />
             <p className="text-gray-600">{error}</p>
-            <Button variant="outline" onClick={() => { invalidateCache('/public/jobs'); fetchJobs(true); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                invalidatePublicHiringCache();
+                fetchJobs(true);
+              }}
+            >
               <RefreshCw className="h-4 w-4 mr-2" /> Retry
             </Button>
           </div>
@@ -639,7 +404,7 @@ export default function HiringsPage() {
             <h3 className="text-xl font-semibold text-gray-600">No Job Openings</h3>
             <p className="text-sm text-gray-400">
               {jobs.length === 0
-                ? 'No open positions right now. Check back soon.'
+                ? 'No public roles are available right now. Check back soon.'
                 : 'No jobs match your current filters. Try adjusting your search criteria.'}
             </p>
             {jobs.length > 0 && (
@@ -665,12 +430,11 @@ export default function HiringsPage() {
         )}
       </div>
 
-      {/* Modals */}
-      <ApplyModal
+      <PublicHiringApplyDialog
         job={applyJob}
         open={!!applyJob}
         onClose={() => setApplyJob(null)}
-        onApplied={(jobId) => setAppliedJobIds((prev) => Array.from(new Set([...prev, jobId])))}
+        onApplied={(jobId) => setAppliedJobIds((current) => Array.from(new Set([...current, jobId])))}
       />
 
       <PublicFooter />
