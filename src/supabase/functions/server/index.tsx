@@ -512,6 +512,7 @@ function normalizeEmploymentType(raw: string): string {
 
 // --- Active statuses for public job visibility ---
 const JOB_ACTIVE_STATUSES = new Set(['active', 'open', 'interviewing', 'offered', 'published', 'live', 'approved', 'posted', 'hiring', 'recruiting', 'accepting_applications']);
+const JOB_NON_PUBLIC_STATUSES = new Set(['draft', 'inactive', 'closed', 'filled', 'archived', 'deleted', 'expired', 'cancelled']);
 const JOB_PUBLIC_VISIBILITIES = new Set([
   'public_global',
   'public',
@@ -597,9 +598,10 @@ function isPublicJobPosting(job: any): boolean {
   const isPublicByVisibility = !!visibility && JOB_PUBLIC_VISIBILITIES.has(visibility);
   if (!isExplicitlyPublic && !isPublicByVisibility) return false;
   const status = normalizeJobStatus(job.status);
-  // Backward compatibility: older public jobs may have missing status.
-  if (status && !JOB_ACTIVE_STATUSES.has(status)) return false;
-  return true;
+  if (!status) return true;
+  if (JOB_ACTIVE_STATUSES.has(status)) return true;
+  if (isExplicitlyPublic && !JOB_NON_PUBLIC_STATUSES.has(status)) return true;
+  return false;
 }
 
 async function buildPublicJobResponse(job: any) {

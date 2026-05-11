@@ -5,7 +5,6 @@ import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 import {
   Search, MapPin, Briefcase, Building2,
@@ -63,6 +62,37 @@ function saveAppliedJobs(jobIds: string[]) {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function normalizeSearchTerm(value: unknown): string {
+  return asString(value).toLowerCase().trim();
+}
+
+function getSearchScore(job: PublicJob, query: string): number {
+  const q = normalizeSearchTerm(query);
+  if (!q) return 0;
+
+  const role = normalizeSearchTerm(job.roleTitle);
+  const company = normalizeSearchTerm(job.companyName);
+  const department = normalizeSearchTerm(job.department);
+  const location = normalizeSearchTerm(job.location);
+  const type = normalizeSearchTerm(job.employmentType);
+  const fields = [role, company, department, location, type].filter(Boolean);
+  const words = q.split(/\s+/).filter(Boolean);
+
+  let score = 0;
+  for (const field of fields) {
+    if (field === q) score += 250;
+    if (field.startsWith(q)) score += 180;
+    if (field.includes(q)) score += 120;
+    for (const word of words) {
+      if (!word) continue;
+      if (field === word) score += 120;
+      else if (field.startsWith(word)) score += 80;
+      else if (field.includes(word)) score += 40;
+    }
+  }
+  return score;
 }
 
 // ─── Job Card Skeleton ────────────────────────────────────────────────────────
@@ -362,7 +392,6 @@ export default function HiringsPage() {
   const [filterLocation, setFilterLocation] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
-  const [sortBy, setSortBy] = useState<'latest' | 'deadline' | 'alphabetical'>('latest');
   const [applyJob, setApplyJob] = useState<PublicJob | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
   const mountedRef = useRef(true);
@@ -380,16 +409,25 @@ export default function HiringsPage() {
 
   const fetchPublicJobsFromAnyEndpoint = useCallback(async () => {
     let lastError: unknown = null;
+    let hadSuccess = false;
+    const merged = new Map<string, PublicJob>();
     for (const path of PUBLIC_JOB_ENDPOINTS) {
       try {
         const data = await api(path);
+        hadSuccess = true;
         const nextJobs = Array.isArray(data?.jobs) ? data.jobs : (Array.isArray(data) ? data : []);
-        return nextJobs;
+        for (const rawJob of nextJobs) {
+          const job = rawJob as PublicJob;
+          if (!job?.id) continue;
+          merged.set(job.id, job);
+        }
       } catch (error) {
         lastError = error;
         invalidateCache(path);
       }
     }
+    if (merged.size > 0) return Array.from(merged.values());
+    if (hadSuccess) return [];
     throw lastError instanceof Error ? lastError : new Error('Failed to load public jobs');
   }, []);
 
@@ -470,43 +508,30 @@ export default function HiringsPage() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchJobs]);
 
-  // Unique locations for filter
-  const locations = Array.from(
-    new Set(jobs.map((j) => asString(j.location).trim()).filter(Boolean))
-  ) as string[];
-
-  // Unique employment types for filter — only show types that exist in the loaded jobs
-  const employmentTypes = Array.from(
-    new Set(jobs.map((j) => asString(j.employmentType).trim()).filter(Boolean))
-  ).sort() as string[];
-
-  // HIRING-FIX: Add department filter options from loaded jobs.
-  const departments = Array.from(
-    new Set(jobs.map((j) => asString(j.department).trim()).filter(Boolean))
-  ).sort() as string[];
-
-  // Filter + sort
+  // Filter + sort (automatic relevance while typing; otherwise latest first)
   const filtered = jobs
     .filter((j) => {
-      const q = search.toLowerCase();
-      const roleTitle = asString(j.roleTitle);
-      const companyName = asString(j.companyName);
-      const employmentType = asString(j.employmentType);
-      const department = asString(j.department);
-      const matchSearch = !q || roleTitle.toLowerCase().includes(q) || companyName.toLowerCase().includes(q);
-      const matchLocation = !filterLocation || filterLocation === 'all' || j.location === filterLocation;
-      const matchType = !filterType || filterType === 'all' || employmentType === filterType;
-      const matchDepartment = !filterDepartment || filterDepartment === 'all' || department === filterDepartment;
+      const q = normalizeSearchTerm(search);
+      const location = normalizeSearchTerm(j.location);
+      const employmentType = normalizeSearchTerm(j.employmentType);
+      const department = normalizeSearchTerm(j.department);
+      const typedLocation = normalizeSearchTerm(filterLocation);
+      const typedType = normalizeSearchTerm(filterType);
+      const typedDepartment = normalizeSearchTerm(filterDepartment);
+      const matchSearch = !q || getSearchScore(j, q) > 0;
+      const matchLocation = !typedLocation || location.includes(typedLocation);
+      const matchType = !typedType || employmentType.includes(typedType);
+      const matchDepartment = !typedDepartment || department.includes(typedDepartment);
       return matchSearch && matchLocation && matchType && matchDepartment;
     })
     .sort((a, b) => {
-      if (sortBy === 'latest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (sortBy === 'deadline') {
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      }
-      return a.roleTitle.localeCompare(b.roleTitle);
+      const q = normalizeSearchTerm(search);
+      const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (!q) return timeDiff;
+      const scoreDiff = getSearchScore(b, q) - getSearchScore(a, q);
+      if (scoreDiff !== 0) return scoreDiff;
+      if (timeDiff !== 0) return timeDiff;
+      return asString(a.roleTitle).localeCompare(asString(b.roleTitle));
     });
 
   return (
@@ -547,55 +572,26 @@ export default function HiringsPage() {
       {/* Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-wrap gap-3 items-center">
-          <Select value={filterLocation} onValueChange={setFilterLocation}>
-            <SelectTrigger className="w-40 bg-white">
-              <SelectValue placeholder="Location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((l) => (
-                <SelectItem key={l} value={l}>{l}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            placeholder="Type location filter"
+            className="w-44 bg-white"
+          />
+          <Input
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            placeholder="Type job type filter"
+            className="w-44 bg-white"
+          />
+          <Input
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
+            placeholder="Type department filter"
+            className="w-52 bg-white"
+          />
 
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-40 bg-white">
-              <SelectValue placeholder="Job Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {employmentTypes.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* HIRING-FIX: Department filter */}
-          <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-            <SelectTrigger className="w-44 bg-white">
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-            <SelectTrigger className="w-40 bg-white">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="latest">Latest</SelectItem>
-              <SelectItem value="deadline">Deadline</SelectItem>
-              <SelectItem value="alphabetical">Alphabetical</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {(search || (filterLocation && filterLocation !== 'all') || (filterType && filterType !== 'all') || (filterDepartment && filterDepartment !== 'all')) && (
+          {(search || filterLocation || filterType || filterDepartment) && (
             <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilterLocation(''); setFilterType(''); setFilterDepartment(''); }}>
               Clear Filters
             </Button>
