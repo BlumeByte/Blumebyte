@@ -57,6 +57,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [activatingLicenses, setActivatingLicenses] = useState(false);
+  const [pendingPaymentType, setPendingPaymentType] = useState<'license' | 'renewal' | null>(null);
 
   // Renewal state
   const [renewPlan, setRenewPlan] = useState<'monthly' | 'yearly'>('monthly');
@@ -82,12 +83,13 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   }, []);
 
   // Start polling for payment completion
-  const startPaymentPolling = (reference: string) => {
+  const startPaymentPolling = (reference: string, paymentType: 'license' | 'renewal') => {
     // Clear any existing poll
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
 
+    setPendingPaymentType(paymentType);
     setPollingStatus('Waiting for payment...');
 
     pollingRef.current = setInterval(async () => {
@@ -114,22 +116,38 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           setPollingStatus(null);
           setPaymentCompleted(true);
           setPaymentWindowOpened(false);
-          toast.success('Payment verified and licenses activated!', { duration: 5000 });
+          setPendingPaymentType(null);
+          toast.success(
+            paymentType === 'renewal'
+              ? 'Payment verified and subscription renewed!'
+              : 'Payment verified and licenses activated!',
+            { duration: 5000 }
+          );
           fetchLicenseInfo();
-          // Auto-sync licenses
-          autoSyncAfterPayment();
+          if (paymentType === 'license') {
+            autoSyncAfterPayment();
+          }
         } else if (data.status === 'paid') {
           // Payment succeeded on Paystack but not yet processed — verify now
           clearInterval(pollingRef.current!);
           pollingRef.current = null;
-          setPollingStatus('Payment received! Activating licenses...');
-          await verifyAndActivate(reference);
+          setPollingStatus(
+            paymentType === 'renewal'
+              ? 'Payment received! Completing renewal...'
+              : 'Payment received! Activating licenses...'
+          );
+          if (paymentType === 'renewal') {
+            await verifyRenewal(reference);
+          } else {
+            await verifyAndActivate(reference);
+          }
         } else if (data.status === 'failed') {
           clearInterval(pollingRef.current!);
           pollingRef.current = null;
           setPollingStatus(null);
           setPaymentWindowOpened(false);
           setPendingReference(null);
+          setPendingPaymentType(null);
           toast.error(`Payment ${data.paystackStatus || 'failed'}. Please try again.`);
         }
         // 'pending' or 'unknown' — keep polling
@@ -158,6 +176,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           setPaymentWindowOpened(false);
           setPendingReference(null);
           setPollingStatus(null);
+          setPendingPaymentType(null);
           const licensesText = data.licensesAdded === 1 ? 'license' : 'licenses';
           toast.success(
             `Payment successful! ${data.licensesAdded} ${licensesText} activated.`,
@@ -178,6 +197,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           setPaymentWindowOpened(false);
           setPendingReference(null);
           setPollingStatus(null);
+          setPendingPaymentType(null);
           toast.success('Payment already processed and licenses activated!');
           fetchLicenseInfo();
         } else if (error.processing) {
@@ -198,6 +218,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
               setPaymentWindowOpened(false);
               setPendingReference(null);
               setPollingStatus(null);
+              setPendingPaymentType(null);
               toast.success('Payment verified and licenses activated!');
               fetchLicenseInfo();
               await autoSyncAfterPayment();
@@ -215,6 +236,44 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       console.error('Verify and activate error:', err);
       setPollingStatus(null);
       toast.error('Failed to verify payment. You can retry from the dashboard.');
+    } finally {
+      setActivatingLicenses(false);
+    }
+  };
+
+  const verifyRenewal = async (reference: string) => {
+    try {
+      setActivatingLicenses(true);
+      setPollingStatus('Verifying payment and renewing subscription...');
+
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await apiClient.post(
+        '/subscription/verify',
+        { reference },
+        freshToken
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || data.error || 'Renewal verification failed');
+      }
+
+      setPaymentCompleted(true);
+      setPaymentWindowOpened(false);
+      setPendingReference(null);
+      setPollingStatus(null);
+      setPendingPaymentType(null);
+      toast.success('Subscription renewed successfully!', { duration: 6000 });
+      fetchLicenseInfo();
+    } catch (err: any) {
+      console.error('Verify renewal error:', err);
+      setPollingStatus(null);
+      toast.error(err.message || 'Failed to verify renewal. You can retry from the dashboard.');
     } finally {
       setActivatingLicenses(false);
     }
@@ -349,7 +408,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           setPaymentWindowOpened(true);
           setPaymentCompleted(false);
           if (payWindow) paymentWindowRef.current = payWindow;
-          startPaymentPolling(data.reference);
+          startPaymentPolling(data.reference, 'renewal');
         }
       } else {
         payWindow?.close();
@@ -550,7 +609,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           setPaymentWindowOpened(true);
           setPaymentCompleted(false);
           if (payWindow) paymentWindowRef.current = payWindow;
-          startPaymentPolling(reference);
+          startPaymentPolling(reference, 'license');
         }
       } else {
         payWindow?.close();
@@ -623,16 +682,18 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
 
   const EXPIRY_WARNING_DAYS = 14; // Show renewal section this many days before expiry
 
+  const licenseExpiryDate = licenseInfo?.endDate || licenseInfo?.expiresAt || licenseInfo?.subscriptionEndDate || null;
+
   const isLicenseExpired = licenseInfo != null && (
     licenseInfo.licenseStatus === 'expired' ||
     licenseInfo.status === 'expired' ||
-    (licenseInfo.expiresAt && new Date(licenseInfo.expiresAt) < new Date())
+    (licenseExpiryDate && new Date(licenseExpiryDate) < new Date())
   );
 
   // Show renewal section when expired OR expiring within EXPIRY_WARNING_DAYS days
   const isLicenseExpiringSoon = licenseInfo != null && !isLicenseExpired && (
-    licenseInfo.expiresAt && (() => {
-      const daysLeft = (new Date(licenseInfo.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    licenseExpiryDate && (() => {
+      const daysLeft = (new Date(licenseExpiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
       return daysLeft <= EXPIRY_WARNING_DAYS;
     })()
   );
@@ -778,16 +839,16 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       {/* Purchase More Licenses */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            Purchase Additional Licenses
-          </CardTitle>
-          <CardDescription>
-            {requiredLicenses 
-              ? `You need at least ${requiredLicenses} more license(s) to proceed`
-              : 'Add more user seats to your existing subscription (extends total capacity, not renewal period)'}
-          </CardDescription>
-        </CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5" />
+              Add More Licenses
+            </CardTitle>
+            <CardDescription>
+              {requiredLicenses 
+                ? `You need at least ${requiredLicenses} more license(s) to proceed`
+                : 'Purchase extra seats only. Subscription renewal is handled separately below.'}
+            </CardDescription>
+          </CardHeader>
         <CardContent className="space-y-6">
           {/* Number of Licenses */}
           <div className="space-y-2">
@@ -953,11 +1014,15 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-blue-900 mb-1">
-                      {activatingLicenses ? 'Activating Licenses...' : 'Payment in Progress'}
-                    </p>
-                    <p className="text-sm text-blue-700 mb-2">
-                      {pollingStatus || 'Complete your payment in the Paystack tab. Once paid, your licenses will be activated automatically — just close the payment tab and come back here.'}
-                    </p>
+                        {activatingLicenses ? 'Activating Licenses...' : 'Payment in Progress'}
+                      </p>
+                      <p className="text-sm text-blue-700 mb-2">
+                        {pollingStatus || (
+                          pendingPaymentType === 'renewal'
+                            ? 'Complete your renewal in the Paystack tab. Once paid, your subscription will be updated automatically.'
+                            : 'Complete your payment in the Paystack tab. Once paid, your licenses will be activated automatically — just close the payment tab and come back here.'
+                        )}
+                      </p>
                     {pollingStatus && (
                       <div className="flex items-center gap-2 mb-3">
                         <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
@@ -1112,12 +1177,12 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           <CardHeader>
             <CardTitle className={`flex items-center gap-2 ${isLicenseExpired ? 'text-orange-800' : 'text-yellow-800'}`}>
               <TrendingUp className="w-5 h-5" />
-              {isLicenseExpired ? 'Renew Your License' : 'License Expiring Soon'}
+              {isLicenseExpired ? 'Renew Current Subscription' : 'Current Subscription Expiring Soon'}
             </CardTitle>
             <p className={`text-sm ${isLicenseExpired ? 'text-orange-700' : 'text-yellow-700'}`}>
               {isLicenseExpired
                 ? 'Your license has expired. Renew now to restore access for your team.'
-                : `Your license expires on ${new Date(licenseInfo.expiresAt).toLocaleDateString()}. Renew early to avoid interruption.`}
+                : `Your license expires on ${new Date(licenseExpiryDate).toLocaleDateString()}. Renew early to avoid interruption.`}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">

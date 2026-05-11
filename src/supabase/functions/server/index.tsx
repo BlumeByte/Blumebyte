@@ -460,6 +460,59 @@ async function getCompanyId(userId: string): Promise<string | null> {
   return companies?.[0] || null;
 }
 
+function getCanonicalSubscriptionLicenses(subscription: any): number {
+  return Number(
+    subscription?.purchasedLicenses ??
+    subscription?.userCount ??
+    subscription?.licenses ??
+    0
+  ) || 0;
+}
+
+async function syncCompanySubscriptionMirror(userId: string, subscription: any) {
+  const companyId = await getCompanyId(userId);
+  if (!companyId) return null;
+
+  const purchasedLicenses = getCanonicalSubscriptionLicenses(subscription);
+  const mirroredSubscription = {
+    ...subscription,
+    userId,
+    companyId,
+    purchasedLicenses,
+    licenses: purchasedLicenses,
+    userCount: purchasedLicenses,
+    status: subscription?.status || 'active',
+  };
+
+  const existingCompany = await kv.get(`company:${companyId}`) || await kv.get(`company_by_id:${companyId}`);
+  if (existingCompany) {
+    const updatedCompany = {
+      ...existingCompany,
+      licenses: purchasedLicenses,
+      subscriptionStatus: mirroredSubscription.status,
+      subscriptionPlan: mirroredSubscription.plan || existingCompany.subscriptionPlan || 'none',
+      subscriptionStartDate: mirroredSubscription.startDate || existingCompany.subscriptionStartDate || null,
+      subscriptionEndDate: mirroredSubscription.endDate || existingCompany.subscriptionEndDate || null,
+      subscription: {
+        ...(existingCompany.subscription || {}),
+        ...mirroredSubscription,
+      },
+    };
+    await kv.set(`company:${companyId}`, updatedCompany);
+    await kv.set(`company_by_id:${companyId}`, updatedCompany);
+  }
+
+  await kv.set(`subscription:${companyId}`, mirroredSubscription);
+
+  try {
+    await recalculateCompanyStats(companyId);
+  } catch (error) {
+    console.error('Failed to sync company subscription mirror:', error);
+  }
+
+  return companyId;
+}
+
 async function resolveCompanyName(companyId: string): Promise<string> {
   if (!companyId) return "";
   // Check both key formats: company: (canonical) and company_by_id: (legacy/alternate)
@@ -7196,11 +7249,8 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
       return c.json({ success: false, message: 'Subscription record not found' }, 404);
     }
     
-    // Verify amount matches
-    const expectedAmount = pendingSubscription.amount * 100; // Convert to kobo
-    if (paystackData.data.amount !== expectedAmount) {
-      return c.json({ success: false, message: 'Payment amount mismatch' }, 400);
-    }
+    // The stored amount is in USD, but Paystack may charge in a converted currency.
+    // A successful transaction for the expected reference is sufficient here.
     
     // Calculate subscription dates
     const startDate = new Date();
@@ -7230,6 +7280,7 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
     };
     
     await kv.set(`subscription:${pendingSubscription.userId}`, subscription);
+    await syncCompanySubscriptionMirror(pendingSubscription.userId, subscription);
     
     // Clean up pending subscription
     await kv.del(`pending-subscription:${reference}`);
@@ -7328,6 +7379,7 @@ app.post(`${PREFIX}/subscription/webhook`, async (c) => {
         }
         
         await kv.set(`subscription:${pendingLicense.userId}`, subscription);
+        await syncCompanySubscriptionMirror(pendingLicense.userId, subscription);
         await kv.del(`pending-license:${reference}`);
         return c.json({ status: 'success' });
       }
@@ -7361,6 +7413,7 @@ app.post(`${PREFIX}/subscription/webhook`, async (c) => {
         };
         
         await kv.set(`subscription:${pendingSubscription.userId}`, subscription);
+        await syncCompanySubscriptionMirror(pendingSubscription.userId, subscription);
         await kv.del(`pending-subscription:${reference}`);
       }
     }

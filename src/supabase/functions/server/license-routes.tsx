@@ -5,6 +5,60 @@ import { recalculateCompanyStats } from './sync-company-stats.tsx';
 
 const PREFIX = '/make-server-668731fc';
 
+function getCanonicalPurchasedLicenses(subscription: any): number {
+  return Number(
+    subscription?.purchasedLicenses ??
+    subscription?.userCount ??
+    subscription?.licenses ??
+    0
+  ) || 0;
+}
+
+async function syncCompanyLicenseMirror(userId: string, subscription: any) {
+  const employee = await kv.get(`employee:${userId}`);
+  const companyId = employee?.companyId || employee?.company;
+  if (!companyId) return null;
+
+  const purchasedLicenses = getCanonicalPurchasedLicenses(subscription);
+  const mirroredSubscription = {
+    ...subscription,
+    userId,
+    companyId,
+    purchasedLicenses,
+    licenses: purchasedLicenses,
+    userCount: purchasedLicenses,
+    status: subscription?.status || 'active',
+  };
+
+  const existingCompany = await kv.get(`company:${companyId}`) || await kv.get(`company_by_id:${companyId}`);
+  if (existingCompany) {
+    const updatedCompany = {
+      ...existingCompany,
+      licenses: purchasedLicenses,
+      subscriptionStatus: mirroredSubscription.status,
+      subscriptionPlan: mirroredSubscription.plan || existingCompany.subscriptionPlan || 'none',
+      subscriptionStartDate: mirroredSubscription.startDate || existingCompany.subscriptionStartDate || null,
+      subscriptionEndDate: mirroredSubscription.endDate || existingCompany.subscriptionEndDate || null,
+      subscription: {
+        ...(existingCompany.subscription || {}),
+        ...mirroredSubscription,
+      },
+    };
+    await kv.set(`company:${companyId}`, updatedCompany);
+    await kv.set(`company_by_id:${companyId}`, updatedCompany);
+  }
+
+  await kv.set(`subscription:${companyId}`, mirroredSubscription);
+
+  try {
+    await recalculateCompanyStats(companyId);
+  } catch (error) {
+    console.error('Failed to sync company license mirror:', error);
+  }
+
+  return companyId;
+}
+
 export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSuperAdmin: any, logAudit: any) {
   
   // Debug endpoint to check Paystack configuration
@@ -517,6 +571,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       await kv.set(`subscription:${pendingLicense.userId}`, subscription);
+      await syncCompanyLicenseMirror(pendingLicense.userId, subscription);
       await kv.del(`pending-license:${reference}`);
       
       // Handle user selection and deactivation if selectedUserIds were provided
@@ -681,6 +736,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       subscription.lastPaymentReference = paystackData.data.reference;
       
       await kv.set(`subscription:${user.id}`, subscription);
+      await syncCompanyLicenseMirror(user.id, subscription);
       
       await logAudit({
         userId: user.id,
@@ -826,6 +882,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         }
 
         await kv.set(`subscription:${userId}`, subscription);
+        await syncCompanyLicenseMirror(userId, subscription);
 
         // Record History
         const transaction = {
@@ -1017,17 +1074,20 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
 
       // First check if already processed (subscription has this reference)
       const subscription = await kv.get(`subscription:${user.id}`);
-      if (subscription?.lastPaymentReference === reference) {
+      if (subscription?.lastPaymentReference === reference || subscription?.paymentReference === reference) {
         return c.json({
           status: 'completed',
           alreadyProcessed: true,
-          totalLicenses: subscription.purchasedLicenses,
+          paymentType: subscription?.paymentReference === reference ? 'renewal' : 'license',
+          totalLicenses: getCanonicalPurchasedLicenses(subscription),
           plan: subscription.plan,
         });
       }
 
       // Check if pending record still exists
-      const pending = await kv.get(`pending-license:${reference}`);
+      const pendingLicense = await kv.get(`pending-license:${reference}`);
+      const pendingRenewal = await kv.get(`pending-subscription:${reference}`);
+      const pending = pendingLicense || pendingRenewal;
       if (!pending) {
         // No pending and not in subscription — unknown reference
         return c.json({ status: 'unknown', message: 'Reference not found' });
@@ -1053,13 +1113,14 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
 
       const paystackData = await paystackResponse.json();
       const txStatus = paystackData.data?.status;
+      const paymentType = pendingLicense ? 'license' : 'renewal';
 
       if (txStatus === 'success') {
-        return c.json({ status: 'paid', message: 'Payment successful on Paystack, ready to verify' });
+        return c.json({ status: 'paid', paymentType, message: 'Payment successful on Paystack, ready to verify' });
       } else if (txStatus === 'abandoned' || txStatus === 'failed') {
-        return c.json({ status: 'failed', paystackStatus: txStatus });
+        return c.json({ status: 'failed', paymentType, paystackStatus: txStatus });
       } else {
-        return c.json({ status: 'pending', paystackStatus: txStatus || 'unknown' });
+        return c.json({ status: 'pending', paymentType, paystackStatus: txStatus || 'unknown' });
       }
     } catch (e: any) {
       console.error('Error checking payment status:', e);
