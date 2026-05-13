@@ -1202,7 +1202,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                   variant="outline"
                   size="sm"
                   onClick={() => setRenewLicenses(Math.max(MIN_LICENSES, renewLicenses - 1))}
-                  disabled={renewLicenses <= MIN_LICENSES}
+                  disabled={renewLicenses === 0 || renewLicenses <= MIN_LICENSES}
                 >-</Button>
                 <Input
                   type="number"
@@ -1217,7 +1217,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                   onClick={() => setRenewLicenses((renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES)) + 1)}
                 >+</Button>
               </div>
-              <p className="text-xs text-muted-foreground">Minimum 2 licenses. Defaults to your current purchased licenses.</p>
+              <p className="text-xs text-muted-foreground">Minimum {MIN_LICENSES} licenses. Defaults to your current purchased licenses.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Card
