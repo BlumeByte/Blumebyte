@@ -61,6 +61,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
 
   // Renewal state
   const [renewPlan, setRenewPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [renewLicenses, setRenewLicenses] = useState<number>(0); // 0 = not yet loaded; updated after fetchLicenseInfo
   const [renewLoading, setRenewLoading] = useState(false);
 
   // Card management state
@@ -331,6 +332,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           ...data,
           endDate: data.endDate ?? null,
         });
+        // Seed renewLicenses from loaded data (only if not yet set by user)
+        setRenewLicenses(prev => prev <= 0 ? Math.max(MIN_LICENSES, data.purchasedLicenses || MIN_LICENSES) : prev);
       }
     } catch (error) {
       console.error('Error fetching license info:', error);
@@ -383,7 +386,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const freshToken = await getToken();
       if (!freshToken) { payWindow?.close(); toast.error('Not authenticated'); return; }
 
-      const licenses = licenseInfo?.purchasedLicenses || MIN_LICENSES;
+      const licenses = Math.max(MIN_LICENSES, renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES));
       const pricePerUser = renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
       const amount = licenses * pricePerUser;
 
@@ -1189,6 +1192,33 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Number of Licenses to Renew */}
+            <div className="space-y-2">
+              <Label className={isLicenseExpired ? 'text-orange-800' : 'text-yellow-800'}>
+                Licenses to Renew
+              </Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRenewLicenses(Math.max(MIN_LICENSES, renewLicenses - 1))}
+                  disabled={renewLicenses <= MIN_LICENSES}
+                >-</Button>
+                <Input
+                  type="number"
+                  min={String(MIN_LICENSES)}
+                  value={renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES)}
+                  onChange={e => setRenewLicenses(Math.max(MIN_LICENSES, parseInt(e.target.value) || MIN_LICENSES))}
+                  className="text-center"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRenewLicenses((renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES)) + 1)}
+                >+</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Minimum 2 licenses. Defaults to your current purchased licenses.</p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <Card
                 className={`cursor-pointer transition-all ${renewPlan === 'monthly' ? 'ring-2 ring-orange-500 shadow-lg' : 'hover:shadow-md'}`}
@@ -1224,8 +1254,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
               </Card>
             </div>
             <div className="bg-orange-100 rounded-lg p-3 text-sm text-orange-800">
-              Renewing <strong>{licenseInfo.purchasedLicenses || MIN_LICENSES} license(s)</strong> for{' '}
-              <strong>${((licenseInfo.purchasedLicenses || MIN_LICENSES) * (renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY)).toFixed(2)}</strong>{' '}
+              Renewing <strong>{renewLicenses > 0 ? renewLicenses : (licenseInfo.purchasedLicenses || MIN_LICENSES)} license(s)</strong> for{' '}
+              <strong>${((renewLicenses > 0 ? renewLicenses : (licenseInfo.purchasedLicenses || MIN_LICENSES)) * (renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY)).toFixed(2)}</strong>{' '}
               ({renewPlan})
             </div>
             <Button

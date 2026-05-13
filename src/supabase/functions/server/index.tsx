@@ -811,7 +811,6 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
     // CASE-INSENSITIVE comparison: match on companyId OR companyName against scope
     return scopeLower.some(ac => (itemCompanyId && ac === itemCompanyId) || (itemCompanyName && ac === itemCompanyName));
   });
-  });
   
   return filtered;
 }
@@ -7130,8 +7129,9 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
     const body = await c.req.json();
     const { licenses, plan, saveCard } = body;
 
-    if (!licenses || !plan) {
-      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
+    const licensesNum = Number(licenses);
+    if (!plan || !Number.isFinite(licensesNum) || licensesNum <= 0) {
+      return c.json({ error: 'Missing required fields: licenses (must be > 0), plan' }, 400);
     }
     if (!['monthly', 'yearly'].includes(plan)) {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
@@ -7144,13 +7144,18 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
 
     // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
     const pricePerUser = plan === 'monthly' ? 3.55 : 30.60;
-    const amount = Number(licenses) * pricePerUser;
+    const amount = licensesNum * pricePerUser;
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
 
     // Convert USD amount to the configured Paystack currency (GHS/NGN/USD)
     const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
+
+    // Guard against zero/invalid amounts that Paystack would reject
+    if (!amountSmallestUnit || amountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}). Please contact support.` }, 400);
+    }
 
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -7167,14 +7172,14 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
         metadata: {
           userId: user.id,
           plan,
-          userCount: licenses,
+          userCount: licensesNum,
           isRenewal: true,
           saveCard: saveCard !== false,
           amountUsd: amount,
           custom_fields: [
             { display_name: 'Transaction Type', variable_name: 'type', value: 'renewal' },
             { display_name: 'Plan', variable_name: 'plan', value: plan },
-            { display_name: 'Licenses', variable_name: 'user_count', value: String(licenses) },
+            { display_name: 'Licenses', variable_name: 'user_count', value: String(licensesNum) },
           ],
         },
       }),
@@ -7188,7 +7193,7 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
     await kv.set(`pending-subscription:${reference}`, {
       userId: user.id,
       plan,
-      userCount: licenses,
+      userCount: licensesNum,
       amount,
       amountSmallestUnit,
       currency,

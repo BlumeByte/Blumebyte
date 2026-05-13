@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { api, clearAllCache, invalidateCache } from '../lib/api-client';
+import { api, invalidateCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -59,7 +59,7 @@ import { AutomationModule } from './AutomationModule';
 import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
-import { CompanySwitcher } from './CompanySwitcher';
+// CompanySwitcher import removed — multi-company feature disabled
 import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
 import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
@@ -685,15 +685,12 @@ export function SuperAdminDashboard() {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <CompanySwitcher 
-              accessToken={accessToken}
-              currentCompanyId={selectedCompanyId}
-              onCompanySwitch={(companyId, companyName) => {
-                clearAllCache();
-                setSelectedCompanyId(companyId);
-                setSelectedCompanyName(companyName);
-              }}
-            />
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
+                {branding.logoUrl ? <img src={branding.logoUrl} alt="" className="w-full h-full object-contain p-0.5" /> : <span className="text-white text-xs font-bold">{branding.companyName?.[0] || 'B'}</span>}
+              </div>
+              <span className="text-sm font-semibold text-foreground truncate">{branding.companyName || 'My Company'}</span>
+            </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
             <SubscriptionBadge />

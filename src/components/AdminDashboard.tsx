@@ -536,13 +536,6 @@ function AdminEmployees() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="employee">Employee</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
                     </Select></div>
-                  <div><Label className="text-xs">Company</Label>
-                    <Select value={formData.companyId || ''} onValueChange={v => setFormData({ ...formData, companyId: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>{allowedCompanies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                    </Select></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
                   <div><Label className="text-xs">Department</Label>
                     <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
                       <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
@@ -793,13 +786,6 @@ function AdminUsers() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="employee">Employee</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
                     </Select></div>
-                  <div><Label className="text-xs">Company</Label>
-                    <Select value={formData.companyId || ''} onValueChange={v => setFormData({ ...formData, companyId: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>{allowedCompanies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                    </Select></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
                   <div><Label className="text-xs">Department</Label>
                     <Select value={formData.department || ''} onValueChange={v => setFormData({ ...formData, department: v })}>
                       <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>

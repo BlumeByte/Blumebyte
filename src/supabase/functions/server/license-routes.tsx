@@ -340,6 +340,11 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       // Convert USD to configured Paystack currency
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+
+      // Guard against zero/invalid amounts that Paystack would reject
+      if (!amountSmallestUnit || amountSmallestUnit < 100) {
+        return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}). Please contact support.` }, 400);
+      }
       
       // Debug logging
       
@@ -984,6 +989,11 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       // Convert USD to configured Paystack currency
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+
+      // Guard against zero/invalid amounts that Paystack would reject
+      if (!amountSmallestUnit || amountSmallestUnit < 100) {
+        return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}). Please contact support.` }, 400);
+      }
       
       // Debug logging
       
