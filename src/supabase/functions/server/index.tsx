@@ -8961,7 +8961,13 @@ app.get(`${PREFIX}/company/info`, async (c) => {
 app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const { plan, amount, licenses } = await c.req.json();
+    const { plan, licenses } = await c.req.json();
+    const licensesNum = Number(licenses);
+    const normalizedPlan = ['monthly', 'yearly'].includes(plan) ? plan : 'monthly';
+
+    if (!Number.isFinite(licensesNum) || licensesNum <= 0) {
+      return c.json({ error: 'licenses must be a positive number' }, 400);
+    }
 
     const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
     const companyId = userProfile?.companyId;
@@ -8981,7 +8987,17 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       return c.json({ error: 'Payment system not configured' }, 500);
     }
 
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+    // Always compute amount server-side from canonical prices
+    const pricePerLicense = normalizedPlan === 'monthly' ? 3.55 : 30.60;
+    const amountUsd = licensesNum * pricePerLicense;
+    const { amountSmallestUnit, currency } = await usdToPaystackAmount(amountUsd);
+    if (!amountSmallestUnit || amountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}).` }, 400);
+    }
+
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`;
+
+    let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${paystackSecretKey}`,
@@ -8989,20 +9005,54 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       },
       body: JSON.stringify({
         email: userProfile.email,
-        amount: Math.round(amount * 100), // Paystack expects amount in kobo
+        amount: amountSmallestUnit,
+        currency,
         reference: reference,
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`,
+        callback_url: callbackUrl,
         metadata: {
           companyId: companyId,
           companyName: company.name,
-          plan: plan,
-          licenses: licenses,
+          plan: normalizedPlan,
+          licenses: licensesNum,
+          amountUsd,
           userId: authUser.user.id,
         },
       }),
     });
 
-    const data = await paystackResponse.json();
+    let data = await paystackResponse.json();
+
+    // Fallback: retry in USD for gateways that reject converted local amounts
+    if (!data?.status && /invalid amount/i.test(String(data?.message || '')) && currency !== 'USD') {
+      const usdAmountSmallestUnit = Math.round(amountUsd * 100);
+      if (usdAmountSmallestUnit >= 100) {
+        paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userProfile.email,
+            amount: usdAmountSmallestUnit,
+            currency: 'USD',
+            reference: reference,
+            callback_url: callbackUrl,
+            metadata: {
+              companyId: companyId,
+              companyName: company.name,
+              plan: normalizedPlan,
+              licenses: licensesNum,
+              amountUsd,
+              userId: authUser.user.id,
+              paystackCurrencyFallback: true,
+              originalCurrency: currency,
+            },
+          }),
+        });
+        data = await paystackResponse.json();
+      }
+    }
 
     if (!data.status) {
       return c.json({ error: data.message || 'Failed to initialize payment' }, 400);
@@ -9012,9 +9062,9 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
     await kv.set(`pending_payment:${reference}`, {
       reference,
       companyId,
-      plan,
-      amount,
-      licenses,
+      plan: normalizedPlan,
+      amount: amountUsd,
+      licenses: licensesNum,
       userId: authUser.user.id,
       createdAt: new Date().toISOString(),
     });
@@ -9138,6 +9188,9 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
 
     // Convert USD to configured Paystack currency
     const { amountSmallestUnit: upgradeAmountSmallestUnit, currency: upgradeCurrency } = await usdToPaystackAmount(amountUsd);
+    if (!upgradeAmountSmallestUnit || upgradeAmountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${upgradeAmountSmallestUnit} ${upgradeCurrency}).` }, 400);
+    }
 
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
