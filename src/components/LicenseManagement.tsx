@@ -11,7 +11,7 @@ import { Separator } from './ui/separator';
 import { toast } from 'sonner@2.0.3';
 import {
   Users, CreditCard, AlertTriangle, CheckCircle, 
-  Loader2, ShoppingCart, Zap, TrendingUp
+  Loader2, ShoppingCart, Zap, TrendingUp, Flag
 } from 'lucide-react';
 import { useBranding, brandGradientStyle } from '../lib/branding-context';
 import {
@@ -68,6 +68,66 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const [removingCard, setRemovingCard] = useState(false);
   const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
   const [changingCard, setChangingCard] = useState(false);
+  const [errorPopup, setErrorPopup] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    source: string;
+    details?: string;
+    reporting: boolean;
+    reported: boolean;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    source: 'license-management',
+    details: '',
+    reporting: false,
+    reported: false,
+  });
+
+  const showErrorPopup = (message: string, source = 'license-management', details = '', title = 'Something went wrong') => {
+    setErrorPopup({
+      open: true,
+      title,
+      message: message || 'An unexpected error occurred.',
+      source,
+      details,
+      reporting: false,
+      reported: false,
+    });
+  };
+
+  const handleReportError = async () => {
+    if (!errorPopup.message || errorPopup.reporting || errorPopup.reported) return;
+    try {
+      setErrorPopup(prev => ({ ...prev, reporting: true }));
+      const freshToken = await getToken();
+      if (!freshToken) throw new Error('Not authenticated');
+      const response = await apiClient.post('/support/report-error', {
+        source: errorPopup.source,
+        location: window.location.pathname,
+        message: errorPopup.message,
+        details: errorPopup.details || '',
+        context: {
+          selectedPlan,
+          renewPlan,
+          additionalLicenses,
+          renewLicenses,
+          pendingReference,
+        },
+      }, freshToken);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to report error');
+      }
+      setErrorPopup(prev => ({ ...prev, reporting: false, reported: true }));
+      toast.success('Error report sent to support.');
+    } catch (e: any) {
+      setErrorPopup(prev => ({ ...prev, reporting: false }));
+      toast.error(e.message || 'Failed to report error');
+    }
+  };
 
   useEffect(() => {
     fetchLicenseInfo();
@@ -188,7 +248,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           await autoSyncAfterPayment();
         } else {
           setPollingStatus(null);
-          toast.error(data.message || 'Verification failed');
+          showErrorPopup(data.message || 'Verification failed', 'verify-license');
         }
       } else {
         const error = await response.json();
@@ -230,13 +290,13 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           toast.info('Payment is still being processed. It should complete shortly.');
         } else {
           setPollingStatus(null);
-          toast.error(error.message || 'Verification failed');
+          showErrorPopup(error.message || 'Verification failed', 'verify-license');
         }
       }
     } catch (err: any) {
       console.error('Verify and activate error:', err);
       setPollingStatus(null);
-      toast.error('Failed to verify payment. You can retry from the dashboard.');
+      showErrorPopup('Failed to verify payment. You can retry from the dashboard.', 'verify-license');
     } finally {
       setActivatingLicenses(false);
     }
@@ -274,7 +334,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     } catch (err: any) {
       console.error('Verify renewal error:', err);
       setPollingStatus(null);
-      toast.error(err.message || 'Failed to verify renewal. You can retry from the dashboard.');
+      showErrorPopup(err.message || 'Failed to verify renewal. You can retry from the dashboard.', 'verify-renewal');
     } finally {
       setActivatingLicenses(false);
     }
@@ -337,7 +397,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       }
     } catch (error) {
       console.error('Error fetching license info:', error);
-      toast.error('Failed to fetch license information');
+      showErrorPopup('Failed to fetch license information', 'license-info');
     } finally {
       setFetchingLicenses(false);
     }
@@ -365,13 +425,18 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       }
     } catch (error: any) {
       console.error('Error syncing licenses:', error);
-      toast.error(error.message || 'Failed to sync licenses');
+      showErrorPopup(error.message || 'Failed to sync licenses', 'license-sync');
     } finally {
       setSyncing(false);
     }
   };
 
   const handleRenewLicense = async () => {
+    const hasActiveSubscription = Boolean(licenseInfo && !isLicenseExpired);
+    if (hasActiveSubscription) {
+      toast.info('Your current license is still active. This renewal will extend your expiry date after payment.', { duration: 5000 });
+    }
+
     const payWindow = window.open('', '_blank');
     if (payWindow) {
       payWindow.document.write(`<html><head><title>Connecting to Paystack...</title>
@@ -400,7 +465,11 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       if (!response.ok) {
         const error = await response.json();
         payWindow?.close();
-        throw new Error(error.error || error.message || 'Failed to initialize renewal');
+        const backendMessage = error.error || error.message || 'Failed to initialize renewal';
+        const friendlyMessage = String(backendMessage).includes('Route not found')
+          ? 'Renewal endpoint is not available right now. Please refresh and try again. If this keeps happening, report this error.'
+          : backendMessage;
+        throw new Error(friendlyMessage);
       }
       const data = await response.json();
       if (data.authorization_url) {
@@ -421,7 +490,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         throw new Error('No payment URL received');
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to start renewal');
+      showErrorPopup(error.message || 'Failed to start renewal', 'renew-license');
     } finally {
       setRenewLoading(false);
     }
@@ -552,7 +621,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     } catch (error: any) {
       console.error('Payment initialization error:', error);
       payWindow?.close();
-      toast.error(error.message || 'Failed to initialize payment');
+      showErrorPopup(error.message || 'Failed to initialize payment', 'purchase-licenses');
       setLoading(false);
       setFetchingUsers(false);
     }
@@ -632,7 +701,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         errorMessage = 'Payment gateway configuration error. Please contact support.';
       }
       
-      toast.error(errorMessage);
+      showErrorPopup(errorMessage, 'purchase-licenses');
       setLoading(false);
     }
   };
@@ -663,7 +732,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       if (!response.ok) {
         const error = await response.json();
         console.error('Paystack test failed:', error);
-        toast.error(`Paystack test failed: ${error.error || 'Unknown error'}`);
+        showErrorPopup(`Paystack test failed: ${error.error || 'Unknown error'}`, 'paystack-test');
         return;
       }
       
@@ -672,11 +741,11 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       if (result.success) {
         toast.success('Paystack connection successful! Payment gateway is working correctly.');
       } else {
-        toast.error(`Paystack test failed: ${result.error || 'Unknown error'}`);
+        showErrorPopup(`Paystack test failed: ${result.error || 'Unknown error'}`, 'paystack-test');
       }
     } catch (error: any) {
       console.error('Error testing Paystack:', error);
-      toast.error(`Test failed: ${error.message || 'Unknown error'}`);
+      showErrorPopup(`Test failed: ${error.message || 'Unknown error'}`, 'paystack-test');
     } finally {
       setTestingPaystack(false);
     }
@@ -1286,6 +1355,40 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           loading={loading}
         />
       )}
+
+      <Dialog open={errorPopup.open} onOpenChange={(open) => setErrorPopup(prev => ({ ...prev, open }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{errorPopup.title}</DialogTitle>
+            <DialogDescription>
+              {errorPopup.message}
+            </DialogDescription>
+          </DialogHeader>
+          {errorPopup.details && (
+            <div className="rounded-md border bg-muted p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+              {errorPopup.details}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setErrorPopup(prev => ({ ...prev, open: false }))}>
+              Close
+            </Button>
+            <Button
+              variant={errorPopup.reported ? 'outline' : 'default'}
+              onClick={handleReportError}
+              disabled={errorPopup.reporting || errorPopup.reported}
+            >
+              {errorPopup.reporting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Reporting...</>
+              ) : errorPopup.reported ? (
+                <><CheckCircle className="w-4 h-4 mr-2" />Reported</>
+              ) : (
+                <><Flag className="w-4 h-4 mr-2" />Report</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

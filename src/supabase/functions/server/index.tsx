@@ -13,6 +13,8 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
+const subscriptionRoutePaths = (path: string) =>
+  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
 // Validate the RESEND_FROM_EMAIL secret: Resend requires the 'from' field to
 // contain an actual email address (e.g. "Name <user@domain.com>" or "user@domain.com").
 // If the secret is missing or contains only a display name with no '@' character
@@ -7123,7 +7125,7 @@ app.get(`${PREFIX}/subscription/all-users`, async (c) => {
 // The duplicate handlers that were previously here have been removed to avoid confusion.
 
 // POST /subscription/renew-license — renew an existing subscription via Paystack
-app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
+const renewSubscriptionLicense = async (c: any) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
@@ -7214,10 +7216,11 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of subscriptionRoutePaths('/subscription/renew-license')) app.post(route, renewSubscriptionLicense);
 
 // Verify Paystack payment
-app.post(`${PREFIX}/subscription/verify`, async (c) => {
+const verifySubscriptionPayment = async (c: any) => {
   try {
     const { user } = await requireAuth(c);
     const body = await c.req.json();
@@ -7270,23 +7273,27 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
       }, 400);
     }
     
-    // Calculate subscription dates
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-    
+    const now = new Date();
+    const existingSubscription = await kv.get(`subscription:${pendingSubscription.userId}`);
+    const existingEndDate = existingSubscription?.endDate ? new Date(existingSubscription.endDate) : null;
+    const renewalAnchor = existingEndDate && existingEndDate > now ? existingEndDate : now;
+    const endDate = new Date(renewalAnchor);
     if (pendingSubscription.plan === 'monthly') {
       endDate.setDate(endDate.getDate() + 30);
     } else {
       endDate.setDate(endDate.getDate() + 365);
     }
-    
+    const existingUserCount = Number(existingSubscription?.userCount || 0);
+    const requestedUserCount = Number(pendingSubscription.userCount || 0);
+    const effectiveUserCount = Math.max(existingUserCount, requestedUserCount);
+
     // Create/update subscription
     const subscription = {
       userId: pendingSubscription.userId,
       plan: pendingSubscription.plan,
-      userCount: pendingSubscription.userCount,
+      userCount: effectiveUserCount,
       amount: pendingSubscription.amount,
-      startDate: startDate.toISOString(),
+      startDate: existingSubscription?.startDate || now.toISOString(),
       endDate: endDate.toISOString(),
       status: 'active',
       paymentReference: reference,
@@ -7294,7 +7301,8 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
         transactionId: paystackData.data.id,
         paidAt: paystackData.data.paid_at,
       },
-      createdAt: new Date().toISOString(),
+      createdAt: existingSubscription?.createdAt || now.toISOString(),
+      updatedAt: now.toISOString(),
     };
     
     await kv.set(`subscription:${pendingSubscription.userId}`, subscription);
@@ -7321,7 +7329,7 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
     return c.json({ 
       success: true, 
       plan: subscription.plan,
-      message: 'Subscription activated successfully',
+      message: existingSubscription ? 'Subscription renewed successfully' : 'Subscription activated successfully',
       subscription,
     });
   } catch (e: any) {
@@ -7329,10 +7337,11 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ success: false, error: e.message }, 500);
   }
-});
+};
+for (const route of subscriptionRoutePaths('/subscription/verify')) app.post(route, verifySubscriptionPayment);
 
 // Paystack webhook handler (for automated verification)
-app.post(`${PREFIX}/subscription/webhook`, async (c) => {
+const handleSubscriptionWebhook = async (c: any) => {
   try {
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
@@ -7441,7 +7450,8 @@ app.post(`${PREFIX}/subscription/webhook`, async (c) => {
     console.error('Webhook error:', e);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of subscriptionRoutePaths('/subscription/webhook')) app.post(route, handleSubscriptionWebhook);
 
 // ============ REPORTING ENDPOINTS ============
 // These endpoints provide aggregated data for the Advanced Reports module
@@ -10984,6 +10994,89 @@ const compatibleRoutePaths = (path: string) =>
 
 const compatibleRoutePathsForAliases = (...paths: string[]) =>
   Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
+
+// POST /support/report-error — report UI/runtime errors to support queue and platform admins
+const reportClientError = async (c: any) => {
+  try {
+    const { user } = await requireAuth(c);
+    const body = await c.req.json();
+    const message = String(body?.message || '').trim();
+    if (!message) {
+      return c.json({ error: 'message is required' }, 400);
+    }
+
+    const source = String(body?.source || 'unknown').trim();
+    const location = String(body?.location || '').trim();
+    const details = String(body?.details || '').trim();
+    const stack = String(body?.stack || '').trim();
+    const context = body?.context && typeof body.context === 'object' ? body.context : {};
+
+    const profile = await kv.get(`employee:${user.id}`) || await kv.get(`user_profile:${user.id}`) || {};
+    const companyId = profile?.companyId || profile?.company || '';
+    const company = companyId ? await kv.get(`company_by_id:${companyId}`) : null;
+    const tenantName = company?.name || profile?.companyName || profile?.company || '';
+
+    const ticketId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const ticket = {
+      id: ticketId,
+      tenantId: companyId,
+      tenantName,
+      issueType: 'system_error',
+      priority: 'high',
+      subject: `[Error Report] ${source || 'Application'}: ${message.slice(0, 120)}`,
+      description: message,
+      status: 'open',
+      assignedAgentId: '',
+      assignedAgentName: '',
+      creatorId: user.id,
+      creatorEmail: user.email,
+      createdAt: now,
+      updatedAt: now,
+      notes: [],
+      errorReport: {
+        source,
+        location,
+        details,
+        stack: stack.slice(0, 4000),
+        context,
+        userAgent: c.req.header('user-agent') || '',
+        requestPath: c.req.path,
+      },
+    };
+
+    await kv.set(`support-ticket:${ticketId}`, ticket);
+
+    const allEmployees = await kv.getByPrefix('employee:');
+    const platformAdmins = allEmployees.filter((emp: any) =>
+      emp?.isPlatformAdmin === true || ['developer', 'ultimateadmin'].includes(normalizeCareRole(emp?.role || ''))
+    );
+    await Promise.allSettled(platformAdmins.map((admin: any) =>
+      sendEmailNotification(
+        admin.id || admin.userId || '',
+        admin.email || '',
+        admin.name || '',
+        `Blumebyte HR Error Report: ${source || 'Application'}`,
+        `
+          <p>A new user error report was submitted and added to the support queue.</p>
+          <p><strong>Tenant:</strong> ${tenantName || 'Unknown'} ${companyId ? `(${companyId})` : ''}</p>
+          <p><strong>Reporter:</strong> ${user.email || user.id}</p>
+          <p><strong>Source:</strong> ${source || 'unknown'}</p>
+          <p><strong>Location:</strong> ${location || 'N/A'}</p>
+          <p><strong>Message:</strong> ${message}</p>
+          ${details ? `<p><strong>Details:</strong> ${details}</p>` : ''}
+          <p><strong>Ticket ID:</strong> ${ticketId}</p>
+        `,
+      )
+    ));
+
+    return c.json({ success: true, ticketId });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message || 'Failed to report error' }, 500);
+  }
+};
+for (const route of compatibleRoutePaths('/support/report-error')) app.post(route, reportClientError);
 
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {
