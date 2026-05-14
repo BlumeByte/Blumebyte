@@ -153,7 +153,7 @@ export function ReportsPanel() {
 
   const totalHoursFromUsers = usersData.reduce((s, u) => s + (parseFloat(u.totalHoursWorked) || 0), 0);
   const totalHoursFromAttendance = attendanceData.reduce((s, a) => s + (parseFloat(a.totalHours) || 0), 0);
-  const totalHoursAll = totalHoursFromUsers > 0 ? totalHoursFromUsers : totalHoursFromAttendance;
+  const totalHoursAll = Math.max(totalHoursFromUsers, totalHoursFromAttendance);
   const totalAttDays = usersData.reduce((s, u) => s + (u.attendanceDays || 0), 0);
 
   const filteredUsers = usersData.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));

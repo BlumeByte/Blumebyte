@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -83,12 +83,16 @@ export function AutomationModule({ companyId, companyName }: AutomationModulePro
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
+  const superAdminProfile = useMemo(
+    () => allEmployees.find((emp: any) => emp?.role === 'superadmin' && (emp?.companyId || emp?.company)),
+    [allEmployees]
+  );
   const resolvedCompanyId = companyId && companyId !== 'all'
     ? companyId
-    : ((allEmployees.find((emp: any) => emp?.role === 'superadmin' && (emp?.companyId || emp?.company))?.companyId
-      || allEmployees.find((emp: any) => emp?.role === 'superadmin' && (emp?.companyId || emp?.company))?.company
+    : ((superAdminProfile?.companyId
+      || superAdminProfile?.company
       || ''));
-  const resolvedCompanyName = companyName || allEmployees.find((emp: any) => emp?.role === 'superadmin')?.company || '';
+  const resolvedCompanyName = companyName || superAdminProfile?.company || '';
 
   // Workflow form state
   const [workflowForm, setWorkflowForm] = useState({

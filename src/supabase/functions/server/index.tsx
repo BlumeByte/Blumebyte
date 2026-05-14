@@ -7287,7 +7287,10 @@ const verifySubscriptionPayment = async (c: any) => {
     
     const now = new Date();
     const existingSubscription = await kv.get(`subscription:${pendingSubscription.userId}`);
-    const existingEndDate = existingSubscription?.endDate ? new Date(existingSubscription.endDate) : null;
+    const existingEndDateCandidate = existingSubscription?.endDate ? new Date(existingSubscription.endDate) : null;
+    const existingEndDate = existingEndDateCandidate && !Number.isNaN(existingEndDateCandidate.getTime())
+      ? existingEndDateCandidate
+      : null;
     const renewalAnchor = existingEndDate && existingEndDate > now ? existingEndDate : now;
     const endDate = new Date(renewalAnchor);
     if (pendingSubscription.plan === 'monthly') {
@@ -11013,6 +11016,8 @@ const compatibleRoutePaths = (path: string) =>
 const compatibleRoutePathsForAliases = (...paths: string[]) =>
   Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
 
+const MAX_ERROR_REPORT_STACK_CHARS = 4000;
+
 // POST /support/report-error — report UI/runtime errors to support queue and platform admins
 const reportClientError = async (c: any) => {
   try {
@@ -11056,7 +11061,7 @@ const reportClientError = async (c: any) => {
         source,
         location,
         details,
-        stack: stack.slice(0, 4000),
+        stack: stack.slice(0, MAX_ERROR_REPORT_STACK_CHARS),
         context,
         userAgent: c.req.header('user-agent') || '',
         requestPath: c.req.path,

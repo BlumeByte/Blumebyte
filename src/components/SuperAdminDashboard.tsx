@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api, invalidateCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
@@ -487,6 +487,7 @@ export function SuperAdminDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [selectedCompanyName, setSelectedCompanyName] = useState<string>('All Companies');
+  const automationCompanyId = selectedCompanyId !== 'all' ? selectedCompanyId : (user?.companyId || '');
 
   const renderContent = () => {
     switch (activeSection) {
@@ -516,7 +517,7 @@ export function SuperAdminDashboard() {
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;
       case 'recruitment': return <RecruitmentView />;
-      case 'automation': return <div className="p-8"><AutomationModule companyId={selectedCompanyId !== 'all' ? selectedCompanyId : (user?.companyId || '')} companyName={selectedCompanyName || ''} /></div>;
+      case 'automation': return <div className="p-8"><AutomationModule companyId={automationCompanyId} companyName={selectedCompanyName || ''} /></div>;
       case 'profile-requests': return <ProfileChangeRequests />;
       case 'settings': return (
         <div className="p-8 space-y-8">
@@ -3601,6 +3602,12 @@ function UserManagementView() {
   const [showTempPw, setShowTempPw] = useState(false);
   const [search, setSearch] = useState('');
   const [licenseInfo, setLicenseInfo] = useState<any>(null);
+  const selectedCompanyRecord = useMemo(
+    () => (selectedCompanyId && selectedCompanyId !== 'all'
+      ? companies.find((c: any) => c.id === selectedCompanyId)
+      : null),
+    [companies, selectedCompanyId]
+  );
 
   const fetchLicenseInfo = useCallback(async () => {
     try {
@@ -3648,11 +3655,8 @@ function UserManagementView() {
         return;
       }
 
-      const selectedCompany = selectedCompanyId && selectedCompanyId !== 'all'
-        ? companies.find((c: any) => c.id === selectedCompanyId)
-        : null;
-      const resolvedCompanyId = selectedCompany?.id || formData.companyId || companies[0]?.id || '';
-      const resolvedCompanyName = selectedCompany?.name
+      const resolvedCompanyId = selectedCompanyRecord?.id || formData.companyId || companies[0]?.id || '';
+      const resolvedCompanyName = selectedCompanyRecord?.name
         || selectedCompanyName
         || formData.company
         || formData.companyName
@@ -3844,7 +3848,7 @@ function UserManagementView() {
                   <Label>Company</Label>
                   <Input
                     value={
-                      (selectedCompanyId !== 'all' && companies.find((c: any) => c.id === selectedCompanyId)?.name)
+                      selectedCompanyRecord?.name
                       || selectedCompanyName
                       || formData.company
                       || formData.companyName
