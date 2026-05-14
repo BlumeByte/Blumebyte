@@ -7286,6 +7286,7 @@ const verifySubscriptionPayment = async (c: any) => {
     const existingUserCount = Number(existingSubscription?.userCount || 0);
     const requestedUserCount = Number(pendingSubscription.userCount || 0);
     const effectiveUserCount = Math.max(existingUserCount, requestedUserCount);
+    const preservedExistingUserCount = existingUserCount > requestedUserCount;
 
     // Create/update subscription
     const subscription = {
@@ -7320,6 +7321,8 @@ const verifySubscriptionPayment = async (c: any) => {
       details: { 
         plan: subscription.plan, 
         userCount: subscription.userCount,
+        requestedUserCount,
+        preservedExistingUserCount,
         amount: subscription.amount,
         startDate: subscription.startDate,
         endDate: subscription.endDate,
@@ -7330,6 +7333,9 @@ const verifySubscriptionPayment = async (c: any) => {
       success: true, 
       plan: subscription.plan,
       message: existingSubscription ? 'Subscription renewed successfully' : 'Subscription activated successfully',
+      userCountPreserved: preservedExistingUserCount,
+      requestedUserCount,
+      effectiveUserCount: subscription.userCount,
       subscription,
     });
   } catch (e: any) {

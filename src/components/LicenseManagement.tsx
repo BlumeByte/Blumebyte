@@ -330,6 +330,12 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       setPollingStatus(null);
       setPendingPaymentType(null);
       toast.success('Subscription renewed successfully!', { duration: 6000 });
+      if (data.userCountPreserved) {
+        toast.info(
+          `Renewal completed. Your active license count remains ${data.effectiveUserCount} (requested ${data.requestedUserCount}).`,
+          { duration: 7000 }
+        );
+      }
       fetchLicenseInfo();
     } catch (err: any) {
       console.error('Verify renewal error:', err);
@@ -451,7 +457,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const freshToken = await getToken();
       if (!freshToken) { payWindow?.close(); toast.error('Not authenticated'); return; }
 
-      const licenses = Math.max(MIN_LICENSES, renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES));
+      const licenses = getEffectiveRenewLicenses();
       const pricePerUser = renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
       const amount = licenses * pricePerUser;
 
@@ -754,6 +760,9 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const pricePerUser = selectedPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
   const totalCost = additionalLicenses * pricePerUser;
   const monthlyEquivalent = selectedPlan === 'yearly' ? (totalCost / 12).toFixed(2) : totalCost;
+  const getEffectiveRenewLicenses = () =>
+    Math.max(MIN_LICENSES, renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES));
+  const effectiveRenewLicenses = getEffectiveRenewLicenses();
 
   const EXPIRY_WARNING_DAYS = 14; // Show renewal section this many days before expiry
 
@@ -1276,14 +1285,14 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                 <Input
                   type="number"
                   min={String(MIN_LICENSES)}
-                  value={renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES)}
+                  value={effectiveRenewLicenses}
                   onChange={e => setRenewLicenses(Math.max(MIN_LICENSES, parseInt(e.target.value) || MIN_LICENSES))}
                   className="text-center"
                 />
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setRenewLicenses((renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES)) + 1)}
+                  onClick={() => setRenewLicenses(effectiveRenewLicenses + 1)}
                 >+</Button>
               </div>
               <p className="text-xs text-muted-foreground">Minimum {MIN_LICENSES} licenses. Defaults to your current purchased licenses.</p>
@@ -1323,8 +1332,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
               </Card>
             </div>
             <div className="bg-orange-100 rounded-lg p-3 text-sm text-orange-800">
-              Renewing <strong>{renewLicenses > 0 ? renewLicenses : (licenseInfo.purchasedLicenses || MIN_LICENSES)} license(s)</strong> for{' '}
-              <strong>${((renewLicenses > 0 ? renewLicenses : (licenseInfo.purchasedLicenses || MIN_LICENSES)) * (renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY)).toFixed(2)}</strong>{' '}
+              Renewing <strong>{effectiveRenewLicenses} license(s)</strong> for{' '}
+              <strong>${(effectiveRenewLicenses * (renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY)).toFixed(2)}</strong>{' '}
               ({renewPlan})
             </div>
             <Button
