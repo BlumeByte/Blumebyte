@@ -3913,6 +3913,7 @@ function UserManagementView() {
 function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config: EntityConfig; filterFn?: (item: any) => boolean }) {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
+  const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [items, setItems] = useState<any[]>([]);
   const [relatedData, setRelatedData] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
@@ -4576,12 +4577,34 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                       </div>
                     </div>
                   ) : field.type === 'related-select' ? (
-                    <NativeSelect value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}>
-                      <option value="">{`Select ${field.label.toLowerCase()}`}</option>
-                      {(relatedData[field.relatedEntity!] || []).map(item => (
-                        <option key={item.id} value={item.id}>{typeof item.name === 'string' ? item.name : String(item.name || item.id)}</option>
-                      ))}
-                    </NativeSelect>
+                    (() => {
+                      const relOptions = relatedData[field.relatedEntity!] || [];
+                      // For company fields: auto-select and hide the dropdown when there is only one company
+                      // or when the dashboard context already has a specific company selected.
+                      if (field.relatedEntity === 'companies') {
+                        const ctxCompanyId = selectedCompanyId !== 'all' ? selectedCompanyId : null;
+                        const effectiveId = ctxCompanyId || (relOptions.length === 1 ? relOptions[0].id : null);
+                        if (effectiveId) {
+                          const co = relOptions.find((o: any) => o.id === effectiveId);
+                          const displayName = co?.name || selectedCompanyName || effectiveId;
+                          // Ensure the hidden value is kept in formData
+                          if (formData[field.key] !== effectiveId) {
+                            setTimeout(() => setFormData((prev: any) => ({ ...prev, [field.key]: effectiveId })), 0);
+                          }
+                          return (
+                            <Input value={displayName} readOnly disabled className="bg-muted cursor-not-allowed" />
+                          );
+                        }
+                      }
+                      return (
+                        <NativeSelect value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}>
+                          <option value="">{`Select ${field.label.toLowerCase()}`}</option>
+                          {relOptions.map((item: any) => (
+                            <option key={item.id} value={item.id}>{typeof item.name === 'string' ? item.name : String(item.name || item.id)}</option>
+                          ))}
+                        </NativeSelect>
+                      );
+                    })()
                   ) : field.type === 'date' ? (
                     <Input type="date" value={formData[field.key] || ''} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} />
                   ) : field.type === 'date-future' ? (

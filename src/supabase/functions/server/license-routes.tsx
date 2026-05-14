@@ -449,7 +449,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       // Initialize Paystack transaction
       const reference = `LIC_${user.id}_${Date.now()}`;
-      const callbackUrl = `${c.req.header('origin')}/payment-verify-license`;
+      const _origin = c.req.header('origin') || c.req.header('referer')?.split('/').slice(0, 3).join('/') || '';
+      const callbackUrl = _origin ? `${_origin}/payment-verify-license` : '';
       
       // Convert USD to configured Paystack currency
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
@@ -1079,7 +1080,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       // Initialize Paystack transaction
       const reference = `LIC_${user.id}_${Date.now()}`;
-      const callbackUrl = `${c.req.header('origin')}/payment-verify-license`;
+      const _origin2 = c.req.header('origin') || c.req.header('referer')?.split('/').slice(0, 3).join('/') || '';
+      const callbackUrl = _origin2 ? `${_origin2}/payment-verify-license` : '';
       
       // Convert USD to configured Paystack currency
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
