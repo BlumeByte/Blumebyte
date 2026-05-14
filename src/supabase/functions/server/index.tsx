@@ -575,6 +575,14 @@ const JOB_PUBLIC_VISIBILITIES = new Set([
   'public_job_board',
   'public_appears_on_job_board',
 ]);
+const JOB_PRIVATE_VISIBILITIES = new Set([
+  'private',
+  'private_internal',
+  'internal',
+  'internal_only',
+  'private_company',
+  'company_only',
+]);
 const JOB_TRUTHY_PUBLIC_VALUES = new Set([
   'true',
   '1',
@@ -665,13 +673,17 @@ function isPublicJobPosting(job: any): boolean {
     return !!normalized && JOB_TRUTHY_PUBLIC_VALUES.has(normalized);
   });
   const isPublicByVisibility = !!visibility && JOB_PUBLIC_VISIBILITIES.has(visibility);
-  if (!isExplicitlyPublic && !isPublicByVisibility) return false;
+  const isExplicitlyPrivate = !!visibility && JOB_PRIVATE_VISIBILITIES.has(visibility);
+  if (isExplicitlyPrivate) return false;
   const status = normalizeJobStatus(job.status);
   // Backward compatibility: old public postings may be missing status entirely.
   if (!status) return true;
+  // Always exclude explicitly hidden statuses.
+  if (JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return false;
+  // Keep explicit public behavior.
+  if (isExplicitlyPublic || isPublicByVisibility) return true;
+  // Default behavior: active open vacancies are public unless explicitly private.
   if (JOB_ACTIVE_STATUSES.has(status)) return true;
-  // Public visibility should continue to expose postings unless they are explicitly hidden.
-  if ((isPublicByVisibility || isExplicitlyPublic) && !JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return true;
   return false;
 }
 
