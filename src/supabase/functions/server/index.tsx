@@ -13,6 +13,8 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
+const subscriptionRoutePaths = (path: string) =>
+  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
 // Validate the RESEND_FROM_EMAIL secret: Resend requires the 'from' field to
 // contain an actual email address (e.g. "Name <user@domain.com>" or "user@domain.com").
 // If the secret is missing or contains only a display name with no '@' character
@@ -573,6 +575,14 @@ const JOB_PUBLIC_VISIBILITIES = new Set([
   'public_job_board',
   'public_appears_on_job_board',
 ]);
+const JOB_PRIVATE_VISIBILITIES = new Set([
+  'private',
+  'private_internal',
+  'internal',
+  'internal_only',
+  'private_company',
+  'company_only',
+]);
 const JOB_TRUTHY_PUBLIC_VALUES = new Set([
   'true',
   '1',
@@ -663,13 +673,17 @@ function isPublicJobPosting(job: any): boolean {
     return !!normalized && JOB_TRUTHY_PUBLIC_VALUES.has(normalized);
   });
   const isPublicByVisibility = !!visibility && JOB_PUBLIC_VISIBILITIES.has(visibility);
-  if (!isExplicitlyPublic && !isPublicByVisibility) return false;
+  const isExplicitlyPrivate = !!visibility && JOB_PRIVATE_VISIBILITIES.has(visibility);
+  if (isExplicitlyPrivate) return false;
   const status = normalizeJobStatus(job.status);
   // Backward compatibility: old public postings may be missing status entirely.
   if (!status) return true;
+  // Always exclude explicitly hidden statuses.
+  if (JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return false;
+  // Keep explicit public behavior.
+  if (isExplicitlyPublic || isPublicByVisibility) return true;
+  // Default behavior: active open vacancies are public unless explicitly private.
   if (JOB_ACTIVE_STATUSES.has(status)) return true;
-  // Public visibility should continue to expose postings unless they are explicitly hidden.
-  if ((isPublicByVisibility || isExplicitlyPublic) && !JOB_EXPLICITLY_HIDDEN_STATUSES.has(status)) return true;
   return false;
 }
 
@@ -810,7 +824,6 @@ async function applyCompanyFilter(items: any[], userId: string, role: string): P
     if (!itemCompanyId && !itemCompanyName) return false; // STRICT: Exclude items without company assignment
     // CASE-INSENSITIVE comparison: match on companyId OR companyName against scope
     return scopeLower.some(ac => (itemCompanyId && ac === itemCompanyId) || (itemCompanyName && ac === itemCompanyName));
-  });
   });
   
   return filtered;
@@ -7124,14 +7137,15 @@ app.get(`${PREFIX}/subscription/all-users`, async (c) => {
 // The duplicate handlers that were previously here have been removed to avoid confusion.
 
 // POST /subscription/renew-license — renew an existing subscription via Paystack
-app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
+const renewSubscriptionLicense = async (c: any) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
     const { licenses, plan, saveCard } = body;
 
-    if (!licenses || !plan) {
-      return c.json({ error: 'Missing required fields: licenses, plan' }, 400);
+    const licensesNum = Number(licenses);
+    if (!plan || !Number.isFinite(licensesNum) || licensesNum <= 0) {
+      return c.json({ error: 'Missing required fields: licenses (must be > 0), plan' }, 400);
     }
     if (!['monthly', 'yearly'].includes(plan)) {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
@@ -7144,13 +7158,18 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
 
     // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month = $30.60/user/year
     const pricePerUser = plan === 'monthly' ? 3.55 : 30.60;
-    const amount = Number(licenses) * pricePerUser;
+    const amount = licensesNum * pricePerUser;
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
 
     // Convert USD amount to the configured Paystack currency (GHS/NGN/USD)
     const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
+
+    // Guard against zero/invalid amounts that Paystack would reject
+    if (!amountSmallestUnit || amountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}). Please contact support.` }, 400);
+    }
 
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -7167,14 +7186,14 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
         metadata: {
           userId: user.id,
           plan,
-          userCount: licenses,
+          userCount: licensesNum,
           isRenewal: true,
           saveCard: saveCard !== false,
           amountUsd: amount,
           custom_fields: [
             { display_name: 'Transaction Type', variable_name: 'type', value: 'renewal' },
             { display_name: 'Plan', variable_name: 'plan', value: plan },
-            { display_name: 'Licenses', variable_name: 'user_count', value: String(licenses) },
+            { display_name: 'Licenses', variable_name: 'user_count', value: String(licensesNum) },
           ],
         },
       }),
@@ -7188,7 +7207,7 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
     await kv.set(`pending-subscription:${reference}`, {
       userId: user.id,
       plan,
-      userCount: licenses,
+      userCount: licensesNum,
       amount,
       amountSmallestUnit,
       currency,
@@ -7209,10 +7228,11 @@ app.post(`${PREFIX}/subscription/renew-license`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of subscriptionRoutePaths('/subscription/renew-license')) app.post(route, renewSubscriptionLicense);
 
 // Verify Paystack payment
-app.post(`${PREFIX}/subscription/verify`, async (c) => {
+const verifySubscriptionPayment = async (c: any) => {
   try {
     const { user } = await requireAuth(c);
     const body = await c.req.json();
@@ -7265,23 +7285,31 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
       }, 400);
     }
     
-    // Calculate subscription dates
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-    
+    const now = new Date();
+    const existingSubscription = await kv.get(`subscription:${pendingSubscription.userId}`);
+    const existingEndDateCandidate = existingSubscription?.endDate ? new Date(existingSubscription.endDate) : null;
+    const existingEndDate = existingEndDateCandidate && !Number.isNaN(existingEndDateCandidate.getTime())
+      ? existingEndDateCandidate
+      : null;
+    const renewalAnchor = existingEndDate && existingEndDate > now ? existingEndDate : now;
+    const endDate = new Date(renewalAnchor);
     if (pendingSubscription.plan === 'monthly') {
       endDate.setDate(endDate.getDate() + 30);
     } else {
       endDate.setDate(endDate.getDate() + 365);
     }
-    
+    const existingUserCount = Number(existingSubscription?.userCount || 0);
+    const requestedUserCount = Number(pendingSubscription.userCount || 0);
+    const effectiveUserCount = Math.max(existingUserCount, requestedUserCount);
+    const preservedExistingUserCount = existingUserCount > requestedUserCount;
+
     // Create/update subscription
     const subscription = {
       userId: pendingSubscription.userId,
       plan: pendingSubscription.plan,
-      userCount: pendingSubscription.userCount,
+      userCount: effectiveUserCount,
       amount: pendingSubscription.amount,
-      startDate: startDate.toISOString(),
+      startDate: existingSubscription?.startDate || now.toISOString(),
       endDate: endDate.toISOString(),
       status: 'active',
       paymentReference: reference,
@@ -7289,7 +7317,8 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
         transactionId: paystackData.data.id,
         paidAt: paystackData.data.paid_at,
       },
-      createdAt: new Date().toISOString(),
+      createdAt: existingSubscription?.createdAt || now.toISOString(),
+      updatedAt: now.toISOString(),
     };
     
     await kv.set(`subscription:${pendingSubscription.userId}`, subscription);
@@ -7307,6 +7336,8 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
       details: { 
         plan: subscription.plan, 
         userCount: subscription.userCount,
+        requestedUserCount,
+        preservedExistingUserCount,
         amount: subscription.amount,
         startDate: subscription.startDate,
         endDate: subscription.endDate,
@@ -7316,7 +7347,10 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
     return c.json({ 
       success: true, 
       plan: subscription.plan,
-      message: 'Subscription activated successfully',
+      message: existingSubscription ? 'Subscription renewed successfully' : 'Subscription activated successfully',
+      userCountPreserved: preservedExistingUserCount,
+      requestedUserCount,
+      effectiveUserCount: subscription.userCount,
       subscription,
     });
   } catch (e: any) {
@@ -7324,10 +7358,11 @@ app.post(`${PREFIX}/subscription/verify`, async (c) => {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     return c.json({ success: false, error: e.message }, 500);
   }
-});
+};
+for (const route of subscriptionRoutePaths('/subscription/verify')) app.post(route, verifySubscriptionPayment);
 
 // Paystack webhook handler (for automated verification)
-app.post(`${PREFIX}/subscription/webhook`, async (c) => {
+const handleSubscriptionWebhook = async (c: any) => {
   try {
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
@@ -7436,7 +7471,8 @@ app.post(`${PREFIX}/subscription/webhook`, async (c) => {
     console.error('Webhook error:', e);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of subscriptionRoutePaths('/subscription/webhook')) app.post(route, handleSubscriptionWebhook);
 
 // ============ REPORTING ENDPOINTS ============
 // These endpoints provide aggregated data for the Advanced Reports module
@@ -8956,7 +8992,13 @@ app.get(`${PREFIX}/company/info`, async (c) => {
 app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const { plan, amount, licenses } = await c.req.json();
+    const { plan, licenses } = await c.req.json();
+    const licensesNum = Number(licenses);
+    const normalizedPlan = ['monthly', 'yearly'].includes(plan) ? plan : 'monthly';
+
+    if (!Number.isFinite(licensesNum) || licensesNum <= 0) {
+      return c.json({ error: 'licenses must be a positive number' }, 400);
+    }
 
     const userProfile = await kv.get(`user_profile:${authUser.user.id}`);
     const companyId = userProfile?.companyId;
@@ -8976,7 +9018,17 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       return c.json({ error: 'Payment system not configured' }, 500);
     }
 
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+    // Always compute amount server-side from canonical prices
+    const pricePerLicense = normalizedPlan === 'monthly' ? 3.55 : 30.60;
+    const amountUsd = licensesNum * pricePerLicense;
+    const { amountSmallestUnit, currency } = await usdToPaystackAmount(amountUsd);
+    if (!amountSmallestUnit || amountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}).` }, 400);
+    }
+
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`;
+
+    let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${paystackSecretKey}`,
@@ -8984,20 +9036,54 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       },
       body: JSON.stringify({
         email: userProfile.email,
-        amount: Math.round(amount * 100), // Paystack expects amount in kobo
+        amount: amountSmallestUnit,
+        currency,
         reference: reference,
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`,
+        callback_url: callbackUrl,
         metadata: {
           companyId: companyId,
           companyName: company.name,
-          plan: plan,
-          licenses: licenses,
+          plan: normalizedPlan,
+          licenses: licensesNum,
+          amountUsd,
           userId: authUser.user.id,
         },
       }),
     });
 
-    const data = await paystackResponse.json();
+    let data = await paystackResponse.json();
+
+    // Fallback: retry in USD for gateways that reject converted local amounts
+    if (!data?.status && /invalid amount/i.test(String(data?.message || '')) && currency !== 'USD') {
+      const usdAmountSmallestUnit = Math.round(amountUsd * 100);
+      if (usdAmountSmallestUnit >= 100) {
+        paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userProfile.email,
+            amount: usdAmountSmallestUnit,
+            currency: 'USD',
+            reference: reference,
+            callback_url: callbackUrl,
+            metadata: {
+              companyId: companyId,
+              companyName: company.name,
+              plan: normalizedPlan,
+              licenses: licensesNum,
+              amountUsd,
+              userId: authUser.user.id,
+              paystackCurrencyFallback: true,
+              originalCurrency: currency,
+            },
+          }),
+        });
+        data = await paystackResponse.json();
+      }
+    }
 
     if (!data.status) {
       return c.json({ error: data.message || 'Failed to initialize payment' }, 400);
@@ -9007,9 +9093,9 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
     await kv.set(`pending_payment:${reference}`, {
       reference,
       companyId,
-      plan,
-      amount,
-      licenses,
+      plan: normalizedPlan,
+      amount: amountUsd,
+      licenses: licensesNum,
       userId: authUser.user.id,
       createdAt: new Date().toISOString(),
     });
@@ -9133,6 +9219,9 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
 
     // Convert USD to configured Paystack currency
     const { amountSmallestUnit: upgradeAmountSmallestUnit, currency: upgradeCurrency } = await usdToPaystackAmount(amountUsd);
+    if (!upgradeAmountSmallestUnit || upgradeAmountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${upgradeAmountSmallestUnit} ${upgradeCurrency}).` }, 400);
+    }
 
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -10926,6 +11015,91 @@ const compatibleRoutePaths = (path: string) =>
 
 const compatibleRoutePathsForAliases = (...paths: string[]) =>
   Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
+
+const MAX_ERROR_REPORT_STACK_CHARS = 4000;
+
+// POST /support/report-error — report UI/runtime errors to support queue and platform admins
+const reportClientError = async (c: any) => {
+  try {
+    const { user } = await requireAuth(c);
+    const body = await c.req.json();
+    const message = String(body?.message || '').trim();
+    if (!message) {
+      return c.json({ error: 'message is required' }, 400);
+    }
+
+    const source = String(body?.source || 'unknown').trim();
+    const location = String(body?.location || '').trim();
+    const details = String(body?.details || '').trim();
+    const stack = String(body?.stack || '').trim();
+    const context = body?.context && typeof body.context === 'object' ? body.context : {};
+
+    const profile = await kv.get(`employee:${user.id}`) || await kv.get(`user_profile:${user.id}`) || {};
+    const companyId = profile?.companyId || profile?.company || '';
+    const company = companyId ? await kv.get(`company_by_id:${companyId}`) : null;
+    const tenantName = company?.name || profile?.companyName || profile?.company || '';
+
+    const ticketId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const ticket = {
+      id: ticketId,
+      tenantId: companyId,
+      tenantName,
+      issueType: 'system_error',
+      priority: 'high',
+      subject: `[Error Report] ${source || 'Application'}: ${message.slice(0, 120)}`,
+      description: message,
+      status: 'open',
+      assignedAgentId: '',
+      assignedAgentName: '',
+      creatorId: user.id,
+      creatorEmail: user.email,
+      createdAt: now,
+      updatedAt: now,
+      notes: [],
+      errorReport: {
+        source,
+        location,
+        details,
+        stack: stack.slice(0, MAX_ERROR_REPORT_STACK_CHARS),
+        context,
+        userAgent: c.req.header('user-agent') || '',
+        requestPath: c.req.path,
+      },
+    };
+
+    await kv.set(`support-ticket:${ticketId}`, ticket);
+
+    const allEmployees = await kv.getByPrefix('employee:');
+    const platformAdmins = allEmployees.filter((emp: any) =>
+      emp?.isPlatformAdmin === true || ['developer', 'ultimateadmin'].includes(normalizeCareRole(emp?.role || ''))
+    );
+    await Promise.allSettled(platformAdmins.map((admin: any) =>
+      sendEmailNotification(
+        admin.id || admin.userId || '',
+        admin.email || '',
+        admin.name || '',
+        `Blumebyte HR Error Report: ${source || 'Application'}`,
+        `
+          <p>A new user error report was submitted and added to the support queue.</p>
+          <p><strong>Tenant:</strong> ${tenantName || 'Unknown'} ${companyId ? `(${companyId})` : ''}</p>
+          <p><strong>Reporter:</strong> ${user.email || user.id}</p>
+          <p><strong>Source:</strong> ${source || 'unknown'}</p>
+          <p><strong>Location:</strong> ${location || 'N/A'}</p>
+          <p><strong>Message:</strong> ${message}</p>
+          ${details ? `<p><strong>Details:</strong> ${details}</p>` : ''}
+          <p><strong>Ticket ID:</strong> ${ticketId}</p>
+        `,
+      )
+    ));
+
+    return c.json({ success: true, ticketId });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: e.message || 'Failed to report error' }, 500);
+  }
+};
+for (const route of compatibleRoutePaths('/support/report-error')) app.post(route, reportClientError);
 
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {

@@ -34,7 +34,7 @@ const SIDEBAR_ITEMS = [
   { id: 'tickets', label: 'Support Tickets', icon: Ticket },
   { id: 'license-issues', label: 'License Issues', icon: Key },
   { id: 'platform-users', label: 'Platform Users', icon: UserPlus },
-  { id: 'assignments', label: 'Assignments', icon: Activity },
+  // { id: 'assignments', label: 'Assignments', icon: Activity }, // disabled – single company mode
   { id: 'audit', label: 'Audit Trail', icon: BookOpen },
   { id: 'dev-tools', label: 'Tools', icon: Wrench },
   { id: 'settings', label: 'Settings', icon: Settings },

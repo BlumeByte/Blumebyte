@@ -118,6 +118,11 @@ export function AdvancedReportsModule() {
       fetchReportData();
     }
   }, [accessToken, fetchReportData]);
+  useEffect(() => {
+    if (!accessToken) return;
+    const interval = setInterval(() => fetchReportData(), 30000);
+    return () => clearInterval(interval);
+  }, [accessToken, fetchReportData]);
 
   // Real-time subscription to Supabase broadcasts for instant updates
   useEffect(() => {
@@ -174,7 +179,7 @@ export function AdvancedReportsModule() {
     avgAttendance: filteredAttendance.length > 0
       ? ((filteredAttendance.filter((a) => a.status === 'present').length / filteredAttendance.length) * 100).toFixed(1)
       : '0',
-    pendingLeaves: (reportData.leaves || []).filter((l) => l.status === 'pending').length,
+    pendingLeaves: filteredLeaves.filter((l) => l.status === 'pending').length,
     totalPayroll: filteredPayroll.reduce((sum, p) => sum + parseFloat(p.netPay || 0), 0),
   };
 

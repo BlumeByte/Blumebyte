@@ -60,6 +60,119 @@ async function syncCompanySubscriptionMirror(userId: string, subscription: any) 
 }
 
 export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSuperAdmin: any, logAudit: any) {
+  const initializePaystackTransaction = async ({
+    paystackSecretKey,
+    email,
+    reference,
+    callbackUrl,
+    preferredAmountSmallestUnit,
+    preferredCurrency,
+    amountUsd,
+    metadata,
+  }: {
+    paystackSecretKey: string;
+    email: string;
+    reference: string;
+    callbackUrl: string;
+    preferredAmountSmallestUnit: number;
+    preferredCurrency: string;
+    amountUsd: number;
+    metadata: Record<string, any>;
+  }) => {
+    const callInitialize = async (payload: Record<string, any>) => {
+      const response = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${paystackSecretKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const rawText = await response.text();
+      let json: any = null;
+      try {
+        json = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        json = null;
+      }
+
+      return { response, rawText, json };
+    };
+
+    const primaryPayload = {
+      email,
+      amount: preferredAmountSmallestUnit,
+      currency: preferredCurrency,
+      reference,
+      callback_url: callbackUrl,
+      metadata,
+    };
+
+    const primary = await callInitialize(primaryPayload);
+    if (primary.response.ok && primary.json?.status) {
+      return {
+        success: true,
+        paystackData: primary.json,
+        amountSmallestUnit: preferredAmountSmallestUnit,
+        currency: preferredCurrency,
+      };
+    }
+
+    const primaryMessage = (primary.json?.message || primary.rawText || '').toString();
+    const shouldRetryWithUsd =
+      /invalid amount/i.test(primaryMessage) &&
+      preferredCurrency !== 'USD';
+
+    if (!shouldRetryWithUsd) {
+      return {
+        success: false,
+        message: primaryMessage || `Paystack API error: ${primary.response.status} ${primary.response.statusText}`,
+        details: primary.rawText,
+        paystackResponse: primary.json,
+      };
+    }
+
+    const usdAmountSmallestUnit = Math.round(Number(amountUsd || 0) * 100);
+    if (!usdAmountSmallestUnit || usdAmountSmallestUnit < 100) {
+      return {
+        success: false,
+        message: primaryMessage || 'Invalid amount for the selected plan',
+        details: primary.rawText,
+        paystackResponse: primary.json,
+      };
+    }
+
+    const fallbackPayload = {
+      email,
+      amount: usdAmountSmallestUnit,
+      currency: 'USD',
+      reference,
+      callback_url: callbackUrl,
+      metadata: {
+        ...metadata,
+        paystackCurrencyFallback: true,
+        originalCurrency: preferredCurrency,
+      },
+    };
+
+    const fallback = await callInitialize(fallbackPayload);
+    if (fallback.response.ok && fallback.json?.status) {
+      return {
+        success: true,
+        paystackData: fallback.json,
+        amountSmallestUnit: usdAmountSmallestUnit,
+        currency: 'USD',
+      };
+    }
+
+    return {
+      success: false,
+      message: (fallback.json?.message || fallback.rawText || primaryMessage || 'Failed to initialize payment').toString(),
+      details: fallback.rawText || primary.rawText,
+      paystackResponse: fallback.json || primary.json,
+    };
+  };
   
   // Debug endpoint to check Paystack configuration
   app.get(`${PREFIX}/subscription/paystack-debug`, async (c: any) => {
@@ -340,55 +453,41 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       // Convert USD to configured Paystack currency
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+
+      // Guard against zero/invalid amounts that Paystack would reject
+      if (!amountSmallestUnit || amountSmallestUnit < 100) {
+        return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}). Please contact support.` }, 400);
+      }
       
-      // Debug logging
-      
-      const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${paystackSecretKey}`,
-          'Content-Type': 'application/json',
+      const paystackInit = await initializePaystackTransaction({
+        paystackSecretKey,
+        email: user.email,
+        reference,
+        callbackUrl,
+        preferredAmountSmallestUnit: amountSmallestUnit,
+        preferredCurrency: currency,
+        amountUsd: amount,
+        metadata: {
+          userId: user.id,
+          plan,
+          licenses,
+          saveCard,
+          amountUsd: amount,
         },
-        body: JSON.stringify({
-          email: user.email,
-          amount: amountSmallestUnit,
-          currency,
-          reference,
-          callback_url: callbackUrl,
-          metadata: {
-            userId: user.id,
-            plan,
-            licenses,
-            saveCard,
-            amountUsd: amount,
-          },
-        }),
       });
-      
-      if (!paystackResponse.ok) {
-        const errorText = await paystackResponse.text();
-        console.error('Paystack API error response:', errorText);
-        return c.json({ 
-          error: `Paystack API error: ${paystackResponse.status} ${paystackResponse.statusText}`,
-          details: errorText 
+
+      if (!paystackInit.success) {
+        console.error('Paystack initialization failed:', paystackInit);
+        return c.json({
+          error: paystackInit.message || 'Failed to initialize payment',
+          details: paystackInit.details || '',
+          paystackResponse: paystackInit.paystackResponse || null,
         }, 500);
       }
-      
-      const paystackData = await paystackResponse.json();
-      
-      // Log the full response for debugging
-      
-      if (!paystackData.status) {
-        console.error('Paystack initialization failed:', paystackData);
-        // Return detailed error message from Paystack
-        const errorMessage = paystackData.message || 'Failed to initialize payment';
-        const errorDetails = paystackData.errors ? JSON.stringify(paystackData.errors) : '';
-        return c.json({ 
-          error: errorMessage,
-          details: errorDetails,
-          paystackResponse: paystackData 
-        }, 500);
-      }
+
+      const paystackData = paystackInit.paystackData;
+      const finalAmountSmallestUnit = paystackInit.amountSmallestUnit;
+      const finalCurrency = paystackInit.currency;
       
       // Store pending license purchase
       await kv.set(`pending-license:${reference}`, {
@@ -396,8 +495,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         plan,
         licenses,
         amount,
-        amountSmallestUnit,
-        currency,
+        amountSmallestUnit: finalAmountSmallestUnit,
+        currency: finalCurrency,
         saveCard,
         reference,
         status: 'pending',
@@ -984,59 +1083,42 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       
       // Convert USD to configured Paystack currency
       const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+
+      // Guard against zero/invalid amounts that Paystack would reject
+      if (!amountSmallestUnit || amountSmallestUnit < 100) {
+        return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}). Please contact support.` }, 400);
+      }
       
-      // Debug logging
-      
-      const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${paystackSecretKey}`,
-          'Content-Type': 'application/json',
+      const paystackInit = await initializePaystackTransaction({
+        paystackSecretKey,
+        email: user.email,
+        reference,
+        callbackUrl,
+        preferredAmountSmallestUnit: amountSmallestUnit,
+        preferredCurrency: currency,
+        amountUsd: amount,
+        metadata: {
+          userId: user.id,
+          plan,
+          licenses,
+          saveCard,
+          selectedUserIds: selectedUserIds || [],
+          amountUsd: amount,
         },
-        body: JSON.stringify({
-          email: user.email,
-          amount: amountSmallestUnit,
-          currency,
-          reference,
-          callback_url: callbackUrl,
-          metadata: {
-            userId: user.id,
-            plan,
-            licenses,
-            saveCard,
-            selectedUserIds: selectedUserIds || [],
-            amountUsd: amount,
-          },
-        }),
       });
-      
-      // Log the response status for debugging
-      
-      // Check if the response is OK before parsing JSON
-      if (!paystackResponse.ok) {
-        const errorText = await paystackResponse.text();
-        console.error('Paystack API error response:', errorText);
-        return c.json({ 
-          error: `Paystack API error: ${paystackResponse.status} ${paystackResponse.statusText}`,
-          details: errorText 
+
+      if (!paystackInit.success) {
+        console.error('Paystack initialization failed:', paystackInit);
+        return c.json({
+          error: paystackInit.message || 'Failed to initialize payment',
+          details: paystackInit.details || '',
+          paystackResponse: paystackInit.paystackResponse || null,
         }, 500);
       }
-      
-      const paystackData = await paystackResponse.json();
-      
-      // Log the full response for debugging
-      
-      if (!paystackData.status) {
-        console.error('Paystack initialization failed:', paystackData);
-        // Return detailed error message from Paystack
-        const errorMessage = paystackData.message || 'Failed to initialize payment';
-        const errorDetails = paystackData.errors ? JSON.stringify(paystackData.errors) : '';
-        return c.json({ 
-          error: errorMessage,
-          details: errorDetails,
-          paystackResponse: paystackData 
-        }, 500);
-      }
+
+      const paystackData = paystackInit.paystackData;
+      const finalAmountSmallestUnit = paystackInit.amountSmallestUnit;
+      const finalCurrency = paystackInit.currency;
       
       // Store pending license purchase with selected users
       await kv.set(`pending-license:${reference}`, {
@@ -1044,8 +1126,8 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         plan,
         licenses,
         amount,
-        amountSmallestUnit,
-        currency,
+        amountSmallestUnit: finalAmountSmallestUnit,
+        currency: finalCurrency,
         saveCard,
         selectedUserIds: selectedUserIds || [],
         reference,

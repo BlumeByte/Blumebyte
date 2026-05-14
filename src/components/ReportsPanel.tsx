@@ -89,6 +89,10 @@ export function ReportsPanel() {
   }, [accessToken, user?.role]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(() => load(), 30000);
+    return () => clearInterval(interval);
+  }, [load]);
   
   // Real-time subscription to Supabase broadcasts for instant updates
   useEffect(() => {
@@ -147,7 +151,9 @@ export function ReportsPanel() {
     return Object.entries(map).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }));
   })();
 
-  const totalHoursAll = usersData.reduce((s, u) => s + (parseFloat(u.totalHoursWorked) || 0), 0);
+  const totalHoursFromUsers = usersData.reduce((s, u) => s + (parseFloat(u.totalHoursWorked) || 0), 0);
+  const totalHoursFromAttendance = attendanceData.reduce((s, a) => s + (parseFloat(a.totalHours) || 0), 0);
+  const totalHoursAll = Math.max(totalHoursFromUsers, totalHoursFromAttendance);
   const totalAttDays = usersData.reduce((s, u) => s + (u.attendanceDays || 0), 0);
 
   const filteredUsers = usersData.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));

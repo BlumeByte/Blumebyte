@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { api, clearAllCache, invalidateCache } from '../lib/api-client';
+import { api, invalidateCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -26,7 +26,7 @@ import {
   Award, Target, MessageSquare, GitMerge, UserCheck, BookOpen, Archive,
   MessageCircle, Send, Mail, User, Download, Upload, ArrowUpRight,
   Eye, Star, MapPin, GraduationCap, Gavel, Shield, Heart, Zap,
-  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Printer, Filter, LogOut, Play, CreditCard, Activity, Menu
+  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet, Printer, Filter, LogOut, Play, CreditCard, Menu
 } from 'lucide-react';
 import { MessagesPanel } from './MessagesPanel';
 import { NotificationsBell } from './NotificationsBell';
@@ -59,8 +59,7 @@ import { AutomationModule } from './AutomationModule';
 import { OvertimeExpenseApproval } from './OvertimeExpenseApproval';
 import { SurveyBuilder } from './SurveyBuilder';
 import { EmployeeEngagementAnalytics } from './EmployeeEngagementAnalytics';
-import { CompanySwitcher } from './CompanySwitcher';
-import { CompanyUsageAnalytics } from './CompanyUsageAnalytics';
+// CompanySwitcher import removed — multi-company feature disabled
 import { GlobalCurrencySettings } from './GlobalCurrencySettings';
 import { CompanyBrandingSettings } from './CompanyBrandingSettings';
 import { LanguageSelector } from './LanguageSelector';
@@ -116,7 +115,6 @@ const SIDEBAR_ITEMS = [
   { id: 'disciplinary', label: 'Disciplinary', icon: AlertCircle, group: 'operations' },
   { id: 'hr-reports', label: 'HR Reports & Analytics', icon: BarChart3, group: 'operations' },
   { id: 'advanced-reports', label: 'Advanced Reports', icon: TrendingUp, group: 'operations' },
-  { id: 'usage-analytics', label: 'Company Usage Analytics', icon: Activity, group: 'operations' },
   { id: 'labour-compliance', label: 'Labour Act Compliance', icon: FileCheck, group: 'operations' },
   { id: 'onboarding-training', label: 'Onboarding & Training', icon: BookOpen, group: 'development' },
   { id: 'overtime-expenses', label: 'OT & Expenses', icon: Clock, group: 'time' },
@@ -489,6 +487,7 @@ export function SuperAdminDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [selectedCompanyName, setSelectedCompanyName] = useState<string>('All Companies');
+  const automationCompanyId = selectedCompanyId !== 'all' ? selectedCompanyId : (user?.companyId || '');
 
   const renderContent = () => {
     switch (activeSection) {
@@ -514,12 +513,11 @@ export function SuperAdminDashboard() {
       case 'overtime-expenses': return <div className="p-8"><OvertimeExpenseApproval /></div>;
       case 'surveys': return <div className="p-8"><SurveyBuilder /></div>;
       case 'engagement-analytics': return <div className="p-8"><EmployeeEngagementAnalytics /></div>;
-      case 'usage-analytics': return <CompanyUsageAnalytics accessToken={accessToken} />;
       case 'meetings-1on1': return <div className="p-8"><MeetingsPanel mode="admin" /></div>;
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;
       case 'recruitment': return <RecruitmentView />;
-      case 'automation': return <div className="p-8"><AutomationModule companyId={user?.companyId || ''} /></div>;
+      case 'automation': return <div className="p-8"><AutomationModule companyId={automationCompanyId} companyName={selectedCompanyName || ''} /></div>;
       case 'profile-requests': return <ProfileChangeRequests />;
       case 'settings': return (
         <div className="p-8 space-y-8">
@@ -685,15 +683,12 @@ export function SuperAdminDashboard() {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <CompanySwitcher 
-              accessToken={accessToken}
-              currentCompanyId={selectedCompanyId}
-              onCompanySwitch={(companyId, companyName) => {
-                clearAllCache();
-                setSelectedCompanyId(companyId);
-                setSelectedCompanyName(companyName);
-              }}
-            />
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden" style={brandGradientStyle(branding.primaryColor)}>
+                {branding.logoUrl ? <img src={branding.logoUrl} alt="" className="w-full h-full object-contain p-0.5" /> : <span className="text-white text-xs font-bold">{branding.companyName?.[0] || 'B'}</span>}
+              </div>
+              <span className="text-sm font-semibold text-foreground truncate">{branding.companyName || 'My Company'}</span>
+            </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
             <SubscriptionBadge />
@@ -2058,11 +2053,25 @@ function PayrollView() {
 
       // Use the server-side calculate endpoint which reads both tax-bracket and tax-configuration,
       // as well as both benefit-plan and benefit KV stores for complete accuracy
-      const result = await api('/superadmin/payroll/calculate', {
-        method: 'POST',
-        body: { userId, basicSalary, period },
-        token: accessToken,
-      });
+      let result: any;
+      try {
+        result = await api('/superadmin/payroll/calculate', {
+          method: 'POST',
+          body: { userId, basicSalary, period },
+          token: accessToken,
+        });
+      } catch (primaryError: any) {
+        // Compatibility fallback for deployments where the superadmin alias is unavailable
+        if (String(primaryError?.message || '').includes('Route not found')) {
+          result = await api('/admin/payroll/calculate', {
+            method: 'POST',
+            body: { userId, basicSalary, period },
+            token: accessToken,
+          });
+        } else {
+          throw primaryError;
+        }
+      }
 
       setFormData((prev: any) => ({
         ...prev,
@@ -3579,6 +3588,8 @@ function EmployeesView() {
 // ========== USER MANAGEMENT ==========
 function UserManagementView() {
   const { accessToken, user } = useAuth();
+  const { branding } = useBranding();
+  const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [users, setUsers] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -3591,6 +3602,12 @@ function UserManagementView() {
   const [showTempPw, setShowTempPw] = useState(false);
   const [search, setSearch] = useState('');
   const [licenseInfo, setLicenseInfo] = useState<any>(null);
+  const selectedCompanyRecord = useMemo(
+    () => (selectedCompanyId && selectedCompanyId !== 'all'
+      ? companies.find((c: any) => c.id === selectedCompanyId)
+      : null),
+    [companies, selectedCompanyId]
+  );
 
   const fetchLicenseInfo = useCallback(async () => {
     try {
@@ -3638,9 +3655,21 @@ function UserManagementView() {
         return;
       }
 
+      const resolvedCompanyId = selectedCompanyRecord?.id || formData.companyId || companies[0]?.id || '';
+      const resolvedCompanyName = selectedCompanyRecord?.name
+        || selectedCompanyName
+        || formData.company
+        || formData.companyName
+        || branding.companyName
+        || companies[0]?.name
+        || 'Blumebyte';
+
       // Prepare data with departments array
       const payload = {
         ...formData,
+        companyId: resolvedCompanyId,
+        company: resolvedCompanyName,
+        companyName: resolvedCompanyName,
         departments: formData.departments || (formData.department ? [formData.department] : []),
         department: formData.department || (formData.departments && formData.departments[0]) || '',
       };
@@ -3817,10 +3846,19 @@ function UserManagementView() {
                 </div>
                 <div>
                   <Label>Company</Label>
-                  <NativeSelect value={formData.companyId || ''} onChange={e => setFormData({ ...formData, companyId: e.target.value })}>
-                    <option value="">Select company</option>
-                    {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </NativeSelect>
+                  <Input
+                    value={
+                      selectedCompanyRecord?.name
+                      || selectedCompanyName
+                      || formData.company
+                      || formData.companyName
+                      || branding.companyName
+                      || companies[0]?.name
+                      || 'Blumebyte'
+                    }
+                    readOnly
+                    disabled
+                  />
                 </div>
                 
                 {/* Multi-Department Selection */}
