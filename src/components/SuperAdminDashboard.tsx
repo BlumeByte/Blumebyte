@@ -3972,6 +3972,23 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
     return () => clearInterval(interval);
   }, [load]);
 
+  // Auto-populate company fields when the dialog opens and a single company context is available.
+  // This avoids showing a multi-company dropdown for admins who manage only one company.
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const companyFields = config.fields.filter(f => f.type === 'related-select' && f.relatedEntity === 'companies');
+    if (companyFields.length === 0) return;
+    const companies = relatedData['companies'] || [];
+    const ctxCompanyId = selectedCompanyId !== 'all' ? selectedCompanyId : null;
+    const effectiveId = ctxCompanyId || (companies.length === 1 ? companies[0].id : null);
+    if (!effectiveId) return;
+    setFormData((prev: any) => {
+      const updates: Record<string, string> = {};
+      companyFields.forEach(f => { if (!prev[f.key]) updates[f.key] = effectiveId; });
+      return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
+    });
+  }, [dialogOpen, selectedCompanyId, relatedData, config.fields]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -4579,18 +4596,15 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
                   ) : field.type === 'related-select' ? (
                     (() => {
                       const relOptions = relatedData[field.relatedEntity!] || [];
-                      // For company fields: auto-select and hide the dropdown when there is only one company
-                      // or when the dashboard context already has a specific company selected.
+                      // For company fields: show a read-only input when the context already
+                      // determines the company (single-company or context-selected). The value
+                      // is pre-populated by the useEffect above; this just hides the dropdown.
                       if (field.relatedEntity === 'companies') {
                         const ctxCompanyId = selectedCompanyId !== 'all' ? selectedCompanyId : null;
                         const effectiveId = ctxCompanyId || (relOptions.length === 1 ? relOptions[0].id : null);
                         if (effectiveId) {
                           const co = relOptions.find((o: any) => o.id === effectiveId);
                           const displayName = co?.name || selectedCompanyName || effectiveId;
-                          // Ensure the hidden value is kept in formData
-                          if (formData[field.key] !== effectiveId) {
-                            setTimeout(() => setFormData((prev: any) => ({ ...prev, [field.key]: effectiveId })), 0);
-                          }
                           return (
                             <Input value={displayName} readOnly disabled className="bg-muted cursor-not-allowed" />
                           );
