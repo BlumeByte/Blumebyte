@@ -106,6 +106,22 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     }
   };
 
+  const buildSupportTicketPayload = () => ({
+    tenantId: licenseInfo?.companyId || '',
+    tenantName: '',
+    issueType: 'bug',
+    priority: 'high',
+    subject: `License billing error: ${errorPopup.source || 'license-management'}`,
+    description: [
+      `Location: ${window.location.pathname}`,
+      `Message: ${errorPopup.message}`,
+      errorPopup.details ? `Details: ${errorPopup.details}` : '',
+      `Plan context: selected=${selectedPlan}, renew=${renewPlan}`,
+      `License context: additional=${additionalLicenses}, renew=${renewLicenses}`,
+      pendingReference ? `Reference: ${pendingReference}` : '',
+    ].filter(Boolean).join('\n'),
+  });
+
   const showErrorPopup = (message: string, source = 'license-management', details = '', title = 'Something went wrong') => {
     setErrorPopup({
       open: true,
@@ -155,6 +171,19 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         lastErrorMessage = errorMessage || `Failed to report error (${response.status})`;
         if (!isRetryableMissingRoute(response.status, errorMessage)) {
           throw new Error(lastErrorMessage);
+        }
+      }
+      if (!reported && isRouteNotFoundMessage(lastErrorMessage)) {
+        const supportTicketResponse = await apiClient.post(
+          '/ultimateadmin/support/tickets',
+          buildSupportTicketPayload(),
+          freshToken,
+        );
+        if (supportTicketResponse.ok) {
+          reported = true;
+        } else {
+          const ticketErrorMessage = await parseApiErrorMessage(supportTicketResponse);
+          lastErrorMessage = ticketErrorMessage || `Failed to create support ticket (${supportTicketResponse.status})`;
         }
       }
       if (!reported) {
@@ -504,7 +533,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const pricePerUser = renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
       const amount = licenses * pricePerUser;
 
-      const renewalEndpoints = ['/subscription/renew-license', '/subscription/renew'];
+      const renewalEndpoints = ['/subscription/renew-license', '/subscription/renew', '/subscription/initialize'];
       const renewalBasePayload = {
         licenses,
         plan: renewPlan,
