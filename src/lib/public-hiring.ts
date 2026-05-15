@@ -88,7 +88,11 @@ function ensureStringArray(value: unknown): string[] {
 
 function shouldTryNextPublicHiringEndpoint(error: any): boolean {
   const status = typeof error?.status === 'number' ? error.status : 0;
-  return status === 0 || status === 404 || status === 405 || status === 501;
+  if (status === 0 || status === 404 || status === 405 || status === 501) return true;
+  const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+  if (message.includes('route not found')) return true;
+  if (message.includes('method not allowed')) return true;
+  return false;
 }
 
 async function requestPublicHiringWithFallback<T>(
