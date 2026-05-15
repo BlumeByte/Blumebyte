@@ -4512,8 +4512,11 @@ makeCrud("admin/departments", "department:", requireAdminOrAbove);
 makeCrud("admin/compensations", "compensation:", requireAdminOrAbove);
 makeCrud("admin/benefits", "benefit:", requireAdminOrAbove);
 
+const payrollRoutePaths = (path: string) =>
+  [`${PREFIX}${path}`, path, `/:functionName${path}`];
+
 // POST /admin/payroll/calculate — auto-calculate tax deductions + benefit allowances for a given employee + basic salary
-app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
+const adminPayrollCalculate = async (c: any) => {
   try {
     const { user } = await requireAdminOrAbove(c);
     const { userId, basicSalary: baseSalaryStr, period } = await c.req.json();
@@ -4614,10 +4617,11 @@ app.post(`${PREFIX}/admin/payroll/calculate`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of payrollRoutePaths('/admin/payroll/calculate')) app.post(route, adminPayrollCalculate);
 
 // Alias: superadmin can also call calculate directly
-app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
+const superadminPayrollCalculate = async (c: any) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const { userId, basicSalary: baseSalaryStr, period } = await c.req.json();
@@ -4685,7 +4689,8 @@ app.post(`${PREFIX}/superadmin/payroll/calculate`, async (c) => {
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of payrollRoutePaths('/superadmin/payroll/calculate')) app.post(route, superadminPayrollCalculate);
 
 // Public read-only endpoints for employees to access reference data
 app.get(`${PREFIX}/leave-types`, async (c) => {
@@ -11099,7 +11104,9 @@ const reportClientError = async (c: any) => {
     return c.json({ error: e.message || 'Failed to report error' }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/support/report-error')) app.post(route, reportClientError);
+for (const route of compatibleRoutePathsForAliases('/support/report-error', '/support/error-report', '/report-error', '/error-report')) {
+  app.post(route, reportClientError);
+}
 
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {

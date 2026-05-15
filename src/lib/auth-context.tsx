@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const tokenCacheRef = useRef<{ token: string; expiresAt: number } | null>(null);
   const tokenFetchingRef = useRef<Promise<string | null> | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clockOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
   const fetchProfile = useCallback(async (token: string) => {
@@ -113,6 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return token;
   }, []);
 
+  // Helper: call auto-clock-out silently; used on logout and inactivity
+  const autoClockOut = async () => {
+    try {
+      const token = await getToken();
+      if (token) {
+        await api('/attendance/auto-clock-out', { method: 'POST', body: {}, token });
+      }
+    } catch (e) {
+      // Silently ignore — user may not be clocked in
+    }
+  };
+
   // Reset inactivity timer
   const resetInactivityTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
@@ -120,10 +133,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
+    if (clockOutTimerRef.current) {
+      clearTimeout(clockOutTimerRef.current);
+    }
     
     // Only set timer if user is logged in
     if (user) {
-      // 2 hours of inactivity before auto-logout (as requested)
+      // Clock out after 1 hour of inactivity
+      const CLOCK_OUT_AFTER_INACTIVITY = 1 * 60 * 60 * 1000;
+      clockOutTimerRef.current = setTimeout(autoClockOut, CLOCK_OUT_AFTER_INACTIVITY);
+
+      // Auto-logout after 2 hours of inactivity (as requested)
       const INACTIVITY_TIMEOUT = 2 * 60 * 60 * 1000;
       
       inactivityTimerRef.current = setTimeout(async () => {
@@ -202,13 +222,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         // Page is visible again - check how long it was hidden
         const hiddenDuration = Date.now() - lastActivityRef.current;
-        // Only force logout if hidden for more than 2 hours (same as inactivity timeout)
+        const CLOCK_OUT_HIDDEN_DURATION = 1 * 60 * 60 * 1000; // 1 hour
         const MAX_HIDDEN_DURATION = 2 * 60 * 60 * 1000; // 2 hours
         
         if (hiddenDuration > MAX_HIDDEN_DURATION) {
+          // Hidden for 2hrs+ — ensure clocked out then force logout
+          await autoClockOut();
           console.log('Auto-logout: Page was hidden for too long');
           await logout();
           window.location.href = '/login?reason=session_expired';
+        } else if (hiddenDuration > CLOCK_OUT_HIDDEN_DURATION) {
+          // Hidden for 1–2hrs — auto clock-out but keep session active
+          await autoClockOut();
+          // Reset the timer when page becomes visible again so the 1hr starts fresh
+          resetInactivityTimer();
         } else {
           // Reset the timer when page becomes visible again so the 1hr starts fresh
           resetInactivityTimer();
@@ -234,6 +261,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
+      }
+      if (clockOutTimerRef.current) {
+        clearTimeout(clockOutTimerRef.current);
       }
     };
   }, [user, resetInactivityTimer]);
@@ -291,6 +321,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    // Auto clock-out before signing out so attendance records are closed
+    await autoClockOut();
     try {
       await supabase.auth.signOut();
     } catch (e) {
@@ -304,6 +336,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
+    }
+    if (clockOutTimerRef.current) {
+      clearTimeout(clockOutTimerRef.current);
+      clockOutTimerRef.current = null;
     }
   };
 

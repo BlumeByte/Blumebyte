@@ -86,6 +86,42 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     reported: false,
   });
 
+  const isRouteNotFoundMessage = (message = '') =>
+    /(route not found|method not allowed|cannot (post|get|put|patch|delete)|404\b)/i.test(message);
+
+  const isRetryableMissingRoute = (status: number, message: string) =>
+    status === 404 || status === 405 || status === 501 || isRouteNotFoundMessage(message);
+
+  const isAmountRequiredMessage = (message = '') =>
+    /(missing required fields?.*amount|amount is required)/i.test(message);
+
+  const parseApiErrorMessage = async (response: Response) => {
+    const raw = await response.text().catch(() => '');
+    if (!raw) return '';
+    try {
+      const parsed = JSON.parse(raw);
+      return String(parsed?.error || parsed?.message || raw);
+    } catch {
+      return raw;
+    }
+  };
+
+  const buildSupportTicketPayload = () => ({
+    tenantId: licenseInfo?.companyId || '',
+    tenantName: '',
+    issueType: 'bug',
+    priority: 'high',
+    subject: `License billing error: ${errorPopup.source || 'license-management'}`,
+    description: [
+      `Location: ${window.location.pathname}`,
+      `Message: ${errorPopup.message}`,
+      errorPopup.details ? `Details: ${errorPopup.details}` : '',
+      `Plan context: selected=${selectedPlan}, renew=${renewPlan}`,
+      `License context: additional=${additionalLicenses}, renew=${renewLicenses}`,
+      pendingReference ? `Reference: ${pendingReference}` : '',
+    ].filter(Boolean).join('\n'),
+  });
+
   const showErrorPopup = (message: string, source = 'license-management', details = '', title = 'Something went wrong') => {
     setErrorPopup({
       open: true,
@@ -104,7 +140,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       setErrorPopup(prev => ({ ...prev, reporting: true }));
       const freshToken = await getToken();
       if (!freshToken) throw new Error('Not authenticated');
-      const response = await apiClient.post('/support/report-error', {
+      const payload = {
         source: errorPopup.source,
         location: window.location.pathname,
         message: errorPopup.message,
@@ -116,10 +152,46 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           renewLicenses,
           pendingReference,
         },
-      }, freshToken);
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to report error');
+      };
+      const endpoints = [
+        '/support/report-error',
+        '/support/error-report',
+        '/report-error',
+        '/error-report',
+      ];
+      let reported = false;
+      let lastErrorMessage = '';
+      for (const endpoint of endpoints) {
+        const response = await apiClient.post(endpoint, payload, freshToken);
+        if (response.ok) {
+          reported = true;
+          break;
+        }
+        const errorMessage = await parseApiErrorMessage(response);
+        lastErrorMessage = errorMessage || `Failed to report error (${response.status})`;
+        if (!isRetryableMissingRoute(response.status, errorMessage)) {
+          throw new Error(lastErrorMessage);
+        }
+      }
+      if (!reported && isRouteNotFoundMessage(lastErrorMessage)) {
+        const supportTicketResponse = await apiClient.post(
+          '/ultimateadmin/support/tickets',
+          buildSupportTicketPayload(),
+          freshToken,
+        );
+        if (supportTicketResponse.ok) {
+          reported = true;
+        } else {
+          const ticketErrorMessage = await parseApiErrorMessage(supportTicketResponse);
+          lastErrorMessage = ticketErrorMessage || `Failed to create support ticket (${supportTicketResponse.status})`;
+        }
+      }
+      if (!reported) {
+        throw new Error(
+          isRouteNotFoundMessage(lastErrorMessage)
+            ? 'Error reporting endpoint is unavailable right now. Please contact support directly.'
+            : lastErrorMessage || 'Failed to report error',
+        );
       }
       setErrorPopup(prev => ({ ...prev, reporting: false, reported: true }));
       toast.success('Error report sent to support.');
@@ -461,20 +533,32 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const pricePerUser = renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
       const amount = licenses * pricePerUser;
 
-      const response = await apiClient.post('/subscription/renew-license', {
+      const renewalEndpoints = ['/subscription/renew-license', '/subscription/renew', '/subscription/initialize'];
+      const renewalBasePayload = {
         licenses,
         plan: renewPlan,
-        amount,
         saveCard,
-      }, freshToken);
+      };
+      let response: Response | null = null;
+      let backendMessage = '';
+      for (const endpoint of renewalEndpoints) {
+        response = await apiClient.post(endpoint, renewalBasePayload, freshToken);
+        if (response.ok) break;
+        backendMessage = await parseApiErrorMessage(response);
+        if (isAmountRequiredMessage(backendMessage)) {
+          response = await apiClient.post(endpoint, { ...renewalBasePayload, amount }, freshToken);
+          if (response.ok) break;
+          backendMessage = await parseApiErrorMessage(response);
+        }
+        if (!isRetryableMissingRoute(response.status, backendMessage)) break;
+      }
 
-      if (!response.ok) {
-        const error = await response.json();
+      if (!response || !response.ok) {
         payWindow?.close();
-        const backendMessage = error.error || error.message || 'Failed to initialize renewal';
-        const friendlyMessage = String(backendMessage).includes('Route not found')
+        const fallbackMessage = backendMessage || 'Failed to initialize renewal';
+        const friendlyMessage = isRouteNotFoundMessage(fallbackMessage)
           ? 'Renewal endpoint is not available right now. Please refresh and try again. If this keeps happening, report this error.'
-          : backendMessage;
+          : fallbackMessage;
         throw new Error(friendlyMessage);
       }
       const data = await response.json();
@@ -657,18 +741,26 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const payload = {
         licenses: safeLicenses,
         plan: selectedPlan,
-        amount: totalAmount,
         saveCard,
         ...(selectedUserIds.length > 0 && { selectedUserIds }),
       };
 
-      const response = await apiClient.post(endpoint, payload, freshToken);
+      let response = await apiClient.post(endpoint, payload, freshToken);
+      let backendMessage = '';
+      if (!response.ok) {
+        backendMessage = await parseApiErrorMessage(response);
+        if (isAmountRequiredMessage(backendMessage)) {
+          response = await apiClient.post(endpoint, { ...payload, amount: totalAmount }, freshToken);
+          if (!response.ok) {
+            backendMessage = await parseApiErrorMessage(response);
+          }
+        }
+      }
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('Payment initialization failed:', error);
+        console.error('Payment initialization failed:', backendMessage);
         payWindow?.close();
-        throw new Error(error.error || error.message || 'Failed to initialize payment');
+        throw new Error(backendMessage || 'Failed to initialize payment');
       }
 
       const data = await response.json();
