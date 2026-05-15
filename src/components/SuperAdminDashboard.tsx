@@ -2053,25 +2053,29 @@ function PayrollView() {
 
       // Use the server-side calculate endpoint which reads both tax-bracket and tax-configuration,
       // as well as both benefit-plan and benefit KV stores for complete accuracy
-      let result: any;
-      try {
-        result = await api('/superadmin/payroll/calculate', {
-          method: 'POST',
-          body: { userId, basicSalary, period },
-          token: accessToken,
-        });
-      } catch (primaryError: any) {
-        // Compatibility fallback for deployments where the superadmin alias is unavailable
-        if (String(primaryError?.message || '').includes('Route not found')) {
-          result = await api('/admin/payroll/calculate', {
+      const isMissingRouteError = (error: any) => {
+        const message = String(error?.message || '');
+        const status = Number(error?.status || 0);
+        return /route not found/i.test(message) || status === 404 || status === 405 || status === 501;
+      };
+      const payrollEndpoints = ['/superadmin/payroll/calculate', '/admin/payroll/calculate', '/payroll/calculate'];
+      let result: any = null;
+      let lastError: any = null;
+      for (const endpoint of payrollEndpoints) {
+        try {
+          result = await api(endpoint, {
             method: 'POST',
             body: { userId, basicSalary, period },
             token: accessToken,
           });
-        } else {
-          throw primaryError;
+          lastError = null;
+          break;
+        } catch (error: any) {
+          lastError = error;
+          if (!isMissingRouteError(error)) break;
         }
       }
+      if (lastError) throw lastError;
 
       setFormData((prev: any) => ({
         ...prev,

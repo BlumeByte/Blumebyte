@@ -86,6 +86,23 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     reported: false,
   });
 
+  const isRouteNotFoundMessage = (message: string) =>
+    /route not found/i.test(message || '');
+
+  const isRetryableMissingRoute = (status: number, message: string) =>
+    status === 404 || status === 405 || status === 501 || isRouteNotFoundMessage(message);
+
+  const parseApiErrorMessage = async (response: Response) => {
+    const raw = await response.text().catch(() => '');
+    if (!raw) return '';
+    try {
+      const parsed = JSON.parse(raw);
+      return String(parsed?.error || parsed?.message || raw);
+    } catch {
+      return raw;
+    }
+  };
+
   const showErrorPopup = (message: string, source = 'license-management', details = '', title = 'Something went wrong') => {
     setErrorPopup({
       open: true,
@@ -104,7 +121,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       setErrorPopup(prev => ({ ...prev, reporting: true }));
       const freshToken = await getToken();
       if (!freshToken) throw new Error('Not authenticated');
-      const response = await apiClient.post('/support/report-error', {
+      const payload = {
         source: errorPopup.source,
         location: window.location.pathname,
         message: errorPopup.message,
@@ -116,10 +133,28 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           renewLicenses,
           pendingReference,
         },
-      }, freshToken);
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to report error');
+      };
+      const endpoints = ['/support/report-error', '/support/error-report'];
+      let reported = false;
+      let lastErrorMessage = '';
+      for (const endpoint of endpoints) {
+        const response = await apiClient.post(endpoint, payload, freshToken);
+        if (response.ok) {
+          reported = true;
+          break;
+        }
+        const errorMessage = await parseApiErrorMessage(response);
+        lastErrorMessage = errorMessage || `Failed to report error (${response.status})`;
+        if (!isRetryableMissingRoute(response.status, errorMessage)) {
+          throw new Error(lastErrorMessage);
+        }
+      }
+      if (!reported) {
+        throw new Error(
+          isRouteNotFoundMessage(lastErrorMessage)
+            ? 'Error reporting endpoint is unavailable right now. Please contact support directly.'
+            : lastErrorMessage || 'Failed to report error',
+        );
       }
       setErrorPopup(prev => ({ ...prev, reporting: false, reported: true }));
       toast.success('Error report sent to support.');
@@ -461,20 +496,27 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const pricePerUser = renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
       const amount = licenses * pricePerUser;
 
-      const response = await apiClient.post('/subscription/renew-license', {
-        licenses,
-        plan: renewPlan,
-        amount,
-        saveCard,
-      }, freshToken);
+      const renewalEndpoints = ['/subscription/renew-license', '/subscription/renew'];
+      let response: Response | null = null;
+      let backendMessage = '';
+      for (const endpoint of renewalEndpoints) {
+        response = await apiClient.post(endpoint, {
+          licenses,
+          plan: renewPlan,
+          amount,
+          saveCard,
+        }, freshToken);
+        if (response.ok) break;
+        backendMessage = await parseApiErrorMessage(response);
+        if (!isRetryableMissingRoute(response.status, backendMessage)) break;
+      }
 
-      if (!response.ok) {
-        const error = await response.json();
+      if (!response || !response.ok) {
         payWindow?.close();
-        const backendMessage = error.error || error.message || 'Failed to initialize renewal';
-        const friendlyMessage = String(backendMessage).includes('Route not found')
+        const fallbackMessage = backendMessage || 'Failed to initialize renewal';
+        const friendlyMessage = isRouteNotFoundMessage(fallbackMessage)
           ? 'Renewal endpoint is not available right now. Please refresh and try again. If this keeps happening, report this error.'
-          : backendMessage;
+          : fallbackMessage;
         throw new Error(friendlyMessage);
       }
       const data = await response.json();
