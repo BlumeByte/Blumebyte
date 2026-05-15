@@ -92,6 +92,9 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const isRetryableMissingRoute = (status: number, message: string) =>
     status === 404 || status === 405 || status === 501 || isRouteNotFoundMessage(message);
 
+  const isAmountRequiredMessage = (message = '') =>
+    /(missing required fields?.*amount|amount is required)/i.test(message);
+
   const parseApiErrorMessage = async (response: Response) => {
     const raw = await response.text().catch(() => '');
     if (!raw) return '';
@@ -502,17 +505,22 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const amount = licenses * pricePerUser;
 
       const renewalEndpoints = ['/subscription/renew-license', '/subscription/renew'];
+      const renewalBasePayload = {
+        licenses,
+        plan: renewPlan,
+        saveCard,
+      };
       let response: Response | null = null;
       let backendMessage = '';
       for (const endpoint of renewalEndpoints) {
-        response = await apiClient.post(endpoint, {
-          licenses,
-          plan: renewPlan,
-          amount,
-          saveCard,
-        }, freshToken);
+        response = await apiClient.post(endpoint, renewalBasePayload, freshToken);
         if (response.ok) break;
         backendMessage = await parseApiErrorMessage(response);
+        if (isAmountRequiredMessage(backendMessage)) {
+          response = await apiClient.post(endpoint, { ...renewalBasePayload, amount }, freshToken);
+          if (response.ok) break;
+          backendMessage = await parseApiErrorMessage(response);
+        }
         if (!isRetryableMissingRoute(response.status, backendMessage)) break;
       }
 
@@ -704,18 +712,26 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const payload = {
         licenses: safeLicenses,
         plan: selectedPlan,
-        amount: totalAmount,
         saveCard,
         ...(selectedUserIds.length > 0 && { selectedUserIds }),
       };
 
-      const response = await apiClient.post(endpoint, payload, freshToken);
+      let response = await apiClient.post(endpoint, payload, freshToken);
+      let backendMessage = '';
+      if (!response.ok) {
+        backendMessage = await parseApiErrorMessage(response);
+        if (isAmountRequiredMessage(backendMessage)) {
+          response = await apiClient.post(endpoint, { ...payload, amount: totalAmount }, freshToken);
+          if (!response.ok) {
+            backendMessage = await parseApiErrorMessage(response);
+          }
+        }
+      }
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('Payment initialization failed:', error);
+        console.error('Payment initialization failed:', backendMessage);
         payWindow?.close();
-        throw new Error(error.error || error.message || 'Failed to initialize payment');
+        throw new Error(backendMessage || 'Failed to initialize payment');
       }
 
       const data = await response.json();
