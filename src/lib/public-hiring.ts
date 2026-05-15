@@ -62,6 +62,9 @@ export const APPLIED_PUBLIC_HIRINGS_STORAGE_KEY = 'public_hiring_applied_jobs';
 export const PUBLIC_HIRINGS_ENDPOINT = '/public/hirings';
 export const PUBLIC_HIRING_APPLICATION_ENDPOINT = '/public/hirings/apply';
 export const DEFAULT_PUBLIC_HIRING_COMPANY_NAME = 'Hiring Organization';
+// Keep this list aligned with backend aliases:
+// - `/public/jobs` and `/public/job-openings` were historical public endpoints
+// - `/hirings/jobs` is a legacy route used by older public pages
 const PUBLIC_HIRING_ENDPOINT_ALIASES = ['/public/jobs', '/public/job-openings', '/hirings/jobs'] as const;
 const PUBLIC_HIRING_LIST_ENDPOINTS = [PUBLIC_HIRINGS_ENDPOINT, ...PUBLIC_HIRING_ENDPOINT_ALIASES] as const;
 const PUBLIC_HIRING_APPLICATION_ENDPOINT_ALIASES = ['/public/job/apply'] as const;
@@ -89,6 +92,7 @@ function shouldTryNextPublicHiringEndpoint(error: any): boolean {
 }
 
 async function requestPublicHiringWithFallback<T>(
+  operation: 'list' | 'detail' | 'apply',
   endpoints: readonly string[],
   request: (endpoint: string) => Promise<T>,
 ): Promise<T> {
@@ -102,12 +106,24 @@ async function requestPublicHiringWithFallback<T>(
     }
   }
 
-  throw lastError || new Error('Unable to complete public hiring request');
+  const lastErrorMessage = typeof (lastError as any)?.message === 'string'
+    ? (lastError as any).message
+    : 'unknown';
+  throw new Error(`Unable to ${operation} public hiring data after trying: ${endpoints.join(', ')}. Last error: ${lastErrorMessage}`);
+}
+
+function extractPublicHiringJobs(data: any): PublicHiring[] {
+  if (Array.isArray(data?.jobs)) return data.jobs;
+  if (Array.isArray(data)) return data;
+  return [];
 }
 
 export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
-  const data = await requestPublicHiringWithFallback(PUBLIC_HIRING_LIST_ENDPOINTS, (endpoint) => api(endpoint));
-  const jobs = Array.isArray(data?.jobs) ? data.jobs : Array.isArray(data) ? data : [];
+  const data = await requestPublicHiringWithFallback('list', PUBLIC_HIRING_LIST_ENDPOINTS, (endpoint) => api(endpoint));
+  const jobs = extractPublicHiringJobs(data);
+  if (typeof data?.total !== 'number') {
+    console.warn('Public hiring API response missing "total"; using jobs.length as fallback.');
+  }
   return {
     jobs,
     total: typeof data?.total === 'number' ? data.total : jobs.length,
@@ -126,13 +142,14 @@ export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
 
 export async function fetchPublicHiringDetail(jobId: string): Promise<PublicHiring> {
   return requestPublicHiringWithFallback(
+    'detail',
     PUBLIC_HIRING_LIST_ENDPOINTS.map((endpoint) => `${endpoint}/${jobId}`),
     (endpoint) => api(endpoint),
   );
 }
 
 export async function submitPublicHiringApplication(payload: PublicHiringApplicationInput) {
-  return requestPublicHiringWithFallback(PUBLIC_HIRING_APPLY_ENDPOINTS, (endpoint) =>
+  return requestPublicHiringWithFallback('apply', PUBLIC_HIRING_APPLY_ENDPOINTS, (endpoint) =>
     api(endpoint, {
       method: 'POST',
       body: payload,
