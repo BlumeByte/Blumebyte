@@ -4571,9 +4571,6 @@ makeCrud("admin/departments", "department:", requireAdminOrAbove);
 makeCrud("admin/compensations", "compensation:", requireAdminOrAbove);
 makeCrud("admin/benefits", "benefit:", requireAdminOrAbove);
 
-const payrollRoutePaths = (path: string) =>
-  [`${PREFIX}${path}`, path, `/:functionName${path}`];
-
 // POST /admin/payroll/calculate — auto-calculate tax deductions + benefit allowances for a given employee + basic salary
 const adminPayrollCalculate = async (c: any) => {
   try {
@@ -4677,7 +4674,9 @@ const adminPayrollCalculate = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of payrollRoutePaths('/admin/payroll/calculate')) app.post(route, adminPayrollCalculate);
+// Register the admin calculate handler on the admin-prefixed route AND the bare /payroll/calculate
+// alias so that the client fallback chain (superadmin → admin → bare) can always succeed.
+for (const route of compatibleRoutePathsForAliases('/admin/payroll/calculate', '/payroll/calculate')) app.post(route, adminPayrollCalculate);
 
 // Alias: superadmin can also call calculate directly
 const superadminPayrollCalculate = async (c: any) => {
@@ -4749,7 +4748,7 @@ const superadminPayrollCalculate = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of payrollRoutePaths('/superadmin/payroll/calculate')) app.post(route, superadminPayrollCalculate);
+for (const route of compatibleRoutePaths('/superadmin/payroll/calculate')) app.post(route, superadminPayrollCalculate);
 
 // Public read-only endpoints for employees to access reference data
 app.get(`${PREFIX}/leave-types`, async (c) => {
