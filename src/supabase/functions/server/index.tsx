@@ -4430,7 +4430,7 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
       status = 'active';
     }
     // Explicitly set visibilityType (don't rely solely on ...body spread to avoid undefined overwrites)
-    const visibilityType = body.visibilityType || 'internal_only';
+    const visibilityType = body.visibilityType || 'public_global';
     const item: any = {
       ...body,
       id,
@@ -4466,7 +4466,7 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
     // Explicitly resolve visibilityType — prefer body value over existing, never allow undefined or empty string to overwrite
-    const visibilityType = body.visibilityType || existing.visibilityType || 'internal_only';
+    const visibilityType = body.visibilityType || existing.visibilityType || 'public_global';
     // Auto-activate status when visibility is set to public_global
     let status = body.status || existing.status || 'active';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
@@ -4766,7 +4766,7 @@ app.post(`${PREFIX}/admin/job-postings`, async (c) => {
     if (!companyId) return c.json({ error: 'User has no company assignment' }, 400);
     const companyName = body.companyName || (await resolveCompanyName(companyId)) || '';
     const employmentType = normalizeEmploymentType(body.employmentType || body.type || '');
-    const visibilityType = body.visibilityType || 'internal_only';
+    const visibilityType = body.visibilityType || 'public_global';
     let status = body.status || 'open';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'open';
@@ -4803,7 +4803,7 @@ app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
     const companyName = body.companyName || existing.companyName || (companyId ? await resolveCompanyName(companyId) : '');
     const rawType = body.employmentType || body.type || existing.employmentType || existing.type || '';
     const employmentType = normalizeEmploymentType(rawType);
-    const visibilityType = body.visibilityType || existing.visibilityType || 'internal_only';
+    const visibilityType = body.visibilityType || existing.visibilityType || 'public_global';
     let status = body.status || existing.status || 'open';
     if (visibilityType === 'public_global' && !JOB_ACTIVE_STATUSES.has(status)) {
       status = 'open';

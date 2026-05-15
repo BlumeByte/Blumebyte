@@ -2410,7 +2410,7 @@ function AdminHiring() {
                         <div className="flex gap-1">
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => {
                             setEditItem(p);
-                            setFormData({ ...p });
+                            setFormData({ ...p, visibilityType: p.visibilityType || 'public_global' });
                             const deptNames = departments.map(d => d.name);
                             if (p.department && p.department !== 'Other' && !deptNames.includes(p.department)) {
                               setOtherDept(p.department);
