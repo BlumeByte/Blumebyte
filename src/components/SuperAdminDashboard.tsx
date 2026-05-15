@@ -2058,6 +2058,8 @@ function PayrollView() {
         const status = Number(error?.status || 0);
         return /route not found/i.test(message) || status === 404 || status === 405 || status === 501;
       };
+      // Compatibility order: superadmin-specific route first, then shared admin route,
+      // then a bare payroll route for legacy deployments.
       const payrollEndpoints = ['/superadmin/payroll/calculate', '/admin/payroll/calculate', '/payroll/calculate'];
       let result: any = null;
       let lastError: any = null;

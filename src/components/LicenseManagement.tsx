@@ -86,8 +86,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
     reported: false,
   });
 
-  const isRouteNotFoundMessage = (message: string) =>
-    /route not found/i.test(message || '');
+  const isRouteNotFoundMessage = (message = '') =>
+    /route not found/i.test(message);
 
   const isRetryableMissingRoute = (status: number, message: string) =>
     status === 404 || status === 405 || status === 501 || isRouteNotFoundMessage(message);

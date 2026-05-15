@@ -4513,7 +4513,7 @@ makeCrud("admin/compensations", "compensation:", requireAdminOrAbove);
 makeCrud("admin/benefits", "benefit:", requireAdminOrAbove);
 
 const payrollRoutePaths = (path: string) =>
-  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+  [`${PREFIX}${path}`, path, `/:functionName${path}`];
 
 // POST /admin/payroll/calculate — auto-calculate tax deductions + benefit allowances for a given employee + basic salary
 const adminPayrollCalculate = async (c: any) => {
