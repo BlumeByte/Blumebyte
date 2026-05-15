@@ -87,7 +87,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   });
 
   const isRouteNotFoundMessage = (message = '') =>
-    /route not found/i.test(message);
+    /(route not found|method not allowed|cannot (post|get|put|patch|delete)|404\b)/i.test(message);
 
   const isRetryableMissingRoute = (status: number, message: string) =>
     status === 404 || status === 405 || status === 501 || isRouteNotFoundMessage(message);
@@ -134,7 +134,12 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           pendingReference,
         },
       };
-      const endpoints = ['/support/report-error', '/support/error-report'];
+      const endpoints = [
+        '/support/report-error',
+        '/support/error-report',
+        '/report-error',
+        '/error-report',
+      ];
       let reported = false;
       let lastErrorMessage = '';
       for (const endpoint of endpoints) {

@@ -11104,7 +11104,9 @@ const reportClientError = async (c: any) => {
     return c.json({ error: e.message || 'Failed to report error' }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/support/report-error')) app.post(route, reportClientError);
+for (const route of compatibleRoutePathsForAliases('/support/report-error', '/support/error-report', '/report-error', '/error-report')) {
+  app.post(route, reportClientError);
+}
 
 // HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
 const listPublicJobs = async (c: Context) => {
