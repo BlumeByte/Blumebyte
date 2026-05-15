@@ -114,6 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return token;
   }, []);
 
+  // Helper: call auto-clock-out silently; used on logout and inactivity
+  const autoClockOut = async () => {
+    try {
+      const token = await getToken();
+      if (token) {
+        await api('/attendance/auto-clock-out', { method: 'POST', body: {}, token });
+      }
+    } catch (e) {
+      // Silently ignore — user may not be clocked in
+    }
+  };
+
   // Reset inactivity timer
   const resetInactivityTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
@@ -129,16 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       // Clock out after 1 hour of inactivity
       const CLOCK_OUT_AFTER_INACTIVITY = 1 * 60 * 60 * 1000;
-      clockOutTimerRef.current = setTimeout(async () => {
-        try {
-          const token = await getToken();
-          if (token) {
-            await api('/attendance/auto-clock-out', { method: 'POST', body: '{}', token });
-          }
-        } catch (e) {
-          // Silently ignore — user may not be clocked in
-        }
-      }, CLOCK_OUT_AFTER_INACTIVITY);
+      clockOutTimerRef.current = setTimeout(autoClockOut, CLOCK_OUT_AFTER_INACTIVITY);
 
       // Auto-logout after 2 hours of inactivity (as requested)
       const INACTIVITY_TIMEOUT = 2 * 60 * 60 * 1000;
@@ -224,19 +227,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (hiddenDuration > MAX_HIDDEN_DURATION) {
           // Hidden for 2hrs+ — ensure clocked out then force logout
-          try {
-            const token = await getToken();
-            if (token) await api('/attendance/auto-clock-out', { method: 'POST', body: '{}', token });
-          } catch (e) { /* ignore */ }
+          await autoClockOut();
           console.log('Auto-logout: Page was hidden for too long');
           await logout();
           window.location.href = '/login?reason=session_expired';
         } else if (hiddenDuration > CLOCK_OUT_HIDDEN_DURATION) {
           // Hidden for 1–2hrs — auto clock-out but keep session active
-          try {
-            const token = await getToken();
-            if (token) await api('/attendance/auto-clock-out', { method: 'POST', body: '{}', token });
-          } catch (e) { /* ignore */ }
+          await autoClockOut();
           // Reset the timer when page becomes visible again so the 1hr starts fresh
           resetInactivityTimer();
         } else {
@@ -325,14 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     // Auto clock-out before signing out so attendance records are closed
-    try {
-      const token = await getToken();
-      if (token) {
-        await api('/attendance/auto-clock-out', { method: 'POST', body: '{}', token });
-      }
-    } catch (e) {
-      // Silently ignore — user may not be clocked in or session already invalid
-    }
+    await autoClockOut();
     try {
       await supabase.auth.signOut();
     } catch (e) {
