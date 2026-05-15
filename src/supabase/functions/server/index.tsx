@@ -13,9 +13,9 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
-// Register each endpoint on:
+// Helpers that generate the full set of route paths for a given endpoint, covering:
 // 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
-// This prevents route mismatches across different Supabase function URL/path forwarding modes.
+// This prevents route mismatches across different Supabase function URL/path-forwarding modes.
 const compatibleRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
 
@@ -780,9 +780,9 @@ function buildPublicHiringFilters(jobs: any[]) {
 }
 
 // ============ PUBLIC HIRING ENDPOINTS ============
-// These are registered early to ensure they're always available, regardless of the size
-// of the route table that follows.  Aliases ensure compatibility across different Supabase
-// function URL/path-forwarding modes.
+// Registered before the large authenticated route table so they are always reachable
+// even if the server is loaded in chunks.  Aliases ensure compatibility across different
+// Supabase function URL/path-forwarding modes.
 
 const listPublicJobs = async (c: Context) => {
   try {
