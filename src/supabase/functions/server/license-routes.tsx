@@ -4,6 +4,8 @@ import { usdToPaystackAmount, getPaystackCurrency } from './currency-utils.tsx';
 import { recalculateCompanyStats } from './sync-company-stats.tsx';
 
 const PREFIX = '/make-server-668731fc';
+const subscriptionRoutePaths = (path: string) =>
+  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
 
 function getCanonicalSubscriptionLicenses(subscription: any): number {
   return Number(
@@ -175,7 +177,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   };
   
   // Debug endpoint to check Paystack configuration
-  app.get(`${PREFIX}/subscription/paystack-debug`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/paystack-debug')) app.get(route, async (c: any) => {
     try {
       const { user, role } = await requireSuperAdmin(c);
       
@@ -199,7 +201,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Test Paystack connection endpoint
-  app.post(`${PREFIX}/subscription/test-paystack`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/test-paystack')) app.post(route, async (c: any) => {
     try {
       const { user, role } = await requireSuperAdmin(c);
       
@@ -278,7 +280,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Public endpoint to check if system has any licenses (for login page)
-  app.get(`${PREFIX}/subscription/public-license-check`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/public-license-check')) app.get(route, async (c: any) => {
     try {
       // Find all subscriptions
       const subscriptions = await kv.getByPrefix('subscription:');
@@ -297,7 +299,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Get license information
-  app.get(`${PREFIX}/subscription/license-info`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/license-info')) app.get(route, async (c: any) => {
     try {
       const { user, role } = await requireAuth(c);
       
@@ -370,7 +372,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Check if can create user (has available licenses)
-  app.get(`${PREFIX}/subscription/can-create-user`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/can-create-user')) app.get(route, async (c: any) => {
     try {
       const { user, role } = await requireAuth(c);
       
@@ -422,7 +424,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Purchase additional licenses
-  app.post(`${PREFIX}/subscription/purchase-licenses`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/purchase-licenses')) app.post(route, async (c: any) => {
     try {
       const { user, role } = await requireSuperAdmin(c);
       const body = await c.req.json();
@@ -527,7 +529,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Verify license purchase payment
-  app.post(`${PREFIX}/subscription/verify-license`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/verify-license')) app.post(route, async (c: any) => {
     try {
       const { user } = await requireAuth(c);
       const body = await c.req.json();
@@ -761,7 +763,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Auto-renew subscription (charge saved card)
-  app.post(`${PREFIX}/subscription/auto-renew`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/auto-renew')) app.post(route, async (c: any) => {
     try {
       const { user, role } = await requireSuperAdmin(c);
       
@@ -878,7 +880,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Get all users for license selection (SuperAdmin only)
-  app.get(`${PREFIX}/subscription/all-users`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/all-users')) app.get(route, async (c: any) => {
     try {
       const { user, role } = await requireSuperAdmin(c);
       
@@ -905,7 +907,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Paystack Webhook
-  app.post(`${PREFIX}/subscription/paystack-webhook`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/paystack-webhook')) app.post(route, async (c: any) => {
     try {
       const bodyText = await c.req.text();
       const signature = c.req.header('x-paystack-signature');
@@ -1053,7 +1055,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // Purchase licenses with user selection (handles deactivation)
-  app.post(`${PREFIX}/subscription/purchase-licenses-with-selection`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/purchase-licenses-with-selection')) app.post(route, async (c: any) => {
     try {
       const { user, role } = await requireSuperAdmin(c);
       const body = await c.req.json();
@@ -1161,7 +1163,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
 
   // Lightweight endpoint: check if a payment reference has been completed on Paystack
   // without processing/activating anything. Used for polling from the main app tab.
-  app.get(`${PREFIX}/subscription/check-payment-status`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/check-payment-status')) app.get(route, async (c: any) => {
     try {
       const { user } = await requireAuth(c);
       const reference = c.req.query('reference');
@@ -1230,7 +1232,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   // ── Card management ──────────────────────────────────────────────────────────
 
   // DELETE /subscription/card — remove saved card (disables auto-renewal)
-  app.delete(`${PREFIX}/subscription/card`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/card')) app.delete(route, async (c: any) => {
     try {
       const { user } = await requireSuperAdmin(c);
       const subscription = await kv.get(`subscription:${user.id}`);
@@ -1249,7 +1251,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   });
 
   // PATCH /subscription/auto-renew — toggle auto-renewal on or off
-  app.patch(`${PREFIX}/subscription/auto-renew`, async (c: any) => {
+  for (const route of subscriptionRoutePaths('/subscription/auto-renew')) app.patch(route, async (c: any) => {
     try {
       const { user } = await requireSuperAdmin(c);
       const { enabled } = await c.req.json();

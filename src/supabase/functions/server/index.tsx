@@ -7060,7 +7060,7 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
 });
 
 // Initialize Paystack payment
-app.post(`${PREFIX}/subscription/initialize`, async (c) => {
+for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post(route, async (c) => {
   try {
     const { user, role } = await requireSuperAdmin(c);
     const body = await c.req.json();
@@ -7292,7 +7292,7 @@ const renewSubscriptionLicense = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of subscriptionRoutePaths('/subscription/renew-license')) app.post(route, renewSubscriptionLicense);
+for (const route of compatibleRoutePathsForAliases('/subscription/renew-license', '/subscription/renew')) app.post(route, renewSubscriptionLicense);
 
 // Verify Paystack payment
 const verifySubscriptionPayment = async (c: any) => {
