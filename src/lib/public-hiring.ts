@@ -62,6 +62,10 @@ export const APPLIED_PUBLIC_HIRINGS_STORAGE_KEY = 'public_hiring_applied_jobs';
 export const PUBLIC_HIRINGS_ENDPOINT = '/public/hirings';
 export const PUBLIC_HIRING_APPLICATION_ENDPOINT = '/public/hirings/apply';
 export const DEFAULT_PUBLIC_HIRING_COMPANY_NAME = 'Hiring Organization';
+const PUBLIC_HIRING_ENDPOINT_ALIASES = ['/public/jobs', '/public/job-openings', '/hirings/jobs'] as const;
+const PUBLIC_HIRING_LIST_ENDPOINTS = [PUBLIC_HIRINGS_ENDPOINT, ...PUBLIC_HIRING_ENDPOINT_ALIASES] as const;
+const PUBLIC_HIRING_APPLICATION_ENDPOINT_ALIASES = ['/public/job/apply'] as const;
+const PUBLIC_HIRING_APPLY_ENDPOINTS = [PUBLIC_HIRING_APPLICATION_ENDPOINT, ...PUBLIC_HIRING_APPLICATION_ENDPOINT_ALIASES] as const;
 
 const EMPTY_FILTERS: PublicHiringFilters = {
   companies: [],
@@ -79,11 +83,34 @@ function ensureStringArray(value: unknown): string[] {
     : [];
 }
 
+function shouldTryNextPublicHiringEndpoint(error: any): boolean {
+  const status = typeof error?.status === 'number' ? error.status : 0;
+  return status === 0 || status === 404 || status === 405 || status === 501;
+}
+
+async function requestPublicHiringWithFallback<T>(
+  endpoints: readonly string[],
+  request: (endpoint: string) => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    try {
+      return await request(endpoint);
+    } catch (error) {
+      lastError = error;
+      if (!shouldTryNextPublicHiringEndpoint(error)) throw error;
+    }
+  }
+
+  throw lastError || new Error('Unable to complete public hiring request');
+}
+
 export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
-  const data = await api(PUBLIC_HIRINGS_ENDPOINT);
+  const data = await requestPublicHiringWithFallback(PUBLIC_HIRING_LIST_ENDPOINTS, (endpoint) => api(endpoint));
+  const jobs = Array.isArray(data?.jobs) ? data.jobs : Array.isArray(data) ? data : [];
   return {
-    jobs: Array.isArray(data?.jobs) ? data.jobs : [],
-    total: typeof data?.total === 'number' ? data.total : 0,
+    jobs,
+    total: typeof data?.total === 'number' ? data.total : jobs.length,
     filters: {
       companies: ensureStringArray(data?.filters?.companies),
       departments: ensureStringArray(data?.filters?.departments),
@@ -98,19 +125,26 @@ export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
 }
 
 export async function fetchPublicHiringDetail(jobId: string): Promise<PublicHiring> {
-  return api(`${PUBLIC_HIRINGS_ENDPOINT}/${jobId}`);
+  return requestPublicHiringWithFallback(
+    PUBLIC_HIRING_LIST_ENDPOINTS.map((endpoint) => `${endpoint}/${jobId}`),
+    (endpoint) => api(endpoint),
+  );
 }
 
 export async function submitPublicHiringApplication(payload: PublicHiringApplicationInput) {
-  return api(PUBLIC_HIRING_APPLICATION_ENDPOINT, {
-    method: 'POST',
-    body: payload,
-  });
+  return requestPublicHiringWithFallback(PUBLIC_HIRING_APPLY_ENDPOINTS, (endpoint) =>
+    api(endpoint, {
+      method: 'POST',
+      body: payload,
+    }),
+  );
 }
 
 export function invalidatePublicHiringCache(jobId?: string) {
-  invalidateCache(PUBLIC_HIRINGS_ENDPOINT);
-  if (jobId) invalidateCache(`${PUBLIC_HIRINGS_ENDPOINT}/${jobId}`);
+  for (const endpoint of PUBLIC_HIRING_LIST_ENDPOINTS) {
+    invalidateCache(endpoint);
+    if (jobId) invalidateCache(`${endpoint}/${jobId}`);
+  }
 }
 
 export function loadAppliedPublicHiringIds(): string[] {
