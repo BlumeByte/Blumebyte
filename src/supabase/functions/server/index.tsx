@@ -15,6 +15,15 @@ const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
 const subscriptionRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+// Register each endpoint on:
+// 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
+// This prevents route mismatches across different Supabase function URL/path forwarding modes.
+const compatibleRoutePaths = (path: string) =>
+  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+
+const compatibleRoutePathsForAliases = (...paths: string[]) =>
+  Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
+
 // Validate the RESEND_FROM_EMAIL secret: Resend requires the 'from' field to
 // contain an actual email address (e.g. "Name <user@domain.com>" or "user@domain.com").
 // If the secret is missing or contains only a display name with no '@' character
@@ -768,6 +777,56 @@ function buildPublicHiringFilters(jobs: any[]) {
     employmentTypes: sortTextValues(employmentTypes),
     locations: sortTextValues(locations),
   };
+}
+
+// ============ PUBLIC HIRING ENDPOINTS ============
+// These are registered early to ensure they're always available, regardless of the size
+// of the route table that follows.  Aliases ensure compatibility across different Supabase
+// function URL/path-forwarding modes.
+
+const listPublicJobs = async (c: Context) => {
+  try {
+    const eligible = await listPublicHiringRecords();
+    const settled = await Promise.allSettled(eligible.map((job: any) => buildPublicJobResponse(job)));
+    const jobs = settled
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
+      .map((r) => r.value)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return c.json({
+      jobs,
+      total: jobs.length,
+      filters: buildPublicHiringFilters(jobs),
+      summary: {
+        totalJobs: jobs.length,
+        totalCompanies: new Set(jobs.map((job: any) => job.companyName).filter(Boolean)).size,
+      },
+    });
+  } catch (e: any) {
+    console.error('Public jobs error:', e);
+    return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
+  }
+};
+
+const getPublicJobDetail = async (c: Context) => {
+  try {
+    const id = c.req.param('id');
+    const match = await getPublicHiringRecordById(id);
+    if (!match) return c.json({ error: 'Job not found' }, 404);
+    const publicJob = await buildPublicJobResponse(match);
+    if (!publicJob) return c.json({ error: 'Job not found' }, 404);
+    return c.json(publicJob);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+};
+
+for (const route of compatibleRoutePathsForAliases('/public/hirings', '/public/jobs', '/public/job-openings', '/hirings/jobs')) {
+  app.get(route, listPublicJobs);
+}
+
+for (const route of compatibleRoutePathsForAliases('/public/hirings/:id', '/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
+  app.get(route, getPublicJobDetail);
 }
 
 // --- Build a scope-based item filter for payroll calculation ---
@@ -11012,15 +11071,6 @@ async function sendEmailNotification(
 
 
 
-// Register each endpoint on:
-// 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
-// This prevents route mismatches across different Supabase function URL/path forwarding modes.
-const compatibleRoutePaths = (path: string) =>
-  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
-
-const compatibleRoutePathsForAliases = (...paths: string[]) =>
-  Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
-
 const MAX_ERROR_REPORT_STACK_CHARS = 4000;
 
 // POST /support/report-error — report UI/runtime errors to support queue and platform admins
@@ -11106,53 +11156,6 @@ const reportClientError = async (c: any) => {
 };
 for (const route of compatibleRoutePathsForAliases('/support/report-error', '/support/error-report', '/report-error', '/error-report')) {
   app.post(route, reportClientError);
-}
-
-// HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
-const listPublicJobs = async (c: Context) => {
-  try {
-    const eligible = await listPublicHiringRecords();
-    const settled = await Promise.allSettled(eligible.map((job: any) => buildPublicJobResponse(job)));
-    const jobs = settled
-      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
-      .map((r) => r.value)
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return c.json({
-      jobs,
-      total: jobs.length,
-      filters: buildPublicHiringFilters(jobs),
-      summary: {
-        totalJobs: jobs.length,
-        totalCompanies: new Set(jobs.map((job: any) => job.companyName).filter(Boolean)).size,
-      },
-    });
-  } catch (e: any) {
-    console.error('Public jobs error:', e);
-    return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
-  }
-};
-
-// HIRING-FIX: Resolve public job detail by scanning all public postings and return stable 404 payload.
-const getPublicJobDetail = async (c: Context) => {
-  try {
-    const id = c.req.param('id');
-    const match = await getPublicHiringRecordById(id);
-    if (!match) return c.json({ error: 'Job not found' }, 404);
-    const publicJob = await buildPublicJobResponse(match);
-    if (!publicJob) return c.json({ error: 'Job not found' }, 404);
-    return c.json(publicJob);
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
-  }
-};
-
-for (const route of compatibleRoutePathsForAliases('/public/hirings', '/public/jobs', '/public/job-openings', '/hirings/jobs')) {
-  app.get(route, listPublicJobs);
-}
-
-for (const route of compatibleRoutePathsForAliases('/public/hirings/:id', '/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
-  app.get(route, getPublicJobDetail);
 }
 
 // POST /public/job/apply — submit a public job application
