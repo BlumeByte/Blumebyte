@@ -3850,23 +3850,6 @@ function UserManagementView() {
                     <option value="superadmin">Super Admin</option>
                   </NativeSelect>
                 </div>
-                <div>
-                  <Label>Company</Label>
-                  <Input
-                    value={
-                      selectedCompanyRecord?.name
-                      || selectedCompanyName
-                      || formData.company
-                      || formData.companyName
-                      || branding.companyName
-                      || companies[0]?.name
-                      || 'Blumebyte'
-                    }
-                    readOnly
-                    disabled
-                  />
-                </div>
-                
                 {/* Multi-Department Selection */}
                 <MultiDepartmentSelect
                   departments={departments}
