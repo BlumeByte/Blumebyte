@@ -118,8 +118,7 @@ function extractPublicHiringJobs(data: any): PublicHiring[] {
   return [];
 }
 
-export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
-  const data = await requestPublicHiringWithFallback('list', PUBLIC_HIRING_LIST_ENDPOINTS, (endpoint) => api(endpoint));
+function buildPublicHiringCatalog(data: any): PublicHiringCatalog {
   const jobs = extractPublicHiringJobs(data);
   if (typeof data?.total !== 'number') {
     console.warn('Public hiring API response missing "total"; using jobs.length as fallback.');
@@ -138,6 +137,29 @@ export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
       totalCompanies: typeof data?.summary?.totalCompanies === 'number' ? data.summary.totalCompanies : 0,
     },
   };
+}
+
+export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
+  let firstSuccessfulCatalog: PublicHiringCatalog | null = null;
+  let lastError: unknown;
+
+  for (const endpoint of PUBLIC_HIRING_LIST_ENDPOINTS) {
+    try {
+      const catalog = buildPublicHiringCatalog(await api(endpoint));
+      if (!firstSuccessfulCatalog) firstSuccessfulCatalog = catalog;
+      if (catalog.jobs.length > 0) return catalog;
+    } catch (error) {
+      lastError = error;
+      if (!shouldTryNextPublicHiringEndpoint(error)) throw error;
+    }
+  }
+
+  if (firstSuccessfulCatalog) return firstSuccessfulCatalog;
+
+  const lastErrorMessage = typeof (lastError as any)?.message === 'string'
+    ? (lastError as any).message
+    : 'unknown';
+  throw new Error(`Unable to list public hiring data after trying: ${PUBLIC_HIRING_LIST_ENDPOINTS.join(', ')}. Last error: ${lastErrorMessage}`);
 }
 
 export async function fetchPublicHiringDetail(jobId: string): Promise<PublicHiring> {
