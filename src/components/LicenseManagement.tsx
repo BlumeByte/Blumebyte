@@ -536,6 +536,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const renewalEndpoints = ['/subscription/renew-license', '/subscription/renew', '/subscription/initialize'];
       const renewalBasePayload = {
         licenses,
+        userCount: licenses,
         plan: renewPlan,
         saveCard,
       };
@@ -740,6 +741,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
 
       const payload = {
         licenses: safeLicenses,
+        userCount: safeLicenses,
         plan: selectedPlan,
         saveCard,
         ...(selectedUserIds.length > 0 && { selectedUserIds }),

@@ -3617,17 +3617,8 @@ function UserManagementView() {
 
   const fetchLicenseInfo = useCallback(async () => {
     try {
-      const response = await fetch(`https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/subscription/license-info`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setLicenseInfo(data);
-      }
+      const data = await api('/subscription/license-info', { token: accessToken });
+      setLicenseInfo(data);
     } catch (error) {
       console.error('Error fetching license info:', error);
     }

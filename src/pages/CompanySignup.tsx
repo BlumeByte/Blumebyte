@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { publicAnonKey } from '../utils/supabase/info';
+import { buildFunctionsUrl } from '../lib/functions-base';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export default function CompanySignup() {
@@ -110,7 +111,7 @@ export default function CompanySignup() {
   useEffect(() => {
     const fetchPublicKey = async () => {
       try {
-        const url = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/paystack/public-key`;
+        const url = buildFunctionsUrl('/paystack/public-key');
         
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${publicAnonKey}` },
@@ -203,7 +204,7 @@ export default function CompanySignup() {
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/company/payment-status/${reference}`,
+          buildFunctionsUrl(`/company/payment-status/${reference}`),
           {
             headers: { Authorization: `Bearer ${publicAnonKey}` },
           }
@@ -323,7 +324,7 @@ export default function CompanySignup() {
       toast.info('Verifying payment and setting up your account...');
       
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/company/register`,
+        buildFunctionsUrl('/company/register'),
         {
           method: 'POST',
           headers: {

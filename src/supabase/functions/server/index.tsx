@@ -24,6 +24,16 @@ const compatibleRoutePathsForAliases = (...paths: string[]) =>
 
 const subscriptionRoutePaths = compatibleRoutePaths;
 
+const getFunctionsCallbackBaseUrl = (c: Context) => {
+  const configuredSupabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/+$/, '');
+  const requestUrl = new URL(c.req.url);
+  const pathSegments = requestUrl.pathname.split('/').filter(Boolean);
+  const functionsIndex = pathSegments.indexOf('functions');
+  const functionName = functionsIndex >= 0 ? pathSegments[functionsIndex + 2] : '';
+  const callbackOrigin = configuredSupabaseUrl || `${requestUrl.protocol}//${requestUrl.host}`;
+  return `${callbackOrigin}/functions/v1/${functionName || 'make-server'}`;
+};
+
 // Validate the RESEND_FROM_EMAIL secret: Resend requires the 'from' field to
 // contain an actual email address (e.g. "Name <user@domain.com>" or "user@domain.com").
 // If the secret is missing or contains only a display name with no '@' character
@@ -1485,7 +1495,7 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
             { display_name: 'Billing Cycle', variable_name: 'billing_cycle', value: billingCycle },
           ],
         },
-        callback_url: `https://${Deno.env.get('SUPABASE_URL')?.replace('https://', '')}/functions/v1/make-server-668731fc/company/payment-callback`,
+        callback_url: `${getFunctionsCallbackBaseUrl(c)}/company/payment-callback`,
       }),
     });
 
@@ -9089,7 +9099,7 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}).` }, 400);
     }
 
-    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`;
+    const callbackUrl = `${getFunctionsCallbackBaseUrl(c)}/subscription/verify-payment?reference=${reference}`;
 
     let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -9297,7 +9307,7 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
         amount: upgradeAmountSmallestUnit,
         currency: upgradeCurrency,
         reference: reference,
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-license-upgrade?reference=${reference}`,
+        callback_url: `${getFunctionsCallbackBaseUrl(c)}/subscription/verify-license-upgrade?reference=${reference}`,
         metadata: {
           companyId: companyId,
           companyName: company?.name || '',

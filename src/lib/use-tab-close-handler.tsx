@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from './auth-context';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
-
-const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
+import { buildFunctionsUrl } from './functions-base';
 
 /**
  * Hook that handles auto clock-out and logout reporting when user closes tab/browser
@@ -23,7 +21,7 @@ export function useTabCloseHandler() {
       // Check if user is clocked in
       const checkClockInStatus = async () => {
         try {
-          const response = await fetch(`${BASE}/attendance/status`, {
+          const response = await fetch(buildFunctionsUrl('/attendance/status'), {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           if (response.ok) {
@@ -61,7 +59,7 @@ export function useTabCloseHandler() {
         // Use sendBeacon for reliable delivery even as page unloads
         const blob = new Blob([JSON.stringify(reportData)], { type: 'application/json' });
         navigator.sendBeacon(
-          `${BASE}/session/logout-report`,
+          buildFunctionsUrl('/session/logout-report'),
           blob
         );
 
@@ -69,7 +67,7 @@ export function useTabCloseHandler() {
         if (clockedInRef.current) {
           const clockOutBlob = new Blob([JSON.stringify({ userId: user.id, auto: true })], { type: 'application/json' });
           navigator.sendBeacon(
-            `${BASE}/attendance/auto-clock-out`,
+            buildFunctionsUrl('/attendance/auto-clock-out'),
             clockOutBlob
           );
         }
