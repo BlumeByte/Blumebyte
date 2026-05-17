@@ -735,10 +735,6 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const totalAmount = safeLicenses * pricePerUser;
 
 
-      const endpoint = selectedUserIds.length > 0 
-        ? '/subscription/purchase-licenses-with-selection'
-        : '/subscription/purchase-licenses';
-
       const payload = {
         licenses: safeLicenses,
         userCount: safeLicenses,
@@ -747,19 +743,24 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         ...(selectedUserIds.length > 0 && { selectedUserIds }),
       };
 
-      let response = await apiClient.post(endpoint, payload, freshToken);
       let backendMessage = '';
-      if (!response.ok) {
+      const endpoints = selectedUserIds.length > 0
+        ? ['/subscription/purchase-licenses-with-selection']
+        : ['/subscription/purchase-licenses', '/subscription/initialize'];
+      let response: Response | null = null;
+      for (const endpoint of endpoints) {
+        response = await apiClient.post(endpoint, payload, freshToken);
+        if (response.ok) break;
         backendMessage = await parseApiErrorMessage(response);
         if (isAmountRequiredMessage(backendMessage)) {
           response = await apiClient.post(endpoint, { ...payload, amount: totalAmount }, freshToken);
-          if (!response.ok) {
-            backendMessage = await parseApiErrorMessage(response);
-          }
+          if (response.ok) break;
+          backendMessage = await parseApiErrorMessage(response);
         }
+        if (!isRetryableMissingRoute(response.status, backendMessage)) break;
       }
 
-      if (!response.ok) {
+      if (!response || !response.ok) {
         console.error('Payment initialization failed:', backendMessage);
         payWindow?.close();
         throw new Error(backendMessage || 'Failed to initialize payment');
