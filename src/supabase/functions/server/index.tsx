@@ -6924,10 +6924,11 @@ async function triggerSuperadminSubscriptionExpiryAlert(
   if (!SUBSCRIPTION_EXPIRY_ALERT_DAYS.has(normalizedDaysRemaining)) return;
 
   const endDate = subscription?.endDate ? new Date(subscription.endDate) : null;
-  const safeEndDate = endDate && !Number.isNaN(endDate.getTime())
+  const isValidEndDate = !!endDate && !Number.isNaN(endDate.getTime());
+  const safeEndDate = isValidEndDate
     ? endDate.toLocaleDateString()
     : 'Unknown';
-  const endDateKey = endDate && !Number.isNaN(endDate.getTime())
+  const endDateKey = isValidEndDate
     ? endDate.toISOString()
     : 'unknown';
 
