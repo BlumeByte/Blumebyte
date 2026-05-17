@@ -6927,8 +6927,11 @@ async function triggerSuperadminSubscriptionExpiryAlert(
   const safeEndDate = endDate && !Number.isNaN(endDate.getTime())
     ? endDate.toLocaleDateString()
     : 'Unknown';
+  const endDateKey = endDate && !Number.isNaN(endDate.getTime())
+    ? endDate.toISOString()
+    : 'unknown';
 
-  const dedupeKey = `subscription-expiry-alert:${superadminId}:${normalizedDaysRemaining}:${subscription?.endDate || 'unknown'}`;
+  const dedupeKey = `subscription-expiry-alert:${superadminId}:${normalizedDaysRemaining}:${endDateKey}`;
   const alreadySent = await kv.get(dedupeKey);
   if (alreadySent) return;
 
@@ -6965,7 +6968,7 @@ async function triggerSuperadminSubscriptionExpiryAlert(
   await kv.set(dedupeKey, {
     sentAt: new Date().toISOString(),
     daysRemaining: normalizedDaysRemaining,
-    endDate: subscription?.endDate || null,
+    endDate: endDateKey === 'unknown' ? null : endDateKey,
   });
 }
 
