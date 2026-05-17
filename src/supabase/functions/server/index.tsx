@@ -7102,8 +7102,14 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
     // Initialize Paystack transaction
     const reference = `SUB_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-    
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+
+    // Convert USD to the configured Paystack currency (GHS/NGN/USD)
+    const { amountSmallestUnit: initAmountSmallestUnit, currency: initCurrency } = await usdToPaystackAmount(amount);
+    if (!initAmountSmallestUnit || initAmountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${initAmountSmallestUnit} ${initCurrency}). Please contact support.` }, 400);
+    }
+
+    let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${paystackSecretKey}`,
@@ -7111,13 +7117,15 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
       },
       body: JSON.stringify({
         email: user.email,
-        amount: Math.round(amount * 100), // Paystack expects amount in kobo (cents)
+        amount: initAmountSmallestUnit,
+        currency: initCurrency,
         reference,
         callback_url: callbackUrl,
         metadata: {
           userId: user.id,
           plan,
           userCount,
+          amountUsd: amount,
           custom_fields: [
             {
               display_name: 'Subscription Plan',
@@ -7133,13 +7141,48 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
         },
       }),
     });
-    
-    const paystackData = await paystackResponse.json();
+
+    let paystackData = await paystackResponse.json();
+
+    // Fallback: retry in USD if Paystack rejects the converted amount
+    if (!paystackData.status && /invalid amount/i.test(String(paystackData?.message || '')) && initCurrency !== 'USD') {
+      const usdFallbackAmount = Math.round(amount * 100);
+      if (usdFallbackAmount >= 100) {
+        paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user.email,
+            amount: usdFallbackAmount,
+            currency: 'USD',
+            reference,
+            callback_url: callbackUrl,
+            metadata: {
+              userId: user.id,
+              plan,
+              userCount,
+              amountUsd: amount,
+              paystackCurrencyFallback: true,
+              originalCurrency: initCurrency,
+            },
+          }),
+        });
+        paystackData = await paystackResponse.json();
+      }
+    }
     
     if (!paystackData.status) {
       console.error('Paystack initialization failed:', paystackData);
       return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
     }
+
+    const finalInitAmountSmallestUnit = paystackData.data?.metadata?.paystackCurrencyFallback
+      ? Math.round(amount * 100)
+      : initAmountSmallestUnit;
+    const finalInitCurrency = paystackData.data?.metadata?.paystackCurrencyFallback ? 'USD' : initCurrency;
     
     // Store pending transaction
     await kv.set(`pending-subscription:${reference}`, {
@@ -7147,6 +7190,8 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
       plan,
       userCount,
       amount,
+      amountSmallestUnit: finalInitAmountSmallestUnit,
+      currency: finalInitCurrency,
       reference,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -7383,6 +7428,8 @@ const verifySubscriptionPayment = async (c: any) => {
       userId: pendingSubscription.userId,
       plan: pendingSubscription.plan,
       userCount: effectiveUserCount,
+      purchasedLicenses: effectiveUserCount,
+      licenses: effectiveUserCount,
       amount: pendingSubscription.amount,
       startDate: existingSubscription?.startDate || now.toISOString(),
       endDate: endDate.toISOString(),
