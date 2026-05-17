@@ -2,7 +2,7 @@ import React, { useEffect, useState, startTransition } from 'react';
 import { useNavigate } from 'react-router';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api-client';
-import { buildFunctionsUrl } from '../lib/functions-base';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Loader2, CheckCircle2, AlertCircle, Building2 } from 'lucide-react';
@@ -101,8 +101,8 @@ export default function AuthCallback() {
                        'User';
 
       // Create company and SuperAdmin profile via backend
-      const response = await fetch(
-        buildFunctionsUrl('/oauth/create-company'),
+      const response = await fetchFunctionsUrl(
+        '/oauth/create-company',
         {
           method: 'POST',
           headers: {

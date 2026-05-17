@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { publicAnonKey } from '../utils/supabase/info';
-import { buildFunctionsUrl } from '../lib/functions-base';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 
 export default function CompanySignup() {
@@ -111,9 +111,7 @@ export default function CompanySignup() {
   useEffect(() => {
     const fetchPublicKey = async () => {
       try {
-        const url = buildFunctionsUrl('/paystack/public-key');
-        
-        const response = await fetch(url, {
+        const response = await fetchFunctionsUrl('/paystack/public-key', {
           headers: { Authorization: `Bearer ${publicAnonKey}` },
         });
         
@@ -203,8 +201,8 @@ export default function CompanySignup() {
     
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await fetch(
-          buildFunctionsUrl(`/company/payment-status/${reference}`),
+        const res = await fetchFunctionsUrl(
+          `/company/payment-status/${reference}`,
           {
             headers: { Authorization: `Bearer ${publicAnonKey}` },
           }
@@ -323,8 +321,8 @@ export default function CompanySignup() {
     try {
       toast.info('Verifying payment and setting up your account...');
       
-      const response = await fetch(
-        buildFunctionsUrl('/company/register'),
+      const response = await fetchFunctionsUrl(
+        '/company/register',
         {
           method: 'POST',
           headers: {

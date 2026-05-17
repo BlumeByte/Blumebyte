@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { publicAnonKey } from '../utils/supabase/info';
 import { supabase } from './supabase';
-import { buildFunctionsUrl } from './functions-base';
+import { fetchFunctionsUrl } from './functions-base';
 
 export interface CompanyBranding {
   companyName: string;
@@ -49,7 +49,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const res = await fetch(buildFunctionsUrl('/company-settings'), {
+      const res = await fetchFunctionsUrl('/company-settings', {
         headers: { 
           'Authorization': `Bearer ${publicAnonKey}`,
           'X-User-Token': token

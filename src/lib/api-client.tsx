@@ -1,5 +1,5 @@
 import { publicAnonKey } from '../utils/supabase/info';
-import { buildFunctionsUrl } from './functions-base';
+import { fetchFunctionsUrl } from './functions-base';
 
 // PERFORMANCE: Simple in-memory cache for GET requests
 const requestCache = new Map<string, { data: any; timestamp: number }>();
@@ -34,7 +34,7 @@ export async function api(path: string, options: RequestInit & { token?: string 
     bodyToSend = JSON.stringify(bodyToSend);
   }
   
-  const res = await fetch(buildFunctionsUrl(path), {
+  const res = await fetchFunctionsUrl(path, {
     ...fetchOpts,
     body: bodyToSend,
     headers: {
@@ -104,7 +104,7 @@ export function clearAllCache() {
 
 // File upload helper function
 export async function apiUpload(path: string, formData: FormData, token?: string | null) {
-  const res = await fetch(buildFunctionsUrl(path), {
+  const res = await fetchFunctionsUrl(path, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${publicAnonKey}`,
@@ -135,14 +135,14 @@ export async function apiUpload(path: string, formData: FormData, token?: string
 // apiClient object for components that need direct Response access
 export const apiClient = {
   async get(path: string, token?: string | null): Promise<Response> {
-      return fetch(buildFunctionsUrl(path), {
+      return fetchFunctionsUrl(path, {
       method: 'GET',
       headers: authHeaders(token, false),
     });
   },
   
   async post(path: string, body: any, token?: string | null): Promise<Response> {
-      return fetch(buildFunctionsUrl(path), {
+      return fetchFunctionsUrl(path, {
       method: 'POST',
       headers: authHeaders(token, true),
       body: JSON.stringify(body),
@@ -150,7 +150,7 @@ export const apiClient = {
   },
   
   async put(path: string, body: any, token?: string | null): Promise<Response> {
-      return fetch(buildFunctionsUrl(path), {
+      return fetchFunctionsUrl(path, {
       method: 'PUT',
       headers: authHeaders(token, true),
       body: JSON.stringify(body),
@@ -158,14 +158,14 @@ export const apiClient = {
   },
   
   async delete(path: string, token?: string | null): Promise<Response> {
-      return fetch(buildFunctionsUrl(path), {
+      return fetchFunctionsUrl(path, {
       method: 'DELETE',
       headers: authHeaders(token, false),
     });
   },
 
   async patch(path: string, body: any, token?: string | null): Promise<Response> {
-      return fetch(buildFunctionsUrl(path), {
+      return fetchFunctionsUrl(path, {
       method: 'PATCH',
       headers: authHeaders(token, true),
       body: JSON.stringify(body),

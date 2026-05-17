@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { CheckCircle2, XCircle, Loader2, Server } from 'lucide-react';
 import { publicAnonKey } from '../utils/supabase/info';
-import { buildFunctionsUrl } from '../lib/functions-base';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 
 interface HealthCheckResponse {
   status: string;
@@ -19,8 +19,8 @@ export function DeploymentStatusCheck() {
   useEffect(() => {
     const checkDeployment = async () => {
       try {
-        const response = await fetch(
-          buildFunctionsUrl('/health'),
+        const response = await fetchFunctionsUrl(
+          '/health',
           {
             method: 'GET',
             headers: {

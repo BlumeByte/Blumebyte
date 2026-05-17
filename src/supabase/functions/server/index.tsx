@@ -29,7 +29,9 @@ const getFunctionsCallbackBaseUrl = (c: Context) => {
   const requestUrl = new URL(c.req.url);
   const pathSegments = requestUrl.pathname.split('/').filter(Boolean);
   const functionsIndex = pathSegments.indexOf('functions');
-  const functionName = functionsIndex >= 0 ? pathSegments[functionsIndex + 2] : '';
+  const functionName = (functionsIndex >= 0 && functionsIndex + 2 < pathSegments.length)
+    ? pathSegments[functionsIndex + 2]
+    : '';
   const callbackOrigin = configuredSupabaseUrl || `${requestUrl.protocol}//${requestUrl.host}`;
   return `${callbackOrigin}/functions/v1/${functionName || 'make-server'}`;
 };

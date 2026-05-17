@@ -9,7 +9,7 @@ import { publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
-import { buildFunctionsUrl } from '../lib/functions-base';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 
 interface ChatMessage {
   id: string;
@@ -51,8 +51,8 @@ export function EmployeeChat() {
       const token = accessToken;
       if (!token) return;
 
-      const response = await fetch(
-        buildFunctionsUrl('/chat/messages'),
+      const response = await fetchFunctionsUrl(
+        '/chat/messages',
         {
           method: 'GET',
           headers: {
@@ -119,8 +119,8 @@ export function EmployeeChat() {
         return;
       }
 
-      const response = await fetch(
-        buildFunctionsUrl('/chat/send'),
+      const response = await fetchFunctionsUrl(
+        '/chat/send',
         {
           method: 'POST',
           headers: {

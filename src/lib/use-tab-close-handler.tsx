@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from './auth-context';
-import { buildFunctionsUrl } from './functions-base';
+import { buildFunctionsUrl, fetchFunctionsUrl } from './functions-base';
 
 /**
  * Hook that handles auto clock-out and logout reporting when user closes tab/browser
@@ -21,7 +21,7 @@ export function useTabCloseHandler() {
       // Check if user is clocked in
       const checkClockInStatus = async () => {
         try {
-          const response = await fetch(buildFunctionsUrl('/attendance/status'), {
+          const response = await fetchFunctionsUrl('/attendance/status', {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           if (response.ok) {

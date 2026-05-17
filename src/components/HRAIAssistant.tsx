@@ -9,7 +9,7 @@ import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
 import { useNavigate } from 'react-router';
-import { buildFunctionsUrl } from '../lib/functions-base';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 
 interface Message {
   id: string;
@@ -129,8 +129,8 @@ export function HRAIAssistant() {
         return;
       }
 
-      const response = await fetch(
-        buildFunctionsUrl('/ai-assistant'),
+      const response = await fetchFunctionsUrl(
+        '/ai-assistant',
         {
           method: 'POST',
           headers: {
