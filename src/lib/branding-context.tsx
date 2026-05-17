@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { publicAnonKey } from '../utils/supabase/info';
 import { supabase } from './supabase';
-
-const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
+import { fetchFunctionsUrl } from './functions-base';
 
 export interface CompanyBranding {
   companyName: string;
@@ -50,7 +49,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const res = await fetch(`${BASE}/company-settings`, {
+      const res = await fetchFunctionsUrl('/company-settings', {
         headers: { 
           'Authorization': `Bearer ${publicAnonKey}`,
           'X-User-Token': token

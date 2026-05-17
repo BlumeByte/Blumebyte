@@ -18,10 +18,6 @@ import {
 } from './ui/popover';
 
 export function SubscriptionBadge() {
-  // TEMPORARILY DEACTIVATED - Subscription logic disabled
-  return null;
-  
-  /*
   const navigate = useNavigate();
   const { accessToken } = useAuth();
   const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
@@ -263,5 +259,4 @@ export function SubscriptionBadge() {
       </PopoverContent>
     </Popover>
   );
-  */
 }

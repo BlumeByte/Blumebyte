@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { CheckCircle2, XCircle, Loader2, Server } from 'lucide-react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { publicAnonKey } from '../utils/supabase/info';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 
 interface HealthCheckResponse {
   status: string;
@@ -18,8 +19,8 @@ export function DeploymentStatusCheck() {
   useEffect(() => {
     const checkDeployment = async () => {
       try {
-        const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/health`,
+        const response = await fetchFunctionsUrl(
+          '/health',
           {
             method: 'GET',
             headers: {

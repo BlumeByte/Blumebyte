@@ -13,8 +13,29 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
-const subscriptionRoutePaths = (path: string) =>
+// Helpers that generate the full set of route paths for a given endpoint, covering:
+// 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
+// This prevents route mismatches across different Supabase function URL/path-forwarding modes.
+const compatibleRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+
+const compatibleRoutePathsForAliases = (...paths: string[]) =>
+  Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
+
+const subscriptionRoutePaths = compatibleRoutePaths;
+
+const getFunctionsCallbackBaseUrl = (c: Context) => {
+  const configuredSupabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/+$/, '');
+  const requestUrl = new URL(c.req.url);
+  const pathSegments = requestUrl.pathname.split('/').filter(Boolean);
+  const functionsIndex = pathSegments.indexOf('functions');
+  const functionName = (functionsIndex >= 0 && functionsIndex + 2 < pathSegments.length)
+    ? pathSegments[functionsIndex + 2]
+    : '';
+  const callbackOrigin = configuredSupabaseUrl || `${requestUrl.protocol}//${requestUrl.host}`;
+  return `${callbackOrigin}/functions/v1/${functionName || 'make-server'}`;
+};
+
 // Validate the RESEND_FROM_EMAIL secret: Resend requires the 'from' field to
 // contain an actual email address (e.g. "Name <user@domain.com>" or "user@domain.com").
 // If the secret is missing or contains only a display name with no '@' character
@@ -770,6 +791,56 @@ function buildPublicHiringFilters(jobs: any[]) {
   };
 }
 
+// ============ PUBLIC HIRING ENDPOINTS ============
+// Registered before the large authenticated route table so they are always reachable
+// even if the server is loaded in chunks.  Aliases ensure compatibility across different
+// Supabase function URL/path-forwarding modes.
+
+const listPublicJobs = async (c: Context) => {
+  try {
+    const eligible = await listPublicHiringRecords();
+    const settled = await Promise.allSettled(eligible.map((job: any) => buildPublicJobResponse(job)));
+    const jobs = settled
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
+      .map((r) => r.value)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return c.json({
+      jobs,
+      total: jobs.length,
+      filters: buildPublicHiringFilters(jobs),
+      summary: {
+        totalJobs: jobs.length,
+        totalCompanies: new Set(jobs.map((job: any) => job.companyName).filter(Boolean)).size,
+      },
+    });
+  } catch (e: any) {
+    console.error('Public jobs error:', e);
+    return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
+  }
+};
+
+const getPublicJobDetail = async (c: Context) => {
+  try {
+    const id = c.req.param('id');
+    const match = await getPublicHiringRecordById(id);
+    if (!match) return c.json({ error: 'Job not found' }, 404);
+    const publicJob = await buildPublicJobResponse(match);
+    if (!publicJob) return c.json({ error: 'Job not found' }, 404);
+    return c.json(publicJob);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+};
+
+for (const route of compatibleRoutePathsForAliases('/public/hirings', '/public/jobs', '/public/job-openings', '/hirings/jobs')) {
+  app.get(route, listPublicJobs);
+}
+
+for (const route of compatibleRoutePathsForAliases('/public/hirings/:id', '/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
+  app.get(route, getPublicJobDetail);
+}
+
 // --- Build a scope-based item filter for payroll calculation ---
 function makeScopeFilter(scope: string[] | null) {
   return (item: any) => {
@@ -1426,7 +1497,7 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
             { display_name: 'Billing Cycle', variable_name: 'billing_cycle', value: billingCycle },
           ],
         },
-        callback_url: `https://${Deno.env.get('SUPABASE_URL')?.replace('https://', '')}/functions/v1/make-server-668731fc/company/payment-callback`,
+        callback_url: `${getFunctionsCallbackBaseUrl(c)}/company/payment-callback`,
       }),
     });
 
@@ -4512,9 +4583,6 @@ makeCrud("admin/departments", "department:", requireAdminOrAbove);
 makeCrud("admin/compensations", "compensation:", requireAdminOrAbove);
 makeCrud("admin/benefits", "benefit:", requireAdminOrAbove);
 
-const payrollRoutePaths = (path: string) =>
-  [`${PREFIX}${path}`, path, `/:functionName${path}`];
-
 // POST /admin/payroll/calculate — auto-calculate tax deductions + benefit allowances for a given employee + basic salary
 const adminPayrollCalculate = async (c: any) => {
   try {
@@ -4618,7 +4686,9 @@ const adminPayrollCalculate = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of payrollRoutePaths('/admin/payroll/calculate')) app.post(route, adminPayrollCalculate);
+// Register the admin calculate handler on the admin-prefixed route AND the bare /payroll/calculate
+// alias so that the client fallback chain (superadmin → admin → bare) can always succeed.
+for (const route of compatibleRoutePathsForAliases('/admin/payroll/calculate', '/payroll/calculate')) app.post(route, adminPayrollCalculate);
 
 // Alias: superadmin can also call calculate directly
 const superadminPayrollCalculate = async (c: any) => {
@@ -4690,7 +4760,7 @@ const superadminPayrollCalculate = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of payrollRoutePaths('/superadmin/payroll/calculate')) app.post(route, superadminPayrollCalculate);
+for (const route of compatibleRoutePaths('/superadmin/payroll/calculate')) app.post(route, superadminPayrollCalculate);
 
 // Public read-only endpoints for employees to access reference data
 app.get(`${PREFIX}/leave-types`, async (c) => {
@@ -6839,6 +6909,70 @@ app.get(`${PREFIX}/subscription/user-count`, async (c) => {
   }
 });
 
+const SUBSCRIPTION_EXPIRY_ALERT_DAYS = new Set([0, 1, 3, 7]);
+
+async function triggerSuperadminSubscriptionExpiryAlert(
+  superadminUser: any,
+  subscription: any,
+  daysRemaining: number,
+) {
+  const superadminId = superadminUser?.userId || superadminUser?.id;
+  const superadminEmail = String(superadminUser?.email || '').trim();
+  if (!superadminId || !superadminEmail) return;
+
+  const normalizedDaysRemaining = Math.max(0, Number(daysRemaining) || 0);
+  if (!SUBSCRIPTION_EXPIRY_ALERT_DAYS.has(normalizedDaysRemaining)) return;
+
+  const endDate = subscription?.endDate ? new Date(subscription.endDate) : null;
+  const isValidEndDate = !!endDate && !Number.isNaN(endDate.getTime());
+  const safeEndDate = isValidEndDate
+    ? endDate.toLocaleDateString()
+    : 'Unknown';
+  const endDateKey = isValidEndDate
+    ? endDate.toISOString()
+    : 'unknown';
+
+  const dedupeKey = `subscription-expiry-alert:${superadminId}:${normalizedDaysRemaining}:${endDateKey}`;
+  const alreadySent = await kv.get(dedupeKey);
+  if (alreadySent) return;
+
+  const isExpired = normalizedDaysRemaining === 0;
+  const title = isExpired ? 'Subscription Expired' : 'Subscription Expiring Soon';
+  const message = isExpired
+    ? 'Your subscription has expired. Renew now to avoid disruption for your team.'
+    : `Your subscription will expire in ${normalizedDaysRemaining} day(s).`;
+
+  const notifId = crypto.randomUUID();
+  await kv.set(`notification:${notifId}`, {
+    id: notifId,
+    userId: superadminId,
+    type: 'subscription-expiry',
+    title,
+    message,
+    read: false,
+    createdAt: new Date().toISOString(),
+  });
+
+  await sendEmailNotification(
+    superadminId,
+    superadminEmail,
+    superadminUser?.name || '',
+    `Blumebyte HR: ${title}`,
+    `
+      <p>${message}</p>
+      <p><strong>Plan:</strong> ${subscription?.plan || 'N/A'}</p>
+      <p><strong>Subscription End Date:</strong> ${safeEndDate}</p>
+      <p>Please sign in and renew from your subscription settings.</p>
+    `,
+  );
+
+  await kv.set(dedupeKey, {
+    sentAt: new Date().toISOString(),
+    daysRemaining: normalizedDaysRemaining,
+    endDate: endDateKey === 'unknown' ? null : endDateKey,
+  });
+}
+
 // Get subscription status
 app.get(`${PREFIX}/subscription/status`, async (c) => {
   try {
@@ -6858,7 +6992,8 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
         return c.json({ status: 'expired', message: 'No superadmin found' }, 200);
       }
       
-      const subscription = await kv.get(`subscription:${superadmin.id}`);
+      const superadminId = superadmin.userId || superadmin.id;
+      const subscription = await kv.get(`subscription:${superadminId}`);
       
       if (!subscription) {
         return c.json({ status: 'expired', message: 'No subscription found' }, 200);
@@ -6868,6 +7003,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
       const endDate = new Date(subscription.endDate);
       const isActive = now < endDate;
       const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      await triggerSuperadminSubscriptionExpiryAlert(superadmin, subscription, daysRemaining);
       
       return c.json({
         status: isActive ? 'active' : 'expired',
@@ -6890,6 +7026,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     const endDate = new Date(subscription.endDate);
     const isActive = now < endDate;
     const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    await triggerSuperadminSubscriptionExpiryAlert(user, subscription, daysRemaining);
     
     await logAudit({
       userId: user.id,
@@ -7002,7 +7139,7 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
 });
 
 // Initialize Paystack payment
-app.post(`${PREFIX}/subscription/initialize`, async (c) => {
+for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post(route, async (c) => {
   try {
     const { user, role } = await requireSuperAdmin(c);
     const body = await c.req.json();
@@ -7032,8 +7169,14 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
     // Initialize Paystack transaction
     const reference = `SUB_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-    
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+
+    // Convert USD to the configured Paystack currency (GHS/NGN/USD)
+    const { amountSmallestUnit: initAmountSmallestUnit, currency: initCurrency } = await usdToPaystackAmount(amount);
+    if (!initAmountSmallestUnit || initAmountSmallestUnit < 100) {
+      return c.json({ error: `Computed payment amount is too low (${initAmountSmallestUnit ?? 0} ${initCurrency ?? 'unknown'}). Please contact support.` }, 400);
+    }
+
+    let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${paystackSecretKey}`,
@@ -7041,13 +7184,15 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount: Math.round(amount * 100), // Paystack expects amount in kobo (cents)
+        amount: initAmountSmallestUnit,
+        currency: initCurrency,
         reference,
         callback_url: callbackUrl,
         metadata: {
           userId: user.id,
           plan,
           userCount,
+          amountUsd: amount,
           custom_fields: [
             {
               display_name: 'Subscription Plan',
@@ -7063,13 +7208,50 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
         },
       }),
     });
-    
-    const paystackData = await paystackResponse.json();
+
+    let paystackData = await paystackResponse.json();
+
+    // Fallback: retry in USD if Paystack rejects the converted amount
+    let usedFallbackUsd = false;
+    const usdFallbackAmount = Math.round(amount * 100);
+    if (!paystackData.status && /invalid amount/i.test(String(paystackData?.message || '')) && initCurrency !== 'USD') {
+      if (usdFallbackAmount >= 100) {
+        paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user.email,
+            amount: usdFallbackAmount,
+            currency: 'USD',
+            reference,
+            callback_url: callbackUrl,
+            metadata: {
+              userId: user.id,
+              plan,
+              userCount,
+              amountUsd: amount,
+              paystackCurrencyFallback: true,
+              originalCurrency: initCurrency,
+            },
+          }),
+        });
+        paystackData = await paystackResponse.json();
+        if (paystackData.status) {
+          usedFallbackUsd = true;
+        }
+      }
+    }
     
     if (!paystackData.status) {
       console.error('Paystack initialization failed:', paystackData);
       return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
     }
+
+    const finalInitAmountSmallestUnit = usedFallbackUsd ? usdFallbackAmount : initAmountSmallestUnit;
+    const finalInitCurrency = usedFallbackUsd ? 'USD' : initCurrency;
     
     // Store pending transaction
     await kv.set(`pending-subscription:${reference}`, {
@@ -7077,6 +7259,8 @@ app.post(`${PREFIX}/subscription/initialize`, async (c) => {
       plan,
       userCount,
       amount,
+      amountSmallestUnit: finalInitAmountSmallestUnit,
+      currency: finalInitCurrency,
       reference,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -7234,7 +7418,7 @@ const renewSubscriptionLicense = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of subscriptionRoutePaths('/subscription/renew-license')) app.post(route, renewSubscriptionLicense);
+for (const route of compatibleRoutePathsForAliases('/subscription/renew-license', '/subscription/renew')) app.post(route, renewSubscriptionLicense);
 
 // Verify Paystack payment
 const verifySubscriptionPayment = async (c: any) => {
@@ -7313,6 +7497,8 @@ const verifySubscriptionPayment = async (c: any) => {
       userId: pendingSubscription.userId,
       plan: pendingSubscription.plan,
       userCount: effectiveUserCount,
+      purchasedLicenses: effectiveUserCount,
+      licenses: effectiveUserCount,
       amount: pendingSubscription.amount,
       startDate: existingSubscription?.startDate || now.toISOString(),
       endDate: endDate.toISOString(),
@@ -9031,7 +9217,7 @@ app.post(`${PREFIX}/subscription/initialize-payment`, async (c) => {
       return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}).` }, 400);
     }
 
-    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-payment?reference=${reference}`;
+    const callbackUrl = `${getFunctionsCallbackBaseUrl(c)}/subscription/verify-payment?reference=${reference}`;
 
     let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -9239,7 +9425,7 @@ app.post(`${PREFIX}/subscription/upgrade-licenses`, async (c) => {
         amount: upgradeAmountSmallestUnit,
         currency: upgradeCurrency,
         reference: reference,
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/make-server-668731fc/subscription/verify-license-upgrade?reference=${reference}`,
+        callback_url: `${getFunctionsCallbackBaseUrl(c)}/subscription/verify-license-upgrade?reference=${reference}`,
         metadata: {
           companyId: companyId,
           companyName: company?.name || '',
@@ -11012,15 +11198,6 @@ async function sendEmailNotification(
 
 
 
-// Register each endpoint on:
-// 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
-// This prevents route mismatches across different Supabase function URL/path forwarding modes.
-const compatibleRoutePaths = (path: string) =>
-  Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
-
-const compatibleRoutePathsForAliases = (...paths: string[]) =>
-  Array.from(new Set(paths.flatMap((path) => compatibleRoutePaths(path))));
-
 const MAX_ERROR_REPORT_STACK_CHARS = 4000;
 
 // POST /support/report-error — report UI/runtime errors to support queue and platform admins
@@ -11106,53 +11283,6 @@ const reportClientError = async (c: any) => {
 };
 for (const route of compatibleRoutePathsForAliases('/support/report-error', '/support/error-report', '/report-error', '/error-report')) {
   app.post(route, reportClientError);
-}
-
-// HIRING-FIX: Keep public hiring routes available on both prefixed and non-prefixed paths.
-const listPublicJobs = async (c: Context) => {
-  try {
-    const eligible = await listPublicHiringRecords();
-    const settled = await Promise.allSettled(eligible.map((job: any) => buildPublicJobResponse(job)));
-    const jobs = settled
-      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && !!r.value)
-      .map((r) => r.value)
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return c.json({
-      jobs,
-      total: jobs.length,
-      filters: buildPublicHiringFilters(jobs),
-      summary: {
-        totalJobs: jobs.length,
-        totalCompanies: new Set(jobs.map((job: any) => job.companyName).filter(Boolean)).size,
-      },
-    });
-  } catch (e: any) {
-    console.error('Public jobs error:', e);
-    return c.json({ error: 'Failed to load job postings', detail: e.message }, 500);
-  }
-};
-
-// HIRING-FIX: Resolve public job detail by scanning all public postings and return stable 404 payload.
-const getPublicJobDetail = async (c: Context) => {
-  try {
-    const id = c.req.param('id');
-    const match = await getPublicHiringRecordById(id);
-    if (!match) return c.json({ error: 'Job not found' }, 404);
-    const publicJob = await buildPublicJobResponse(match);
-    if (!publicJob) return c.json({ error: 'Job not found' }, 404);
-    return c.json(publicJob);
-  } catch (e: any) {
-    return c.json({ error: e.message }, 500);
-  }
-};
-
-for (const route of compatibleRoutePathsForAliases('/public/hirings', '/public/jobs', '/public/job-openings', '/hirings/jobs')) {
-  app.get(route, listPublicJobs);
-}
-
-for (const route of compatibleRoutePathsForAliases('/public/hirings/:id', '/public/jobs/:id', '/public/job-openings/:id', '/hirings/jobs/:id')) {
-  app.get(route, getPublicJobDetail);
 }
 
 // POST /public/job/apply — submit a public job application

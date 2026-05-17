@@ -5,10 +5,11 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Alert, AlertDescription } from './ui/alert';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 
 interface ChatMessage {
   id: string;
@@ -50,8 +51,8 @@ export function EmployeeChat() {
       const token = accessToken;
       if (!token) return;
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/chat/messages`,
+      const response = await fetchFunctionsUrl(
+        '/chat/messages',
         {
           method: 'GET',
           headers: {
@@ -118,8 +119,8 @@ export function EmployeeChat() {
         return;
       }
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/chat/send`,
+      const response = await fetchFunctionsUrl(
+        '/chat/send',
         {
           method: 'POST',
           headers: {

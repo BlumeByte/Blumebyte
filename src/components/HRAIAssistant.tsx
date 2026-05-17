@@ -4,11 +4,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
 import { useNavigate } from 'react-router';
+import { fetchFunctionsUrl } from '../lib/functions-base';
 
 interface Message {
   id: string;
@@ -128,8 +129,8 @@ export function HRAIAssistant() {
         return;
       }
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/ai-assistant`,
+      const response = await fetchFunctionsUrl(
+        '/ai-assistant',
         {
           method: 'POST',
           headers: {
