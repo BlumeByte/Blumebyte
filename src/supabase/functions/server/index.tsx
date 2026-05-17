@@ -7106,7 +7106,7 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
     // Convert USD to the configured Paystack currency (GHS/NGN/USD)
     const { amountSmallestUnit: initAmountSmallestUnit, currency: initCurrency } = await usdToPaystackAmount(amount);
     if (!initAmountSmallestUnit || initAmountSmallestUnit < 100) {
-      return c.json({ error: `Computed payment amount is too low (${initAmountSmallestUnit} ${initCurrency}). Please contact support.` }, 400);
+      return c.json({ error: `Computed payment amount is too low (${initAmountSmallestUnit ?? 0} ${initCurrency ?? 'unknown'}). Please contact support.` }, 400);
     }
 
     let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -7145,8 +7145,9 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
     let paystackData = await paystackResponse.json();
 
     // Fallback: retry in USD if Paystack rejects the converted amount
+    let usedFallbackUsd = false;
+    const usdFallbackAmount = Math.round(amount * 100);
     if (!paystackData.status && /invalid amount/i.test(String(paystackData?.message || '')) && initCurrency !== 'USD') {
-      const usdFallbackAmount = Math.round(amount * 100);
       if (usdFallbackAmount >= 100) {
         paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
           method: 'POST',
@@ -7171,6 +7172,9 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
           }),
         });
         paystackData = await paystackResponse.json();
+        if (paystackData.status) {
+          usedFallbackUsd = true;
+        }
       }
     }
     
@@ -7179,10 +7183,8 @@ for (const route of subscriptionRoutePaths('/subscription/initialize')) app.post
       return c.json({ error: paystackData.message || 'Failed to initialize payment' }, 500);
     }
 
-    const finalInitAmountSmallestUnit = paystackData.data?.metadata?.paystackCurrencyFallback
-      ? Math.round(amount * 100)
-      : initAmountSmallestUnit;
-    const finalInitCurrency = paystackData.data?.metadata?.paystackCurrencyFallback ? 'USD' : initCurrency;
+    const finalInitAmountSmallestUnit = usedFallbackUsd ? usdFallbackAmount : initAmountSmallestUnit;
+    const finalInitCurrency = usedFallbackUsd ? 'USD' : initCurrency;
     
     // Store pending transaction
     await kv.set(`pending-subscription:${reference}`, {
