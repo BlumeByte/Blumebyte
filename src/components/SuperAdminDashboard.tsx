@@ -492,7 +492,7 @@ export function SuperAdminDashboard() {
   const renderContent = () => {
     switch (activeSection) {
       case 'dashboard': return <DashboardView onNavigate={setActiveSection} />;
-      case 'messages': return <div className="p-8"><MessagesPanel /></div>;
+      case 'messages': return <div className="p-4 md:p-8"><MessagesPanel /></div>;
       case 'announcements': return <AnnouncementsView />;
       case 'employees': return <EmployeesView />;
       case 'usermanagement': return <UserManagementView />;
@@ -501,26 +501,26 @@ export function SuperAdminDashboard() {
       case 'attendance': return <AttendanceView />;
       case 'leave-management': return <LeaveManagementView />;
       case 'payroll': return <PayrollView />;
-      case 'compensation': return <div className="p-8"><CompensationModule /></div>;
-      case 'paygrades': return <div className="p-8"><PayGradesModule /></div>;
-      case 'financial-years': return <div className="p-8"><FinancialYearsModule /></div>;
-      case 'tax-configuration': return <div className="p-8"><TaxConfigurationModule /></div>;
-      case 'benefits': return <div className="p-8"><BenefitsModule /></div>;
-      case 'hr-reports': return <div className="p-8"><ReportsPanel /></div>;
-      case 'advanced-reports': return <div className="p-8"><AdvancedReportsModule /></div>;
-      case 'audit-logs': return <div className="p-8"><AuditLogsModule /></div>;
+      case 'compensation': return <div className="p-4 md:p-8"><CompensationModule /></div>;
+      case 'paygrades': return <div className="p-4 md:p-8"><PayGradesModule /></div>;
+      case 'financial-years': return <div className="p-4 md:p-8"><FinancialYearsModule /></div>;
+      case 'tax-configuration': return <div className="p-4 md:p-8"><TaxConfigurationModule /></div>;
+      case 'benefits': return <div className="p-4 md:p-8"><BenefitsModule /></div>;
+      case 'hr-reports': return <div className="p-4 md:p-8"><ReportsPanel /></div>;
+      case 'advanced-reports': return <div className="p-4 md:p-8"><AdvancedReportsModule /></div>;
+      case 'audit-logs': return <div className="p-4 md:p-8"><AuditLogsModule /></div>;
       case 'onboarding-training': return <OnboardingView />;
-      case 'overtime-expenses': return <div className="p-8"><OvertimeExpenseApproval /></div>;
-      case 'surveys': return <div className="p-8"><SurveyBuilder /></div>;
-      case 'engagement-analytics': return <div className="p-8"><EmployeeEngagementAnalytics /></div>;
-      case 'meetings-1on1': return <div className="p-8"><MeetingsPanel mode="admin" /></div>;
+      case 'overtime-expenses': return <div className="p-4 md:p-8"><OvertimeExpenseApproval /></div>;
+      case 'surveys': return <div className="p-4 md:p-8"><SurveyBuilder /></div>;
+      case 'engagement-analytics': return <div className="p-4 md:p-8"><EmployeeEngagementAnalytics /></div>;
+      case 'meetings-1on1': return <div className="p-4 md:p-8"><MeetingsPanel mode="admin" /></div>;
       case 'self-service': return <SharedSelfServiceHub onNavigate={setActiveSection} />;
       case 'backup-restore': return <BackupRestore />;
       case 'recruitment': return <RecruitmentView />;
-      case 'automation': return <div className="p-8"><AutomationModule companyId={automationCompanyId} companyName={selectedCompanyName || ''} /></div>;
+      case 'automation': return <div className="p-4 md:p-8"><AutomationModule companyId={automationCompanyId} companyName={selectedCompanyName || ''} /></div>;
       case 'profile-requests': return <ProfileChangeRequests />;
       case 'settings': return (
-        <div className="p-8 space-y-8">
+        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold mb-6">Appearance</h2>
             <Card className="max-w-md">
@@ -572,7 +572,7 @@ export function SuperAdminDashboard() {
       );
       case 'global-hiring-applications': return <GlobalHiringApplicationsPanel accessToken={accessToken} />;
       case 'billings-subscriptions': return (
-        <div className="p-8 space-y-8">
+        <div className="p-4 md:p-8 space-y-6 md:space-y-8">
           <LicenseManagement />
         </div>
       );
@@ -710,7 +710,7 @@ function RecruitmentView() {
   const { accessToken } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'postings' | 'applications'>('postings');
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center gap-3 mb-4">
         <UserPlus className="w-6 h-6 text-blue-600" />
         <div>
@@ -718,9 +718,11 @@ function RecruitmentView() {
           <p className="text-sm text-gray-500">Manage job postings and review applications</p>
         </div>
       </div>
-      <div className="flex gap-1 mb-6 border-b">
+      <div className="mb-6 border-b overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
         <button onClick={() => setActiveSubTab('postings')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeSubTab === 'postings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Job Postings</button>
         <button onClick={() => setActiveSubTab('applications')} className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeSubTab === 'applications' ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Applications & Hiring</button>
+        </div>
       </div>
       {activeSubTab === 'postings' && <EntityCrud entityKey="recruitment" config={ENTITY_CONFIGS.recruitment} />}
       {activeSubTab === 'applications' && <HiringApprovalPanel />}
@@ -730,7 +732,7 @@ function RecruitmentView() {
 
 function PlaceholderView({ title }: { title: string }) {
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold mb-2">{title}</h1>
       <Card className="mt-6"><CardContent className="py-16 text-center"><FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" /><p className="text-gray-500">This module is under development</p></CardContent></Card>
     </div>
@@ -796,8 +798,8 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
   });
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Global Hiring Applications</h1>
           <p className="text-gray-500 text-sm mt-1">Applications submitted via the public Blumebyte hiring portal</p>
@@ -809,7 +811,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
 
       <div className="mb-4 relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input className="pl-9 w-72" placeholder="Search applicants, roles…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input className="pl-9 w-full sm:w-72" placeholder="Search applicants, roles…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       <Card>
@@ -1125,7 +1127,7 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
   })();
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Welcome back! Here's your organization overview.</p>
@@ -1303,7 +1305,7 @@ function MyProfileView() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">My Profile</h1>
         <Button onClick={() => editing ? handleSave() : setEditing(true)}>{editing ? 'Save Changes' : 'Edit Profile'}</Button>
@@ -1431,7 +1433,7 @@ function TimeOffCalendarView() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-foreground">Time Off & Events Calendar</h1>
         <div className="flex items-center gap-2">
@@ -1708,7 +1710,7 @@ function AttendanceView() {
   ].filter(d => d.value > 0);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Attendance</h1>
         <div className="flex gap-2">
@@ -2167,7 +2169,7 @@ function PayrollView() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Payroll</h1>
         <Button onClick={() => { setEditItem(null); setFormData({ status: 'pending', period: new Date().toISOString().slice(0, 7) }); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Run Payroll</Button>
@@ -2367,7 +2369,7 @@ function HRReportsView() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">HR Reports & Analytics</h1>
         <div className="flex items-center gap-2">
@@ -2665,7 +2667,7 @@ function LeaveManagementView() {
   const filtered = companyLeaves.filter(l => !search || l.employeeName?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Leave Management</h1>
         <div className="flex gap-2">
@@ -2855,7 +2857,7 @@ function OnboardingView() {
   const progressPct = checklists.length > 0 ? Math.round((completedCount / checklists.length) * 100) : 0;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Onboarding & Training</h1>
         <div className="flex gap-2">
@@ -3068,7 +3070,7 @@ function SelfServiceView({ onNavigate }: { onNavigate: (id: string) => void }) {
   ];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold mb-2">Self-Service Hub</h1>
       <p className="text-sm text-gray-500 mb-6">Your personal employee portal</p>
 
@@ -3286,7 +3288,7 @@ function AnnouncementsView() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Announcements</h1>
@@ -3499,7 +3501,7 @@ function EmployeesView() {
     });
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Employees</h1>
       </div>
@@ -3729,7 +3731,7 @@ function UserManagementView() {
   const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">User Management</h1>
         <Button onClick={() => { setEditUser(null); setFormData({ role: 'employee', departments: [], department: '' }); setShowTempPw(false); setDialogOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Create User</Button>
@@ -4159,7 +4161,7 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
   }));
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">{config.title}</h1>
