@@ -6909,6 +6909,66 @@ app.get(`${PREFIX}/subscription/user-count`, async (c) => {
   }
 });
 
+const SUBSCRIPTION_EXPIRY_ALERT_DAYS = new Set([0, 1, 3, 7]);
+
+async function triggerSuperadminSubscriptionExpiryAlert(
+  superadminUser: any,
+  subscription: any,
+  daysRemaining: number,
+) {
+  const superadminId = superadminUser?.userId || superadminUser?.id;
+  const superadminEmail = String(superadminUser?.email || '').trim();
+  if (!superadminId || !superadminEmail) return;
+
+  const normalizedDaysRemaining = Math.max(0, Number(daysRemaining) || 0);
+  if (!SUBSCRIPTION_EXPIRY_ALERT_DAYS.has(normalizedDaysRemaining)) return;
+
+  const endDate = subscription?.endDate ? new Date(subscription.endDate) : null;
+  const safeEndDate = endDate && !Number.isNaN(endDate.getTime())
+    ? endDate.toLocaleDateString()
+    : 'Unknown';
+
+  const dedupeKey = `subscription-expiry-alert:${superadminId}:${normalizedDaysRemaining}:${subscription?.endDate || 'unknown'}`;
+  const alreadySent = await kv.get(dedupeKey);
+  if (alreadySent) return;
+
+  const isExpired = normalizedDaysRemaining === 0;
+  const title = isExpired ? 'Subscription Expired' : 'Subscription Expiring Soon';
+  const message = isExpired
+    ? 'Your subscription has expired. Renew now to avoid disruption for your team.'
+    : `Your subscription will expire in ${normalizedDaysRemaining} day(s).`;
+
+  const notifId = crypto.randomUUID();
+  await kv.set(`notification:${notifId}`, {
+    id: notifId,
+    userId: superadminId,
+    type: 'subscription-expiry',
+    title,
+    message,
+    read: false,
+    createdAt: new Date().toISOString(),
+  });
+
+  await sendEmailNotification(
+    superadminId,
+    superadminEmail,
+    superadminUser?.name || '',
+    `Blumebyte HR: ${title}`,
+    `
+      <p>${message}</p>
+      <p><strong>Plan:</strong> ${subscription?.plan || 'N/A'}</p>
+      <p><strong>Subscription End Date:</strong> ${safeEndDate}</p>
+      <p>Please sign in and renew from your subscription settings.</p>
+    `,
+  );
+
+  await kv.set(dedupeKey, {
+    sentAt: new Date().toISOString(),
+    daysRemaining: normalizedDaysRemaining,
+    endDate: subscription?.endDate || null,
+  });
+}
+
 // Get subscription status
 app.get(`${PREFIX}/subscription/status`, async (c) => {
   try {
@@ -6928,7 +6988,8 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
         return c.json({ status: 'expired', message: 'No superadmin found' }, 200);
       }
       
-      const subscription = await kv.get(`subscription:${superadmin.id}`);
+      const superadminId = superadmin.userId || superadmin.id;
+      const subscription = await kv.get(`subscription:${superadminId}`);
       
       if (!subscription) {
         return c.json({ status: 'expired', message: 'No subscription found' }, 200);
@@ -6938,6 +6999,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
       const endDate = new Date(subscription.endDate);
       const isActive = now < endDate;
       const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      await triggerSuperadminSubscriptionExpiryAlert(superadmin, subscription, daysRemaining);
       
       return c.json({
         status: isActive ? 'active' : 'expired',
@@ -6960,6 +7022,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     const endDate = new Date(subscription.endDate);
     const isActive = now < endDate;
     const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    await triggerSuperadminSubscriptionExpiryAlert(user, subscription, daysRemaining);
     
     await logAudit({
       userId: user.id,
