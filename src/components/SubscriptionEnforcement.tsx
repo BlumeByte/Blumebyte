@@ -19,12 +19,16 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     error: string | null;
     accountInactive: boolean;
     subscriptionInactive: boolean;
+    canManageSubscription: boolean;
+    autoRenewEligible: boolean;
   }>({
     isActive: true,
     checking: true,
     error: null,
     accountInactive: false,
     subscriptionInactive: false,
+    canManageSubscription: false,
+    autoRenewEligible: false,
   });
 
   useEffect(() => {
@@ -40,29 +44,22 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
         return;
       }
 
-      // SuperAdmin always gets access (needs to manage subscription)
-      if (user.role === 'superadmin') {
-        setSubscriptionStatus({
-          isActive: true,
-          checking: false,
-          error: null,
-          accountInactive: false,
-          subscriptionInactive: false,
-        });
-        return;
-      }
-
       try {
         const token = await getToken();
-        // Make a simple API call to check if user can access system
-        await api('/profile', { token });
+        if (!token) {
+          throw new Error('Missing authentication token');
+        }
+
+        const status = await api('/subscription/status', { token });
         
         setSubscriptionStatus({
-          isActive: true,
+          isActive: status?.status === 'active',
           checking: false,
           error: null,
           accountInactive: false,
-          subscriptionInactive: false,
+          subscriptionInactive: status?.status !== 'active',
+          canManageSubscription: status?.isSubscriptionOwner === true,
+          autoRenewEligible: status?.autoRenewEligible === true,
         });
       } catch (error: any) {
         console.error('Subscription check failed:', error);
@@ -73,6 +70,8 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
           error: error.message,
           accountInactive: error.accountInactive || false,
           subscriptionInactive: error.subscriptionInactive || false,
+          canManageSubscription: false,
+          autoRenewEligible: false,
         });
       }
     }
@@ -175,14 +174,25 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
                 </div>
               </div>
 
-              <div className="text-center pt-2">
-                <p className="text-sm font-bold text-red-700 animate-pulse">
-                  ⏰ System will remain locked until SuperAdmin completes payment
-                </p>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </div>
+                <div className="text-center pt-2">
+                  <p className="text-sm font-bold text-red-700 animate-pulse">
+                    ⏰ System will remain locked until SuperAdmin completes payment
+                  </p>
+                </div>
+                {subscriptionStatus.canManageSubscription && (
+                  <Button className="w-full" onClick={() => navigate('/subscription')}>
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Go to Subscription & Renew
+                  </Button>
+                )}
+                {subscriptionStatus.autoRenewEligible && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    A saved-card auto-renewal can be attempted from your subscription page.
+                  </p>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 import { apiClient } from '../lib/api-client.tsx';
@@ -11,6 +11,7 @@ import {
   Clock,
   Loader2 
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Popover,
   PopoverContent,
@@ -22,6 +23,8 @@ export function SubscriptionBadge() {
   const { accessToken } = useAuth();
   const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [autoRenewing, setAutoRenewing] = useState(false);
+  const autoRenewAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchSubscriptionInfo();
@@ -30,6 +33,28 @@ export function SubscriptionBadge() {
     const interval = setInterval(fetchSubscriptionInfo, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [accessToken]);
+
+  const attemptAutoRenew = async (info: any) => {
+    const attemptKey = `${info?.endDate || 'unknown'}:${info?.status || 'unknown'}`;
+    if (autoRenewAttemptedRef.current === attemptKey) return;
+    autoRenewAttemptedRef.current = attemptKey;
+
+    try {
+      setAutoRenewing(true);
+      const response = await apiClient.post('/subscription/auto-renew', {}, accessToken);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success === false) {
+        toast.error(data?.message || data?.error || 'Auto-renewal attempt failed');
+        return;
+      }
+      toast.success('Saved-card auto-renewal completed successfully.');
+      await fetchSubscriptionInfo();
+    } catch (error: any) {
+      toast.error(error?.message || 'Auto-renewal attempt failed');
+    } finally {
+      setAutoRenewing(false);
+    }
+  };
 
   const fetchSubscriptionInfo = async () => {
     if (!accessToken) {
@@ -42,6 +67,13 @@ export function SubscriptionBadge() {
       if (response.ok) {
         const data = await response.json();
         setSubscriptionInfo(data);
+        if (
+          data?.status === 'expired' &&
+          data?.isSubscriptionOwner === true &&
+          data?.autoRenewEligible === true
+        ) {
+          void attemptAutoRenew(data);
+        }
       }
     } catch (error) {
       console.error('Error fetching subscription info:', error);
@@ -129,6 +161,12 @@ export function SubscriptionBadge() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Your subscription expired on {subscriptionInfo.endDate ? formatDate(subscriptionInfo.endDate) : 'N/A'}.
                 </p>
+                {subscriptionInfo.autoRenewEligible && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Saved-card auto-renew is enabled.
+                    {autoRenewing ? ' Attempting charge now…' : ' You can retry renewal from Subscription.'}
+                  </p>
+                )}
               </div>
             </div>
             <div className="text-xs space-y-1 bg-gray-50 p-2 rounded">

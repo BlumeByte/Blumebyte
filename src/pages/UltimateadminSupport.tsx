@@ -86,7 +86,8 @@ export default function CustomerCareDashboard() {
 
   useEffect(() => {
     if (sessionLoading) return;
-    if (!user || (user.role !== 'ultimateadmin' && user.role !== 'developer')) {
+    const normalizedRole = String(user?.role || '').toLowerCase();
+    if (!user || (normalizedRole !== 'ultimateadmin' && normalizedRole !== 'developer')) {
       clearSupportSession();
       setAuthState(false);
       return;
@@ -99,6 +100,9 @@ export default function CustomerCareDashboard() {
       }
       setSupportSession();
       setAuthState(true);
+    }).catch(() => {
+      clearSupportSession();
+      setAuthState(false);
     });
   }, [sessionLoading, user, getToken]);
 
@@ -1549,27 +1553,12 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle className="text-base">SQL Setup</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Access Setup</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm text-gray-600">Run this SQL in Supabase to grant Ultimateadmin access to a user:</p>
-          <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{`-- Grant Ultimateadmin access
-UPDATE auth.users
-SET raw_user_meta_data = 
-  COALESCE(raw_user_meta_data, '{}'::jsonb) ||
-  '{"role": "ultimateadmin"}'::jsonb
-WHERE email = 'your-email@example.com';
-
--- Grant Customer Care access
-UPDATE auth.users
-SET raw_user_meta_data = 
-  COALESCE(raw_user_meta_data, '{}'::jsonb) ||
-  '{"role": "customer_care"}'::jsonb
-WHERE email = 'care-agent@example.com';
-
--- Verify
-SELECT id, email, raw_user_meta_data->>'role' as role
-FROM auth.users
-WHERE email IN ('your-email@example.com', 'care-agent@example.com');`}</pre>
+          <p className="text-sm text-gray-600">
+            Platform role assignment is managed by authorized platform administrators.
+            If you need Ultimateadmin or Customer Care access, contact Blumebyte support.
+          </p>
           <p className="text-xs text-gray-500">Ultimateadmin → /developer dashboard. Customer Care → /customer-care dashboard.</p>
         </CardContent>
       </Card>

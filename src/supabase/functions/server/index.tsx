@@ -844,9 +844,16 @@ for (const route of compatibleRoutePathsForAliases('/public/hirings/:id', '/publ
 // --- Build a scope-based item filter for payroll calculation ---
 function makeScopeFilter(scope: string[] | null) {
   return (item: any) => {
-    const co = item.company || item.companyId;
-    if (!co) return false;
-    return !scope?.length || scope.some((s: string) => s.toLowerCase() === co.toLowerCase());
+    const rawValues = [
+      item?.company,
+      item?.companyId,
+      item?.companyName,
+      item?.tenantId,
+      item?.tenant,
+    ].filter(Boolean).map((v: any) => String(v).toLowerCase());
+    if (rawValues.length === 0) return false;
+    if (!scope?.length) return true;
+    return scope.some((s: string) => rawValues.includes(String(s).toLowerCase()));
   };
 }
 
@@ -6977,6 +6984,38 @@ async function triggerSuperadminSubscriptionExpiryAlert(
 app.get(`${PREFIX}/subscription/status`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
+
+    const toValidDate = (value: any): Date | null => {
+      if (!value) return null;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const deriveSubscriptionLifecycle = (subscription: any) => {
+      const now = new Date();
+      const plan = String(subscription?.plan || '').toLowerCase();
+      let endDate = toValidDate(subscription?.endDate);
+      if (!endDate) {
+        const startDate = toValidDate(subscription?.startDate) || toValidDate(subscription?.createdAt);
+        if (startDate && (plan === 'monthly' || plan === 'yearly')) {
+          endDate = new Date(startDate);
+          if (plan === 'monthly') endDate.setDate(endDate.getDate() + 30);
+          else endDate.setDate(endDate.getDate() + 365);
+        }
+      }
+
+      const fallbackActive = String(subscription?.status || '').toLowerCase() === 'active';
+      const isActive = endDate ? now < endDate : fallbackActive;
+      const daysRemaining = endDate
+        ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        : (isActive ? 0 : -1);
+
+      return {
+        isActive,
+        endDateIso: endDate ? endDate.toISOString() : (subscription?.endDate || null),
+        daysRemaining: Math.max(0, daysRemaining),
+      };
+    };
     
     // For non-superadmins, they're covered under the superadmin's subscription
     if (role !== 'superadmin') {
@@ -6987,31 +7026,33 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
       const superadmin = companyId 
         ? allEmployees.find((emp: any) => emp.role === 'superadmin' && (emp.companyId === companyId || emp.company === companyId))
         : null;
-      
-      if (!superadmin) {
-        return c.json({ status: 'expired', message: 'No superadmin found' }, 200);
-      }
-      
-      const superadminId = superadmin.userId || superadmin.id;
-      const subscription = await kv.get(`subscription:${superadminId}`);
+
+      const superadminId = superadmin?.userId || superadmin?.id || null;
+      const ownerSubscription = superadminId ? await kv.get(`subscription:${superadminId}`) : null;
+      const mirrorSubscription = companyId ? await kv.get(`subscription:${companyId}`) : null;
+      const subscription = ownerSubscription || mirrorSubscription;
       
       if (!subscription) {
         return c.json({ status: 'expired', message: 'No subscription found' }, 200);
       }
-      
-      const now = new Date();
-      const endDate = new Date(subscription.endDate);
-      const isActive = now < endDate;
-      const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      await triggerSuperadminSubscriptionExpiryAlert(superadmin, subscription, daysRemaining);
+
+      const lifecycle = deriveSubscriptionLifecycle(subscription);
+      if (superadmin) {
+        await triggerSuperadminSubscriptionExpiryAlert(superadmin, subscription, lifecycle.daysRemaining);
+      }
       
       return c.json({
-        status: isActive ? 'active' : 'expired',
+        status: lifecycle.isActive ? 'active' : 'expired',
         plan: subscription.plan,
         startDate: subscription.startDate,
-        endDate: subscription.endDate,
-        daysRemaining: Math.max(0, daysRemaining),
-        userCount: subscription.userCount,
+        endDate: lifecycle.endDateIso,
+        daysRemaining: lifecycle.daysRemaining,
+        userCount: getCanonicalSubscriptionLicenses(subscription),
+        purchasedLicenses: getCanonicalSubscriptionLicenses(subscription),
+        cardSaved: !!subscription?.cardAuthorization,
+        autoRenewEnabled: subscription?.autoRenew !== false,
+        autoRenewEligible: false,
+        isSubscriptionOwner: false,
       });
     }
     
@@ -7022,11 +7063,23 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
       return c.json({ status: 'none', message: 'No subscription found' }, 200);
     }
     
-    const now = new Date();
-    const endDate = new Date(subscription.endDate);
-    const isActive = now < endDate;
-    const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    await triggerSuperadminSubscriptionExpiryAlert(user, subscription, daysRemaining);
+    const lifecycle = deriveSubscriptionLifecycle(subscription);
+    await triggerSuperadminSubscriptionExpiryAlert(user, subscription, lifecycle.daysRemaining);
+
+    const normalizedStatus = lifecycle.isActive ? 'active' : 'expired';
+    if (
+      subscription?.status !== normalizedStatus ||
+      (lifecycle.endDateIso && subscription?.endDate !== lifecycle.endDateIso)
+    ) {
+      const normalizedSubscription = {
+        ...subscription,
+        status: normalizedStatus,
+        endDate: lifecycle.endDateIso || subscription?.endDate || null,
+        updatedAt: new Date().toISOString(),
+      };
+      await kv.set(`subscription:${user.id}`, normalizedSubscription);
+      await syncCompanySubscriptionMirror(user.id, normalizedSubscription);
+    }
     
     await logAudit({
       userId: user.id,
@@ -7034,17 +7087,22 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
       action: 'READ',
       resourceType: 'subscription',
       resourceId: user.id,
-      details: { status: isActive ? 'active' : 'expired' },
+      details: { status: normalizedStatus },
     });
     
     return c.json({
-      status: isActive ? 'active' : 'expired',
+      status: normalizedStatus,
       plan: subscription.plan,
       startDate: subscription.startDate,
-      endDate: subscription.endDate,
-      daysRemaining: Math.max(0, daysRemaining),
-      userCount: subscription.userCount,
+      endDate: lifecycle.endDateIso,
+      daysRemaining: lifecycle.daysRemaining,
+      userCount: getCanonicalSubscriptionLicenses(subscription),
+      purchasedLicenses: getCanonicalSubscriptionLicenses(subscription),
       amount: subscription.amount,
+      cardSaved: !!subscription?.cardAuthorization,
+      autoRenewEnabled: subscription?.autoRenew !== false,
+      autoRenewEligible: !lifecycle.isActive && !!subscription?.cardAuthorization && subscription?.autoRenew !== false,
+      isSubscriptionOwner: true,
     });
   } catch (e: any) {
     console.error('Error checking subscription status:', e);
@@ -11272,6 +11330,23 @@ const reportClientError = async (c: any) => {
     };
 
     await kv.set(`support-ticket:${ticketId}`, ticket);
+
+    await sendEmailNotification(
+      user.id,
+      'info@blumebyte.com',
+      'Blumebyte Support',
+      `Blumebyte HR Error Report: ${source || 'Application'}`,
+      `
+        <p>A new user error report was submitted.</p>
+        <p><strong>Tenant:</strong> ${tenantName || 'Unknown'} ${companyId ? `(${companyId})` : ''}</p>
+        <p><strong>Reporter:</strong> ${user.email || user.id}</p>
+        <p><strong>Source:</strong> ${source || 'unknown'}</p>
+        <p><strong>Location:</strong> ${location || 'N/A'}</p>
+        <p><strong>Message:</strong> ${message}</p>
+        ${details ? `<p><strong>Details:</strong> ${details}</p>` : ''}
+        <p><strong>Ticket ID:</strong> ${ticketId}</p>
+      `,
+    );
 
     const allEmployees = await kv.getByPrefix('employee:');
     const platformAdmins = allEmployees.filter((emp: any) =>
