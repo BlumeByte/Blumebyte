@@ -11856,13 +11856,16 @@ async function listSupabasePlatformUsers() {
   const users: any[] = [];
   let page = 1;
   const perPage = 200;
-  while (page <= 20) {
+  while (page <= 1000) {
     const { data, error } = await sb.auth.admin.listUsers({ page, perPage });
     if (error) break;
     const batch = Array.isArray(data?.users) ? data.users : [];
     users.push(...batch);
     if (batch.length < perPage) break;
     page += 1;
+  }
+  if (page > 1000) {
+    console.warn('listSupabasePlatformUsers: reached pagination safety limit (1000 pages)');
   }
   return users;
 }
