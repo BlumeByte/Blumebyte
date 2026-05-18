@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext, useRef } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api, invalidateCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
@@ -766,6 +766,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -783,8 +784,11 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
 
   useEffect(() => {
     const refresh = () => {
-      invalidateCache('/superadmin/public-job-applications', accessToken);
-      load();
+      if (realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
+      realtimeRefreshTimerRef.current = setTimeout(() => {
+        invalidateCache('/superadmin/public-job-applications', accessToken);
+        load();
+      }, 500);
     };
     const channel = supabase
       .channel('realtime:public-job-application')
@@ -794,6 +798,10 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
       .subscribe();
 
     return () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
   }, [accessToken, load]);
