@@ -781,6 +781,23 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const refresh = () => {
+      invalidateCache('/superadmin/public-job-applications', accessToken);
+      load();
+    };
+    const channel = supabase
+      .channel('realtime:public-job-application')
+      .on('broadcast', { event: 'INSERT' }, refresh)
+      .on('broadcast', { event: 'UPDATE' }, refresh)
+      .on('broadcast', { event: 'DELETE' }, refresh)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [accessToken, load]);
+
   const updateStatus = async (id: string, status: string) => {
     try {
       await api(`/superadmin/public-job-application/${id}`, { method: 'PUT', body: { status }, token: accessToken });

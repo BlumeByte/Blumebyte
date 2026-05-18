@@ -7340,6 +7340,22 @@ const renewSubscriptionLicense = async (c: any) => {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
 
+    const existingSubscription = await kv.get(`subscription:${user.id}`);
+    const purchasedLicenses = Number(
+      existingSubscription?.purchasedLicenses ||
+      existingSubscription?.userCount ||
+      existingSubscription?.licenses ||
+      0
+    );
+    if (!existingSubscription || purchasedLicenses <= 0) {
+      return c.json({ error: 'No active subscription found to renew. Please purchase licenses first.' }, 400);
+    }
+    if (licensesNum > purchasedLicenses) {
+      return c.json({
+        error: `Renewal cannot exceed your purchased licenses (${purchasedLicenses}). Renew your current licenses first, then purchase extra licenses.`,
+      }, 400);
+    }
+
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
       return c.json({ error: 'Payment gateway not configured' }, 500);
@@ -7487,10 +7503,15 @@ const verifySubscriptionPayment = async (c: any) => {
     } else {
       endDate.setDate(endDate.getDate() + 365);
     }
-    const existingUserCount = Number(existingSubscription?.userCount || 0);
     const requestedUserCount = Number(pendingSubscription.userCount || 0);
-    const effectiveUserCount = Math.max(existingUserCount, requestedUserCount);
-    const preservedExistingUserCount = existingUserCount > requestedUserCount;
+    if (!Number.isFinite(requestedUserCount) || requestedUserCount <= 0) {
+      return c.json({
+        success: false,
+        message: 'Invalid renewal license count',
+      }, 400);
+    }
+    const effectiveUserCount = requestedUserCount;
+    const preservedExistingUserCount = false;
 
     // Create/update subscription
     const subscription = {
@@ -11339,6 +11360,7 @@ const applyToPublicJob = async (c: any) => {
     };
 
     await kv.set(`public-job-application:${id}`, application);
+    await broadcastUpdate('public-job-application', 'INSERT', id, application);
 
     // Also store as a job-application: record scoped to the company so that
     // the admin's HiringApprovalPanel (/job-applications endpoint) can see it.
@@ -11718,6 +11740,7 @@ app.put(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
     if (!existing) return c.json({ error: 'Not found' }, 404);
     const updated = { ...existing, ...body, id };
     await kv.set(`public-job-application:${id}`, updated);
+    await broadcastUpdate('public-job-application', 'UPDATE', id, updated);
     return c.json(updated);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
@@ -11731,6 +11754,7 @@ app.delete(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
     await requireSuperAdmin(c);
     const id = c.req.param('id');
     await kv.del(`public-job-application:${id}`);
+    await broadcastUpdate('public-job-application', 'DELETE', id, { id });
     return c.json({ success: true });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);

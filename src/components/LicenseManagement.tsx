@@ -515,6 +515,25 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       toast.info('Your current license is still active. This renewal will extend your expiry date after payment.', { duration: 5000 });
     }
 
+    const requestedLicenses = getEffectiveRenewLicenses();
+    const purchasedLicenses = Math.max(MIN_LICENSES, licenseInfo?.purchasedLicenses || MIN_LICENSES);
+    let licensesToRenew = requestedLicenses;
+    if (requestedLicenses > purchasedLicenses) {
+      const proceedWithPurchasedCount = window.confirm(
+        `You selected ${requestedLicenses} license(s), but your current purchased license count is ${purchasedLicenses}.\n\n` +
+        `Renew only ${purchasedLicenses} license(s) now?\n\n` +
+        `If you need extra licenses, complete renewal first, then purchase additional licenses in the section above.\n` +
+        `You can also reassign licenses by removing some currently licensed users.`
+      );
+      if (!proceedWithPurchasedCount) return;
+      licensesToRenew = purchasedLicenses;
+      setRenewLicenses(purchasedLicenses);
+      toast.info(
+        `Renewal count set to ${purchasedLicenses}. Purchase extra licenses after renewal if needed.`,
+        { duration: 6000 }
+      );
+    }
+
     const payWindow = window.open('', '_blank');
     if (payWindow) {
       payWindow.document.write(`<html><head><title>Connecting to Paystack...</title>
@@ -529,14 +548,13 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       const freshToken = await getToken();
       if (!freshToken) { payWindow?.close(); toast.error('Not authenticated'); return; }
 
-      const licenses = getEffectiveRenewLicenses();
       const pricePerUser = renewPlan === 'monthly' ? PRICE_MONTHLY : PRICE_YEARLY;
-      const amount = licenses * pricePerUser;
+      const amount = licensesToRenew * pricePerUser;
 
       const renewalEndpoints = ['/subscription/renew-license', '/subscription/renew', '/subscription/initialize'];
       const renewalBasePayload = {
-        licenses,
-        userCount: licenses,
+        licenses: licensesToRenew,
+        userCount: licensesToRenew,
         plan: renewPlan,
         saveCard,
       };
@@ -858,6 +876,8 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const getEffectiveRenewLicenses = () =>
     Math.max(MIN_LICENSES, renewLicenses > 0 ? renewLicenses : (licenseInfo?.purchasedLicenses || MIN_LICENSES));
   const effectiveRenewLicenses = getEffectiveRenewLicenses();
+  const purchasedRenewLicenses = Math.max(MIN_LICENSES, licenseInfo?.purchasedLicenses || MIN_LICENSES);
+  const renewalExceedsPurchased = effectiveRenewLicenses > purchasedRenewLicenses;
 
   const EXPIRY_WARNING_DAYS = 14; // Show renewal section this many days before expiry
 
@@ -1390,8 +1410,20 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
                   onClick={() => setRenewLicenses(effectiveRenewLicenses + 1)}
                 >+</Button>
               </div>
-              <p className="text-xs text-muted-foreground">Minimum {MIN_LICENSES} licenses. Defaults to your current purchased licenses.</p>
+              <p className="text-xs text-muted-foreground">
+                Minimum {MIN_LICENSES} licenses. Renewal is based on your purchased license count ({purchasedRenewLicenses}).
+              </p>
             </div>
+            {renewalExceedsPurchased && (
+              <Alert className="border-amber-300 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  Renewal selection exceeds your purchased license count ({purchasedRenewLicenses}).
+                  You can renew your purchased licenses now, then purchase extra licenses after renewal,
+                  or reassign existing licenses by removing licenses from users you no longer want to keep active.
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <Card
                 className={`cursor-pointer transition-all ${renewPlan === 'monthly' ? 'ring-2 ring-orange-500 shadow-lg' : 'hover:shadow-md'}`}
