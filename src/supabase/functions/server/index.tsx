@@ -2801,7 +2801,7 @@ app.post(`${PREFIX}/superadmin/users/create`, async (c) => {
       });
       // Also send email notification
       if (emp.email) {
-        sendEmailNotification(
+        await sendEmailNotification(
           emp.userId || emp.id, emp.email, emp.name || '',
           `New Team Member: ${name} joined ${company.name || 'your organization'} — Blumebyte HR`,
           `<p>${newHireMsg}</p>`,
@@ -4378,7 +4378,7 @@ app.post(`${PREFIX}/superadmin/payroll-run`, async (c) => {
       // Send email notification for payslip
       const emp = await kv.get(`employee:${item.userId}`) as any;
       if (emp?.email) {
-        sendEmailNotification(
+        await sendEmailNotification(
           item.userId, emp.email, emp.name || '',
           `Your Payslip for ${item.period || 'this period'} — Blumebyte HR`,
           `<p>Your payroll for <strong>${item.period || 'this period'}</strong> has been generated.</p><p style="color:#6b7280;font-size:14px;">Net Pay: <strong>${item.netPay || 0}</strong> &nbsp;|&nbsp; Status: <strong>${statusLabel}</strong></p>`,
@@ -4420,7 +4420,7 @@ app.put(`${PREFIX}/superadmin/payroll-run/:id`, async (c) => {
       // Send email notification for payslip status update
       const emp = await kv.get(`employee:${updated.userId}`) as any;
       if (emp?.email) {
-        sendEmailNotification(
+        await sendEmailNotification(
           updated.userId, emp.email, emp.name || '',
           `Payroll Update for ${updated.period || 'this period'} — Blumebyte HR`,
           `<p>Your payroll for <strong>${updated.period || 'this period'}</strong> is now <strong>${statusLabel}</strong>.</p><p style="color:#6b7280;font-size:14px;">Net Pay: <strong>${updated.netPay || 0}</strong></p>`,
@@ -4936,7 +4936,7 @@ app.post(`${PREFIX}/admin/tasks`, async (c) => {
       if (emp?.email) {
         const nid = crypto.randomUUID();
         await kv.set(`notification:${nid}`, { id: nid, userId: aid, type: 'task-assigned', title: 'New Task Assigned', message: `You have been assigned a new task: "${body.title || 'Task'}"`, read: false, createdAt: new Date().toISOString() });
-        sendEmailNotification(
+        await sendEmailNotification(
           aid, emp.email, emp.name || '',
           `New Task Assigned: "${body.title || 'Task'}" — Blumebyte HR`,
           `<p>You have been assigned a new task.</p><p><strong>Task:</strong> ${body.title || 'Task'}</p>${body.description ? `<p style="color:#6b7280;font-size:14px;">${body.description}</p>` : ''}${body.dueDate ? `<p style="color:#6b7280;font-size:14px;">Due: <strong>${body.dueDate}</strong></p>` : ''}`,
@@ -4970,7 +4970,7 @@ app.post(`${PREFIX}/admin/performance-reviews`, async (c) => {
       if (emp?.email) {
         const nid = crypto.randomUUID();
         await kv.set(`notification:${nid}`, { id: nid, userId: revieweeId, type: 'performance-review', title: 'Performance Review Scheduled', message: `A performance review has been scheduled for you${body.period ? ` for ${body.period}` : ''}.`, read: false, createdAt: new Date().toISOString() });
-        sendEmailNotification(
+        await sendEmailNotification(
           revieweeId, emp.email, emp.name || '',
           `Performance Review Scheduled — Blumebyte HR`,
           `<p>A performance review has been scheduled for you${body.period ? ` for the period <strong>${body.period}</strong>` : ''}.</p>${body.reviewDate ? `<p style="color:#6b7280;font-size:14px;">Review Date: <strong>${body.reviewDate}</strong></p>` : ''}`,
@@ -5099,7 +5099,7 @@ app.post(`${PREFIX}/meetings`, async (c) => {
       // Send email notification to each participant
       const participant = await kv.get(`employee:${pid}`) as any;
       if (participant?.email) {
-        sendEmailNotification(
+        await sendEmailNotification(
           pid, participant.email, participant.name || '',
           `${msgTitle}: "${body.title || 'Meeting'}" — Blumebyte HR`,
           `<p>${msgBody}</p><p style="color:#6b7280;font-size:14px;">Date: <strong>${body.date || ''}</strong> &nbsp;|&nbsp; Time: <strong>${body.startTime || ''}</strong>${body.location ? ` &nbsp;|&nbsp; Location: <strong>${body.location}</strong>` : ''}</p>`,
@@ -5446,7 +5446,7 @@ app.put(`${PREFIX}/leave-requests/:leaveId`, async (c) => {
       // Also send email notification
       const emp = await kv.get(`employee:${existing.userId}`) as any;
       if (emp?.email) {
-        sendEmailNotification(
+        await sendEmailNotification(
           existing.userId, emp.email, emp.name || '',
           `Leave Request ${body.status === 'approved' ? 'Approved' : body.status === 'rejected' ? 'Rejected' : 'Updated'} — Blumebyte HR`,
           `<p>${leaveMsg}.</p><p style="color:#6b7280;font-size:14px;">Leave type: <strong>${existing.leaveType || 'Leave'}</strong><br/>Period: ${existing.startDate || ''} – ${existing.endDate || ''}</p>`,
@@ -6131,7 +6131,7 @@ app.post(`${PREFIX}/announcements`, async (c) => {
       const companyEmps = allEmps.filter((emp: any) => emp.companyId === companyId || emp.company === companyId);
       for (const emp of companyEmps) {
         if (!emp.email) continue;
-        sendEmailNotification(
+        await sendEmailNotification(
           emp.userId || emp.id, emp.email, emp.name || '',
           `Company Announcement: ${body.title || 'New Announcement'} — Blumebyte HR`,
           `<h3 style="color:#111827;margin-bottom:8px;">${body.title || 'New Announcement'}</h3><p style="color:#374151;">${body.content || body.message || ''}</p>`,
@@ -6289,7 +6289,7 @@ app.post(`${PREFIX}/admin/announcements`, async (c) => {
       const companyEmps = allEmps.filter((emp: any) => emp.companyId === companyId || emp.company === companyId);
       for (const emp of companyEmps) {
         if (!emp.email) continue;
-        sendEmailNotification(
+        await sendEmailNotification(
           emp.userId || emp.id, emp.email, emp.name || '',
           `Company Announcement: ${body.title || 'New Announcement'} — Blumebyte HR`,
           `<h3 style="color:#111827;margin-bottom:8px;">${body.title || 'New Announcement'}</h3><p style="color:#374151;">${body.content || body.message || ''}</p>`,
@@ -11231,10 +11231,13 @@ async function sendEmailNotification(
 
     // Only skip if the user has explicitly opted out of this specific pref.
     // If no prefs are stored at all, we always send (notifications on by default).
-    const prefs = await kv.get(`notif-prefs:${recipientId}`).catch((err: any) => {
-      console.warn('sendEmailNotification: failed to read notif-prefs from KV', err?.message || err);
-      return null;
-    });
+    const normalizedRecipientId = String(recipientId || '').trim();
+    const prefs = normalizedRecipientId
+      ? await kv.get(`notif-prefs:${normalizedRecipientId}`).catch((err: any) => {
+          console.warn('sendEmailNotification: failed to read notif-prefs from KV', err?.message || err);
+          return null;
+        })
+      : null;
     if (prefs && prefKey && prefs[prefKey] === false) return;
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
@@ -11842,6 +11845,71 @@ app.delete(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
 
 // Helper: allowed support roles (KV or user_metadata)
 const SUPPORT_ROLES = new Set(['ultimateadmin', 'developer', 'customer_care']);
+const PLATFORM_SUPPORT_ROLES = new Set(['ultimateadmin', 'developer', 'customer_care']);
+
+function isPlatformSupportRole(role: string) {
+  return PLATFORM_SUPPORT_ROLES.has(normalizeCareRole(String(role || '')));
+}
+
+async function listSupabasePlatformUsers() {
+  const sb = supabaseAdmin();
+  const users: any[] = [];
+  let page = 1;
+  const perPage = 200;
+  while (page <= 20) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage });
+    if (error) break;
+    const batch = Array.isArray(data?.users) ? data.users : [];
+    users.push(...batch);
+    if (batch.length < perPage) break;
+    page += 1;
+  }
+  return users;
+}
+
+async function getDynamicPlatformAgents() {
+  const [platformUsers, customerCareUsers, supportAgents, allEmployees, supabaseUsers] = await Promise.all([
+    kv.getByPrefix('platform_user:'),
+    kv.getByPrefix('customer_care_users:'),
+    kv.getByPrefix('support-agent:'),
+    kv.getByPrefix('employee:'),
+    listSupabasePlatformUsers(),
+  ]);
+
+  const employeePlatformUsers = allEmployees.filter((u: any) => isPlatformSupportRole(u?.role || ''));
+  const supabasePlatformUsers = supabaseUsers
+    .filter((u: any) => isPlatformSupportRole(u?.user_metadata?.role || ''))
+    .map((u: any) => ({
+      id: u.id,
+      userId: u.id,
+      name: u.user_metadata?.name || u.email || '',
+      email: u.email || '',
+      role: normalizeCareRole(u.user_metadata?.role || ''),
+      status: 'active',
+      assignedTenants: [],
+      createdAt: u.created_at || '',
+    }));
+
+  const seen = new Set<string>();
+  const merged: any[] = [];
+  for (const u of [...platformUsers, ...customerCareUsers, ...supportAgents, ...employeePlatformUsers, ...supabasePlatformUsers]) {
+    const dedupeKey = String(u?.userId || u?.id || u?.email || '').trim().toLowerCase();
+    if (!dedupeKey || seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    merged.push({
+      id: u.id || u.userId || dedupeKey,
+      userId: u.userId || u.id || dedupeKey,
+      name: u.name || '',
+      email: u.email || '',
+      role: normalizeCareRole(u.role || 'customer_care'),
+      status: u.status || 'active',
+      assignedTenants: Array.isArray(u.assignedTenants) ? u.assignedTenants : [],
+      createdAt: u.createdAt || '',
+    });
+  }
+
+  return merged.filter((u: any) => isPlatformSupportRole(u.role || ''));
+}
 
 async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
   const token = extractUserToken(c);
@@ -11889,11 +11957,12 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
-    const [allEmployees, allSubscriptions, allTickets, allAgents] = await Promise.all([
+    const [allEmployees, allSubscriptions, allCompanies, allAgents, allTickets] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
-      kv.getByPrefix('support-ticket:'),
-      kv.getByPrefix('support-agent:'),
+      kv.getByPrefix('company:'),
+      getDynamicPlatformAgents(),
+      getAllSupportTickets(),
     ]);
 
     const companyMap = new Map<string, { name: string; usedLicenses: number; purchasedLicenses: number; status: string }>();
@@ -11905,20 +11974,42 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       }
       if (emp.status === 'active') companyMap.get(cid)!.usedLicenses++;
     }
+    for (const c of allCompanies) {
+      const cid = c.id || c.companyId;
+      if (!cid) continue;
+      if (!companyMap.has(cid)) {
+        companyMap.set(cid, { name: c.name || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'unknown' });
+      }
+    }
     for (const sub of allSubscriptions) {
       const cid = sub.companyId || sub.company;
       if (cid && companyMap.has(cid)) {
         const entry = companyMap.get(cid)!;
-        entry.purchasedLicenses = sub.purchasedLicenses || 0;
-        if (sub.status !== 'active') entry.status = sub.status || 'expired';
+        entry.purchasedLicenses = sub.purchasedLicenses || sub.userCount || sub.licenses || 0;
+        const fallbackEndDate = sub.endDate || sub.expiresAt;
+        const parsedFallbackEndDate = fallbackEndDate ? new Date(fallbackEndDate) : null;
+        const hasValidFallbackEndDate = !!parsedFallbackEndDate && !Number.isNaN(parsedFallbackEndDate.getTime());
+        const inferredStatus = hasValidFallbackEndDate
+          ? (parsedFallbackEndDate! > new Date() ? 'active' : 'expired')
+          : 'unknown';
+        const normalizedStatus = sub.status || inferredStatus;
+        if (normalizedStatus !== 'active') entry.status = normalizedStatus;
+        if (normalizedStatus === 'active') entry.status = 'active';
       }
+    }
+
+    let scopedTickets = allTickets;
+    if (normalizeCareRole(access.role) === 'customer_care') {
+      const assigned = await getCareAssignmentsForAgent(access.user.id);
+      const assignedSet = new Set(assigned);
+      scopedTickets = allTickets.filter((t: any) => assignedSet.has(t.tenantId));
     }
 
     const totalTenants = companyMap.size;
     const activeTenants = [...companyMap.values()].filter(t => t.status === 'active').length;
     const expiredLicenses = [...companyMap.values()].filter(t => t.status !== 'active').length;
-    const openTickets = allTickets.filter((t: any) => t.status === 'open').length;
-    const resolvedToday = allTickets.filter((t: any) => {
+    const openTickets = scopedTickets.filter((t: any) => t.status === 'open').length;
+    const resolvedToday = scopedTickets.filter((t: any) => {
       if (t.status !== 'resolved') return false;
       const d = new Date(t.updatedAt || t.createdAt);
       const now = new Date();
@@ -11932,7 +12023,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       openTickets,
       resolvedToday,
       totalAgents: allAgents.length,
-      totalTickets: allTickets.length,
+      totalTickets: scopedTickets.length,
     });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
@@ -12147,7 +12238,7 @@ const listUltimateadminSupportTickets = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    let tickets = await kv.getByPrefix('support-ticket:');
+    let tickets = await getAllSupportTickets();
     // Care agents only see tickets for their assigned tenants
     const normalizedRole = normalizeCareRole(access.role);
     if (normalizedRole === 'customer_care') {
@@ -12606,32 +12697,7 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
-    // Merge canonical and legacy records so ultimateadmin can see all platform users.
-    const [platformUsers, customerCareUsers, supportAgents, allEmployees] = await Promise.all([
-      kv.getByPrefix('platform_user:'),
-      kv.getByPrefix('customer_care_users:'),
-      kv.getByPrefix('support-agent:'),
-      kv.getByPrefix('employee:'),
-    ]);
-    const allowedPlatformRoles = new Set(['developer', 'ultimateadmin', 'customer_care']);
-    const employeePlatformUsers = allEmployees.filter((u: any) => allowedPlatformRoles.has(normalizeCareRole(u?.role || '')));
-    const seen = new Set<string>();
-    const merged: any[] = [];
-    for (const u of [...platformUsers, ...customerCareUsers, ...supportAgents, ...employeePlatformUsers]) {
-      const key = u?.userId || u?.id || u?.email;
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      merged.push({
-        id: u.id || u.userId || key,
-        userId: u.userId || u.id || key,
-        name: u.name || '',
-        email: u.email || '',
-        role: normalizeCareRole(u.role || 'customer_care'),
-        status: u.status || 'active',
-        assignedTenants: u.assignedTenants || [],
-        createdAt: u.createdAt || '',
-      });
-    }
+    const merged = await getDynamicPlatformAgents();
     return c.json(merged);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
