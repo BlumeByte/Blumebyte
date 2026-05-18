@@ -760,6 +760,8 @@ function LanguageSettingsCard() {
 }
 
 // ========== GLOBAL HIRING APPLICATIONS PANEL (SuperAdmin) ==========
+const GLOBAL_HIRING_REALTIME_REFRESH_DEBOUNCE_MS = 500;
+
 function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | null }) {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -788,7 +790,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
       realtimeRefreshTimerRef.current = setTimeout(() => {
         invalidateCache('/superadmin/public-job-applications', accessToken);
         load();
-      }, 500);
+      }, GLOBAL_HIRING_REALTIME_REFRESH_DEBOUNCE_MS);
     };
     const channel = supabase
       .channel('realtime:public-job-application')
