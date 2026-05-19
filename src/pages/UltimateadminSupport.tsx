@@ -26,6 +26,17 @@ import {
 const ROLES = ['ultimateadmin', 'customer_care'];
 const PLATFORM_ROLES = ['ultimateadmin', 'developer', 'customer_care'];
 
+/** Returns true when an API error represents a route that simply doesn't exist yet
+ *  (stale backend). These are handled by UI empty-states rather than error toasts. */
+function isRouteNotFound(r: PromiseSettledResult<any>): boolean {
+  return (
+    r.status === 'rejected' && (
+      String(r.reason?.message).toLowerCase().includes('route not found') ||
+      r.reason?.status === 404
+    )
+  );
+}
+
 const SIDEBAR_ITEMS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'tenants', label: 'Tenants', icon: Building2 },
@@ -1037,7 +1048,12 @@ function PlatformUsersPanel() {
                   <p className="text-xs text-gray-500">Email</p>
                   <p className="font-mono text-sm font-medium">{form.email}</p>
                   <p className="text-xs text-gray-500 mt-2">Temporary Password</p>
-                  <p className="font-mono text-sm font-bold tracking-widest bg-yellow-50 px-2 py-1 rounded">{tempPassword}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="font-mono text-sm font-bold tracking-widest bg-yellow-50 px-2 py-1 rounded flex-1 select-all">{'•'.repeat(tempPassword.length)}</p>
+                    <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(tempPassword); toast.success('Password copied'); }}>
+                      Copy
+                    </Button>
+                  </div>
                 </div>
                 <p className="text-xs text-orange-700 mt-2">⚠ Copy this password now — it will not be shown again.</p>
               </div>
@@ -1312,18 +1328,28 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
   const [recipient, setRecipient] = useState('');
   const [search, setSearch] = useState('');
 
+  const [chatUnavailable, setChatUnavailable] = useState(false);
+
   const loadThreads = useCallback(async () => {
     setLoading(true);
     try {
       const token = await getToken();
       invalidateCache('/ultimateadmin/chat/threads', token);
       invalidateCache('/ultimateadmin/users', token);
-      const [threadData, userData] = await Promise.all([
+      const [threadData, userData] = await Promise.allSettled([
         api('/ultimateadmin/chat/threads', { token }),
         api('/ultimateadmin/users', { token }),
       ]);
-      setThreads(Array.isArray(threadData) ? threadData : []);
-      setAllUsers(Array.isArray(userData) ? userData : []);
+      // Check if routes are unavailable (old deployed function) vs real errors
+      if (isRouteNotFound(threadData) || isRouteNotFound(userData)) {
+        setChatUnavailable(true);
+        return;
+      }
+      setChatUnavailable(false);
+      if (threadData.status === 'fulfilled') setThreads(Array.isArray(threadData.value) ? threadData.value : []);
+      if (userData.status === 'fulfilled') setAllUsers(Array.isArray(userData.value) ? userData.value : []);
+      if (threadData.status === 'rejected') toast.error('Failed to load chat: ' + (threadData.reason?.message || ''));
+      if (userData.status === 'rejected') toast.error('Failed to load users: ' + (userData.reason?.message || ''));
     } catch (e: any) { toast.error('Failed to load chat: ' + (e.message || '')); }
     finally { setLoading(false); }
   }, [getToken]);
@@ -1337,7 +1363,12 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
       const token = await getToken();
       const data = await api(`/ultimateadmin/chat/threads/${thread.id}`, { token });
       setMessages(Array.isArray(data.messages) ? data.messages : []);
-    } catch (e: any) { toast.error('Failed to load messages: ' + (e.message || '')); }
+    } catch (e: any) {
+      const msg = String(e?.message || '').toLowerCase();
+      if (!msg.includes('route not found') && e?.status !== 404) {
+        toast.error('Failed to load messages: ' + (e.message || ''));
+      }
+    }
     finally { setMsgLoading(false); }
   };
 
@@ -1382,6 +1413,18 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
     (t.recipientName || '').toLowerCase().includes(search.toLowerCase()) ||
     (t.recipientEmail || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  if (chatUnavailable) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
+        <MessageSquare className="h-12 w-12 text-gray-300" />
+        <p className="text-gray-500 font-medium">Global Chat not available</p>
+        <p className="text-sm text-gray-400 max-w-sm">
+          This feature requires the latest backend to be deployed. Once the Supabase function is updated, chat threads will appear here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-200px)] gap-4">
@@ -1617,14 +1660,19 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
 
 // ─── Settings Panel ────────────────────────────────────────────────────────────
 function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string; role: string } | null }) {
+  const { user } = useAuth();
+  // Prefer API-fetched profile; fall back to the auth-context user (always available after login)
+  const email = myProfile?.email || user?.email || '—';
+  const name = myProfile?.name || user?.name || user?.email || '—';
+  const role = myProfile?.role || user?.role || 'unknown';
   return (
     <div className="space-y-4 max-w-md">
       <Card>
         <CardHeader><CardTitle className="text-base">My Profile</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <div className="flex justify-between text-sm"><span className="text-gray-500">Email</span><span className="font-medium">{myProfile?.email || '—'}</span></div>
-          <div className="flex justify-between text-sm"><span className="text-gray-500">Name</span><span className="font-medium">{myProfile?.name || '—'}</span></div>
-          <div className="flex justify-between text-sm"><span className="text-gray-500">Role</span><StatusBadge status={myProfile?.role || 'unknown'} /></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-500">Email</span><span className="font-medium">{email}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-500">Name</span><span className="font-medium">{name}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-500">Role</span><StatusBadge status={role} /></div>
         </CardContent>
       </Card>
       <Card>
@@ -1651,6 +1699,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [myProfile, setMyProfile] = useState<{ email: string; name: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [backendUnavailable, setBackendUnavailable] = useState(false);
   const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => isSectionAllowed(item.id, role));
   const quickActions = [
     { label: 'View Tenants', icon: Building2, section: 'tenants' },
@@ -1676,8 +1725,15 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
     if (metricsResult.status === 'fulfilled') setMetrics(metricsResult.value);
     if (tenantsResult.status === 'fulfilled') setTenants(Array.isArray(tenantsResult.value) ? tenantsResult.value : []);
     if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
-    // Only show error if tenants failed (core data)
-    if (tenantsResult.status === 'rejected') toast.error('Failed to load tenant data');
+
+    // Detect stale backend: both metrics and tenants fail with route-not-found
+    const bothMissing = isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
+    setBackendUnavailable(bothMissing);
+
+    // Only show error toast if failure is NOT a simple route-not-found (that is handled by the empty-state UI)
+    if (tenantsResult.status === 'rejected' && !isRouteNotFound(tenantsResult)) {
+      toast.error('Failed to load tenant data');
+    }
     setLoading(false);
   }, [getToken]);
 
@@ -1791,6 +1847,21 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
             <>
               {activeSection === 'overview' && (
                 <div className="space-y-6">
+                  {/* Backend-not-deployed notice */}
+                  {backendUnavailable && (
+                    <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-amber-800">Backend not yet deployed</p>
+                        <p className="text-sm text-amber-700 mt-0.5">
+                          The Supabase Edge Function hasn't been updated yet — tenant, metrics, and chat routes return 404. Deploy the function to see live data here.
+                        </p>
+                        <code className="mt-2 block text-xs bg-amber-100 text-amber-900 rounded px-2 py-1 font-mono">
+                          supabase functions deploy make-server-668731fc
+                        </code>
+                      </div>
+                    </div>
+                  )}
                   {metrics && <MetricsCards metrics={metrics} />}
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1883,7 +1954,13 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                               .map(([plan, count]) => {
                                 const total = Object.values(metrics.planBreakdown).reduce((s, v) => s + v, 0);
                                 const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                                const color = plan === 'enterprise' ? 'bg-purple-500' : plan === 'pro' ? 'bg-blue-500' : plan === 'basic' ? 'bg-green-500' : plan === 'trial' ? 'bg-yellow-500' : 'bg-gray-400';
+                                const PLAN_COLORS: Record<string, string> = {
+                                  enterprise: 'bg-purple-500',
+                                  pro: 'bg-blue-500',
+                                  basic: 'bg-green-500',
+                                  trial: 'bg-yellow-500',
+                                };
+                                const color = PLAN_COLORS[plan] ?? 'bg-gray-400';
                                 return (
                                   <div key={plan} className="space-y-0.5">
                                     <div className="flex justify-between text-sm">

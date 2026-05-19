@@ -81,7 +81,7 @@ app.use(
       if (_allowedOrigins === '*') return '*';
       const allowed = _allowedOrigins as (string | RegExp)[];
       for (const o of allowed) {
-        if (typeof o === 'string' ? o === origin : o.test(origin)) return origin;
+        if (typeof o === 'string' ? o === origin : (o instanceof RegExp && o.test(origin))) return origin;
       }
       return null;
     },
@@ -12040,7 +12040,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
 
     // New tenants / users in the last 30 days
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const newTenantsLast30Days = [...tenantValues].filter(t => {
+    const newTenantsLast30Days = tenantValues.filter(t => {
       const d = t.createdAt ? new Date(t.createdAt) : null;
       return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
     }).length;

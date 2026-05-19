@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
+import { supabase } from '../lib/supabase';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,6 +9,8 @@ import { Textarea } from './ui/textarea';
 import { AlertCircle, CreditCard, Lock, Mail, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
+
+const SUPPORT_EMAIL = 'info@blumebyte.com';
 
 interface SubscriptionEnforcementProps {
   children: React.ReactNode;
@@ -23,6 +26,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     subscriptionInactive: boolean;
     canManageSubscription: boolean;
     autoRenewEligible: boolean;
+    sessionRole: string | null;
   }>({
     isActive: true,
     checking: true,
@@ -31,11 +35,19 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     subscriptionInactive: false,
     canManageSubscription: false,
     autoRenewEligible: false,
+    sessionRole: null,
   });
 
   useEffect(() => {
     async function checkSubscription() {
-      if (!user) {
+      // Read role from the raw Supabase session (always available, no API call)
+      let sessionRole: string | null = null;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        sessionRole = sessionData?.session?.user?.user_metadata?.role || null;
+      } catch { /* ignore */ }
+
+      if (!user && !sessionRole) {
         setSubscriptionStatus({
           isActive: false,
           checking: false,
@@ -44,6 +56,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
           subscriptionInactive: false,
           canManageSubscription: false,
           autoRenewEligible: false,
+          sessionRole,
         });
         return;
       }
@@ -64,6 +77,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
           subscriptionInactive: status?.status !== 'active',
           canManageSubscription: status?.isSubscriptionOwner === true,
           autoRenewEligible: status?.autoRenewEligible === true,
+          sessionRole,
         });
       } catch (error: any) {
         console.error('Subscription check failed:', error);
@@ -76,6 +90,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
           subscriptionInactive: error.subscriptionInactive || false,
           canManageSubscription: false,
           autoRenewEligible: false,
+          sessionRole,
         });
       }
     }
@@ -149,8 +164,12 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
 
   // Subscription is inactive
   if (subscriptionStatus.subscriptionInactive) {
-    // SuperAdmin can always manage their subscription
-    const isSuperAdmin = user?.role === 'superadmin';
+    // SuperAdmin can always manage their subscription.
+    // Check auth-context user first, then the raw Supabase session role
+    // (needed when /profile is blocked by CORS and user.role is null).
+    const isSuperAdmin =
+      user?.role === 'superadmin' ||
+      subscriptionStatus.sessionRole === 'superadmin';
     const canPay = subscriptionStatus.canManageSubscription || isSuperAdmin;
     return <SubscriptionLockedScreen canPay={canPay} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
   }
@@ -211,10 +230,10 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
           userRole: user?.role,
         },
       });
-      toast.success('Support request sent to info@blumebyte.com — we will contact you shortly.');
+      toast.success(`Support request sent to ${SUPPORT_EMAIL} — we will contact you shortly.`);
       setShowSupportForm(false);
     } catch {
-      toast.error('Failed to send support request. Please email info@blumebyte.com directly.');
+      toast.error(`Failed to send support request. Please email ${SUPPORT_EMAIL} directly.`);
     } finally {
       setSubmitting(false);
     }
@@ -309,7 +328,7 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
                 </Button>
               ) : (
                 <div className="space-y-2 bg-white p-3 rounded-lg border">
-                  <p className="text-xs font-semibold text-gray-700">Send a support request to info@blumebyte.com</p>
+                  <p className="text-xs font-semibold text-gray-700">Send a support request to {SUPPORT_EMAIL}</p>
                   <Input
                     placeholder="Your name"
                     value={supportForm.name}
