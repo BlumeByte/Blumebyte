@@ -100,7 +100,7 @@ interface Agent {
 }
 
 interface Metrics {
-  totalTenants: number; activeTenants: number; expiredLicenses: number;
+  totalTenants: number; activeTenants: number; expiredTenants: number;
   suspendedTenants: number; trialTenants: number;
   openTickets: number; pendingTickets: number; criticalTickets: number;
   resolvedToday: number; totalAgents: number; totalTickets: number;
@@ -172,7 +172,7 @@ function MetricsCards({ metrics }: { metrics: Metrics }) {
   const cards = [
     { label: 'Total Tenants', value: metrics.totalTenants, icon: Building2, color: 'text-blue-600 bg-blue-50' },
     { label: 'Active Tenants', value: metrics.activeTenants, icon: CheckCircle, color: 'text-green-600 bg-green-50' },
-    { label: 'Expired Licenses', value: metrics.expiredLicenses, icon: AlertTriangle, color: 'text-orange-600 bg-orange-50' },
+    { label: 'Expired Licenses', value: metrics.expiredTenants, icon: AlertTriangle, color: 'text-orange-600 bg-orange-50' },
     { label: 'Suspended', value: metrics.suspendedTenants ?? 0, icon: Lock, color: 'text-red-600 bg-red-50' },
     { label: 'Trial Tenants', value: metrics.trialTenants ?? 0, icon: Zap, color: 'text-yellow-600 bg-yellow-50' },
     { label: 'Total Users', value: metrics.totalUsers ?? 0, icon: Users, color: 'text-indigo-600 bg-indigo-50' },
@@ -1883,7 +1883,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                       <CardHeader><CardTitle className="text-base">Platform Health</CardTitle></CardHeader>
                       <CardContent className="space-y-3">
                         {[
-                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} active` : '—', ok: (metrics?.expiredLicenses || 0) === 0 && (metrics?.suspendedTenants || 0) === 0 },
+                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} active` : '—', ok: (metrics?.expiredTenants || 0) === 0 && (metrics?.suspendedTenants || 0) === 0 },
                           { label: 'Open Tickets', value: `${metrics?.openTickets || 0} open · ${metrics?.pendingTickets || 0} pending`, ok: (metrics?.openTickets || 0) < 10 },
                           { label: 'Critical Issues', value: `${metrics?.criticalTickets || 0} critical tickets`, ok: (metrics?.criticalTickets || 0) === 0 },
                           { label: 'Support Coverage', value: `${metrics?.totalAgents || 0} agents`, ok: (metrics?.totalAgents || 0) > 0 },

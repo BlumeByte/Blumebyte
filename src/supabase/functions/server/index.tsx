@@ -12020,7 +12020,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     const totalTenants = companyMap.size;
     const tenantValues = [...companyMap.values()];
     const activeTenants = tenantValues.filter(t => t.status === 'active').length;
-    const expiredLicenses = tenantValues.filter(t => t.status === 'expired').length;
+    const expiredTenants = tenantValues.filter(t => t.status === 'expired').length;
     const suspendedTenants = tenantValues.filter(t => t.status === 'suspended').length;
     const trialTenants = tenantValues.filter(t => t.status === 'trial').length;
 
@@ -12072,7 +12072,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     return c.json({
       totalTenants,
       activeTenants,
-      expiredLicenses,
+      expiredTenants,
       suspendedTenants,
       trialTenants,
       openTickets,

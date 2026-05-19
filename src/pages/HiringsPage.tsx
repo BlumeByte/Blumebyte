@@ -7,6 +7,7 @@ import { PublicFooter, PublicNavbar } from '../components/PublicNavFooter';
 import { PublicHiringApplyDialog } from '../components/PublicHiringApplyDialog';
 import { supabase } from '../lib/supabase';
 import {
+  ALL_ROUTES_EXHAUSTED_PREFIX,
   fetchPublicHiringCatalog,
   getEmptyPublicHiringFilters,
   invalidatePublicHiringCache,
@@ -194,7 +195,11 @@ export default function HiringsPage() {
     } catch (err: any) {
       if (!mountedRef.current) return;
       console.error('Failed to load public jobs:', err?.message);
-      if (!isRetry) {
+      // If all endpoints were exhausted (every alias returned 404/route-not-found),
+      // retrying won't help — skip the 3-second retry and go straight to error state.
+      const allRoutesExhausted =
+        typeof err?.message === 'string' && err.message.startsWith(ALL_ROUTES_EXHAUSTED_PREFIX);
+      if (!isRetry && !allRoutesExhausted) {
         retryTimerRef.current = setTimeout(() => {
           retryTimerRef.current = null;
           invalidatePublicHiringCache();
@@ -301,7 +306,7 @@ export default function HiringsPage() {
     <div className="min-h-screen public-page-bg flex flex-col">
       <PublicNavbar />
 
-      <section className="relative text-white py-16 px-4 overflow-hidden">
+      <section className="relative text-white py-16 px-4 overflow-hidden bg-gray-900">
         <div className="absolute inset-0 z-0">
           <img
             src="https://images.pexels.com/photos/5439438/pexels-photo-5439438.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080"
@@ -369,9 +374,11 @@ export default function HiringsPage() {
             </Button>
           )}
 
-          <span className="ml-auto text-sm text-gray-500">
-            {filtered.length} {filtered.length === 1 ? 'job' : 'jobs'} found
-          </span>
+          {!loading && (
+            <span className="ml-auto text-sm text-gray-500">
+              {filtered.length} {filtered.length === 1 ? 'job' : 'jobs'} found
+            </span>
+          )}
         </div>
         <p id="public-hiring-filter-help" className="sr-only">
           Select one of the suggested values or type your own filter text.

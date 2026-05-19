@@ -57,6 +57,7 @@ export interface PublicHiringApplicationFormData {
   cvMessage: string;
 }
 
+export const ALL_ROUTES_EXHAUSTED_PREFIX = 'Unable to list public hiring data after trying:';
 export const MAX_PUBLIC_HIRING_CV_CHARS = 4000;
 export const APPLIED_PUBLIC_HIRINGS_STORAGE_KEY = 'public_hiring_applied_jobs';
 export const PUBLIC_HIRINGS_ENDPOINT = '/public/hirings';
@@ -163,7 +164,7 @@ export async function fetchPublicHiringCatalog(): Promise<PublicHiringCatalog> {
   const lastErrorMessage = typeof (lastError as any)?.message === 'string'
     ? (lastError as any).message
     : 'unknown';
-  throw new Error(`Unable to list public hiring data after trying: ${PUBLIC_HIRING_LIST_ENDPOINTS.join(', ')}. Last error: ${lastErrorMessage}`);
+  throw new Error(`${ALL_ROUTES_EXHAUSTED_PREFIX} ${PUBLIC_HIRING_LIST_ENDPOINTS.join(', ')}. Last error: ${lastErrorMessage}`);
 }
 
 export async function fetchPublicHiringDetail(jobId: string): Promise<PublicHiring> {
