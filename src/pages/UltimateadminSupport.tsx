@@ -24,7 +24,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ROLES = ['ultimateadmin', 'customer_care'];
-const PLATFORM_ROLES = ['ultimateadmin', 'customer_care'];
+const PLATFORM_ROLES = ['ultimateadmin', 'developer', 'customer_care'];
 
 const SIDEBAR_ITEMS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -90,7 +90,14 @@ interface Agent {
 
 interface Metrics {
   totalTenants: number; activeTenants: number; expiredLicenses: number;
-  openTickets: number; resolvedToday: number; totalAgents: number; totalTickets: number;
+  suspendedTenants: number; trialTenants: number;
+  openTickets: number; pendingTickets: number; criticalTickets: number;
+  resolvedToday: number; totalAgents: number; totalTickets: number;
+  totalUsers: number; activeUsers: number;
+  newTenantsLast30Days: number; newUsersLast30Days: number;
+  planBreakdown: Record<string, number>;
+  licenseUtilization: { purchased: number; used: number; available: number };
+  recentTenants: { id: string; name: string; status: string; createdAt: string; plan?: string }[];
 }
 
 interface AuditLog {
@@ -155,13 +162,21 @@ function MetricsCards({ metrics }: { metrics: Metrics }) {
     { label: 'Total Tenants', value: metrics.totalTenants, icon: Building2, color: 'text-blue-600 bg-blue-50' },
     { label: 'Active Tenants', value: metrics.activeTenants, icon: CheckCircle, color: 'text-green-600 bg-green-50' },
     { label: 'Expired Licenses', value: metrics.expiredLicenses, icon: AlertTriangle, color: 'text-orange-600 bg-orange-50' },
+    { label: 'Suspended', value: metrics.suspendedTenants ?? 0, icon: Lock, color: 'text-red-600 bg-red-50' },
+    { label: 'Trial Tenants', value: metrics.trialTenants ?? 0, icon: Zap, color: 'text-yellow-600 bg-yellow-50' },
+    { label: 'Total Users', value: metrics.totalUsers ?? 0, icon: Users, color: 'text-indigo-600 bg-indigo-50' },
+    { label: 'Active Users', value: metrics.activeUsers ?? 0, icon: CheckCircle, color: 'text-teal-600 bg-teal-50' },
     { label: 'Open Tickets', value: metrics.openTickets, icon: Ticket, color: 'text-red-600 bg-red-50' },
+    { label: 'Pending Tickets', value: metrics.pendingTickets ?? 0, icon: Bell, color: 'text-yellow-600 bg-yellow-50' },
+    { label: 'Critical Tickets', value: metrics.criticalTickets ?? 0, icon: AlertCircle, color: 'text-red-700 bg-red-100' },
     { label: 'Resolved Today', value: metrics.resolvedToday, icon: CheckCircle, color: 'text-teal-600 bg-teal-50' },
-    { label: 'Support Agents', value: metrics.totalAgents, icon: Users, color: 'text-purple-600 bg-purple-50' },
     { label: 'Total Tickets', value: metrics.totalTickets, icon: FileText, color: 'text-gray-600 bg-gray-50' },
+    { label: 'Support Agents', value: metrics.totalAgents, icon: Users, color: 'text-purple-600 bg-purple-50' },
+    { label: 'New Tenants (30d)', value: metrics.newTenantsLast30Days ?? 0, icon: TrendingUp, color: 'text-blue-700 bg-blue-100' },
+    { label: 'New Users (30d)', value: metrics.newUsersLast30Days ?? 0, icon: TrendingUp, color: 'text-green-700 bg-green-100' },
   ];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 gap-3">
       {cards.map(card => (
         <Card key={card.label} className="p-4">
           <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${card.color}`}>
@@ -898,8 +913,9 @@ function PlatformUsersPanel() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState<any | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', role: 'customer_care_agent' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'customer_care', password: '' });
   const [saving, setSaving] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -920,15 +936,27 @@ function PlatformUsersPanel() {
     try {
       const token = await getToken();
       if (editUser) {
-        await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body: form });
+        const body: any = { name: form.name, role: form.role };
+        if (form.password) body.password = form.password;
+        await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body });
         toast.success('User updated');
+        setTempPassword(null);
       } else {
-        await api('/ultimateadmin/platform-users', { method: 'POST', token, body: form });
-        toast.success('Platform user created');
+        const body: any = { name: form.name, email: form.email, role: form.role };
+        if (form.password) body.password = form.password;
+        const result = await api('/ultimateadmin/platform-users', { method: 'POST', token, body });
+        if (result?.tempPassword) {
+          setTempPassword(result.tempPassword);
+          toast.success(`Platform user created — temp password shown below`);
+        } else {
+          toast.success('Platform user created');
+        }
       }
-      setShowCreate(false);
-      setEditUser(null);
-      setForm({ name: '', email: '', role: 'customer_care_agent' });
+      if (!tempPassword) {
+        setShowCreate(false);
+        setEditUser(null);
+        setForm({ name: '', email: '', role: 'customer_care', password: '' });
+      }
       load();
     } catch (e: any) { toast.error('Save failed: ' + (e.message || '')); }
     finally { setSaving(false); }
@@ -946,19 +974,20 @@ function PlatformUsersPanel() {
 
   const openEdit = (u: any) => {
     setEditUser(u);
-    setForm({ name: u.name || '', email: u.email || '', role: u.role || 'customer_care' });
+    setForm({ name: u.name || '', email: u.email || '', role: u.role || 'customer_care', password: '' });
+    setTempPassword(null);
     setShowCreate(true);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => { setEditUser(null); setForm({ name: '', email: '', role: 'customer_care' }); setShowCreate(true); }}>
+        <Button size="sm" onClick={() => { setEditUser(null); setForm({ name: '', email: '', role: 'customer_care', password: '' }); setTempPassword(null); setShowCreate(true); }}>
           <UserPlus className="h-3.5 w-3.5 mr-1" />Add Platform User
         </Button>
       </div>
       <p className="text-sm text-gray-500">
-        Platform users (developers and customer care agents) are granted access directly here.
+        Platform users (ultimateadmin, developers, and customer care agents) are granted access directly here.
         They do not need a tenant subscription or license.
       </p>
       {loading ? (
@@ -996,24 +1025,49 @@ function PlatformUsersPanel() {
         </div>
       )}
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(open) => { if (!open) { setTempPassword(null); } setShowCreate(open); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editUser ? 'Edit Platform User' : 'Add Platform User'}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Full Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div><Label>Email *</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} disabled={!!editUser} /></div>
-            <div>
-              <Label>Role</Label>
-              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{PLATFORM_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-              </Select>
+          {tempPassword ? (
+            <div className="space-y-3">
+              <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                <p className="font-semibold text-green-800 mb-2">✓ Platform user created successfully</p>
+                <p className="text-sm text-green-700 mb-3">Share these credentials securely with the new user:</p>
+                <div className="bg-white border border-green-300 rounded p-3 space-y-1">
+                  <p className="text-xs text-gray-500">Email</p>
+                  <p className="font-mono text-sm font-medium">{form.email}</p>
+                  <p className="text-xs text-gray-500 mt-2">Temporary Password</p>
+                  <p className="font-mono text-sm font-bold tracking-widest bg-yellow-50 px-2 py-1 rounded">{tempPassword}</p>
+                </div>
+                <p className="text-xs text-orange-700 mt-2">⚠ Copy this password now — it will not be shown again.</p>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => { setShowCreate(false); setTempPassword(null); setForm({ name: '', email: '', role: 'customer_care', password: '' }); }}>Done</Button>
+              </DialogFooter>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={saveUser} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}{editUser ? 'Update' : 'Create'}</Button>
-          </DialogFooter>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <div><Label>Full Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+                <div><Label>Email *</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} disabled={!!editUser} /></div>
+                <div>
+                  <Label>Role</Label>
+                  <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{PLATFORM_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>{editUser ? 'New Password (leave blank to keep current)' : 'Password (leave blank to auto-generate)'}</Label>
+                  <Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder={editUser ? 'Leave blank to keep current' : 'Auto-generated if empty'} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button onClick={saveUser} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}{editUser ? 'Update' : 'Create'}</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -1738,7 +1792,9 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
               {activeSection === 'overview' && (
                 <div className="space-y-6">
                   {metrics && <MetricsCards metrics={metrics} />}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Quick Actions */}
                     <Card>
                       <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
                       <CardContent className="grid grid-cols-3 gap-2">
@@ -1750,25 +1806,145 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                         ))}
                       </CardContent>
                     </Card>
+
+                    {/* Platform Health */}
                     <Card>
                       <CardHeader><CardTitle className="text-base">Platform Health</CardTitle></CardHeader>
                       <CardContent className="space-y-3">
                         {[
-                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} tenants active` : '—', ok: (metrics?.expiredLicenses || 0) === 0 },
-                          { label: 'Open Tickets', value: `${metrics?.openTickets || 0} pending`, ok: (metrics?.openTickets || 0) < 10 },
+                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} active` : '—', ok: (metrics?.expiredLicenses || 0) === 0 },
+                          { label: 'Open Tickets', value: `${metrics?.openTickets || 0} open · ${metrics?.pendingTickets || 0} pending`, ok: (metrics?.openTickets || 0) < 10 },
+                          { label: 'Critical Issues', value: `${metrics?.criticalTickets || 0} critical tickets`, ok: (metrics?.criticalTickets || 0) === 0 },
                           { label: 'Support Coverage', value: `${metrics?.totalAgents || 0} agents`, ok: (metrics?.totalAgents || 0) > 0 },
+                          { label: 'Suspended Tenants', value: `${metrics?.suspendedTenants || 0} suspended`, ok: (metrics?.suspendedTenants || 0) === 0 },
                         ].map(item => (
                           <div key={item.label} className="flex items-center justify-between text-sm">
                             <span className="text-gray-600">{item.label}</span>
                             <div className="flex items-center gap-2">
-                              <span>{item.value}</span>
+                              <span className="text-xs text-gray-500">{item.value}</span>
                               {item.ok ? <CheckCircle className="h-3.5 w-3.5 text-green-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />}
                             </div>
                           </div>
                         ))}
                       </CardContent>
                     </Card>
+
+                    {/* License Utilisation */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base">License Utilisation</CardTitle></CardHeader>
+                      <CardContent className="space-y-4">
+                        {metrics?.licenseUtilization ? (() => {
+                          const { purchased, used, available } = metrics.licenseUtilization;
+                          const pct = purchased > 0 ? Math.round((used / purchased) * 100) : 0;
+                          return (
+                            <>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>{used} used / {purchased} purchased</span>
+                                  <span className={pct >= 90 ? 'text-red-600 font-medium' : pct >= 70 ? 'text-orange-600' : 'text-green-600'}>{pct}%</span>
+                                </div>
+                                <div className="w-full bg-gray-100 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full transition-all ${pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-orange-400' : 'bg-green-500'}`}
+                                    style={{ width: `${Math.min(pct, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="bg-blue-50 rounded-lg p-2">
+                                  <p className="text-lg font-bold text-blue-700">{purchased}</p>
+                                  <p className="text-xs text-blue-600">Purchased</p>
+                                </div>
+                                <div className="bg-green-50 rounded-lg p-2">
+                                  <p className="text-lg font-bold text-green-700">{used}</p>
+                                  <p className="text-xs text-green-600">In Use</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-2">
+                                  <p className="text-lg font-bold text-gray-700">{available}</p>
+                                  <p className="text-xs text-gray-600">Free</p>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })() : <p className="text-sm text-gray-400 text-center py-4">Loading…</p>}
+                      </CardContent>
+                    </Card>
                   </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Subscription Plan Breakdown */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base">Subscription Plans</CardTitle></CardHeader>
+                      <CardContent>
+                        {metrics?.planBreakdown && Object.keys(metrics.planBreakdown).length > 0 ? (
+                          <div className="space-y-2">
+                            {Object.entries(metrics.planBreakdown)
+                              .sort(([, a], [, b]) => b - a)
+                              .map(([plan, count]) => {
+                                const total = Object.values(metrics.planBreakdown).reduce((s, v) => s + v, 0);
+                                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                                const color = plan === 'enterprise' ? 'bg-purple-500' : plan === 'pro' ? 'bg-blue-500' : plan === 'basic' ? 'bg-green-500' : plan === 'trial' ? 'bg-yellow-500' : 'bg-gray-400';
+                                return (
+                                  <div key={plan} className="space-y-0.5">
+                                    <div className="flex justify-between text-sm">
+                                      <span className="capitalize font-medium">{plan}</span>
+                                      <span className="text-gray-500">{count} tenant{count !== 1 ? 's' : ''} · {pct}%</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                      <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400 text-center py-4">{metrics ? 'No subscription data yet' : 'Loading…'}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Recent Tenants */}
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle className="text-base">Recently Added Tenants</CardTitle>
+                        <Button size="sm" variant="ghost" className="text-xs" onClick={() => setActiveSection('tenants')}>
+                          View All <ChevronRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </CardHeader>
+                      <CardContent>
+                        {metrics?.recentTenants && metrics.recentTenants.length > 0 ? (
+                          <div className="space-y-2">
+                            {metrics.recentTenants.slice(0, 6).map((t, i) => (
+                              <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                                <div>
+                                  <p className="font-medium text-sm">{t.name}</p>
+                                  <p className="text-xs text-gray-400">{t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {t.plan && t.plan !== 'unknown' && <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{t.plan}</span>}
+                                  <StatusBadge status={t.status || 'unknown'} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400 text-center py-4">{metrics ? 'No tenants yet' : 'Loading…'}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Growth Summary */}
+                  {metrics && (metrics.newTenantsLast30Days > 0 || metrics.newUsersLast30Days > 0) && (
+                    <Card className="border-blue-200 bg-blue-50">
+                      <CardContent className="flex items-center gap-4 pt-4 flex-wrap">
+                        <TrendingUp className="h-5 w-5 text-blue-600 shrink-0" />
+                        <p className="text-sm text-blue-800 font-medium">
+                          Last 30 days: <strong>{metrics.newTenantsLast30Days} new tenant{metrics.newTenantsLast30Days !== 1 ? 's' : ''}</strong> and <strong>{metrics.newUsersLast30Days} new user{metrics.newUsersLast30Days !== 1 ? 's' : ''}</strong> joined the platform.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               )}
 

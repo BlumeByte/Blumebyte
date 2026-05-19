@@ -75,7 +75,16 @@ const _allowedOrigins = (() => {
 app.use(
   "/*",
   cors({
-    origin: _allowedOrigins as any,
+    // Use a function so RegExp patterns in _allowedOrigins are handled correctly.
+    // Hono's array-mode only does strict string equality (no regex support).
+    origin: (origin: string) => {
+      if (_allowedOrigins === '*') return '*';
+      const allowed = _allowedOrigins as (string | RegExp)[];
+      for (const o of allowed) {
+        if (typeof o === 'string' ? o === origin : o.test(origin)) return origin;
+      }
+      return null;
+    },
     allowHeaders: ["Content-Type", "Authorization", "X-User-Token"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
@@ -12009,9 +12018,15 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     }
 
     const totalTenants = companyMap.size;
-    const activeTenants = [...companyMap.values()].filter(t => t.status === 'active').length;
-    const expiredLicenses = [...companyMap.values()].filter(t => t.status !== 'active').length;
+    const tenantValues = [...companyMap.values()];
+    const activeTenants = tenantValues.filter(t => t.status === 'active').length;
+    const expiredLicenses = tenantValues.filter(t => t.status === 'expired').length;
+    const suspendedTenants = tenantValues.filter(t => t.status === 'suspended').length;
+    const trialTenants = tenantValues.filter(t => t.status === 'trial').length;
+
     const openTickets = scopedTickets.filter((t: any) => t.status === 'open').length;
+    const pendingTickets = scopedTickets.filter((t: any) => t.status === 'pending').length;
+    const criticalTickets = scopedTickets.filter((t: any) => t.priority === 'critical').length;
     const resolvedToday = scopedTickets.filter((t: any) => {
       if (t.status !== 'resolved') return false;
       const d = new Date(t.updatedAt || t.createdAt);
@@ -12019,14 +12034,64 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       return d.toDateString() === now.toDateString();
     }).length;
 
+    // User stats
+    const totalUsers = allEmployees.length;
+    const activeUsers = allEmployees.filter((e: any) => e.status === 'active').length;
+
+    // New tenants / users in the last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const newTenantsLast30Days = [...tenantValues].filter(t => {
+      const d = t.createdAt ? new Date(t.createdAt) : null;
+      return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
+    }).length;
+    const newUsersLast30Days = allEmployees.filter((e: any) => {
+      const d = e.createdAt ? new Date(e.createdAt) : null;
+      return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
+    }).length;
+
+    // Plan breakdown
+    const planBreakdown: Record<string, number> = {};
+    for (const sub of allSubscriptions) {
+      const plan = (sub.plan || sub.planName || 'unknown').toLowerCase();
+      planBreakdown[plan] = (planBreakdown[plan] || 0) + 1;
+    }
+
+    // License utilisation: total purchased vs total used
+    let totalPurchasedLicenses = 0;
+    for (const sub of allSubscriptions) {
+      totalPurchasedLicenses += sub.purchasedLicenses || sub.userCount || sub.licenses || 0;
+    }
+
+    // Recent tenants (last 10 sorted by createdAt desc)
+    const recentTenants = tenantValues
+      .filter(t => t.createdAt)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10)
+      .map(t => ({ id: t.name, name: t.name, status: t.status, createdAt: t.createdAt, plan: t.plan }));
+
     return c.json({
       totalTenants,
       activeTenants,
       expiredLicenses,
+      suspendedTenants,
+      trialTenants,
       openTickets,
+      pendingTickets,
+      criticalTickets,
       resolvedToday,
       totalAgents: allAgents.length,
       totalTickets: scopedTickets.length,
+      totalUsers,
+      activeUsers,
+      newTenantsLast30Days,
+      newUsersLast30Days,
+      planBreakdown,
+      licenseUtilization: {
+        purchased: totalPurchasedLicenses,
+        used: activeUsers,
+        available: Math.max(0, totalPurchasedLicenses - activeUsers),
+      },
+      recentTenants,
     });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
