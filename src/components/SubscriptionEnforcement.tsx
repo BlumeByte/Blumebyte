@@ -244,7 +244,7 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
             <div className="bg-white/50 p-4 rounded-lg">
               <p className="font-semibold text-lg mb-2">🔒 System-Wide Access Suspended</p>
               <p className="text-sm">
-                The organisation's subscription is inactive. All system functions are disabled until payment is completed.
+                The organization's subscription is inactive. All system functions are disabled until payment is completed.
               </p>
             </div>
 
@@ -260,7 +260,7 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
 
                 <Button className="w-full" onClick={() => navigate('/subscription')}>
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Go to Subscription &amp; Renew Now
+                  Go to Subscription & Renew Now
                 </Button>
 
                 {autoRenewEligible && (

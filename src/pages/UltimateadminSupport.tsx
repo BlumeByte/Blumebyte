@@ -1812,7 +1812,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                       <CardHeader><CardTitle className="text-base">Platform Health</CardTitle></CardHeader>
                       <CardContent className="space-y-3">
                         {[
-                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} active` : '—', ok: (metrics?.expiredLicenses || 0) === 0 },
+                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} active` : '—', ok: (metrics?.expiredLicenses || 0) === 0 && (metrics?.suspendedTenants || 0) === 0 },
                           { label: 'Open Tickets', value: `${metrics?.openTickets || 0} open · ${metrics?.pendingTickets || 0} pending`, ok: (metrics?.openTickets || 0) < 10 },
                           { label: 'Critical Issues', value: `${metrics?.criticalTickets || 0} critical tickets`, ok: (metrics?.criticalTickets || 0) === 0 },
                           { label: 'Support Coverage', value: `${metrics?.totalAgents || 0} agents`, ok: (metrics?.totalAgents || 0) > 0 },
@@ -1821,7 +1821,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                           <div key={item.label} className="flex items-center justify-between text-sm">
                             <span className="text-gray-600">{item.label}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{item.value}</span>
+                              <span className="text-sm text-gray-700">{item.value}</span>
                               {item.ok ? <CheckCircle className="h-3.5 w-3.5 text-green-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />}
                             </div>
                           </div>
