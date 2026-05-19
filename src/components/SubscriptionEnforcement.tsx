@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
+import { supabase } from '../lib/supabase';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Button } from './ui/button';
-import { AlertCircle, CreditCard, Lock } from 'lucide-react';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { AlertCircle, CreditCard, Lock, Mail, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+
+const SUPPORT_EMAIL = 'info@blumebyte.com';
 
 interface SubscriptionEnforcementProps {
   children: React.ReactNode;
@@ -12,7 +18,6 @@ interface SubscriptionEnforcementProps {
 
 export function SubscriptionEnforcement({ children }: SubscriptionEnforcementProps) {
   const { user, getToken } = useAuth();
-  const navigate = useNavigate();
   const [subscriptionStatus, setSubscriptionStatus] = useState<{
     isActive: boolean;
     checking: boolean;
@@ -21,6 +26,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     subscriptionInactive: boolean;
     canManageSubscription: boolean;
     autoRenewEligible: boolean;
+    sessionRole: string | null;
   }>({
     isActive: true,
     checking: true,
@@ -29,17 +35,28 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     subscriptionInactive: false,
     canManageSubscription: false,
     autoRenewEligible: false,
+    sessionRole: null,
   });
 
   useEffect(() => {
     async function checkSubscription() {
-      if (!user) {
+      // Read role from the raw Supabase session (always available, no API call)
+      let sessionRole: string | null = null;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        sessionRole = sessionData?.session?.user?.user_metadata?.role || null;
+      } catch { /* ignore */ }
+
+      if (!user && !sessionRole) {
         setSubscriptionStatus({
           isActive: false,
           checking: false,
           error: null,
           accountInactive: false,
           subscriptionInactive: false,
+          canManageSubscription: false,
+          autoRenewEligible: false,
+          sessionRole,
         });
         return;
       }
@@ -60,6 +77,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
           subscriptionInactive: status?.status !== 'active',
           canManageSubscription: status?.isSubscriptionOwner === true,
           autoRenewEligible: status?.autoRenewEligible === true,
+          sessionRole,
         });
       } catch (error: any) {
         console.error('Subscription check failed:', error);
@@ -72,6 +90,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
           subscriptionInactive: error.subscriptionInactive || false,
           canManageSubscription: false,
           autoRenewEligible: false,
+          sessionRole,
         });
       }
     }
@@ -145,56 +164,14 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
 
   // Subscription is inactive
   if (subscriptionStatus.subscriptionInactive) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-red-50 to-pink-50">
-        <div className="max-w-lg w-full space-y-4">
-          <Alert variant="destructive" className="border-2">
-            <CreditCard className="h-5 w-5" />
-            <AlertTitle className="text-xl font-bold">Payment Required - System Locked</AlertTitle>
-            <AlertDescription className="mt-3 space-y-4">
-              <div className="bg-white/50 p-4 rounded-lg">
-                <p className="font-semibold text-lg mb-2">🔒 System-Wide Access Suspended</p>
-                <p className="text-sm">
-                  The organization's subscription is inactive. All system functions are disabled.
-                </p>
-              </div>
-              
-              <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-                <p className="font-bold text-red-900 mb-2">💳 Subscription Payment Required</p>
-                <p className="text-sm text-red-900 mb-3">
-                  Your SuperAdmin must complete payment to restore system access for all users.
-                </p>
-                <div className="bg-white p-3 rounded border border-red-300">
-                  <p className="text-xs font-semibold text-red-900">URGENT ACTION NEEDED:</p>
-                  <ul className="text-xs text-red-900 mt-1 space-y-1">
-                    <li>✓ Contact SuperAdmin immediately</li>
-                    <li>✓ Ask them to renew the subscription</li>
-                    <li>✓ Payment must be completed to unlock system</li>
-                  </ul>
-                </div>
-              </div>
-
-                <div className="text-center pt-2">
-                  <p className="text-sm font-bold text-red-700 animate-pulse">
-                    ⏰ System will remain locked until SuperAdmin completes payment
-                  </p>
-                </div>
-                {subscriptionStatus.canManageSubscription && (
-                  <Button className="w-full" onClick={() => navigate('/subscription')}>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Go to Subscription & Renew
-                  </Button>
-                )}
-                {subscriptionStatus.autoRenewEligible && (
-                  <p className="text-xs text-center text-muted-foreground">
-                    A saved-card auto-renewal can be attempted from your subscription page.
-                  </p>
-                )}
-              </AlertDescription>
-            </Alert>
-          </div>
-      </div>
-    );
+    // SuperAdmin can always manage their subscription.
+    // Check auth-context user first, then the raw Supabase session role
+    // (needed when /profile is blocked by CORS and user.role is null).
+    const isSuperAdmin =
+      user?.role === 'superadmin' ||
+      subscriptionStatus.sessionRole === 'superadmin';
+    const canPay = subscriptionStatus.canManageSubscription || isSuperAdmin;
+    return <SubscriptionLockedScreen canPay={canPay} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
   }
 
   // Generic error
@@ -216,6 +193,171 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
             >
               Retry
             </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    </div>
+  );
+}
+
+// ─── Subscription Locked Screen ─────────────────────────────────────────────
+function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boolean; autoRenewEligible: boolean }) {
+  const navigate = useNavigate();
+  const { user, getToken } = useAuth();
+  const [showSupportForm, setShowSupportForm] = useState(false);
+  const [supportForm, setSupportForm] = useState({ name: '', email: user?.email || '', message: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [autoRenewing, setAutoRenewing] = useState(false);
+
+  const submitSupportRequest = async () => {
+    if (!supportForm.message.trim()) {
+      toast.error('Please describe your issue');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const token = await getToken();
+      await api('/support/report-error', {
+        method: 'POST',
+        token,
+        body: {
+          type: 'subscription_locked',
+          subject: 'Subscription Payment Required — System Locked',
+          message: supportForm.message,
+          contactEmail: supportForm.email || user?.email,
+          contactName: supportForm.name,
+          userEmail: user?.email,
+          userRole: user?.role,
+        },
+      });
+      toast.success(`Support request sent to ${SUPPORT_EMAIL} — we will contact you shortly.`);
+      setShowSupportForm(false);
+    } catch {
+      toast.error(`Failed to send support request. Please email ${SUPPORT_EMAIL} directly.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const attemptAutoRenew = async () => {
+    setAutoRenewing(true);
+    try {
+      const token = await getToken();
+      await api('/subscription/renew', { method: 'POST', token, body: { autoRenew: true } });
+      toast.success('Auto-renewal initiated — refreshing...');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err: any) {
+      toast.error(err.message || 'Auto-renewal failed. Please renew manually on the subscription page.');
+    } finally {
+      setAutoRenewing(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-red-50 to-pink-50">
+      <div className="max-w-lg w-full space-y-4">
+        <Alert variant="destructive" className="border-2">
+          <CreditCard className="h-5 w-5" />
+          <AlertTitle className="text-xl font-bold">Payment Required — System Locked</AlertTitle>
+          <AlertDescription className="mt-3 space-y-4">
+            <div className="bg-white/50 p-4 rounded-lg">
+              <p className="font-semibold text-lg mb-2">🔒 System-Wide Access Suspended</p>
+              <p className="text-sm">
+                The organization's subscription is inactive. All system functions are disabled until payment is completed.
+              </p>
+            </div>
+
+            {canPay ? (
+              /* SuperAdmin / subscription owner: show payment options */
+              <div className="space-y-3">
+                <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                  <p className="font-bold text-red-900 mb-1">💳 Action required</p>
+                  <p className="text-sm text-red-900">
+                    Renew your subscription to restore access for all users immediately.
+                  </p>
+                </div>
+
+                <Button className="w-full" onClick={() => navigate('/subscription')}>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Go to Subscription & Renew Now
+                </Button>
+
+                {autoRenewEligible && (
+                  <Button variant="outline" className="w-full" onClick={attemptAutoRenew} disabled={autoRenewing}>
+                    {autoRenewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
+                    {autoRenewing ? 'Processing auto-renewal…' : 'Auto-renew with saved card'}
+                  </Button>
+                )}
+
+                {autoRenewEligible && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Auto-renewal will charge your saved payment method. You can also add a new card on the subscription page.
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Non-superadmin: show instructions */
+              <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                <p className="font-bold text-red-900 mb-2">💳 Subscription Payment Required</p>
+                <p className="text-sm text-red-900 mb-3">
+                  Your SuperAdmin must complete payment to restore system access for all users.
+                </p>
+                <div className="bg-white p-3 rounded border border-red-300">
+                  <p className="text-xs font-semibold text-red-900">URGENT ACTION NEEDED:</p>
+                  <ul className="text-xs text-red-900 mt-1 space-y-1">
+                    <li>✓ Contact your SuperAdmin immediately</li>
+                    <li>✓ Ask them to renew the subscription</li>
+                    <li>✓ Payment must be completed to unlock the system</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            <div className="text-center pt-1">
+              <p className="text-sm font-bold text-red-700 animate-pulse">
+                ⏰ System will remain locked until payment is completed
+              </p>
+            </div>
+
+            {/* Contact Support */}
+            <div className="border-t pt-3">
+              {!showSupportForm ? (
+                <Button variant="outline" size="sm" className="w-full" onClick={() => setShowSupportForm(true)}>
+                  <Mail className="w-3.5 h-3.5 mr-2" />
+                  Contact Blumebyte Support
+                </Button>
+              ) : (
+                <div className="space-y-2 bg-white p-3 rounded-lg border">
+                  <p className="text-xs font-semibold text-gray-700">Send a support request to {SUPPORT_EMAIL}</p>
+                  <Input
+                    placeholder="Your name"
+                    value={supportForm.name}
+                    onChange={e => setSupportForm(f => ({ ...f, name: e.target.value }))}
+                    className="text-sm"
+                  />
+                  <Input
+                    placeholder="Your email"
+                    value={supportForm.email}
+                    onChange={e => setSupportForm(f => ({ ...f, email: e.target.value }))}
+                    className="text-sm"
+                  />
+                  <Textarea
+                    placeholder="Describe your issue (company name, subscription plan, what happened)…"
+                    value={supportForm.message}
+                    onChange={e => setSupportForm(f => ({ ...f, message: e.target.value }))}
+                    rows={3}
+                    className="text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => setShowSupportForm(false)}>Cancel</Button>
+                    <Button size="sm" className="flex-1" onClick={submitSupportRequest} disabled={submitting}>
+                      {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Mail className="w-3.5 h-3.5 mr-1" />}
+                      Send Request
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </AlertDescription>
         </Alert>
       </div>

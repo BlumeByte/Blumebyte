@@ -75,7 +75,16 @@ const _allowedOrigins = (() => {
 app.use(
   "/*",
   cors({
-    origin: _allowedOrigins as any,
+    // Use a function so RegExp patterns in _allowedOrigins are handled correctly.
+    // Hono's array-mode only does strict string equality (no regex support).
+    origin: (origin: string) => {
+      if (_allowedOrigins === '*') return '*';
+      const allowed = _allowedOrigins as (string | RegExp)[];
+      for (const o of allowed) {
+        if (typeof o === 'string' ? o === origin : (o instanceof RegExp && o.test(origin))) return origin;
+      }
+      return null;
+    },
     allowHeaders: ["Content-Type", "Authorization", "X-User-Token"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
@@ -7147,10 +7156,17 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
       }, 200);
     }
     
-    // Get subscription
-    const subscription = await kv.get(`subscription:${superadmin.id}`);
+    // Subscription keys are stored as subscription:<auth-user-id>.
+    // Employee records store the Supabase auth ID as `userId`; `id` may be a
+    // local record ID.  Always prefer userId so the lookup succeeds even when
+    // the two differ.
+    const superadminAuthId = superadmin.userId || superadmin.id;
+    const subscription = superadminAuthId ? await kv.get(`subscription:${superadminAuthId}`) : null;
+    // Also try the company mirror if the owner record is missing
+    const mirrorSubscription = !subscription && companyId ? await kv.get(`subscription:${companyId}`) : null;
+    const resolvedSubscription = subscription || mirrorSubscription;
     
-    if (!subscription) {
+    if (!resolvedSubscription) {
       return c.json({ 
         error: 'No subscription found',
         totalLicenses: 0,
@@ -7159,15 +7175,27 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
       }, 200);
     }
     
-    const totalLicenses = subscription.userCount || 0;
+    // Read license count from whichever field was saved (schema has evolved over time)
+    const totalLicenses = Number(
+      resolvedSubscription.purchasedLicenses ||
+      resolvedSubscription.userCount ||
+      resolvedSubscription.licenses ||
+      0
+    );
     const usedLicenses = companyEmployees.length;
     const availableLicenses = Math.max(0, totalLicenses - usedLicenses);
     
+    // Derive active status safely — mirrors the logic in deriveSubscriptionLifecycle
+    // used by /subscription/status so the two endpoints agree.
     const now = new Date();
-    const endDate = new Date(subscription.endDate);
-    const isActive = now < endDate;
+    const endDateRaw = resolvedSubscription.endDate;
+    const endDateParsed = endDateRaw ? new Date(endDateRaw) : null;
+    const validEndDate = endDateParsed && !Number.isNaN(endDateParsed.getTime()) ? endDateParsed : null;
+    const isActive = validEndDate
+      ? now < validEndDate
+      : String(resolvedSubscription.status || '').toLowerCase() === 'active';
     
-    const cardAuth = subscription.cardAuthorization;
+    const cardAuth = resolvedSubscription.cardAuthorization;
     const cardSaved = !!(cardAuth?.authorizationCode);
     const cardLast4 = cardAuth?.last4 || '';
     const cardExpiry = cardAuth ? `${cardAuth.expMonth}/${cardAuth.expYear}` : '';
@@ -7180,8 +7208,8 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
       usedLicenses,
       availableLicenses,
       subscriptionStatus: isActive ? 'active' : 'expired',
-      plan: subscription.plan,
-      endDate: subscription.endDate,
+      plan: resolvedSubscription.plan,
+      endDate: resolvedSubscription.endDate,
       companyId,
       // Saved card for auto-renewal display
       cardSaved,
@@ -12009,9 +12037,15 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     }
 
     const totalTenants = companyMap.size;
-    const activeTenants = [...companyMap.values()].filter(t => t.status === 'active').length;
-    const expiredLicenses = [...companyMap.values()].filter(t => t.status !== 'active').length;
+    const tenantValues = [...companyMap.values()];
+    const activeTenants = tenantValues.filter(t => t.status === 'active').length;
+    const expiredTenants = tenantValues.filter(t => t.status === 'expired').length;
+    const suspendedTenants = tenantValues.filter(t => t.status === 'suspended').length;
+    const trialTenants = tenantValues.filter(t => t.status === 'trial').length;
+
     const openTickets = scopedTickets.filter((t: any) => t.status === 'open').length;
+    const pendingTickets = scopedTickets.filter((t: any) => t.status === 'pending').length;
+    const criticalTickets = scopedTickets.filter((t: any) => t.priority === 'critical').length;
     const resolvedToday = scopedTickets.filter((t: any) => {
       if (t.status !== 'resolved') return false;
       const d = new Date(t.updatedAt || t.createdAt);
@@ -12019,14 +12053,64 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       return d.toDateString() === now.toDateString();
     }).length;
 
+    // User stats
+    const totalUsers = allEmployees.length;
+    const activeUsers = allEmployees.filter((e: any) => e.status === 'active').length;
+
+    // New tenants / users in the last 30 days
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const newTenantsLast30Days = tenantValues.filter(t => {
+      const d = t.createdAt ? new Date(t.createdAt) : null;
+      return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
+    }).length;
+    const newUsersLast30Days = allEmployees.filter((e: any) => {
+      const d = e.createdAt ? new Date(e.createdAt) : null;
+      return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
+    }).length;
+
+    // Plan breakdown
+    const planBreakdown: Record<string, number> = {};
+    for (const sub of allSubscriptions) {
+      const plan = (sub.plan || sub.planName || 'unknown').toLowerCase();
+      planBreakdown[plan] = (planBreakdown[plan] || 0) + 1;
+    }
+
+    // License utilisation: total purchased vs total used
+    let totalPurchasedLicenses = 0;
+    for (const sub of allSubscriptions) {
+      totalPurchasedLicenses += sub.purchasedLicenses || sub.userCount || sub.licenses || 0;
+    }
+
+    // Recent tenants (last 10 sorted by createdAt desc)
+    const recentTenants = tenantValues
+      .filter(t => t.createdAt)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10)
+      .map(t => ({ id: t.name, name: t.name, status: t.status, createdAt: t.createdAt, plan: t.plan }));
+
     return c.json({
       totalTenants,
       activeTenants,
-      expiredLicenses,
+      expiredTenants,
+      suspendedTenants,
+      trialTenants,
       openTickets,
+      pendingTickets,
+      criticalTickets,
       resolvedToday,
       totalAgents: allAgents.length,
       totalTickets: scopedTickets.length,
+      totalUsers,
+      activeUsers,
+      newTenantsLast30Days,
+      newUsersLast30Days,
+      planBreakdown,
+      licenseUtilization: {
+        purchased: totalPurchasedLicenses,
+        used: activeUsers,
+        available: Math.max(0, totalPurchasedLicenses - activeUsers),
+      },
+      recentTenants,
     });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
