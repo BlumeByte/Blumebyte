@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
@@ -14,8 +14,12 @@ export function PaymentVerification() {
   const { branding } = useBranding();
   const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
   const [message, setMessage] = useState('Verifying your payment...');
+  const hasVerifiedRef = useRef(false);
 
   useEffect(() => {
+    if (!accessToken) return;
+    if (hasVerifiedRef.current) return;
+    hasVerifiedRef.current = true;
     verifyPayment();
   }, [accessToken]);
 

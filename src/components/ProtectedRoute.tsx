@@ -1,14 +1,14 @@
 import React from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 import { Loader2 } from 'lucide-react';
 import { ForcePasswordChange } from './ForcePasswordChange';
 import { getRoleDashboardPath } from '../lib/role-utils';
-// Subscription enforcement temporarily deactivated
-// import { SubscriptionEnforcement } from './SubscriptionEnforcement';
+import { SubscriptionEnforcement } from './SubscriptionEnforcement';
 
 export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) {
   const { user, sessionLoading } = useAuth();
+  const location = useLocation();
 
   if (sessionLoading) {
     return (
@@ -32,6 +32,15 @@ export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: strin
     return <ForcePasswordChange />;
   }
 
-  // Subscription enforcement temporarily deactivated - direct access to children
+  const subscriptionProtectedRoles = ['superadmin', 'admin', 'manager', 'employee'];
+  const subscriptionExemptPaths = new Set(['/subscription', '/payment-verify', '/payment-verify-license']);
+  const shouldEnforceSubscription =
+    subscriptionProtectedRoles.includes(user.role) &&
+    !subscriptionExemptPaths.has(location.pathname);
+
+  if (shouldEnforceSubscription) {
+    return <SubscriptionEnforcement>{children}</SubscriptionEnforcement>;
+  }
+
   return <>{children}</>;
 }

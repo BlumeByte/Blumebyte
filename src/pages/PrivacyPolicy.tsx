@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
             How we collect, use, and protect your information
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Last Updated: March 15, 2026
+            Last Updated: May 18, 2026
           </p>
         </div>
 
@@ -220,31 +220,31 @@ export default function PrivacyPolicy() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>
-                We implement industry-standard security measures to protect your information:
+                We implement reasonable technical and organizational measures designed to protect your information:
               </p>
 
               <div className="grid md:grid-cols-2 gap-3 mt-4">
                 <div className="bg-gray-50 border rounded-lg p-3">
                   <h5 className="font-semibold text-foreground text-xs mb-1">Encryption</h5>
-                  <p className="text-xs">TLS 1.3 for data in transit, AES-256 for data at rest</p>
+                  <p className="text-xs">Encryption in transit and at rest where supported by our infrastructure providers</p>
                 </div>
                 <div className="bg-gray-50 border rounded-lg p-3">
                   <h5 className="font-semibold text-foreground text-xs mb-1">Authentication</h5>
-                  <p className="text-xs">Secure password hashing with bcrypt</p>
+                  <p className="text-xs">Authentication controls, password protection, and account recovery safeguards</p>
                 </div>
                 <div className="bg-gray-50 border rounded-lg p-3">
                   <h5 className="font-semibold text-foreground text-xs mb-1">Access Control</h5>
-                  <p className="text-xs">Role-based permissions and Row Level Security</p>
+                  <p className="text-xs">Role-based permissions and tenant-level access restrictions</p>
                 </div>
                 <div className="bg-gray-50 border rounded-lg p-3">
                   <h5 className="font-semibold text-foreground text-xs mb-1">Monitoring</h5>
-                  <p className="text-xs">24/7 security monitoring and automated alerts</p>
+                  <p className="text-xs">Logging and monitoring practices intended to detect misuse and operational issues</p>
                 </div>
               </div>
 
               <p className="mt-4">
                 However, no method of transmission over the internet or electronic storage is 100% secure. 
-                While we strive to protect your information, we cannot guarantee absolute security.
+                While we strive to protect your information, we cannot guarantee absolute security and do not represent that our service satisfies every legal or regulatory framework in every country.
               </p>
             </CardContent>
           </Card>
@@ -358,9 +358,20 @@ export default function PrivacyPolicy() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               <p>
-                Your information may be transferred to and processed in countries other than your own. We ensure 
-                that such transfers comply with applicable data protection laws and that your information 
-                receives adequate protection.
+                Your information may be transferred to and processed in countries other than your own, depending on where our providers operate.
+                You are responsible for determining whether use of the service is lawful in your jurisdiction and for configuring your organization to meet local legal obligations.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Compliance Responsibility Notice</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              <p>
+                Blumebyte provides software tools and operational controls, but does not provide legal advice and does not certify compliance with all country-specific employment, privacy, or payroll laws.
+                Each customer remains responsible for obtaining legal advice and ensuring their own compliance requirements are met.
               </p>
             </CardContent>
           </Card>

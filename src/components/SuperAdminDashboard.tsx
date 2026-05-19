@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, createContext, useContext, useRef } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api, invalidateCache } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';
@@ -760,12 +760,15 @@ function LanguageSettingsCard() {
 }
 
 // ========== GLOBAL HIRING APPLICATIONS PANEL (SuperAdmin) ==========
+const GLOBAL_HIRING_REALTIME_REFRESH_DEBOUNCE_MS = 500;
+
 function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | null }) {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -780,6 +783,30 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
   }, [accessToken]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (realtimeRefreshTimerRef.current) clearTimeout(realtimeRefreshTimerRef.current);
+      realtimeRefreshTimerRef.current = setTimeout(() => {
+        invalidateCache('/superadmin/public-job-applications', accessToken);
+        load();
+      }, GLOBAL_HIRING_REALTIME_REFRESH_DEBOUNCE_MS);
+    };
+    const channel = supabase
+      .channel('realtime:public-job-application')
+      .on('broadcast', { event: 'INSERT' }, refresh)
+      .on('broadcast', { event: 'UPDATE' }, refresh)
+      .on('broadcast', { event: 'DELETE' }, refresh)
+      .subscribe();
+
+    return () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [accessToken, load]);
 
   const updateStatus = async (id: string, status: string) => {
     try {

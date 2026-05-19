@@ -34,11 +34,32 @@ const SIDEBAR_ITEMS = [
   { id: 'tickets', label: 'Support Tickets', icon: Ticket },
   { id: 'license-issues', label: 'License Issues', icon: Key },
   { id: 'platform-users', label: 'Platform Users', icon: UserPlus },
-  // { id: 'assignments', label: 'Assignments', icon: Activity }, // disabled – single company mode
+  { id: 'assignments', label: 'Assignments', icon: Activity },
+  { id: 'agents', label: 'Agents', icon: Users },
   { id: 'audit', label: 'Audit Trail', icon: BookOpen },
   { id: 'dev-tools', label: 'Tools', icon: Wrench },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
+
+const SECTION_ACCESS_RULES: Record<string, string[]> = {
+  overview: ['ultimateadmin', 'developer', 'customer_care'],
+  tenants: ['ultimateadmin', 'developer', 'customer_care'],
+  users: ['ultimateadmin', 'developer', 'customer_care'],
+  chat: ['ultimateadmin', 'developer', 'customer_care'],
+  tickets: ['ultimateadmin', 'developer', 'customer_care'],
+  'license-issues': ['ultimateadmin', 'developer', 'customer_care'],
+  'platform-users': ['ultimateadmin', 'developer'],
+  assignments: ['ultimateadmin', 'developer'],
+  agents: ['ultimateadmin', 'developer'],
+  audit: ['ultimateadmin', 'developer'],
+  'dev-tools': ['ultimateadmin', 'developer'],
+  settings: ['ultimateadmin', 'developer', 'customer_care'],
+};
+
+function isSectionAllowed(sectionId: string, role: string) {
+  const allowedRoles = SECTION_ACCESS_RULES[sectionId] || ['ultimateadmin', 'developer'];
+  return allowedRoles.includes(role);
+}
 
 const TICKET_STATUSES = ['open', 'pending', 'resolved', 'escalated'];
 const TICKET_PRIORITIES = ['low', 'medium', 'high', 'critical'];
@@ -81,12 +102,13 @@ interface AuditLog {
 export default function CustomerCareDashboard() {
   const navigate = useNavigate();
   const { user, sessionLoading, getToken, logout } = useAuth();
+  const normalizedRole = String(user?.role || '').toLowerCase().replace('-', '_');
   // tri-state: null = verifying, true = authenticated, false = unauthenticated
   const [authState, setAuthState] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (sessionLoading) return;
-    if (!user || (user.role !== 'ultimateadmin' && user.role !== 'developer')) {
+    if (!user || !ROLES.includes(normalizedRole) && normalizedRole !== 'developer') {
       clearSupportSession();
       setAuthState(false);
       return;
@@ -99,6 +121,9 @@ export default function CustomerCareDashboard() {
       }
       setSupportSession();
       setAuthState(true);
+    }).catch(() => {
+      clearSupportSession();
+      setAuthState(false);
     });
   }, [sessionLoading, user, getToken]);
 
@@ -122,7 +147,7 @@ export default function CustomerCareDashboard() {
     return null;
   }
 
-  return <SupportDashboard onLogout={handleLogout} />;
+  return <SupportDashboard onLogout={handleLogout} role={normalizedRole === 'developer' ? 'developer' : normalizedRole} />;
 }
 // ─── Metrics Cards ────────────────────────────────────────────────────────────
 function MetricsCards({ metrics }: { metrics: Metrics }) {
@@ -1549,27 +1574,12 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle className="text-base">SQL Setup</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Access Setup</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm text-gray-600">Run this SQL in Supabase to grant Ultimateadmin access to a user:</p>
-          <pre className="bg-gray-950 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">{`-- Grant Ultimateadmin access
-UPDATE auth.users
-SET raw_user_meta_data = 
-  COALESCE(raw_user_meta_data, '{}'::jsonb) ||
-  '{"role": "ultimateadmin"}'::jsonb
-WHERE email = 'your-email@example.com';
-
--- Grant Customer Care access
-UPDATE auth.users
-SET raw_user_meta_data = 
-  COALESCE(raw_user_meta_data, '{}'::jsonb) ||
-  '{"role": "customer_care"}'::jsonb
-WHERE email = 'care-agent@example.com';
-
--- Verify
-SELECT id, email, raw_user_meta_data->>'role' as role
-FROM auth.users
-WHERE email IN ('your-email@example.com', 'care-agent@example.com');`}</pre>
+          <p className="text-sm text-gray-600">
+            Platform role assignment is managed by authorized platform administrators.
+            If you need Ultimateadmin or Customer Care access, contact Blumebyte support.
+          </p>
           <p className="text-xs text-gray-500">Ultimateadmin → /developer dashboard. Customer Care → /customer-care dashboard.</p>
         </CardContent>
       </Card>
@@ -1578,7 +1588,7 @@ WHERE email IN ('your-email@example.com', 'care-agent@example.com');`}</pre>
 }
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
-function SupportDashboard({ onLogout }: { onLogout: () => void }) {
+function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: string }) {
   const { getToken } = useAuth();
   const [activeSection, setActiveSection] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1587,6 +1597,15 @@ function SupportDashboard({ onLogout }: { onLogout: () => void }) {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [myProfile, setMyProfile] = useState<{ email: string; name: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => isSectionAllowed(item.id, role));
+  const quickActions = [
+    { label: 'View Tenants', icon: Building2, section: 'tenants' },
+    { label: 'All Users', icon: Users, section: 'users' },
+    { label: 'Global Chat', icon: MessageSquare, section: 'chat' },
+    { label: 'New Ticket', icon: Ticket, section: 'tickets' },
+    { label: 'License Issues', icon: Key, section: 'license-issues' },
+    { label: 'Platform Users', icon: Users, section: 'platform-users' },
+  ].filter(item => isSectionAllowed(item.section, role));
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -1610,13 +1629,19 @@ function SupportDashboard({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    if (!isSectionAllowed(activeSection, role)) {
+      setActiveSection(visibleSidebarItems[0]?.id || 'overview');
+    }
+  }, [activeSection, role, visibleSidebarItems]);
+
   // Auto-refresh metrics and tenant list every 30 seconds
   useEffect(() => {
     const interval = setInterval(loadData, 30_000);
     return () => clearInterval(interval);
   }, [loadData]);
 
-  const sectionTitle = SIDEBAR_ITEMS.find(s => s.id === activeSection)?.label || 'Overview';
+  const sectionTitle = visibleSidebarItems.find(s => s.id === activeSection)?.label || 'Overview';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -1653,7 +1678,7 @@ function SupportDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
-          {SIDEBAR_ITEMS.map(item => (
+          {visibleSidebarItems.map(item => (
             <button
               key={item.id}
               onClick={() => { setActiveSection(item.id); setMobileMenuOpen(false); }}
@@ -1717,14 +1742,7 @@ function SupportDashboard({ onLogout }: { onLogout: () => void }) {
                     <Card>
                       <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
                       <CardContent className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: 'View Tenants', icon: Building2, section: 'tenants' },
-                          { label: 'All Users', icon: Users, section: 'users' },
-                          { label: 'Global Chat', icon: MessageSquare, section: 'chat' },
-                          { label: 'New Ticket', icon: Ticket, section: 'tickets' },
-                          { label: 'License Issues', icon: Key, section: 'license-issues' },
-                          { label: 'Platform Users', icon: Users, section: 'platform-users' },
-                        ].map(a => (
+                        {quickActions.map(a => (
                           <Button key={a.label} variant="outline" className="h-16 flex-col gap-1" onClick={() => setActiveSection(a.section)}>
                             <a.icon className="h-4 w-4" />
                             <span className="text-xs">{a.label}</span>
@@ -1759,11 +1777,11 @@ function SupportDashboard({ onLogout }: { onLogout: () => void }) {
               {activeSection === 'chat' && <GlobalChatPanel tenants={tenants} />}
               {activeSection === 'tickets' && <TicketsPanel tenants={tenants} />}
               {activeSection === 'license-issues' && <LicenseIssuesPanel tenants={tenants} onRefresh={loadData} />}
-              {activeSection === 'platform-users' && <PlatformUsersPanel />}
-              {activeSection === 'assignments' && <AssignmentsPanel tenants={tenants} />}
-              {activeSection === 'agents' && <AgentsPanel />}
-              {activeSection === 'audit' && <AuditTrailPanel />}
-              {activeSection === 'dev-tools' && <DevToolsPanel tenants={tenants} />}
+              {activeSection === 'platform-users' && isSectionAllowed('platform-users', role) && <PlatformUsersPanel />}
+              {activeSection === 'assignments' && isSectionAllowed('assignments', role) && <AssignmentsPanel tenants={tenants} />}
+              {activeSection === 'agents' && isSectionAllowed('agents', role) && <AgentsPanel />}
+              {activeSection === 'audit' && isSectionAllowed('audit', role) && <AuditTrailPanel />}
+              {activeSection === 'dev-tools' && isSectionAllowed('dev-tools', role) && <DevToolsPanel tenants={tenants} />}
               {activeSection === 'settings' && <SettingsPanel myProfile={myProfile} />}
             </>
           )}
