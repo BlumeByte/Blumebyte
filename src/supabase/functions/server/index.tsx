@@ -7156,10 +7156,17 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
       }, 200);
     }
     
-    // Get subscription
-    const subscription = await kv.get(`subscription:${superadmin.id}`);
+    // Subscription keys are stored as subscription:<auth-user-id>.
+    // Employee records store the Supabase auth ID as `userId`; `id` may be a
+    // local record ID.  Always prefer userId so the lookup succeeds even when
+    // the two differ.
+    const superadminAuthId = superadmin.userId || superadmin.id;
+    const subscription = superadminAuthId ? await kv.get(`subscription:${superadminAuthId}`) : null;
+    // Also try the company mirror if the owner record is missing
+    const mirrorSubscription = !subscription && companyId ? await kv.get(`subscription:${companyId}`) : null;
+    const resolvedSubscription = subscription || mirrorSubscription;
     
-    if (!subscription) {
+    if (!resolvedSubscription) {
       return c.json({ 
         error: 'No subscription found',
         totalLicenses: 0,
@@ -7168,15 +7175,27 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
       }, 200);
     }
     
-    const totalLicenses = subscription.userCount || 0;
+    // Read license count from whichever field was saved (schema has evolved over time)
+    const totalLicenses = Number(
+      resolvedSubscription.purchasedLicenses ||
+      resolvedSubscription.userCount ||
+      resolvedSubscription.licenses ||
+      0
+    );
     const usedLicenses = companyEmployees.length;
     const availableLicenses = Math.max(0, totalLicenses - usedLicenses);
     
+    // Derive active status safely — mirrors the logic in deriveSubscriptionLifecycle
+    // used by /subscription/status so the two endpoints agree.
     const now = new Date();
-    const endDate = new Date(subscription.endDate);
-    const isActive = now < endDate;
+    const endDateRaw = resolvedSubscription.endDate;
+    const endDateParsed = endDateRaw ? new Date(endDateRaw) : null;
+    const validEndDate = endDateParsed && !Number.isNaN(endDateParsed.getTime()) ? endDateParsed : null;
+    const isActive = validEndDate
+      ? now < validEndDate
+      : String(resolvedSubscription.status || '').toLowerCase() === 'active';
     
-    const cardAuth = subscription.cardAuthorization;
+    const cardAuth = resolvedSubscription.cardAuthorization;
     const cardSaved = !!(cardAuth?.authorizationCode);
     const cardLast4 = cardAuth?.last4 || '';
     const cardExpiry = cardAuth ? `${cardAuth.expMonth}/${cardAuth.expYear}` : '';
@@ -7189,8 +7208,8 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
       usedLicenses,
       availableLicenses,
       subscriptionStatus: isActive ? 'active' : 'expired',
-      plan: subscription.plan,
-      endDate: subscription.endDate,
+      plan: resolvedSubscription.plan,
+      endDate: resolvedSubscription.endDate,
       companyId,
       // Saved card for auto-renewal display
       cardSaved,
