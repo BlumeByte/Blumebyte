@@ -1374,7 +1374,7 @@ function PlatformUsersPanel() {
           await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body });
         } catch (error: any) {
           if (!isRouteNotFoundError(error)) throw error;
-          await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body });
+          await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body });
         }
         toast.success('User updated');
         setTempPassword(null);
@@ -1386,7 +1386,7 @@ function PlatformUsersPanel() {
           result = await api('/developer/platform-users', { method: 'POST', token, body });
         } catch (error: any) {
           if (!isRouteNotFoundError(error)) throw error;
-          result = await api('/developer/platform-users', { method: 'POST', token, body });
+          result = await api('/ultimateadmin/platform-users', { method: 'POST', token, body });
         }
         if (result?.tempPassword) {
           setTempPassword(result.tempPassword);
@@ -1413,7 +1413,7 @@ function PlatformUsersPanel() {
         await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
-        await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
+        await api(`/ultimateadmin/platform-users/${u.id}`, { method: 'DELETE', token });
       }
       toast.success('User removed');
       load();
@@ -1570,7 +1570,7 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
         await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
-        await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+        await api('/ultimateadmin/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
       }
       toast.success('Assignment saved');
       setSelectedAgent('');
@@ -1587,7 +1587,7 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
         await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
-        await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
+        await api(`/ultimateadmin/assignments/${assignmentId}`, { method: 'DELETE', token });
       }
       toast.success('Assignment removed');
       load();

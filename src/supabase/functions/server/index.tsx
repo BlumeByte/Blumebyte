@@ -12011,8 +12011,6 @@ async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: 
       ? 'developer'
       : (profileRole === 'developer' || metadataRole === 'developer')
       ? 'developer'
-      : (profileRole === 'ultimateadmin' || metadataRole === 'ultimateadmin')
-      ? 'developer'
       : (profileRole === 'customer_care' || metadataRole === 'customer_care')
       ? 'customer_care'
       : profileRole || metadataRole;
