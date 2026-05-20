@@ -33,7 +33,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const PRICE_MONTHLY = 3.55;  // USD per license/month
   const PRICE_YEARLY = 30.60;  // USD per license/year ($2.55/month billed annually)
   const { branding } = useBranding();
-  const { accessToken, getToken } = useAuth();
+  const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [fetchingLicenses, setFetchingLicenses] = useState(true);
   const [licenseInfo, setLicenseInfo] = useState<any>(null);
@@ -306,10 +306,14 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
       setActivatingLicenses(true);
       setPollingStatus('Verifying payment and activating licenses...');
 
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
       const response = await apiClient.post(
         '/subscription/verify-license',
         { reference },
-        accessToken
+        freshToken
       );
 
       if (response.ok) {
@@ -432,7 +436,9 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   // Auto-sync user licenses after successful payment
   const autoSyncAfterPayment = async () => {
     try {
-      const response = await apiClient.post('/sync-user-licenses', {}, accessToken);
+      const freshToken = await getToken();
+      if (!freshToken) return;
+      const response = await apiClient.post('/sync-user-licenses', {}, freshToken);
       if (response.ok) {
         const result = await response.json();
         if (result.activatedCount > 0 || result.deactivatedCount > 0) {
@@ -474,7 +480,11 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const fetchLicenseInfo = async () => {
     try {
       setFetchingLicenses(true);
-      const response = await apiClient.get('/subscription/license-info', accessToken);
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+      const response = await apiClient.get('/subscription/license-info', freshToken);
       if (response.ok) {
         const data = await response.json();
         setLicenseInfo({
@@ -857,7 +867,11 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const handleTestPaystack = async () => {
     try {
       setTestingPaystack(true);
-      const response = await apiClient.post('/subscription/test-paystack', {}, accessToken);
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+      const response = await apiClient.post('/subscription/test-paystack', {}, freshToken);
       
       if (!response.ok) {
         const error = await response.json();

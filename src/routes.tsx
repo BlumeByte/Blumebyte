@@ -15,7 +15,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './components/LoginPage';
 import CompanySignup from './pages/CompanySignup';
 import EmployeePortal from './pages/EmployeePortal';
-import PaystackSubscription from './pages/PaystackSubscription';
+import { SubscriptionPage as SubscriptionManagementPage } from './components/SubscriptionPage';
 import AuthCallback from './pages/AuthCallback';
 import OAuthConsent from './pages/OAuthConsent';
 import PasswordReset from './pages/PasswordReset';
@@ -112,7 +112,7 @@ const EmployeePortalPage = () => <EmployeePortal />;
 
 const SubscriptionPage = () => (
   <ProtectedRoute allowedRoles={['superadmin']}>
-    <PaystackSubscription />
+    <SubscriptionManagementPage />
   </ProtectedRoute>
 );
 
