@@ -1856,7 +1856,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
   useEffect(() => {
-    const interval = setInterval(loadThreads, 20_000);
+    const interval = setInterval(loadThreads, 30_000);
     return () => clearInterval(interval);
   }, [loadThreads]);
   useEffect(() => {
@@ -1873,7 +1873,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
       } catch {
         // silent background refresh failure
       }
-    }, 10_000);
+    }, 15_000);
     return () => clearInterval(interval);
   }, [activeThread, getToken]);
 
