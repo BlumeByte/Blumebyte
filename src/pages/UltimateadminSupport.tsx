@@ -58,6 +58,7 @@ function isRouteNotFoundError(error: any): boolean {
   return isStaleBackendMessage(error?.message) || isStaleBackendStatus(error?.status);
 }
 
+/** Tries `path` first, then each fallback path in order, only for route-not-found style errors. */
 async function apiWithRouteFallback(path: string, options: any = {}, fallbackPaths: string[] = []) {
   try {
     return await api(path, options);
