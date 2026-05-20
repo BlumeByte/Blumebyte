@@ -37,6 +37,11 @@ function isRouteNotFound(r: PromiseSettledResult<any>): boolean {
   );
 }
 
+function isRouteNotFoundError(error: any): boolean {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('route not found') || error?.status === 404;
+}
+
 const SIDEBAR_ITEMS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'tenants', label: 'Tenants', icon: Building2 },
@@ -266,7 +271,11 @@ function TenantsPanel() {
       const data = await api(`/ultimateadmin/support/tenants/${tenant.id}/users`, { token });
       setTenantUsers(Array.isArray(data) ? data : []);
       setShowUsers(true);
-    } catch (e: any) { toast.error('Failed to load users: ' + (e.message || '')); }
+    } catch (e: any) {
+      if (!isRouteNotFoundError(e)) {
+        toast.error('Failed to load users: ' + (e.message || ''));
+      }
+    }
   };
 
   const toggleSuspend = async (tenant: Tenant) => {
@@ -1247,7 +1256,11 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
       invalidateCache('/ultimateadmin/users', token);
       const data = await api('/ultimateadmin/users', { token });
       setUsers(Array.isArray(data) ? data : []);
-    } catch (e: any) { toast.error('Failed to load users: ' + (e.message || '')); }
+    } catch (e: any) {
+      if (!isRouteNotFoundError(e)) {
+        toast.error('Failed to load users: ' + (e.message || ''));
+      }
+    }
     finally { setLoading(false); }
   }, [getToken]);
 
