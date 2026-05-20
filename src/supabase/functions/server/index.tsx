@@ -7455,8 +7455,14 @@ const renewSubscriptionLicense = async (c: any) => {
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-    const companyId = await getCompanyId(user.id);
-    const companyName = companyId ? await resolveCompanyName(companyId) : '';
+    let companyId: string | null = null;
+    let companyName = '';
+    try {
+      companyId = await getCompanyId(user.id);
+      companyName = companyId ? await resolveCompanyName(companyId) : '';
+    } catch (companyError) {
+      console.warn('Unable to resolve renewal tenant metadata:', companyError);
+    }
 
     // Convert USD amount to the configured Paystack currency (GHS/NGN/USD)
     const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
@@ -7524,6 +7530,9 @@ const renewSubscriptionLicense = async (c: any) => {
               amountUsd: amount,
               paystackCurrencyFallback: true,
               originalCurrency: currency,
+              custom_fields: [
+                { display_name: 'Tenant Account', variable_name: 'tenant_account', value: companyName || companyId || user.id },
+              ],
             },
           }),
         });
