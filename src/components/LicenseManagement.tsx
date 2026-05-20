@@ -95,6 +95,9 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const isAmountRequiredMessage = (message = '') =>
     /(missing required fields?.*amount|amount is required)/i.test(message);
 
+  const isRenewalInitializationFallbackMessage = (message = '') =>
+    /(no active subscription found to renew|purchase licenses first|subscription record not found)/i.test(message);
+
   const parseApiErrorMessage = async (response: Response) => {
     const raw = await response.text().catch(() => '');
     if (!raw) return '';
@@ -590,7 +593,10 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           if (response.ok) break;
           backendMessage = await parseApiErrorMessage(response);
         }
-        if (!isRetryableMissingRoute(response.status, backendMessage)) break;
+        const shouldFallbackToInitialize =
+          endpoint !== '/subscription/initialize' &&
+          isRenewalInitializationFallbackMessage(backendMessage);
+        if (!isRetryableMissingRoute(response.status, backendMessage) && !shouldFallbackToInitialize) break;
       }
 
       if (!response || !response.ok) {
@@ -784,7 +790,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
 
       let backendMessage = '';
       const endpoints = selectedUserIds.length > 0
-        ? ['/subscription/purchase-licenses-with-selection']
+        ? ['/subscription/purchase-licenses-with-selection', '/subscription/purchase-licenses', '/subscription/initialize']
         : ['/subscription/purchase-licenses', '/subscription/initialize'];
       let response: Response | null = null;
       for (const endpoint of endpoints) {
