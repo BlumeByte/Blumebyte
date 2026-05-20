@@ -12179,10 +12179,11 @@ const listUltimateadminSupportTenants = async (c: any) => {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
-    const [allEmployees, allSubscriptions, allCompanies] = await Promise.all([
+    const [allEmployees, allSubscriptions, allCompanies, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
       kv.getByPrefix('company:'),
+      listSupabasePlatformUsers(),
     ]);
 
     const subMap = new Map<string, any>();
@@ -12216,6 +12217,28 @@ const listUltimateadminSupportTenants = async (c: any) => {
       const t = tenantMap.get(cid)!;
       t.totalUsers++;
       if (emp.status === 'active') t.activeUsers++;
+    }
+
+    // Include tenant references from auth metadata (handles users that exist in auth
+    // before KV profile sync runs).
+    for (const authUser of supabaseUsers) {
+      const meta = authUser?.user_metadata || {};
+      const cid = meta.companyId || meta.company;
+      if (!cid) continue;
+      if (!tenantMap.has(cid)) {
+        const companyRecord = companyMap.get(cid);
+        tenantMap.set(cid, {
+          id: cid,
+          name: companyRecord?.name || meta.companyName || cid,
+          industry: companyRecord?.industry || meta.industry || '',
+          createdAt: companyRecord?.createdAt || authUser?.created_at || '',
+          activeUsers: 0,
+          totalUsers: 0,
+        });
+      }
+      const t = tenantMap.get(cid)!;
+      t.totalUsers++;
+      if ((meta.status || 'active') === 'active') t.activeUsers++;
     }
 
 
@@ -12728,18 +12751,58 @@ const listUltimateadminUsers = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    const allEmployees = await kv.getByPrefix('employee:');
-    const users = allEmployees.map((e: any) => ({
-      id: e.id || e.userId, email: e.email, name: e.name || e.fullName || e.email,
-      role: e.role, status: e.status, companyId: e.companyId || e.company,
-      companyName: e.companyName || '', createdAt: e.createdAt || '',
-    }));
+    const [allEmployees, allCompanies, supabaseUsers] = await Promise.all([
+      kv.getByPrefix('employee:'),
+      kv.getByPrefix('company:'),
+      listSupabasePlatformUsers(),
+    ]);
+    const companyNameMap = new Map<string, string>();
+    for (const company of allCompanies) {
+      const cid = company?.id || company?.companyId;
+      if (cid) companyNameMap.set(cid, company?.name || cid);
+    }
+
+    const users: any[] = [];
+    const seen = new Set<string>();
+    const addUser = (u: any) => {
+      const key = String(u?.id || u?.userId || u?.email || '').trim().toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      users.push({
+        id: u.id || u.userId || key,
+        email: u.email || '',
+        name: u.name || u.fullName || u.email || '',
+        role: u.role || 'employee',
+        status: u.status || 'active',
+        companyId: u.companyId || u.company || '',
+        companyName: u.companyName || companyNameMap.get(u.companyId || u.company || '') || '',
+        createdAt: u.createdAt || '',
+      });
+    };
+
+    for (const employee of allEmployees) addUser(employee);
+    for (const authUser of supabaseUsers) {
+      const meta = authUser?.user_metadata || {};
+      addUser({
+        id: authUser?.id,
+        email: authUser?.email,
+        name: meta?.name || meta?.fullName || authUser?.email,
+        role: meta?.role || 'employee',
+        status: meta?.status || 'active',
+        companyId: meta?.companyId || meta?.company || '',
+        companyName: meta?.companyName || '',
+        createdAt: authUser?.created_at || '',
+      });
+    }
+
     return c.json(users);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/users')) app.get(route, listUltimateadminUsers);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/users', '/support/users')) {
+  app.get(route, listUltimateadminUsers);
+}
 
 // ── Ultimateadmin Global Chat ───────────────────────────────────────────────────
 // Ultimateadmin can chat with any tenant user directly

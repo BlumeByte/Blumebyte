@@ -28,18 +28,47 @@ const PLATFORM_ROLES = ['ultimateadmin', 'developer', 'customer_care'];
 
 /** Returns true when an API error represents a route that simply doesn't exist yet
  *  (stale backend). These are handled by UI empty-states rather than error toasts. */
+function isStaleBackendStatus(status: unknown): boolean {
+  return status === 404 || status === 405 || status === 501;
+}
+
+function isStaleBackendMessage(message: unknown): boolean {
+  const normalized = String(message || '').toLowerCase();
+  return (
+    normalized.includes('route not found') ||
+    normalized.includes('method not allowed') ||
+    normalized.includes('cannot get') ||
+    normalized.includes('cannot post') ||
+    normalized.includes('cannot put') ||
+    normalized.includes('cannot patch') ||
+    normalized.includes('cannot delete')
+  );
+}
+
 function isRouteNotFound(r: PromiseSettledResult<any>): boolean {
   return (
     r.status === 'rejected' && (
-      String(r.reason?.message).toLowerCase().includes('route not found') ||
-      r.reason?.status === 404
+      isStaleBackendMessage(r.reason?.message) ||
+      isStaleBackendStatus(r.reason?.status)
     )
   );
 }
 
 function isRouteNotFoundError(error: any): boolean {
-  const message = String(error?.message || '').toLowerCase();
-  return message.includes('route not found') || error?.status === 404;
+  return isStaleBackendMessage(error?.message) || isStaleBackendStatus(error?.status);
+}
+
+async function loadUltimateadminUsersWithFallback(token?: string | null) {
+  try {
+    invalidateCache('/ultimateadmin/users', token);
+    const data = await api('/ultimateadmin/users', { token });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (!isRouteNotFoundError(error)) throw error;
+    invalidateCache('/support/users', token);
+    const data = await api('/support/users', { token });
+    return Array.isArray(data) ? data : [];
+  }
 }
 
 const SIDEBAR_ITEMS = [
@@ -250,7 +279,9 @@ function TenantsPanel() {
       const data = await api('/ultimateadmin/support/tenants', { token });
       setTenants(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      toast.error('Failed to load tenants: ' + (e.message || 'Unknown error'));
+      if (!isRouteNotFoundError(e)) {
+        toast.error('Failed to load tenants: ' + (e.message || 'Unknown error'));
+      }
     } finally {
       setLoading(false);
     }
@@ -1253,9 +1284,8 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/users', token);
-      const data = await api('/ultimateadmin/users', { token });
-      setUsers(Array.isArray(data) ? data : []);
+      const data = await loadUltimateadminUsersWithFallback(token);
+      setUsers(data);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
         toast.error('Failed to load users: ' + (e.message || ''));
@@ -1348,10 +1378,9 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
     try {
       const token = await getToken();
       invalidateCache('/ultimateadmin/chat/threads', token);
-      invalidateCache('/ultimateadmin/users', token);
       const [threadData, userData] = await Promise.allSettled([
         api('/ultimateadmin/chat/threads', { token }),
-        api('/ultimateadmin/users', { token }),
+        loadUltimateadminUsersWithFallback(token),
       ]);
       // Check if routes are unavailable (old deployed function) vs real errors
       if (isRouteNotFound(threadData) || isRouteNotFound(userData)) {
@@ -1377,8 +1406,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
       const data = await api(`/ultimateadmin/chat/threads/${thread.id}`, { token });
       setMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (e: any) {
-      const msg = String(e?.message || '').toLowerCase();
-      if (!msg.includes('route not found') && e?.status !== 404) {
+      if (!isRouteNotFoundError(e)) {
         toast.error('Failed to load messages: ' + (e.message || ''));
       }
     }
