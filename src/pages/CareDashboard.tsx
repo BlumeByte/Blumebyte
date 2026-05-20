@@ -41,6 +41,41 @@ interface TenantUser {
   companyId?: string;
 }
 
+function isRouteNotFoundError(error: any): boolean {
+  const status = Number(error?.status || 0);
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    status === 404 ||
+    status === 405 ||
+    status === 501 ||
+    message.includes('route not found') ||
+    message.includes('method not allowed') ||
+    message.includes('cannot get') ||
+    message.includes('cannot post') ||
+    message.includes('cannot put') ||
+    message.includes('cannot patch') ||
+    message.includes('cannot delete')
+  );
+}
+
+async function apiWithRouteFallback(path: string, options: any = {}, fallbackPaths: string[] = []) {
+  try {
+    return await api(path, options);
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    let lastError: any = error;
+    for (const fallbackPath of fallbackPaths) {
+      try {
+        return await api(fallbackPath, options);
+      } catch (fallbackError: any) {
+        if (!isRouteNotFoundError(fallbackError)) throw fallbackError;
+        lastError = fallbackError;
+      }
+    }
+    throw lastError;
+  }
+}
+
 // ─── Tenant Row ───────────────────────────────────────────────────────────────
 function TenantRow({
   tenant,
@@ -128,12 +163,10 @@ export default function CareDashboard() {
       return;
     }
     try {
-      const p = await api('/care/profile', { token });
+      const p = await apiWithRouteFallback('/care/profile', { token }, ['/developer/support/verify', '/support/verify']);
+      const role = String(p?.role || '').toLowerCase().replace('-', '_');
       setCareProfile(p);
-      const role = p?.role || '';
-      // This dashboard is for customer care agents ONLY.
-      // Developers must use /developer instead.
-      const allowed = isCustomerCareRole(role);
+      const allowed = isCustomerCareRole(role) || role === 'developer' || role === 'ultimateadmin';
       setAuthenticated(allowed);
     } catch (e: any) {
       if (e?.status === 401 || e?.status === 403) {
@@ -146,9 +179,8 @@ export default function CareDashboard() {
         name: user.name,
         role: user.role,
       });
-      const role = user.role || '';
-      // Developers are not allowed here — they have /developer
-      setAuthenticated(isCustomerCareRole(role));
+      const role = String(user.role || '').toLowerCase().replace('-', '_');
+      setAuthenticated(isCustomerCareRole(role) || role === 'developer' || role === 'ultimateadmin');
     }
   }, [user]);
 
@@ -157,7 +189,7 @@ export default function CareDashboard() {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await api('/care/tenants', { token });
+      const data = await apiWithRouteFallback('/care/tenants', { token }, ['/developer/support/tenants', '/support/tenants']);
       setTenants(Array.isArray(data) ? data : []);
     } catch (e: any) {
       toast.error('Failed to load tenants');
@@ -185,7 +217,7 @@ export default function CareDashboard() {
     if (!token) return;
     setTicketsLoading(true);
     try {
-      const data = await api('/care/tickets', { token });
+      const data = await apiWithRouteFallback('/care/tickets', { token }, ['/developer/support/tickets', '/support/tickets']);
       setTickets(Array.isArray(data) ? data : []);
     } catch {
       setTickets([]);
@@ -201,7 +233,7 @@ export default function CareDashboard() {
     const token = await getCareToken();
     if (!token) return;
     try {
-      const data = await api(`/care/tickets/${ticket.id}`, { token });
+      const data = await apiWithRouteFallback(`/care/tickets/${ticket.id}`, { token }, [`/developer/tickets/${ticket.id}`]);
       setTicketComments(Array.isArray(data?.comments) ? data.comments : []);
     } catch {
       setTicketComments([]);
@@ -213,12 +245,12 @@ export default function CareDashboard() {
     setSendingComment(true);
     try {
       const token = await getCareToken();
-      await api(`/care/tickets/${selectedTicket.id}/comment`, {
+      await apiWithRouteFallback(`/care/tickets/${selectedTicket.id}/comment`, {
         method: 'POST',
         token,
         body: { comment: newComment.trim() },
-      });
-      const data = await api(`/care/tickets/${selectedTicket.id}`, { token });
+      }, [`/developer/tickets/${selectedTicket.id}/comment`]);
+      const data = await apiWithRouteFallback(`/care/tickets/${selectedTicket.id}`, { token }, [`/developer/tickets/${selectedTicket.id}`]);
       setTicketComments(Array.isArray(data?.comments) ? data.comments : []);
       setNewComment('');
       toast.success('Message sent');
@@ -233,7 +265,16 @@ export default function CareDashboard() {
     const token = await getCareToken();
     if (!token) return;
     try {
-      await api(`/care/tickets/${ticketId}/escalate`, { method: 'POST', token, body: {} });
+      try {
+        await api(`/care/tickets/${ticketId}/escalate`, { method: 'POST', token, body: {} });
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await apiWithRouteFallback(
+          `/developer/support/tickets/${ticketId}`,
+          { method: 'PUT', token, body: { status: 'escalated', escalated: true } },
+          [`/support/tickets/${ticketId}`],
+        );
+      }
       toast.success('Ticket escalated');
       loadTickets();
     } catch (e: any) {
@@ -245,7 +286,21 @@ export default function CareDashboard() {
     const token = await getCareToken();
     if (!token) return;
     try {
-      await api(`/care/tickets/${ticketId}/resolve`, { method: 'POST', token, body: {} });
+      try {
+        await api(`/care/tickets/${ticketId}/resolve`, { method: 'POST', token, body: {} });
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        try {
+          await api(`/developer/tickets/${ticketId}/resolve`, { method: 'POST', token, body: {} });
+        } catch (legacyError: any) {
+          if (!isRouteNotFoundError(legacyError)) throw legacyError;
+          await apiWithRouteFallback(
+            `/developer/support/tickets/${ticketId}`,
+            { method: 'PUT', token, body: { status: 'resolved', chatClosed: true } },
+            [`/support/tickets/${ticketId}`],
+          );
+        }
+      }
       toast.success('Ticket resolved and chat closed');
       loadTickets();
       if (selectedTicket?.id === ticketId) {
@@ -285,7 +340,11 @@ export default function CareDashboard() {
     setUsersLoading(true);
     try {
       const token = await getCareToken();
-      const data = await api(`/care/tenants/${tenant.id}/users`, { token });
+      const data = await apiWithRouteFallback(
+        `/care/tenants/${tenant.id}/users`,
+        { token },
+        [`/developer/support/tenants/${tenant.id}/users`, `/support/tenants/${tenant.id}/users`],
+      );
       setTenantUsers(Array.isArray(data) ? data : []);
     } catch {
       toast.error('Failed to load users');
@@ -305,11 +364,11 @@ export default function CareDashboard() {
     if (!resetEmail || !resetTarget) return;
     try {
       const token = await getCareToken();
-      const result = await api('/care/reset-password', {
+      const result = await apiWithRouteFallback('/care/reset-password', {
         method: 'POST',
         token,
         body: { email: resetEmail },
-      });
+      }, ['/developer/support/generate-reset-link', '/support/generate-reset-link']);
       setResetLinkResult(result?.resetLink || result?.message || 'Reset email sent.');
       toast.success('Password reset initiated.');
     } catch (e: any) {

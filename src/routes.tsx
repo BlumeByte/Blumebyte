@@ -203,7 +203,7 @@ const DeveloperPage = () => (
 );
 
 const CustomerCarePage = () => (
-  <ProtectedRoute allowedRoles={[...CUSTOMER_CARE_ROLES]}>
+  <ProtectedRoute allowedRoles={[...CUSTOMER_CARE_ROLES, 'developer', 'ultimateadmin']}>
     <CustomerCareDashboardWrapper />
   </ProtectedRoute>
 );

@@ -2311,7 +2311,12 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   const [myProfile, setMyProfile] = useState<{ email: string; name: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [backendUnavailable, setBackendUnavailable] = useState(false);
-  const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => isSectionAllowed(item.id, role));
+  const normalizeSupportRole = (value: string) => {
+    const normalized = String(value || '').toLowerCase().replace('-', '_');
+    return normalized === 'ultimateadmin' ? 'developer' : normalized;
+  };
+  const [effectiveRole, setEffectiveRole] = useState(() => normalizeSupportRole(role));
+  const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => isSectionAllowed(item.id, effectiveRole));
   const quickActions = [
     { label: 'View Tenants', icon: Building2, section: 'tenants' },
     { label: 'All Users', icon: Users, section: 'users' },
@@ -2319,7 +2324,11 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
     { label: 'New Ticket', icon: Ticket, section: 'tickets' },
     { label: 'License Issues', icon: Key, section: 'license-issues' },
     { label: 'Platform Users', icon: Users, section: 'platform-users' },
-  ].filter(item => isSectionAllowed(item.section, role));
+  ].filter(item => isSectionAllowed(item.section, effectiveRole));
+
+  useEffect(() => {
+    setEffectiveRole(normalizeSupportRole(role));
+  }, [role]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -2338,7 +2347,11 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
         : [];
       if (tenantsResult.status === 'fulfilled') setTenants(tenantList);
       if (metricsResult.status === 'fulfilled') setMetrics(normalizeMetricsPayload(metricsResult.value, tenantList));
-      if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
+      if (profileResult.status === 'fulfilled') {
+        setMyProfile(profileResult.value);
+        const verifiedRole = normalizeSupportRole(profileResult.value?.role || '');
+        if (verifiedRole) setEffectiveRole(verifiedRole);
+      }
 
       // Detect stale backend: both metrics and tenants fail with route-not-found
       const bothMissing = isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
@@ -2356,10 +2369,10 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    if (!isSectionAllowed(activeSection, role)) {
+    if (!isSectionAllowed(activeSection, effectiveRole)) {
       setActiveSection(visibleSidebarItems[0]?.id || 'overview');
     }
-  }, [activeSection, role, visibleSidebarItems]);
+  }, [activeSection, effectiveRole, visibleSidebarItems]);
 
   // Auto-refresh metrics and tenant list every 30 seconds
   useEffect(() => {
@@ -2646,11 +2659,11 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
               {activeSection === 'chat' && <GlobalChatPanel tenants={tenants} />}
               {activeSection === 'tickets' && <TicketsPanel tenants={tenants} />}
               {activeSection === 'license-issues' && <LicenseIssuesPanel tenants={tenants} onRefresh={loadData} />}
-              {activeSection === 'platform-users' && isSectionAllowed('platform-users', role) && <PlatformUsersPanel />}
-              {activeSection === 'assignments' && isSectionAllowed('assignments', role) && <AssignmentsPanel tenants={tenants} />}
-              {activeSection === 'agents' && isSectionAllowed('agents', role) && <AgentsPanel />}
-              {activeSection === 'audit' && isSectionAllowed('audit', role) && <AuditTrailPanel />}
-              {activeSection === 'dev-tools' && isSectionAllowed('dev-tools', role) && <DevToolsPanel tenants={tenants} />}
+              {activeSection === 'platform-users' && isSectionAllowed('platform-users', effectiveRole) && <PlatformUsersPanel />}
+              {activeSection === 'assignments' && isSectionAllowed('assignments', effectiveRole) && <AssignmentsPanel tenants={tenants} />}
+              {activeSection === 'agents' && isSectionAllowed('agents', effectiveRole) && <AgentsPanel />}
+              {activeSection === 'audit' && isSectionAllowed('audit', effectiveRole) && <AuditTrailPanel />}
+              {activeSection === 'dev-tools' && isSectionAllowed('dev-tools', effectiveRole) && <DevToolsPanel tenants={tenants} />}
               {activeSection === 'settings' && <SettingsPanel myProfile={myProfile} />}
             </>
           )}
