@@ -132,8 +132,8 @@ app.post(`${PREFIX}/admin/sync-all-stats`, async (c) => {
     const authUser = await getAuthUser(c);
     if (!authUser) return c.json({ error: 'Unauthorized' }, 401);
     const profile = await kv.get(`employee:${authUser.id}`);
-    const role = profile?.role || authUser.user_metadata?.role || '';
-    if (!['superadmin', 'ultimateadmin', 'developer'].includes(role)) {
+    const role = normalizeCareRole(profile?.role || authUser.user_metadata?.role || '');
+    if (!['superadmin', 'developer'].includes(role)) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const results = await syncAllCompaniesStats();
@@ -11434,7 +11434,7 @@ const reportClientError = async (c: any) => {
 
     const allEmployees = await kv.getByPrefix('employee:');
     const platformAdmins = allEmployees.filter((emp: any) =>
-      emp?.isPlatformAdmin === true || ['developer', 'ultimateadmin'].includes(normalizeCareRole(emp?.role || ''))
+      emp?.isPlatformAdmin === true || ['developer'].includes(normalizeCareRole(emp?.role || ''))
     );
     await Promise.allSettled(platformAdmins.map((admin: any) =>
       sendEmailNotification(
@@ -11925,8 +11925,8 @@ app.delete(`${PREFIX}/superadmin/public-job-application/:id`, async (c) => {
 // ============ ULTIMATEADMIN SUPPORT DASHBOARD ENDPOINTS ============
 
 // Helper: allowed support roles (KV or user_metadata)
-const SUPPORT_ROLES = new Set(['ultimateadmin', 'developer', 'customer_care']);
-const PLATFORM_SUPPORT_ROLES = new Set(['ultimateadmin', 'developer', 'customer_care']);
+const SUPPORT_ROLES = new Set(['developer', 'customer_care']);
+const PLATFORM_SUPPORT_ROLES = new Set(['developer', 'customer_care']);
 
 function isPlatformSupportRole(role: string) {
   return PLATFORM_SUPPORT_ROLES.has(normalizeCareRole(String(role || '')));
@@ -12008,10 +12008,10 @@ async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: 
   // Prevent stale KV roles from downgrading platform owners.
   const normalizedRole =
     isPlatformAdmin
-      ? 'ultimateadmin'
-      : (profileRole === 'ultimateadmin' || metadataRole === 'ultimateadmin')
-      ? 'ultimateadmin'
+      ? 'developer'
       : (profileRole === 'developer' || metadataRole === 'developer')
+      ? 'developer'
+      : (profileRole === 'ultimateadmin' || metadataRole === 'ultimateadmin')
       ? 'developer'
       : (profileRole === 'customer_care' || metadataRole === 'customer_care')
       ? 'customer_care'
@@ -12031,7 +12031,7 @@ const verifyUltimateadminSupport = async (c: any) => {
     return c.json({ allowed: false }, 403);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/verify', '/support/verify')) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/verify', '/support/verify', '/developer/support/verify')) {
   app.get(route, verifyUltimateadminSupport);
 }
 
@@ -12175,7 +12175,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/metrics', '/support/metrics')) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/metrics', '/support/metrics', '/developer/support/metrics')) {
   app.get(route, getUltimateadminSupportMetrics);
 }
 
@@ -12288,7 +12288,7 @@ const listUltimateadminSupportTenants = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants')) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants', '/developer/support/tenants')) {
   app.get(route, listUltimateadminSupportTenants);
 }
 
@@ -12313,7 +12313,7 @@ const listUltimateadminSupportTenantUsers = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users')) app.get(route, listUltimateadminSupportTenantUsers);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users', '/developer/support/tenants/:id/users')) app.get(route, listUltimateadminSupportTenantUsers);
 
 // POST /ultimateadmin/support/tenants/:id/suspend
 const suspendUltimateadminSupportTenant = async (c: any) => {
@@ -12339,7 +12339,7 @@ const suspendUltimateadminSupportTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/suspend', '/support/tenants/:id/suspend')) app.post(route, suspendUltimateadminSupportTenant);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/suspend', '/support/tenants/:id/suspend', '/developer/support/tenants/:id/suspend')) app.post(route, suspendUltimateadminSupportTenant);
 
 // PUT /ultimateadmin/support/tenants/:id/license
 const updateUltimateadminSupportTenantLicense = async (c: any) => {
@@ -12400,7 +12400,7 @@ const updateUltimateadminSupportTenantLicense = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/license', '/support/tenants/:id/license')) app.put(route, updateUltimateadminSupportTenantLicense);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/license', '/support/tenants/:id/license', '/developer/support/tenants/:id/license')) app.put(route, updateUltimateadminSupportTenantLicense);
 
 // GET /ultimateadmin/support/tickets
 const listUltimateadminSupportTickets = async (c: any) => {
@@ -12420,7 +12420,7 @@ const listUltimateadminSupportTickets = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets')) app.get(route, listUltimateadminSupportTickets);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets', '/developer/support/tickets')) app.get(route, listUltimateadminSupportTickets);
 
 // POST /ultimateadmin/support/tickets
 const createUltimateadminSupportTicket = async (c: any) => {
@@ -12445,7 +12445,7 @@ const createUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets')) app.post(route, createUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets', '/developer/support/tickets')) app.post(route, createUltimateadminSupportTicket);
 
 // PUT /ultimateadmin/support/tickets/:id
 const updateUltimateadminSupportTicket = async (c: any) => {
@@ -12469,7 +12469,7 @@ const updateUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id')) app.put(route, updateUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id', '/developer/support/tickets/:id')) app.put(route, updateUltimateadminSupportTicket);
 
 // DELETE /ultimateadmin/support/tickets/:id
 const deleteUltimateadminSupportTicket = async (c: any) => {
@@ -12483,7 +12483,7 @@ const deleteUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id', '/developer/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
 
 // GET /ultimateadmin/support/agents
 const listUltimateadminSupportAgents = async (c: any) => {
@@ -12496,14 +12496,14 @@ const listUltimateadminSupportAgents = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents')) app.get(route, listUltimateadminSupportAgents);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents', '/developer/support/agents')) app.get(route, listUltimateadminSupportAgents);
 
 // POST /ultimateadmin/support/agents
 const createUltimateadminSupportAgent = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && !access.profile?.isPlatformAdmin) {
+    if (access.role !== 'developer' && !access.profile?.isPlatformAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const body = await c.req.json();
@@ -12520,7 +12520,7 @@ const createUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents')) app.post(route, createUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents', '/developer/support/agents')) app.post(route, createUltimateadminSupportAgent);
 
 // PUT /ultimateadmin/support/agents/:id
 const updateUltimateadminSupportAgent = async (c: any) => {
@@ -12538,14 +12538,14 @@ const updateUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id')) app.put(route, updateUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id', '/developer/support/agents/:id')) app.put(route, updateUltimateadminSupportAgent);
 
 // DELETE /ultimateadmin/support/agents/:id
 const deleteUltimateadminSupportAgent = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && !access.profile?.isPlatformAdmin) {
+    if (access.role !== 'developer' && !access.profile?.isPlatformAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
     }
     const id = c.req.param('id');
@@ -12561,7 +12561,7 @@ const deleteUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id')) app.delete(route, deleteUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id', '/developer/support/agents/:id')) app.delete(route, deleteUltimateadminSupportAgent);
 
 // GET /ultimateadmin/support/audit — audit trail
 const listUltimateadminSupportAudit = async (c: any) => {
@@ -12575,19 +12575,20 @@ const listUltimateadminSupportAudit = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/audit', '/support/audit')) app.get(route, listUltimateadminSupportAudit);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/audit', '/support/audit', '/developer/support/audit')) app.get(route, listUltimateadminSupportAudit);
 
 // POST /ultimateadmin/support/set-platform-user — set role+name for developer/care platform users
 const setUltimateadminPlatformUser = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
     const { userId, name, role } = body;
     if (!userId || !role) return c.json({ error: 'userId and role are required' }, 400);
-    const ALLOWED_PLATFORM_ROLES = ['developer', 'ultimateadmin', 'customer_care'];
-    if (!ALLOWED_PLATFORM_ROLES.includes(role)) {
+    const normalizedRole = normalizeCareRole(role);
+    const ALLOWED_PLATFORM_ROLES = ['developer', 'customer_care'];
+    if (!ALLOWED_PLATFORM_ROLES.includes(normalizedRole)) {
       return c.json({ error: `Invalid role. Allowed: ${ALLOWED_PLATFORM_ROLES.join(', ')}` }, 400);
     }
     const sb = supabaseAdmin();
@@ -12596,7 +12597,7 @@ const setUltimateadminPlatformUser = async (c: any) => {
     const resolvedName = name || authData.user.user_metadata?.name || authData.user.email || '';
     // Update Supabase auth metadata (fixes the Supabase dashboard display)
     await sb.auth.admin.updateUserById(userId, {
-      user_metadata: { ...authData.user.user_metadata, name: resolvedName, role },
+      user_metadata: { ...authData.user.user_metadata, name: resolvedName, role: normalizedRole },
     });
     // Upsert KV employee record so the server role check always resolves correctly
     const existing = await kv.get(`employee:${userId}`) || {};
@@ -12606,7 +12607,7 @@ const setUltimateadminPlatformUser = async (c: any) => {
       id: userId,
       name: resolvedName,
       email: authData.user.email || existing.email || '',
-      role,
+      role: normalizedRole,
       updatedAt: new Date().toISOString(),
     };
     await kv.set(`employee:${userId}`, updated);
@@ -12615,23 +12616,23 @@ const setUltimateadminPlatformUser = async (c: any) => {
     await kv.set(`support-audit:${auditId}`, {
       id: auditId, actorId: access.user.id, actorEmail: access.user.email,
       actionType: 'set_platform_user_role', targetUserId: userId,
-      targetEmail: authData.user.email, newRole: role, newName: resolvedName,
+      targetEmail: authData.user.email, newRole: normalizedRole, newName: resolvedName,
       timestamp: new Date().toISOString(),
-      description: `Set platform user ${authData.user.email} to role '${role}' by ${access.user.email}`,
+      description: `Set platform user ${authData.user.email} to role '${normalizedRole}' by ${access.user.email}`,
     });
-    return c.json({ success: true, userId, email: authData.user.email, name: resolvedName, role });
+    return c.json({ success: true, userId, email: authData.user.email, name: resolvedName, role: normalizedRole });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/set-platform-user', '/support/set-platform-user')) app.post(route, setUltimateadminPlatformUser);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/set-platform-user', '/support/set-platform-user', '/developer/support/set-platform-user')) app.post(route, setUltimateadminPlatformUser);
 
-// POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (ultimateadmin only)
+// POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (developer only)
 const generateUltimateadminResetLink = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
     const { email } = body;
     if (!email) return c.json({ error: 'email is required' }, 400);
@@ -12653,7 +12654,7 @@ const generateUltimateadminResetLink = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/generate-reset-link', '/support/generate-reset-link')) app.post(route, generateUltimateadminResetLink);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/generate-reset-link', '/support/generate-reset-link', '/developer/support/generate-reset-link')) app.post(route, generateUltimateadminResetLink);
 
 // POST /ultimateadmin/support/repair/:tenantId — run quick repair actions
 const repairUltimateadminTenant = async (c: any) => {
@@ -12677,14 +12678,14 @@ const repairUltimateadminTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/repair/:tenantId', '/support/repair/:tenantId')) app.post(route, repairUltimateadminTenant);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/repair/:tenantId', '/support/repair/:tenantId', '/developer/support/repair/:tenantId')) app.post(route, repairUltimateadminTenant);
 
 // POST /ultimateadmin/support/tenants — create a new tenant without payment
 const createUltimateadminSupportTenant = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
     if (!body?.name) return c.json({ error: 'name is required' }, 400);
     const tenantId = body.id || crypto.randomUUID();
@@ -12727,14 +12728,14 @@ const createUltimateadminSupportTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants')) app.post(route, createUltimateadminSupportTenant);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants', '/developer/support/tenants')) app.post(route, createUltimateadminSupportTenant);
 
 // POST /ultimateadmin/support/tenants/:id/users — create a user for a tenant without payment
 const createUltimateadminSupportTenantUser = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const tenantId = c.req.param('id');
     const body = await c.req.json();
     if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
@@ -12776,7 +12777,7 @@ const createUltimateadminSupportTenantUser = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users')) app.post(route, createUltimateadminSupportTenantUser);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users', '/developer/support/tenants/:id/users')) app.post(route, createUltimateadminSupportTenantUser);
 
 // GET /ultimateadmin/users — all users across all tenants
 const listUltimateadminUsers = async (c: any) => {
@@ -12836,7 +12837,7 @@ const listUltimateadminUsers = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/users', '/support/users')) {
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/users', '/support/users', '/developer/users')) {
   app.get(route, listUltimateadminUsers);
 }
 
@@ -12848,7 +12849,7 @@ const listUltimateadminChatThreads = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const threads = await kv.getByPrefix('ultimateadmin_chat_thread:');
     threads.sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
     return c.json(threads);
@@ -12856,14 +12857,14 @@ const listUltimateadminChatThreads = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads', '/support/chat/threads')) app.get(route, listUltimateadminChatThreads);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads', '/support/chat/threads', '/developer/chat/threads')) app.get(route, listUltimateadminChatThreads);
 
 // GET /ultimateadmin/chat/threads/:threadId — get thread messages
 const getUltimateadminChatThread = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const threadId = c.req.param('threadId');
     const thread = await kv.get(`ultimateadmin_chat_thread:${threadId}`);
     if (!thread) return c.json({ error: 'Thread not found' }, 404);
@@ -12874,14 +12875,14 @@ const getUltimateadminChatThread = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads/:threadId', '/support/chat/threads/:threadId')) app.get(route, getUltimateadminChatThread);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads/:threadId', '/support/chat/threads/:threadId', '/developer/chat/threads/:threadId')) app.get(route, getUltimateadminChatThread);
 
 // POST /ultimateadmin/chat/send — send a message to a tenant user (creates thread if needed)
 const sendUltimateadminChatMessage = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
     const { recipientId, recipientEmail, recipientName, tenantId, message, threadId: existingThreadId } = body;
     if (!message?.trim()) return c.json({ error: 'message is required' }, 400);
@@ -12914,7 +12915,7 @@ const sendUltimateadminChatMessage = async (c: any) => {
 
     const msgId = crypto.randomUUID();
     const msg = {
-      id: msgId, threadId, senderRole: 'ultimateadmin',
+      id: msgId, threadId, senderRole: 'developer',
       senderEmail: access.user.email, senderId: access.user.id,
       recipientId: recipientId || '', recipientEmail: recipientEmail || '',
       message: message.trim(), sentAt: now,
@@ -12925,7 +12926,7 @@ const sendUltimateadminChatMessage = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/send', '/support/chat/send')) app.post(route, sendUltimateadminChatMessage);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/send', '/support/chat/send', '/developer/chat/send')) app.post(route, sendUltimateadminChatMessage);
 
 // ── Ultimateadmin canonical aliases for /developer/* endpoints ─────────────────
 // Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
@@ -12935,7 +12936,7 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const merged = await getDynamicPlatformAgents();
     return c.json(merged);
   } catch (e: any) {
@@ -12947,13 +12948,13 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
     if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
     const sb = supabaseAdmin();
     const password = body.password || generateTempPassword();
     const role = normalizeCareRole(body.role || 'customer_care');
-    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+    const allowedRoles = ['developer', 'customer_care'];
     if (!allowedRoles.includes(role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
     const { data: authData, error: authErr } = await sb.auth.admin.createUser({
       email: body.email.toLowerCase().trim(), password,
@@ -12985,14 +12986,14 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const userId = c.req.param('id');
     const body = await c.req.json();
     const existing = await kv.get(`platform_user:${userId}`);
     if (!existing) return c.json({ error: 'User not found' }, 404);
     if (body.role) {
       body.role = normalizeCareRole(body.role);
-      const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+      const allowedRoles = ['developer', 'customer_care'];
       if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
     }
     const updated = { ...existing, ...body, id: userId, updatedAt: new Date().toISOString() };
@@ -13012,7 +13013,7 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const userId = c.req.param('id');
     await kv.del(`platform_user:${userId}`);
     await kv.del(`care_assignments:${userId}`);
@@ -13028,7 +13029,7 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments',
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const assignments = await kv.getByPrefix('care_assignments_record:');
     return c.json(assignments);
   } catch (e: any) {
@@ -13040,7 +13041,7 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments',
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
     const careAgentId = body?.careAgentId || body?.care_agent_id;
     const tenantIds: string[] = Array.isArray(body?.tenantIds) ? body.tenantIds : body?.tenantId ? [body.tenantId] : [];
@@ -13065,7 +13066,7 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments/:
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    if (access.role !== 'ultimateadmin' && access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const assignmentId = c.req.param('id');
     const record = await kv.get(`care_assignments_record:${assignmentId}`);
     if (!record) return c.json({ error: 'Assignment not found' }, 404);
@@ -13111,6 +13112,7 @@ async function writeDeveloperAudit(actor: any, action: string, details: any = {}
 }
 
 function normalizeCareRole(role: string) {
+  if (role === 'ultimateadmin' || role === 'ultimate_admin') return 'developer';
   if (role === 'customer-care') return 'customer_care';
   if (role === 'customer_care_agent' || role === 'care' || role === 'support' || role === 'support_manager') return 'customer_care';
   return role;
@@ -13802,7 +13804,7 @@ app.get(`${PREFIX}/developer/platform-users`, async (c) => {
     ]);
     // Also include developer/ultimateadmin accounts from employee records
     const allEmps = await kv.getByPrefix('employee:');
-    const platformRoles = new Set(['developer', 'ultimateadmin', 'customer_care']);
+    const platformRoles = new Set(['developer', 'customer_care']);
     const devUsers = allEmps.filter((u: any) => platformRoles.has(u.role));
 
     // Deduplicate by userId/id/email
@@ -13838,7 +13840,7 @@ app.post(`${PREFIX}/developer/platform-users`, async (c) => {
     const { user } = await requireDeveloper(c);
     const body = await c.req.json();
     if (!body?.email || !body?.name || !body?.role) return c.json({ error: 'email, name and role are required' }, 400);
-    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+    const allowedRoles = ['developer', 'customer_care'];
     const normalizedRole = normalizeCareRole(body.role);
     if (!allowedRoles.includes(normalizedRole)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
     const id = body.id || body.userId || crypto.randomUUID();
@@ -13871,7 +13873,7 @@ app.put(`${PREFIX}/developer/platform-users/:id`, async (c) => {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
     const body = await c.req.json();
-    const allowedRoles = ['developer', 'ultimateadmin', 'customer_care'];
+    const allowedRoles = ['developer', 'customer_care'];
     if (body.role) {
       body.role = normalizeCareRole(body.role);
       if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);

@@ -23,8 +23,8 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ROLES = ['ultimateadmin', 'customer_care'];
-const PLATFORM_ROLES = ['ultimateadmin', 'developer', 'customer_care'];
+const ROLES = ['developer', 'ultimateadmin', 'customer_care'];
+const PLATFORM_ROLES = ['developer', 'customer_care'];
 
 /** Returns true when an API error represents a route that simply doesn't exist yet
  *  (stale backend). These are handled by UI empty-states rather than error toasts. */
@@ -97,9 +97,9 @@ function normalizeLegacyTenant(raw: any): Tenant {
 }
 
 async function loadSupportTenantsWithFallback(token?: string | null) {
-  invalidateCache('/ultimateadmin/support/tenants', token);
+  invalidateCache('/developer/support/tenants', token);
   try {
-    const data = await apiWithRouteFallback('/ultimateadmin/support/tenants', { token }, ['/support/tenants']);
+    const data = await apiWithRouteFallback('/developer/support/tenants', { token }, ['/support/tenants']);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -111,7 +111,7 @@ async function loadSupportTenantsWithFallback(token?: string | null) {
 
 async function loadSupportTenantUsersWithFallback(tenantId: string, token?: string | null) {
   try {
-    const data = await apiWithRouteFallback(`/ultimateadmin/support/tenants/${tenantId}/users`, { token }, [`/support/tenants/${tenantId}/users`]);
+    const data = await apiWithRouteFallback(`/developer/support/tenants/${tenantId}/users`, { token }, [`/support/tenants/${tenantId}/users`]);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -120,10 +120,10 @@ async function loadSupportTenantUsersWithFallback(tenantId: string, token?: stri
   }
 }
 
-async function loadUltimateadminUsersWithFallback(token?: string | null) {
+async function loadDeveloperUsersWithFallback(token?: string | null) {
   try {
-    invalidateCache('/ultimateadmin/users', token);
-    const data = await api('/ultimateadmin/users', { token });
+    invalidateCache('/developer/users', token);
+    const data = await api('/developer/users', { token });
     return Array.isArray(data) ? data : [];
   } catch (error) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -142,33 +142,33 @@ async function loadUltimateadminUsersWithFallback(token?: string | null) {
 }
 
 async function loadPlatformUsersWithFallback(token?: string | null) {
-  invalidateCache('/ultimateadmin/platform-users', token);
+  invalidateCache('/developer/platform-users', token);
   try {
-    const data = await api('/ultimateadmin/platform-users', { token });
+    const data = await api('/developer/platform-users', { token });
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
-    const data = await api('/developer/platform-users', { token });
+    const data = await api('/ultimateadmin/platform-users', { token });
     return Array.isArray(data) ? data : [];
   }
 }
 
 async function loadAssignmentsWithFallback(token?: string | null) {
-  invalidateCache('/ultimateadmin/assignments', token);
+  invalidateCache('/developer/assignments', token);
   try {
-    const data = await api('/ultimateadmin/assignments', { token });
+    const data = await api('/developer/assignments', { token });
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
-    const data = await api('/developer/assignments', { token });
+    const data = await api('/ultimateadmin/assignments', { token });
     return Array.isArray(data) ? data : [];
   }
 }
 
 async function loadSupportTicketsWithFallback(token?: string | null) {
-  invalidateCache('/ultimateadmin/support/tickets', token);
+  invalidateCache('/developer/support/tickets', token);
   try {
-    const data = await apiWithRouteFallback('/ultimateadmin/support/tickets', { token }, ['/support/tickets']);
+    const data = await apiWithRouteFallback('/developer/support/tickets', { token }, ['/support/tickets']);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -178,9 +178,9 @@ async function loadSupportTicketsWithFallback(token?: string | null) {
 }
 
 async function loadSupportAgentsWithFallback(token?: string | null) {
-  invalidateCache('/ultimateadmin/support/agents', token);
+  invalidateCache('/developer/support/agents', token);
   try {
-    const data = await apiWithRouteFallback('/ultimateadmin/support/agents', { token }, ['/support/agents']);
+    const data = await apiWithRouteFallback('/developer/support/agents', { token }, ['/support/agents']);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -201,9 +201,9 @@ async function loadSupportAgentsWithFallback(token?: string | null) {
 }
 
 async function loadSupportAuditWithFallback(token?: string | null) {
-  invalidateCache('/ultimateadmin/support/audit', token);
+  invalidateCache('/developer/support/audit', token);
   try {
-    const data = await apiWithRouteFallback('/ultimateadmin/support/audit', { token }, ['/support/audit']);
+    const data = await apiWithRouteFallback('/developer/support/audit', { token }, ['/support/audit']);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -325,22 +325,22 @@ const SIDEBAR_ITEMS = [
 ];
 
 const SECTION_ACCESS_RULES: Record<string, string[]> = {
-  overview: ['ultimateadmin', 'developer', 'customer_care'],
-  tenants: ['ultimateadmin', 'developer', 'customer_care'],
-  users: ['ultimateadmin', 'developer', 'customer_care'],
-  chat: ['ultimateadmin', 'developer', 'customer_care'],
-  tickets: ['ultimateadmin', 'developer', 'customer_care'],
-  'license-issues': ['ultimateadmin', 'developer', 'customer_care'],
-  'platform-users': ['ultimateadmin', 'developer'],
-  assignments: ['ultimateadmin', 'developer'],
-  agents: ['ultimateadmin', 'developer'],
-  audit: ['ultimateadmin', 'developer'],
-  'dev-tools': ['ultimateadmin', 'developer'],
-  settings: ['ultimateadmin', 'developer', 'customer_care'],
+  overview: ['developer', 'customer_care'],
+  tenants: ['developer', 'customer_care'],
+  users: ['developer', 'customer_care'],
+  chat: ['developer', 'customer_care'],
+  tickets: ['developer', 'customer_care'],
+  'license-issues': ['developer', 'customer_care'],
+  'platform-users': ['developer'],
+  assignments: ['developer'],
+  agents: ['developer'],
+  audit: ['developer'],
+  'dev-tools': ['developer'],
+  settings: ['developer', 'customer_care'],
 };
 
 function isSectionAllowed(sectionId: string, role: string) {
-  const allowedRoles = SECTION_ACCESS_RULES[sectionId] || ['ultimateadmin', 'developer'];
+  const allowedRoles = SECTION_ACCESS_RULES[sectionId] || ['developer'];
   return allowedRoles.includes(role);
 }
 
@@ -349,8 +349,14 @@ const TICKET_PRIORITIES = ['low', 'medium', 'high', 'critical'];
 const ISSUE_TYPES = ['general', 'billing', 'license', 'technical', 'data', 'account', 'integration', 'other'];
 
 // ─── Session helpers ───────────────────────────────────────────────────────────
-function setSupportSession() { sessionStorage.setItem('ultimateadmin_support_session', '1'); }
-function clearSupportSession() { sessionStorage.removeItem('ultimateadmin_support_session'); }
+function setSupportSession() {
+  sessionStorage.setItem('developer_support_session', '1');
+  sessionStorage.removeItem('ultimateadmin_support_session');
+}
+function clearSupportSession() {
+  sessionStorage.removeItem('developer_support_session');
+  sessionStorage.removeItem('ultimateadmin_support_session');
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Tenant {
@@ -437,7 +443,7 @@ export default function CustomerCareDashboard() {
     return null;
   }
 
-  return <SupportDashboard onLogout={handleLogout} role={normalizedRole === 'developer' ? 'developer' : normalizedRole} />;
+  return <SupportDashboard onLogout={handleLogout} role={normalizedRole === 'ultimateadmin' ? 'developer' : normalizedRole} />;
 }
 // ─── Metrics Cards ────────────────────────────────────────────────────────────
 function MetricsCards({ metrics }: { metrics: Metrics }) {
@@ -551,7 +557,7 @@ function TenantsPanel() {
     try {
       const token = await getToken();
       try {
-        await apiWithRouteFallback(`/ultimateadmin/support/tenants/${tenant.id}/suspend`, {
+        await apiWithRouteFallback(`/developer/support/tenants/${tenant.id}/suspend`, {
           method: 'POST', token, body: { restore: isSuspended },
         }, [`/support/tenants/${tenant.id}/suspend`]);
       } catch (error: any) {
@@ -582,7 +588,7 @@ function TenantsPanel() {
         body.durationUnit = licenseForm.durationUnit;
       }
       try {
-        await apiWithRouteFallback(`/ultimateadmin/support/tenants/${selected.id}/license`, { method: 'PUT', token, body }, [`/support/tenants/${selected.id}/license`]);
+        await apiWithRouteFallback(`/developer/support/tenants/${selected.id}/license`, { method: 'PUT', token, body }, [`/support/tenants/${selected.id}/license`]);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         const legacyBody: any = {
@@ -603,7 +609,7 @@ function TenantsPanel() {
     setSaving(true);
     try {
       const token = await getToken();
-      await apiWithRouteFallback('/ultimateadmin/support/tenants', {
+      await apiWithRouteFallback('/developer/support/tenants', {
         method: 'POST', token, body: createForm,
       }, ['/support/tenants']);
       toast.success(`Tenant "${createForm.name}" created`);
@@ -620,7 +626,7 @@ function TenantsPanel() {
     setSaving(true);
     try {
       const token = await getToken();
-      const result = await apiWithRouteFallback(`/ultimateadmin/support/tenants/${selected.id}/users`, {
+      const result = await apiWithRouteFallback(`/developer/support/tenants/${selected.id}/users`, {
         method: 'POST', token, body: createUserForm,
       }, [`/support/tenants/${selected.id}/users`]);
       toast.success(`User created${result.tempPassword ? ` — temp password: ${result.tempPassword}` : ''}`);
@@ -885,7 +891,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     setSaving(true);
     try {
       const token = await getToken();
-      await apiWithRouteFallback('/ultimateadmin/support/tickets', { method: 'POST', token, body: form }, ['/support/tickets']);
+      await apiWithRouteFallback('/developer/support/tickets', { method: 'POST', token, body: form }, ['/support/tickets']);
       toast.success('Ticket created');
       setShowCreate(false);
       setForm({ tenantId: '', tenantName: '', issueType: 'general', priority: 'medium', subject: '', description: '' });
@@ -897,7 +903,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
   const updateTicket = async (id: string, patch: any) => {
     try {
       const token = await getToken();
-      await apiWithRouteFallback(`/ultimateadmin/support/tickets/${id}`, { method: 'PUT', token, body: patch }, [`/support/tickets/${id}`]);
+      await apiWithRouteFallback(`/developer/support/tickets/${id}`, { method: 'PUT', token, body: patch }, [`/support/tickets/${id}`]);
       toast.success('Ticket updated');
       load();
       setSelected(null);
@@ -909,7 +915,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     setSaving(true);
     try {
       const token = await getToken();
-      await apiWithRouteFallback(`/ultimateadmin/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } }, [`/support/tickets/${selected.id}`]);
+      await apiWithRouteFallback(`/developer/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } }, [`/support/tickets/${selected.id}`]);
       toast.success('Note added');
       setNoteText('');
       load();
@@ -983,7 +989,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
                       <Button size="sm" variant="ghost" onClick={() => setSelected(t)}><Eye className="h-3.5 w-3.5" /></Button>
                       <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => {
                         const token = await getToken();
-                        apiWithRouteFallback(`/ultimateadmin/support/tickets/${t.id}`, { method: 'DELETE', token }, [`/support/tickets/${t.id}`])
+                        apiWithRouteFallback(`/developer/support/tickets/${t.id}`, { method: 'DELETE', token }, [`/support/tickets/${t.id}`])
                           .then(() => { toast.success('Deleted'); load(); })
                           .catch((error: any) => toast.error('Delete failed: ' + (error?.message || '')));
                       }}>
@@ -1104,7 +1110,7 @@ function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefre
     try {
       const token = await getToken();
       try {
-        await apiWithRouteFallback(`/ultimateadmin/support/tenants/${tenant.id}/license`, {
+        await apiWithRouteFallback(`/developer/support/tenants/${tenant.id}/license`, {
           method: 'PUT', token, body: {
             status: 'active',
             durationAmount: String(durationDays),
@@ -1209,7 +1215,7 @@ function AgentsPanel() {
     try {
       const token = await getToken();
       try {
-        await apiWithRouteFallback('/ultimateadmin/support/agents', { method: 'POST', token, body: form }, ['/support/agents']);
+        await apiWithRouteFallback('/developer/support/agents', { method: 'POST', token, body: form }, ['/support/agents']);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api('/developer/platform-users', {
@@ -1230,7 +1236,7 @@ function AgentsPanel() {
     try {
       const token = await getToken();
       try {
-        await apiWithRouteFallback(`/ultimateadmin/support/agents/${agent.id}`, { method: 'PUT', token, body: { status: agent.status === 'active' ? 'inactive' : 'active' } }, [`/support/agents/${agent.id}`]);
+        await apiWithRouteFallback(`/developer/support/agents/${agent.id}`, { method: 'PUT', token, body: { status: agent.status === 'active' ? 'inactive' : 'active' } }, [`/support/agents/${agent.id}`]);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api(`/developer/platform-users/${agent.id}`, {
@@ -1249,7 +1255,7 @@ function AgentsPanel() {
     try {
       const token = await getToken();
       try {
-        await apiWithRouteFallback(`/ultimateadmin/support/agents/${agent.id}`, { method: 'DELETE', token }, [`/support/agents/${agent.id}`]);
+        await apiWithRouteFallback(`/developer/support/agents/${agent.id}`, { method: 'DELETE', token }, [`/support/agents/${agent.id}`]);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api(`/developer/platform-users/${agent.id}`, { method: 'DELETE', token });
@@ -1363,7 +1369,7 @@ function PlatformUsersPanel() {
         const body: any = { name: form.name, role: form.role };
         if (form.password) body.password = form.password;
         try {
-          await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body });
+          await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body });
         } catch (error: any) {
           if (!isRouteNotFoundError(error)) throw error;
           await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body });
@@ -1375,7 +1381,7 @@ function PlatformUsersPanel() {
         if (form.password) body.password = form.password;
         let result: any;
         try {
-          result = await api('/ultimateadmin/platform-users', { method: 'POST', token, body });
+          result = await api('/developer/platform-users', { method: 'POST', token, body });
         } catch (error: any) {
           if (!isRouteNotFoundError(error)) throw error;
           result = await api('/developer/platform-users', { method: 'POST', token, body });
@@ -1402,7 +1408,7 @@ function PlatformUsersPanel() {
     try {
       const token = await getToken();
       try {
-        await api(`/ultimateadmin/platform-users/${u.id}`, { method: 'DELETE', token });
+        await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
@@ -1427,7 +1433,7 @@ function PlatformUsersPanel() {
         </Button>
       </div>
       <p className="text-sm text-gray-500">
-        Platform users (ultimateadmin, developers, and customer care agents) are granted access directly here.
+        Platform users (developers and customer care agents) are granted access directly here.
         They do not need a tenant subscription or license.
       </p>
       {loading ? (
@@ -1559,7 +1565,7 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
     try {
       const token = await getToken();
       try {
-        await api('/ultimateadmin/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+        await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
@@ -1576,7 +1582,7 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
     try {
       const token = await getToken();
       try {
-        await api(`/ultimateadmin/assignments/${assignmentId}`, { method: 'DELETE', token });
+        await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
@@ -1683,13 +1689,13 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
   const [resetTarget, setResetTarget] = useState<{ email: string } | null>(null);
   const [resetLink, setResetLink] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
-  const isUltimateadmin = (authUser?.role || '').toLowerCase() === 'ultimateadmin';
+  const isDeveloperAdmin = ['developer', 'ultimateadmin'].includes((authUser?.role || '').toLowerCase());
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const token = await getToken();
-      const data = await loadUltimateadminUsersWithFallback(token);
+      const data = await loadDeveloperUsersWithFallback(token);
       setUsers(data);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
@@ -1707,7 +1713,7 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
     setResetLink(null);
     try {
       const token = await getToken();
-      const res = await apiWithRouteFallback('/ultimateadmin/support/generate-reset-link', {
+      const res = await apiWithRouteFallback('/developer/support/generate-reset-link', {
         method: 'POST', token, body: { email: resetTarget.email },
       }, ['/support/generate-reset-link']);
       setResetLink(res.resetLink || '(link generated — check Supabase logs)');
@@ -1755,11 +1761,11 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                 <TableHead>Role</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Status</TableHead>
-                {isUltimateadmin && <TableHead>Actions</TableHead>}
+                {isDeveloperAdmin && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 && <TableRow><TableCell colSpan={isUltimateadmin ? 6 : 5} className="text-center text-gray-400 py-8">No users found</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={isDeveloperAdmin ? 6 : 5} className="text-center text-gray-400 py-8">No users found</TableCell></TableRow>}
               {filtered.map(u => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-sm">{u.name || '—'}</TableCell>
@@ -1767,7 +1773,7 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                   <TableCell><StatusBadge status={u.role} /></TableCell>
                   <TableCell className="text-sm">{u.companyName || tenants.find(t => t.id === u.companyId)?.name || u.companyId || '—'}</TableCell>
                   <TableCell><StatusBadge status={u.status || 'active'} /></TableCell>
-                  {isUltimateadmin && (
+                  {isDeveloperAdmin && (
                     <TableCell>
                       <Button size="sm" variant="ghost" title="Generate Password Reset Link"
                         onClick={() => { setResetTarget({ email: u.email }); setResetLink(null); }}>
@@ -1835,10 +1841,10 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/chat/threads', token);
+      invalidateCache('/developer/chat/threads', token);
       const [threadData, userData] = await Promise.allSettled([
-        apiWithRouteFallback('/ultimateadmin/chat/threads', { token }, ['/support/chat/threads']),
-        loadUltimateadminUsersWithFallback(token),
+        apiWithRouteFallback('/developer/chat/threads', { token }, ['/support/chat/threads']),
+        loadDeveloperUsersWithFallback(token),
       ]);
       // Check if routes are unavailable (old deployed function) vs real errors
       if (isRouteNotFound(threadData) || isRouteNotFound(userData)) {
@@ -1865,7 +1871,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
       try {
         const token = await getToken();
         const data = await apiWithRouteFallback(
-          `/ultimateadmin/chat/threads/${activeThread.id}`,
+          `/developer/chat/threads/${activeThread.id}`,
           { token },
           [`/support/chat/threads/${activeThread.id}`],
         );
@@ -1882,7 +1888,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
     setMsgLoading(true);
     try {
       const token = await getToken();
-      const data = await apiWithRouteFallback(`/ultimateadmin/chat/threads/${thread.id}`, { token }, [`/support/chat/threads/${thread.id}`]);
+      const data = await apiWithRouteFallback(`/developer/chat/threads/${thread.id}`, { token }, [`/support/chat/threads/${thread.id}`]);
       setMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
@@ -1907,7 +1913,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
         recipientName: activeThread?.recipientName || selectedUser?.name || '',
         tenantId: activeThread?.tenantId || selectedUser?.companyId || '',
       };
-      const result = await apiWithRouteFallback('/ultimateadmin/chat/send', { method: 'POST', token, body }, ['/support/chat/send']);
+      const result = await apiWithRouteFallback('/developer/chat/send', { method: 'POST', token, body }, ['/support/chat/send']);
       setNewMsg('');
       if (!activeThread) {
         // New thread created — load it
@@ -1916,13 +1922,13 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
         setRecipient('');
         // Find and open the new thread
         const freshToken = await getToken();
-        const freshThreads = await apiWithRouteFallback('/ultimateadmin/chat/threads', { token: freshToken }, ['/support/chat/threads']);
+        const freshThreads = await apiWithRouteFallback('/developer/chat/threads', { token: freshToken }, ['/support/chat/threads']);
         const newThread = freshThreads.find((t: any) => t.id === result.threadId);
         if (newThread) loadThread(newThread);
       } else {
         // Refresh messages
         const refreshToken = await getToken();
-        const data = await apiWithRouteFallback(`/ultimateadmin/chat/threads/${activeThread.id}`, { token: refreshToken }, [`/support/chat/threads/${activeThread.id}`]);
+        const data = await apiWithRouteFallback(`/developer/chat/threads/${activeThread.id}`, { token: refreshToken }, [`/support/chat/threads/${activeThread.id}`]);
         setMessages(Array.isArray(data.messages) ? data.messages : []);
       }
     } catch (e: any) { toast.error(e.message || 'Failed to send message'); }
@@ -2001,10 +2007,10 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {msgLoading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
               {messages.map(m => (
-                <div key={m.id} className={`flex ${m.senderRole === 'ultimateadmin' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-lg p-2 text-sm ${m.senderRole === 'ultimateadmin' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                <div key={m.id} className={`flex ${['developer', 'ultimateadmin'].includes(m.senderRole) ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[75%] rounded-lg p-2 text-sm ${['developer', 'ultimateadmin'].includes(m.senderRole) ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
                     <p>{m.message}</p>
-                    <p className={`text-xs mt-0.5 ${m.senderRole === 'ultimateadmin' ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(m.sentAt).toLocaleTimeString()}</p>
+                    <p className={`text-xs mt-0.5 ${['developer', 'ultimateadmin'].includes(m.senderRole) ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(m.sentAt).toLocaleTimeString()}</p>
                   </div>
                 </div>
               ))}
@@ -2154,7 +2160,7 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
     setRunning(action);
     try {
       const token = await getToken();
-      const result = await apiWithRouteFallback(`/ultimateadmin/support/repair/${selectedTenant}`, {
+      const result = await apiWithRouteFallback(`/developer/support/repair/${selectedTenant}`, {
         method: 'POST', token, body: { action },
       }, [`/support/repair/${selectedTenant}`]);
       toast.success(`✓ ${action} executed for ${result.tenantId}`);
@@ -2168,7 +2174,7 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
     setResetLink(null);
     try {
       const token = await getToken();
-      const res = await apiWithRouteFallback('/ultimateadmin/support/generate-reset-link', {
+      const res = await apiWithRouteFallback('/developer/support/generate-reset-link', {
         method: 'POST', token, body: { email: resetEmail.trim() },
       }, ['/support/generate-reset-link']);
       setResetLink(res.resetLink || '(link generated — check Supabase logs)');
@@ -2279,9 +2285,9 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
         <CardContent className="space-y-2">
           <p className="text-sm text-gray-600">
             Platform role assignment is managed by authorized platform administrators.
-            If you need Ultimateadmin or Customer Care access, contact Blumebyte support.
+            If you need Developer or Customer Care access, contact Blumebyte support.
           </p>
-          <p className="text-xs text-gray-500">Ultimateadmin → /developer dashboard. Customer Care → /customer-care dashboard.</p>
+          <p className="text-xs text-gray-500">Developer → /developer dashboard. Customer Care → /customer-care dashboard.</p>
         </CardContent>
       </Card>
     </div>
@@ -2314,12 +2320,12 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
     try {
       const token = await getToken();
       // Invalidate caches so auto-refresh always fetches fresh data from the server
-      invalidateCache('/ultimateadmin/support/metrics', token);
-      invalidateCache('/ultimateadmin/support/verify', token);
+      invalidateCache('/developer/support/metrics', token);
+      invalidateCache('/developer/support/verify', token);
       const [metricsResult, tenantsResult, profileResult] = await Promise.allSettled([
-        apiWithRouteFallback('/ultimateadmin/support/metrics', { token }, ['/support/metrics', '/developer/overview']),
+        apiWithRouteFallback('/developer/support/metrics', { token }, ['/support/metrics', '/developer/overview']),
         loadSupportTenantsWithFallback(token),
-        apiWithRouteFallback('/ultimateadmin/support/verify', { token }, ['/support/verify']),
+        apiWithRouteFallback('/developer/support/verify', { token }, ['/support/verify']),
       ]);
       const tenantList = tenantsResult.status === 'fulfilled' && Array.isArray(tenantsResult.value)
         ? tenantsResult.value
@@ -2378,7 +2384,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
             <Shield className="h-4 w-4 text-gray-900" />
           </div>
-          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Ultimateadmin</span>}
+          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Developer</span>}
           {/* Close button on mobile */}
           {!sidebarCollapsed && (
             <button

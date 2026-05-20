@@ -174,11 +174,21 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
         }
       }
       if (!reported && isRouteNotFoundMessage(lastErrorMessage)) {
-        const supportTicketResponse = await apiClient.post(
-          '/ultimateadmin/support/tickets',
+        let supportTicketResponse = await apiClient.post(
+          '/developer/support/tickets',
           buildSupportTicketPayload(),
           freshToken,
         );
+        if (!supportTicketResponse.ok) {
+          const supportTicketError = await parseApiErrorMessage(supportTicketResponse);
+          if (isRetryableMissingRoute(supportTicketResponse.status, supportTicketError)) {
+            supportTicketResponse = await apiClient.post(
+              '/ultimateadmin/support/tickets',
+              buildSupportTicketPayload(),
+              freshToken,
+            );
+          }
+        }
         if (supportTicketResponse.ok) {
           reported = true;
         } else {
