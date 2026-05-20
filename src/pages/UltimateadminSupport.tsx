@@ -613,6 +613,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -674,7 +675,8 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) ||
       t.tenantName.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
+    return matchSearch && matchStatus && matchPriority;
   });
 
   return (
@@ -691,7 +693,15 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
             {TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Priorities</SelectItem>
+            {TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Badge variant="secondary">{filtered.length} tickets</Badge>
         <Button size="sm" onClick={() => setShowCreate(true)}><UserPlus className="h-3.5 w-3.5 mr-1" />New Ticket</Button>
       </div>
 
@@ -789,12 +799,21 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
                 <div><span className="text-gray-500">Priority:</span> <StatusBadge status={selected.priority} /></div>
               </div>
               {selected.description && <p className="text-sm bg-gray-50 p-3 rounded-lg">{selected.description}</p>}
-              <div className="flex items-center gap-2">
-                <Label className="shrink-0">Update Status:</Label>
-                <Select defaultValue={selected.status} onValueChange={v => updateTicket(selected.id, { status: v })}>
-                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                  <SelectContent>{TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <Label className="shrink-0 text-xs">Status:</Label>
+                  <Select defaultValue={selected.status} onValueChange={v => updateTicket(selected.id, { status: v })}>
+                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="shrink-0 text-xs">Priority:</Label>
+                  <Select defaultValue={selected.priority} onValueChange={v => updateTicket(selected.id, { priority: v })}>
+                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
               {/* Notes */}
               <div>
@@ -823,11 +842,38 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
 
 // ─── License Issues Panel ─────────────────────────────────────────────────────
 function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefresh: () => void }) {
+  const { getToken } = useAuth();
+  const [fixing, setFixing] = useState<string | null>(null);
+
   const problematic = tenants.filter(t => t.licenseStatus !== 'active' && t.licenseStatus !== 'unknown');
+
+  const quickFix = async (tenant: Tenant, durationDays = 30) => {
+    setFixing(tenant.id);
+    try {
+      const token = await getToken();
+      await api(`/ultimateadmin/support/tenants/${tenant.id}/license`, {
+        method: 'PUT', token, body: {
+          status: 'active',
+          durationAmount: String(durationDays),
+          durationUnit: 'days',
+          purchasedLicenses: String(tenant.purchasedLicenses || 1),
+          plan: tenant.plan || 'custom',
+        },
+      });
+      toast.success(`License reactivated for ${tenant.name} (+${durationDays}d)`);
+      onRefresh();
+    } catch (e: any) { toast.error('Failed to fix license: ' + (e.message || '')); }
+    finally { setFixing(null); }
+  };
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">{problematic.length} tenants with license issues</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{problematic.length} tenants with license issues</p>
+        {problematic.length > 0 && (
+          <p className="text-xs text-gray-400">Use "Quick Fix" to reactivate for 30 days without payment</p>
+        )}
+      </div>
       <div className="border rounded-lg overflow-auto">
         <Table>
           <TableHeader>
@@ -837,10 +883,11 @@ function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefre
               <TableHead>Plan</TableHead>
               <TableHead>Seats</TableHead>
               <TableHead>Users</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {problematic.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-green-600 py-8">✓ All licenses are healthy</TableCell></TableRow>}
+            {problematic.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-green-600 py-8">✓ All licenses are healthy</TableCell></TableRow>}
             {problematic.map(t => (
               <TableRow key={t.id}>
                 <TableCell className="font-medium text-sm">{t.name}</TableCell>
@@ -848,6 +895,19 @@ function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefre
                 <TableCell className="text-sm">{t.plan || '—'}</TableCell>
                 <TableCell className="text-sm">{t.purchasedLicenses}</TableCell>
                 <TableCell className="text-sm">{t.activeUsers}/{t.totalUsers}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" className="text-xs h-7 px-2 text-green-700 border-green-300 hover:bg-green-50"
+                      onClick={() => quickFix(t, 30)} disabled={fixing === t.id} title="Reactivate license for 30 days">
+                      {fixing === t.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
+                      +30d
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs h-7 px-2 text-blue-700 border-blue-300 hover:bg-blue-50"
+                      onClick={() => quickFix(t, 365)} disabled={fixing === t.id} title="Reactivate license for 1 year">
+                      +1y
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -902,6 +962,16 @@ function AgentsPanel() {
     } catch (e: any) { toast.error('Update failed: ' + (e.message || '')); }
   };
 
+  const deleteAgent = async (agent: Agent) => {
+    if (!confirm(`Delete agent ${agent.email}?`)) return;
+    try {
+      const token = await getToken();
+      await api(`/ultimateadmin/support/agents/${agent.id}`, { method: 'DELETE', token });
+      toast.success('Agent removed');
+      load();
+    } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -930,9 +1000,14 @@ function AgentsPanel() {
                   <TableCell><StatusBadge status={a.role} /></TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
                   <TableCell>
-                    <Button size="sm" variant="ghost" onClick={() => toggleStatus(a)}>
-                      {a.status === 'active' ? <Lock className="h-3.5 w-3.5 text-orange-500" /> : <Unlock className="h-3.5 w-3.5 text-green-500" />}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => toggleStatus(a)} title={a.status === 'active' ? 'Deactivate' : 'Activate'}>
+                        {a.status === 'active' ? <Lock className="h-3.5 w-3.5 text-orange-500" /> : <Unlock className="h-3.5 w-3.5 text-green-500" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteAgent(a)} title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -1282,11 +1357,15 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
 
 // ─── All Users Panel ──────────────────────────────────────────────────────────
 function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
-  const { getToken } = useAuth();
+  const { getToken, user: authUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [resetTarget, setResetTarget] = useState<{ email: string } | null>(null);
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const isUltimateadmin = (authUser?.role || '').toLowerCase() === 'ultimateadmin';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1303,6 +1382,21 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+
+  const generateReset = async () => {
+    if (!resetTarget) return;
+    setResetting(true);
+    setResetLink(null);
+    try {
+      const token = await getToken();
+      const res = await api('/ultimateadmin/support/generate-reset-link', {
+        method: 'POST', token, body: { email: resetTarget.email },
+      });
+      setResetLink(res.resetLink || '(link generated — check Supabase logs)');
+      toast.success('Reset link generated');
+    } catch (e: any) { toast.error('Failed to generate reset link: ' + (e.message || '')); }
+    finally { setResetting(false); }
+  };
 
   const filtered = users.filter(u => {
     const matchSearch = (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -1343,10 +1437,11 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                 <TableHead>Role</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Status</TableHead>
+                {isUltimateadmin && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No users found</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={isUltimateadmin ? 6 : 5} className="text-center text-gray-400 py-8">No users found</TableCell></TableRow>}
               {filtered.map(u => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-sm">{u.name || '—'}</TableCell>
@@ -1354,12 +1449,49 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                   <TableCell><StatusBadge status={u.role} /></TableCell>
                   <TableCell className="text-sm">{u.companyName || tenants.find(t => t.id === u.companyId)?.name || u.companyId || '—'}</TableCell>
                   <TableCell><StatusBadge status={u.status || 'active'} /></TableCell>
+                  {isUltimateadmin && (
+                    <TableCell>
+                      <Button size="sm" variant="ghost" title="Generate Password Reset Link"
+                        onClick={() => { setResetTarget({ email: u.email }); setResetLink(null); }}>
+                        <Key className="h-3.5 w-3.5 text-blue-500" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
+
+      {/* Reset password dialog */}
+      <Dialog open={!!resetTarget} onOpenChange={open => { if (!open) { setResetTarget(null); setResetLink(null); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Generate Password Reset Link</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">Send a password reset link for <strong>{resetTarget?.email}</strong>.</p>
+            {resetLink && (
+              <div className="space-y-1">
+                <Label>Reset Link</Label>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={resetLink} className="font-mono text-xs" />
+                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(resetLink); toast.success('Copied'); }}>
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-400">Send this link to the user. It expires after 24 hours.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetTarget(null); setResetLink(null); }}>Close</Button>
+            <Button onClick={generateReset} disabled={resetting}>
+              {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Key className="h-4 w-4 mr-2" />}
+              Generate Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1589,6 +1721,8 @@ function AuditTrailPanel() {
   const { getToken } = useAuth();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [actionFilter, setActionFilter] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1603,10 +1737,33 @@ function AuditTrailPanel() {
 
   useEffect(() => { load(); }, [load]);
 
+  const allActionTypes = [...new Set(logs.map(l => l.actionType).filter(Boolean))].sort();
+
+  const filtered = logs.filter(l => {
+    const matchSearch = !search ||
+      (l.actorEmail || '').toLowerCase().includes(search.toLowerCase()) ||
+      (l.description || '').toLowerCase().includes(search.toLowerCase()) ||
+      (l.tenantId || '').toLowerCase().includes(search.toLowerCase());
+    const matchAction = actionFilter === 'all' || l.actionType === actionFilter;
+    return matchSearch && matchAction;
+  });
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Input className="pl-8" placeholder="Search logs…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <Select value={actionFilter} onValueChange={setActionFilter}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="All actions" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Actions</SelectItem>
+            {allActionTypes.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Badge variant="secondary">{filtered.length} entries</Badge>
       </div>
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
@@ -1623,8 +1780,8 @@ function AuditTrailPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {logs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No audit logs yet</TableCell></TableRow>}
-              {logs.map(log => (
+              {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No audit logs found</TableCell></TableRow>}
+              {filtered.map(log => (
                 <TableRow key={log.id}>
                   <TableCell className="text-xs text-gray-500 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</TableCell>
                   <TableCell className="text-sm">{log.actorEmail}</TableCell>
@@ -1646,6 +1803,9 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
   const { getToken } = useAuth();
   const [selectedTenant, setSelectedTenant] = useState('');
   const [running, setRunning] = useState<string | null>(null);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [generatingReset, setGeneratingReset] = useState(false);
 
   const runRepair = async (action: string) => {
     if (!selectedTenant) return toast.error('Select a tenant first');
@@ -1660,6 +1820,21 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
     finally { setRunning(null); }
   };
 
+  const generateResetLink = async () => {
+    if (!resetEmail.trim()) return toast.error('Enter an email address');
+    setGeneratingReset(true);
+    setResetLink(null);
+    try {
+      const token = await getToken();
+      const res = await api('/ultimateadmin/support/generate-reset-link', {
+        method: 'POST', token, body: { email: resetEmail.trim() },
+      });
+      setResetLink(res.resetLink || '(link generated — check Supabase logs)');
+      toast.success('Reset link generated');
+    } catch (e: any) { toast.error('Failed: ' + (e.message || '')); }
+    finally { setGeneratingReset(false); }
+  };
+
   const tools = [
     { id: 'reset_cache', label: 'Reset Tenant Cache', icon: RefreshCw, desc: 'Clears all cached data for this tenant' },
     { id: 'refresh_permissions', label: 'Refresh Permissions', icon: Shield, desc: 'Re-evaluates all role-based permissions' },
@@ -1670,7 +1845,7 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Card className="border-orange-200 bg-orange-50">
         <CardContent className="flex items-center gap-2 pt-4">
           <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
@@ -1678,6 +1853,39 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
         </CardContent>
       </Card>
 
+      {/* Password Reset Link Generator */}
+      <Card>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Key className="h-4 w-4" />Generate Password Reset Link</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-500">Generate a password reset link for any user by email. Link expires after 24 hours.</p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="user@example.com"
+              type="email"
+              value={resetEmail}
+              onChange={e => { setResetEmail(e.target.value); setResetLink(null); }}
+              className="flex-1"
+            />
+            <Button onClick={generateResetLink} disabled={generatingReset || !resetEmail.trim()}>
+              {generatingReset ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Generate
+            </Button>
+          </div>
+          {resetLink && (
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">Reset Link (copy and send to user)</Label>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={resetLink} className="font-mono text-xs flex-1" />
+                <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(resetLink); toast.success('Copied to clipboard'); }}>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tenant Repair Tools */}
       <div>
         <Label>Target Tenant</Label>
         <Select value={selectedTenant} onValueChange={setSelectedTenant}>

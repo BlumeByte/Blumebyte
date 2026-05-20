@@ -12480,7 +12480,7 @@ const deleteUltimateadminSupportTicket = async (c: any) => {
 for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
 
 // GET /ultimateadmin/support/agents
-app.get(`${PREFIX}/ultimateadmin/support/agents`, async (c) => {
+const listUltimateadminSupportAgents = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12489,10 +12489,11 @@ app.get(`${PREFIX}/ultimateadmin/support/agents`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/agents')) app.get(route, listUltimateadminSupportAgents);
 
 // POST /ultimateadmin/support/agents
-app.post(`${PREFIX}/ultimateadmin/support/agents`, async (c) => {
+const createUltimateadminSupportAgent = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12512,10 +12513,11 @@ app.post(`${PREFIX}/ultimateadmin/support/agents`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/agents')) app.post(route, createUltimateadminSupportAgent);
 
 // PUT /ultimateadmin/support/agents/:id
-app.put(`${PREFIX}/ultimateadmin/support/agents/:id`, async (c) => {
+const updateUltimateadminSupportAgent = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
@@ -12529,7 +12531,31 @@ app.put(`${PREFIX}/ultimateadmin/support/agents/:id`, async (c) => {
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
-});
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/agents/:id')) app.put(route, updateUltimateadminSupportAgent);
+
+// DELETE /ultimateadmin/support/agents/:id
+const deleteUltimateadminSupportAgent = async (c: any) => {
+  try {
+    const access = await verifyUltimateAdminAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'ultimateadmin' && !access.profile?.isPlatformAdmin) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+    const id = c.req.param('id');
+    await kv.del(`support-agent:${id}`);
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId, actorId: access.user.id, actorEmail: access.user.email,
+      actionType: 'agent_delete', timestamp: new Date().toISOString(),
+      description: `Support agent ${id} deleted by ${access.user.email}`,
+    });
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+};
+for (const route of compatibleRoutePaths('/ultimateadmin/support/agents/:id')) app.delete(route, deleteUltimateadminSupportAgent);
 
 // GET /ultimateadmin/support/audit — audit trail
 const listUltimateadminSupportAudit = async (c: any) => {
