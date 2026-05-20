@@ -12307,7 +12307,7 @@ const listUltimateadminSupportTenantUsers = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/users')) app.get(route, listUltimateadminSupportTenantUsers);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users')) app.get(route, listUltimateadminSupportTenantUsers);
 
 // POST /ultimateadmin/support/tenants/:id/suspend
 const suspendUltimateadminSupportTenant = async (c: any) => {
@@ -12333,7 +12333,7 @@ const suspendUltimateadminSupportTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/suspend')) app.post(route, suspendUltimateadminSupportTenant);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/suspend', '/support/tenants/:id/suspend')) app.post(route, suspendUltimateadminSupportTenant);
 
 // PUT /ultimateadmin/support/tenants/:id/license
 const updateUltimateadminSupportTenantLicense = async (c: any) => {
@@ -12394,7 +12394,7 @@ const updateUltimateadminSupportTenantLicense = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/license')) app.put(route, updateUltimateadminSupportTenantLicense);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/license', '/support/tenants/:id/license')) app.put(route, updateUltimateadminSupportTenantLicense);
 
 // GET /ultimateadmin/support/tickets
 const listUltimateadminSupportTickets = async (c: any) => {
@@ -12414,7 +12414,7 @@ const listUltimateadminSupportTickets = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets')) app.get(route, listUltimateadminSupportTickets);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets')) app.get(route, listUltimateadminSupportTickets);
 
 // POST /ultimateadmin/support/tickets
 const createUltimateadminSupportTicket = async (c: any) => {
@@ -12439,7 +12439,7 @@ const createUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets')) app.post(route, createUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets')) app.post(route, createUltimateadminSupportTicket);
 
 // PUT /ultimateadmin/support/tickets/:id
 const updateUltimateadminSupportTicket = async (c: any) => {
@@ -12463,7 +12463,7 @@ const updateUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets/:id')) app.put(route, updateUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id')) app.put(route, updateUltimateadminSupportTicket);
 
 // DELETE /ultimateadmin/support/tickets/:id
 const deleteUltimateadminSupportTicket = async (c: any) => {
@@ -12477,7 +12477,7 @@ const deleteUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
 
 // GET /ultimateadmin/support/agents
 const listUltimateadminSupportAgents = async (c: any) => {
@@ -12490,7 +12490,7 @@ const listUltimateadminSupportAgents = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/agents')) app.get(route, listUltimateadminSupportAgents);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents')) app.get(route, listUltimateadminSupportAgents);
 
 // POST /ultimateadmin/support/agents
 const createUltimateadminSupportAgent = async (c: any) => {
@@ -12514,7 +12514,7 @@ const createUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/agents')) app.post(route, createUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents')) app.post(route, createUltimateadminSupportAgent);
 
 // PUT /ultimateadmin/support/agents/:id
 const updateUltimateadminSupportAgent = async (c: any) => {
@@ -12532,7 +12532,7 @@ const updateUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/agents/:id')) app.put(route, updateUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id')) app.put(route, updateUltimateadminSupportAgent);
 
 // DELETE /ultimateadmin/support/agents/:id
 const deleteUltimateadminSupportAgent = async (c: any) => {
@@ -12555,7 +12555,7 @@ const deleteUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/agents/:id')) app.delete(route, deleteUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id')) app.delete(route, deleteUltimateadminSupportAgent);
 
 // GET /ultimateadmin/support/audit — audit trail
 const listUltimateadminSupportAudit = async (c: any) => {
@@ -12569,7 +12569,7 @@ const listUltimateadminSupportAudit = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/audit')) app.get(route, listUltimateadminSupportAudit);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/audit', '/support/audit')) app.get(route, listUltimateadminSupportAudit);
 
 // POST /ultimateadmin/support/set-platform-user — set role+name for developer/care platform users
 const setUltimateadminPlatformUser = async (c: any) => {
@@ -12721,7 +12721,7 @@ const createUltimateadminSupportTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants')) app.post(route, createUltimateadminSupportTenant);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants')) app.post(route, createUltimateadminSupportTenant);
 
 // POST /ultimateadmin/support/tenants/:id/users — create a user for a tenant without payment
 const createUltimateadminSupportTenantUser = async (c: any) => {
@@ -12770,7 +12770,7 @@ const createUltimateadminSupportTenantUser = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/tenants/:id/users')) app.post(route, createUltimateadminSupportTenantUser);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users')) app.post(route, createUltimateadminSupportTenantUser);
 
 // GET /ultimateadmin/users — all users across all tenants
 const listUltimateadminUsers = async (c: any) => {
