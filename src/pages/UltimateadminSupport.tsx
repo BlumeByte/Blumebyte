@@ -23,23 +23,291 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const ROLES = ['ultimateadmin', 'customer_care'];
-const PLATFORM_ROLES = ['ultimateadmin', 'developer', 'customer_care'];
+// Keep ultimateadmin for backward compatibility while developer is canonical.
+const ROLES = ['developer', 'ultimateadmin', 'customer_care'];
+const PLATFORM_ROLES = ['developer', 'customer_care'];
 
 /** Returns true when an API error represents a route that simply doesn't exist yet
  *  (stale backend). These are handled by UI empty-states rather than error toasts. */
+function isStaleBackendStatus(status: unknown): boolean {
+  return status === 404 || status === 405 || status === 501;
+}
+
+function isStaleBackendMessage(message: unknown): boolean {
+  const normalized = String(message || '').toLowerCase();
+  return (
+    normalized.includes('route not found') ||
+    normalized.includes('method not allowed') ||
+    normalized.includes('cannot get') ||
+    normalized.includes('cannot post') ||
+    normalized.includes('cannot put') ||
+    normalized.includes('cannot patch') ||
+    normalized.includes('cannot delete')
+  );
+}
+
 function isRouteNotFound(r: PromiseSettledResult<any>): boolean {
   return (
     r.status === 'rejected' && (
-      String(r.reason?.message).toLowerCase().includes('route not found') ||
-      r.reason?.status === 404
+      isStaleBackendMessage(r.reason?.message) ||
+      isStaleBackendStatus(r.reason?.status)
     )
   );
 }
 
 function isRouteNotFoundError(error: any): boolean {
-  const message = String(error?.message || '').toLowerCase();
-  return message.includes('route not found') || error?.status === 404;
+  return isStaleBackendMessage(error?.message) || isStaleBackendStatus(error?.status);
+}
+
+/** Tries `path` first, then each fallback path in order, only for route-not-found style errors. */
+async function apiWithRouteFallback(path: string, options: any = {}, fallbackPaths: string[] = []) {
+  try {
+    return await api(path, options);
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    let lastError: any = error;
+    for (const fallbackPath of fallbackPaths) {
+      try {
+        return await api(fallbackPath, options);
+      } catch (fallbackError: any) {
+        if (!isRouteNotFoundError(fallbackError)) throw fallbackError;
+        lastError = fallbackError;
+      }
+    }
+    throw lastError;
+  }
+}
+
+function normalizeLegacyTenant(raw: any): Tenant {
+  const purchasedLicenses = Number(raw?.purchasedLicenses ?? raw?.licenses ?? raw?.subscription?.licenses ?? 0) || 0;
+  const activeUsers = Number(raw?.activeUsers ?? 0) || 0;
+  const totalUsers = Number(raw?.totalUsers ?? 0) || 0;
+  const status = raw?.licenseStatus || raw?.subscription?.status || raw?.status || 'unknown';
+  return {
+    id: String(raw?.id || raw?.companyId || raw?.company || ''),
+    name: raw?.name || raw?.companyName || 'Unknown Tenant',
+    industry: raw?.industry,
+    licenseStatus: status,
+    activeUsers,
+    totalUsers: Math.max(totalUsers, activeUsers),
+    purchasedLicenses,
+    plan: raw?.plan || raw?.subscription?.plan,
+    lastActivity: raw?.lastActivity,
+    createdAt: raw?.createdAt || raw?.created_at,
+  };
+}
+
+async function loadSupportTenantsWithFallback(token?: string | null) {
+  invalidateCache('/developer/support/tenants', token);
+  try {
+    const data = await apiWithRouteFallback('/developer/support/tenants', { token }, ['/support/tenants']);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    const legacy = await api('/developer/tenants', { token });
+    const tenants = Array.isArray(legacy) ? legacy.map(normalizeLegacyTenant) : [];
+    return tenants.filter((t) => !!t.id);
+  }
+}
+
+async function loadSupportTenantUsersWithFallback(tenantId: string, token?: string | null) {
+  try {
+    const data = await apiWithRouteFallback(`/developer/support/tenants/${tenantId}/users`, { token }, [`/support/tenants/${tenantId}/users`]);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    const data = await api(`/developer/tenants/${tenantId}/users`, { token });
+    return Array.isArray(data) ? data : [];
+  }
+}
+
+async function loadDeveloperUsersWithFallback(token?: string | null) {
+  try {
+    invalidateCache('/developer/users', token);
+    const data = await api('/developer/users', { token });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    if (!isRouteNotFoundError(error)) throw error;
+    try {
+      invalidateCache('/support/users', token);
+      const data = await api('/support/users', { token });
+      return Array.isArray(data) ? data : [];
+    } catch (fallbackError: any) {
+      const wrapped: any = new Error(
+        `Failed to load users: ${fallbackError?.message || 'Unknown error'}`,
+      );
+      wrapped.status = fallbackError?.status;
+      throw wrapped;
+    }
+  }
+}
+
+async function loadPlatformUsersWithFallback(token?: string | null) {
+  invalidateCache('/developer/platform-users', token);
+  try {
+    const data = await api('/developer/platform-users', { token });
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    const data = await api('/ultimateadmin/platform-users', { token });
+    return Array.isArray(data) ? data : [];
+  }
+}
+
+async function loadAssignmentsWithFallback(token?: string | null) {
+  invalidateCache('/developer/assignments', token);
+  try {
+    const data = await api('/developer/assignments', { token });
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    const data = await api('/ultimateadmin/assignments', { token });
+    return Array.isArray(data) ? data : [];
+  }
+}
+
+async function loadSupportTicketsWithFallback(token?: string | null) {
+  invalidateCache('/developer/support/tickets', token);
+  try {
+    const data = await apiWithRouteFallback('/developer/support/tickets', { token }, ['/support/tickets']);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    const data = await api('/developer/tickets', { token });
+    return Array.isArray(data) ? data : [];
+  }
+}
+
+async function loadSupportAgentsWithFallback(token?: string | null) {
+  invalidateCache('/developer/support/agents', token);
+  try {
+    const data = await apiWithRouteFallback('/developer/support/agents', { token }, ['/support/agents']);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    const platformUsers = await loadPlatformUsersWithFallback(token);
+    return platformUsers
+      .filter((u: any) => String(u?.role || '') === 'customer_care')
+      .map((u: any) => ({
+        id: u.id,
+        name: u.name || u.email,
+        email: u.email,
+        role: u.role || 'customer_care',
+        assignedTenants: u.assignedTenants || [],
+        status: u.status || 'active',
+        openTickets: u.openTickets || 0,
+        resolvedTickets: u.resolvedTickets || 0,
+      }));
+  }
+}
+
+async function loadSupportAuditWithFallback(token?: string | null) {
+  invalidateCache('/developer/support/audit', token);
+  try {
+    const data = await apiWithRouteFallback('/developer/support/audit', { token }, ['/support/audit']);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    if (!isRouteNotFoundError(error)) throw error;
+    const data = await api('/developer/audit-log', { token });
+    return Array.isArray(data) ? data.map((entry: any) => ({
+      id: entry.id,
+      actorEmail: entry.actorEmail || entry.userEmail || entry.userId || 'unknown',
+      actionType: entry.actionType || entry.action || 'activity',
+      tenantId: entry.tenantId || entry.details?.tenantId || '',
+      timestamp: entry.timestamp || entry.createdAt || new Date().toISOString(),
+      description: entry.description || JSON.stringify(entry.details || {}),
+    })) : [];
+  }
+}
+
+function toNumber(value: any, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeMetricsPayload(raw: any, tenants: Tenant[]): Metrics {
+  const planBreakdown: Record<string, number> = {};
+  let purchased = 0;
+  let used = 0;
+  const recentTenants = [...tenants]
+    .filter((t) => !!t.createdAt)
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 10)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      status: t.licenseStatus || 'unknown',
+      createdAt: t.createdAt || '',
+      plan: t.plan || 'unknown',
+    }));
+
+  for (const tenant of tenants) {
+    const plan = String(tenant.plan || 'unknown').toLowerCase();
+    planBreakdown[plan] = (planBreakdown[plan] || 0) + 1;
+    purchased += toNumber(tenant.purchasedLicenses, 0);
+    used += toNumber(tenant.activeUsers, 0);
+  }
+
+  const totalTenants = toNumber(raw?.totalTenants, tenants.length);
+  const activeTenants = toNumber(
+    raw?.activeTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'active').length,
+  );
+  const expiredTenants = toNumber(
+    raw?.expiredTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'expired').length,
+  );
+  const suspendedTenants = toNumber(
+    raw?.suspendedTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'suspended').length,
+  );
+  const trialTenants = toNumber(
+    raw?.trialTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'trial').length,
+  );
+
+  const normalized: Metrics = {
+    totalTenants,
+    activeTenants,
+    expiredTenants,
+    suspendedTenants,
+    trialTenants,
+    openTickets: toNumber(raw?.openTickets, 0),
+    pendingTickets: toNumber(raw?.pendingTickets, 0),
+    criticalTickets: toNumber(raw?.criticalTickets, 0),
+    resolvedToday: toNumber(raw?.resolvedToday, 0),
+    totalAgents: toNumber(raw?.totalAgents, raw?.totalCustomerCareAgents || 0),
+    totalTickets: toNumber(raw?.totalTickets, raw?.openTickets || 0),
+    totalUsers: toNumber(raw?.totalUsers, 0),
+    activeUsers: toNumber(raw?.activeUsers, 0),
+    newTenantsLast30Days: toNumber(raw?.newTenantsLast30Days, 0),
+    newUsersLast30Days: toNumber(raw?.newUsersLast30Days, 0),
+    planBreakdown: (raw?.planBreakdown && Object.keys(raw.planBreakdown).length > 0)
+      ? raw.planBreakdown
+      : planBreakdown,
+    licenseUtilization: raw?.licenseUtilization && typeof raw.licenseUtilization === 'object'
+      ? {
+        purchased: toNumber(raw.licenseUtilization.purchased, purchased),
+        used: toNumber(raw.licenseUtilization.used, used),
+        available: toNumber(raw.licenseUtilization.available, Math.max(0, purchased - used)),
+      }
+      : {
+        purchased,
+        used,
+        available: Math.max(0, purchased - used),
+      },
+    recentTenants: Array.isArray(raw?.recentTenants) && raw.recentTenants.length > 0
+      ? raw.recentTenants.map((t: any) => ({
+        id: String(t?.id || t?.tenantId || ''),
+        name: t?.name || t?.companyName || 'Unknown Tenant',
+        status: t?.status || 'unknown',
+        createdAt: t?.createdAt || t?.created_at || '',
+        plan: t?.plan || 'unknown',
+      }))
+      : recentTenants,
+  };
+
+  return normalized;
 }
 
 const SIDEBAR_ITEMS = [
@@ -58,23 +326,23 @@ const SIDEBAR_ITEMS = [
 ];
 
 const SECTION_ACCESS_RULES: Record<string, string[]> = {
-  overview: ['ultimateadmin', 'developer', 'customer_care'],
-  tenants: ['ultimateadmin', 'developer', 'customer_care'],
-  users: ['ultimateadmin', 'developer', 'customer_care'],
-  chat: ['ultimateadmin', 'developer', 'customer_care'],
-  tickets: ['ultimateadmin', 'developer', 'customer_care'],
-  'license-issues': ['ultimateadmin', 'developer', 'customer_care'],
-  'platform-users': ['ultimateadmin', 'developer'],
-  assignments: ['ultimateadmin', 'developer'],
-  agents: ['ultimateadmin', 'developer'],
-  audit: ['ultimateadmin', 'developer'],
-  'dev-tools': ['ultimateadmin', 'developer'],
-  settings: ['ultimateadmin', 'developer', 'customer_care'],
+  overview: ['developer', 'customer_care'],
+  tenants: ['developer', 'customer_care'],
+  users: ['developer', 'customer_care'],
+  chat: ['developer', 'customer_care'],
+  tickets: ['developer', 'customer_care'],
+  'license-issues': ['developer', 'customer_care'],
+  'platform-users': ['developer'],
+  assignments: ['developer'],
+  agents: ['developer'],
+  audit: ['developer'],
+  'dev-tools': ['developer'],
+  settings: ['developer', 'customer_care'],
 };
 
 function isSectionAllowed(sectionId: string, role: string) {
-  const allowedRoles = SECTION_ACCESS_RULES[sectionId] || ['ultimateadmin', 'developer'];
-  return allowedRoles.includes(role);
+  const allowedRoles = SECTION_ACCESS_RULES[sectionId] || ['developer'];
+  return allowedRoles.includes(role === 'ultimateadmin' ? 'developer' : role);
 }
 
 const TICKET_STATUSES = ['open', 'pending', 'resolved', 'escalated'];
@@ -82,8 +350,14 @@ const TICKET_PRIORITIES = ['low', 'medium', 'high', 'critical'];
 const ISSUE_TYPES = ['general', 'billing', 'license', 'technical', 'data', 'account', 'integration', 'other'];
 
 // ─── Session helpers ───────────────────────────────────────────────────────────
-function setSupportSession() { sessionStorage.setItem('ultimateadmin_support_session', '1'); }
-function clearSupportSession() { sessionStorage.removeItem('ultimateadmin_support_session'); }
+function setSupportSession() {
+  sessionStorage.setItem('developer_support_session', '1');
+  sessionStorage.removeItem('ultimateadmin_support_session');
+}
+function clearSupportSession() {
+  sessionStorage.removeItem('developer_support_session');
+  sessionStorage.removeItem('ultimateadmin_support_session');
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Tenant {
@@ -126,6 +400,7 @@ export default function CustomerCareDashboard() {
   const navigate = useNavigate();
   const { user, sessionLoading, getToken, logout } = useAuth();
   const normalizedRole = String(user?.role || '').toLowerCase().replace('-', '_');
+  const supportRole = normalizedRole === 'ultimateadmin' ? 'developer' : normalizedRole;
   // tri-state: null = verifying, true = authenticated, false = unauthenticated
   const [authState, setAuthState] = useState<boolean | null>(null);
 
@@ -170,7 +445,7 @@ export default function CustomerCareDashboard() {
     return null;
   }
 
-  return <SupportDashboard onLogout={handleLogout} role={normalizedRole === 'developer' ? 'developer' : normalizedRole} />;
+  return <SupportDashboard onLogout={handleLogout} role={supportRole} />;
 }
 // ─── Metrics Cards ────────────────────────────────────────────────────────────
 function MetricsCards({ metrics }: { metrics: Metrics }) {
@@ -245,12 +520,12 @@ function TenantsPanel() {
     setLoading(true);
     try {
       const token = await getToken();
-      // Invalidate cache so mutations (create/update/delete) always fetch fresh data
-      invalidateCache('/ultimateadmin/support/tenants', token);
-      const data = await api('/ultimateadmin/support/tenants', { token });
+      const data = await loadSupportTenantsWithFallback(token);
       setTenants(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      toast.error('Failed to load tenants: ' + (e.message || 'Unknown error'));
+      if (!isRouteNotFoundError(e)) {
+        toast.error('Failed to load tenants: ' + (e.message || 'Unknown error'));
+      }
     } finally {
       setLoading(false);
     }
@@ -268,7 +543,7 @@ function TenantsPanel() {
     setSelected(tenant);
     try {
       const token = await getToken();
-      const data = await api(`/ultimateadmin/support/tenants/${tenant.id}/users`, { token });
+      const data = await loadSupportTenantUsersWithFallback(tenant.id, token);
       setTenantUsers(Array.isArray(data) ? data : []);
       setShowUsers(true);
     } catch (e: any) {
@@ -283,9 +558,16 @@ function TenantsPanel() {
     setActionLoading(tenant.id);
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/support/tenants/${tenant.id}/suspend`, {
-        method: 'POST', token, body: { restore: isSuspended },
-      });
+      try {
+        await apiWithRouteFallback(`/developer/support/tenants/${tenant.id}/suspend`, {
+          method: 'POST', token, body: { restore: isSuspended },
+        }, [`/support/tenants/${tenant.id}/suspend`]);
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api(`/developer/tenants/${tenant.id}/${isSuspended ? 'reinstate' : 'suspend'}`, {
+          method: 'POST', token,
+        });
+      }
       toast.success(isSuspended ? 'Tenant restored' : 'Tenant suspended');
       load();
     } catch (e: any) { toast.error('Action failed: ' + (e.message || '')); }
@@ -307,7 +589,16 @@ function TenantsPanel() {
         body.durationAmount = licenseForm.durationAmount;
         body.durationUnit = licenseForm.durationUnit;
       }
-      await api(`/ultimateadmin/support/tenants/${selected.id}/license`, { method: 'PUT', token, body });
+      try {
+        await apiWithRouteFallback(`/developer/support/tenants/${selected.id}/license`, { method: 'PUT', token, body }, [`/support/tenants/${selected.id}/license`]);
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        const legacyBody: any = {
+          plan: body.plan,
+          licenses: body.purchasedLicenses,
+        };
+        await api(`/developer/tenants/${selected.id}/license`, { method: 'PUT', token, body: legacyBody });
+      }
       toast.success('License updated');
       setLicenseDialog(false);
       load();
@@ -320,9 +611,9 @@ function TenantsPanel() {
     setSaving(true);
     try {
       const token = await getToken();
-      await api('/ultimateadmin/support/tenants', {
+      await apiWithRouteFallback('/developer/support/tenants', {
         method: 'POST', token, body: createForm,
-      });
+      }, ['/support/tenants']);
       toast.success(`Tenant "${createForm.name}" created`);
       setCreateDialog(false);
       setCreateForm({ name: '', industry: '', plan: 'custom', purchasedLicenses: '0', durationAmount: '30', durationUnit: 'days' });
@@ -337,9 +628,9 @@ function TenantsPanel() {
     setSaving(true);
     try {
       const token = await getToken();
-      const result = await api(`/ultimateadmin/support/tenants/${selected.id}/users`, {
+      const result = await apiWithRouteFallback(`/developer/support/tenants/${selected.id}/users`, {
         method: 'POST', token, body: createUserForm,
-      });
+      }, [`/support/tenants/${selected.id}/users`]);
       toast.success(`User created${result.tempPassword ? ` — temp password: ${result.tempPassword}` : ''}`);
       setCreateUserDialog(false);
       setCreateUserForm({ name: '', email: '', role: 'superadmin', password: '' });
@@ -574,6 +865,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -584,21 +876,24 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/support/tickets', token);
-      const data = await api('/ultimateadmin/support/tickets', { token });
+      const data = await loadSupportTicketsWithFallback(token);
       setTickets(Array.isArray(data) ? data : []);
     } catch (e: any) { toast.error('Failed to load tickets: ' + (e.message || '')); }
     finally { setLoading(false); }
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const createTicket = async () => {
     if (!form.subject.trim()) return toast.error('Subject required');
     setSaving(true);
     try {
       const token = await getToken();
-      await api('/ultimateadmin/support/tickets', { method: 'POST', token, body: form });
+      await apiWithRouteFallback('/developer/support/tickets', { method: 'POST', token, body: form }, ['/support/tickets']);
       toast.success('Ticket created');
       setShowCreate(false);
       setForm({ tenantId: '', tenantName: '', issueType: 'general', priority: 'medium', subject: '', description: '' });
@@ -610,7 +905,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
   const updateTicket = async (id: string, patch: any) => {
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/support/tickets/${id}`, { method: 'PUT', token, body: patch });
+      await apiWithRouteFallback(`/developer/support/tickets/${id}`, { method: 'PUT', token, body: patch }, [`/support/tickets/${id}`]);
       toast.success('Ticket updated');
       load();
       setSelected(null);
@@ -622,7 +917,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     setSaving(true);
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } });
+      await apiWithRouteFallback(`/developer/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } }, [`/support/tickets/${selected.id}`]);
       toast.success('Note added');
       setNoteText('');
       load();
@@ -635,7 +930,8 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     const matchSearch = t.subject.toLowerCase().includes(search.toLowerCase()) ||
       t.tenantName.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
+    return matchSearch && matchStatus && matchPriority;
   });
 
   return (
@@ -652,7 +948,15 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
             {TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Priorities</SelectItem>
+            {TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Badge variant="secondary">{filtered.length} {filtered.length === 1 ? 'ticket' : 'tickets'}</Badge>
         <Button size="sm" onClick={() => setShowCreate(true)}><UserPlus className="h-3.5 w-3.5 mr-1" />New Ticket</Button>
       </div>
 
@@ -685,7 +989,12 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => setSelected(t)}><Eye className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => { const token = await getToken(); api(`/ultimateadmin/support/tickets/${t.id}`, { method: 'DELETE', token }).then(() => { toast.success('Deleted'); load(); }); }}>
+                      <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => {
+                        const token = await getToken();
+                        apiWithRouteFallback(`/developer/support/tickets/${t.id}`, { method: 'DELETE', token }, [`/support/tickets/${t.id}`])
+                          .then(() => { toast.success('Deleted'); load(); })
+                          .catch((error: any) => toast.error('Delete failed: ' + (error?.message || '')));
+                      }}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -750,12 +1059,21 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
                 <div><span className="text-gray-500">Priority:</span> <StatusBadge status={selected.priority} /></div>
               </div>
               {selected.description && <p className="text-sm bg-gray-50 p-3 rounded-lg">{selected.description}</p>}
-              <div className="flex items-center gap-2">
-                <Label className="shrink-0">Update Status:</Label>
-                <Select defaultValue={selected.status} onValueChange={v => updateTicket(selected.id, { status: v })}>
-                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                  <SelectContent>{TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <Label className="shrink-0 text-xs">Status:</Label>
+                  <Select defaultValue={selected.status} onValueChange={v => updateTicket(selected.id, { status: v })}>
+                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="shrink-0 text-xs">Priority:</Label>
+                  <Select defaultValue={selected.priority} onValueChange={v => updateTicket(selected.id, { priority: v })}>
+                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
               {/* Notes */}
               <div>
@@ -784,11 +1102,47 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
 
 // ─── License Issues Panel ─────────────────────────────────────────────────────
 function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefresh: () => void }) {
+  const { getToken } = useAuth();
+  const [fixing, setFixing] = useState<string | null>(null);
+
   const problematic = tenants.filter(t => t.licenseStatus !== 'active' && t.licenseStatus !== 'unknown');
+
+  const quickFix = async (tenant: Tenant, durationDays = 30) => {
+    setFixing(tenant.id);
+    try {
+      const token = await getToken();
+      try {
+        await apiWithRouteFallback(`/developer/support/tenants/${tenant.id}/license`, {
+          method: 'PUT', token, body: {
+            status: 'active',
+            durationAmount: String(durationDays),
+            durationUnit: 'days',
+            purchasedLicenses: String(tenant.purchasedLicenses || 1),
+            plan: tenant.plan || 'custom',
+          },
+        }, [`/support/tenants/${tenant.id}/license`]);
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api(`/developer/tenants/${tenant.id}/license`, {
+          method: 'PUT',
+          token,
+          body: { licenses: tenant.purchasedLicenses || 1, plan: tenant.plan || 'custom' },
+        });
+      }
+      toast.success(`License reactivated for ${tenant.name} (+${durationDays}d)`);
+      onRefresh();
+    } catch (e: any) { toast.error('Failed to fix license: ' + (e.message || '')); }
+    finally { setFixing(null); }
+  };
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">{problematic.length} tenants with license issues</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{problematic.length} tenants with license issues</p>
+        {problematic.length > 0 && (
+          <p className="text-xs text-gray-400">Use "Quick Fix" to reactivate for 30 days without payment</p>
+        )}
+      </div>
       <div className="border rounded-lg overflow-auto">
         <Table>
           <TableHeader>
@@ -798,10 +1152,11 @@ function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefre
               <TableHead>Plan</TableHead>
               <TableHead>Seats</TableHead>
               <TableHead>Users</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {problematic.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-green-600 py-8">✓ All licenses are healthy</TableCell></TableRow>}
+            {problematic.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-green-600 py-8">✓ All licenses are healthy</TableCell></TableRow>}
             {problematic.map(t => (
               <TableRow key={t.id}>
                 <TableCell className="font-medium text-sm">{t.name}</TableCell>
@@ -809,6 +1164,19 @@ function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefre
                 <TableCell className="text-sm">{t.plan || '—'}</TableCell>
                 <TableCell className="text-sm">{t.purchasedLicenses}</TableCell>
                 <TableCell className="text-sm">{t.activeUsers}/{t.totalUsers}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" className="text-xs h-7 px-2 text-green-700 border-green-300 hover:bg-green-50"
+                      onClick={() => quickFix(t, 30)} disabled={fixing === t.id} title="Reactivate license for 30 days">
+                      {fixing === t.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
+                      +30d
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs h-7 px-2 text-blue-700 border-blue-300 hover:bg-blue-50"
+                      onClick={() => quickFix(t, 365)} disabled={fixing === t.id} title="Reactivate license for 1 year">
+                      +1y
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -831,21 +1199,33 @@ function AgentsPanel() {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/support/agents', token);
-      const data = await api('/ultimateadmin/support/agents', { token });
+      const data = await loadSupportAgentsWithFallback(token);
       setAgents(Array.isArray(data) ? data : []);
     } catch (e: any) { toast.error('Failed to load agents: ' + (e.message || '')); }
     finally { setLoading(false); }
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const createAgent = async () => {
     if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
     setSaving(true);
     try {
       const token = await getToken();
-      await api('/ultimateadmin/support/agents', { method: 'POST', token, body: form });
+      try {
+        await apiWithRouteFallback('/developer/support/agents', { method: 'POST', token, body: form }, ['/support/agents']);
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api('/developer/platform-users', {
+          method: 'POST',
+          token,
+          body: { name: form.name, email: form.email, role: form.role },
+        });
+      }
       toast.success('Agent created');
       setShowCreate(false);
       setForm({ name: '', email: '', role: 'customer_care' });
@@ -857,10 +1237,34 @@ function AgentsPanel() {
   const toggleStatus = async (agent: Agent) => {
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/support/agents/${agent.id}`, { method: 'PUT', token, body: { status: agent.status === 'active' ? 'inactive' : 'active' } });
+      try {
+        await apiWithRouteFallback(`/developer/support/agents/${agent.id}`, { method: 'PUT', token, body: { status: agent.status === 'active' ? 'inactive' : 'active' } }, [`/support/agents/${agent.id}`]);
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api(`/developer/platform-users/${agent.id}`, {
+          method: 'PUT',
+          token,
+          body: { status: agent.status === 'active' ? 'inactive' : 'active' },
+        });
+      }
       toast.success('Agent updated');
       load();
     } catch (e: any) { toast.error('Update failed: ' + (e.message || '')); }
+  };
+
+  const deleteAgent = async (agent: Agent) => {
+    if (!confirm(`Delete agent ${agent.email}?`)) return;
+    try {
+      const token = await getToken();
+      try {
+        await apiWithRouteFallback(`/developer/support/agents/${agent.id}`, { method: 'DELETE', token }, [`/support/agents/${agent.id}`]);
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api(`/developer/platform-users/${agent.id}`, { method: 'DELETE', token });
+      }
+      toast.success('Agent removed');
+      load();
+    } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
   };
 
   return (
@@ -891,9 +1295,14 @@ function AgentsPanel() {
                   <TableCell><StatusBadge status={a.role} /></TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
                   <TableCell>
-                    <Button size="sm" variant="ghost" onClick={() => toggleStatus(a)}>
-                      {a.status === 'active' ? <Lock className="h-3.5 w-3.5 text-orange-500" /> : <Unlock className="h-3.5 w-3.5 text-green-500" />}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => toggleStatus(a)} title={a.status === 'active' ? 'Deactivate' : 'Activate'}>
+                        {a.status === 'active' ? <Lock className="h-3.5 w-3.5 text-orange-500" /> : <Unlock className="h-3.5 w-3.5 text-green-500" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteAgent(a)} title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -941,14 +1350,17 @@ function PlatformUsersPanel() {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/platform-users', token);
-      const data = await api('/ultimateadmin/platform-users', { token });
+      const data = await loadPlatformUsersWithFallback(token);
       setUsers(Array.isArray(data) ? data : []);
     } catch (e: any) { toast.error('Failed to load platform users: ' + (e.message || '')); }
     finally { setLoading(false); }
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const saveUser = async () => {
     if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
@@ -958,13 +1370,24 @@ function PlatformUsersPanel() {
       if (editUser) {
         const body: any = { name: form.name, role: form.role };
         if (form.password) body.password = form.password;
-        await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body });
+        try {
+          await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body });
+        } catch (error: any) {
+          if (!isRouteNotFoundError(error)) throw error;
+          await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body });
+        }
         toast.success('User updated');
         setTempPassword(null);
       } else {
         const body: any = { name: form.name, email: form.email, role: form.role };
         if (form.password) body.password = form.password;
-        const result = await api('/ultimateadmin/platform-users', { method: 'POST', token, body });
+        let result: any;
+        try {
+          result = await api('/developer/platform-users', { method: 'POST', token, body });
+        } catch (error: any) {
+          if (!isRouteNotFoundError(error)) throw error;
+          result = await api('/ultimateadmin/platform-users', { method: 'POST', token, body });
+        }
         if (result?.tempPassword) {
           setTempPassword(result.tempPassword);
           toast.success(`Platform user created — temp password shown below`);
@@ -986,7 +1409,12 @@ function PlatformUsersPanel() {
     if (!confirm(`Delete platform user ${u.email}?`)) return;
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/platform-users/${u.id}`, { method: 'DELETE', token });
+      try {
+        await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api(`/ultimateadmin/platform-users/${u.id}`, { method: 'DELETE', token });
+      }
       toast.success('User removed');
       load();
     } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
@@ -1007,7 +1435,7 @@ function PlatformUsersPanel() {
         </Button>
       </div>
       <p className="text-sm text-gray-500">
-        Platform users (ultimateadmin, developers, and customer care agents) are granted access directly here.
+        Platform users (developers and customer care agents) are granted access directly here.
         They do not need a tenant subscription or license.
       </p>
       {loading ? (
@@ -1113,11 +1541,9 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/platform-users', token);
-      invalidateCache('/ultimateadmin/assignments', token);
       const [agentsData, assignData] = await Promise.all([
-        api('/ultimateadmin/platform-users', { token }),
-        api('/ultimateadmin/assignments', { token }),
+        loadPlatformUsersWithFallback(token),
+        loadAssignmentsWithFallback(token),
       ]);
       const agents = Array.isArray(agentsData) ? agentsData.filter((u: any) => {
         const r = u.role || '';
@@ -1130,13 +1556,22 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const addAssignment = async () => {
     if (!selectedAgent || selectedTenants.length === 0) return toast.error('Select agent and at least one tenant');
     setSaving(true);
     try {
       const token = await getToken();
-      await api('/ultimateadmin/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+      try {
+        await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api('/ultimateadmin/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+      }
       toast.success('Assignment saved');
       setSelectedAgent('');
       setSelectedTenants([]);
@@ -1148,7 +1583,12 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
   const removeAssignment = async (assignmentId: string) => {
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/assignments/${assignmentId}`, { method: 'DELETE', token });
+      try {
+        await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api(`/ultimateadmin/assignments/${assignmentId}`, { method: 'DELETE', token });
+      }
       toast.success('Assignment removed');
       load();
     } catch (e: any) { toast.error('Remove failed: ' + (e.message || '')); }
@@ -1243,19 +1683,23 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
 
 // ─── All Users Panel ──────────────────────────────────────────────────────────
 function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
-  const { getToken } = useAuth();
+  const { getToken, user: authUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [resetTarget, setResetTarget] = useState<{ email: string } | null>(null);
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const normalizedSupportRole = String(authUser?.role || '').toLowerCase().replace('-', '_');
+  const isDeveloperAdmin = (normalizedSupportRole === 'ultimateadmin' ? 'developer' : normalizedSupportRole) === 'developer';
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/users', token);
-      const data = await api('/ultimateadmin/users', { token });
-      setUsers(Array.isArray(data) ? data : []);
+      const data = await loadDeveloperUsersWithFallback(token);
+      setUsers(data);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
         toast.error('Failed to load users: ' + (e.message || ''));
@@ -1265,6 +1709,21 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+
+  const generateReset = async () => {
+    if (!resetTarget) return;
+    setResetting(true);
+    setResetLink(null);
+    try {
+      const token = await getToken();
+      const res = await apiWithRouteFallback('/developer/support/generate-reset-link', {
+        method: 'POST', token, body: { email: resetTarget.email },
+      }, ['/support/generate-reset-link']);
+      setResetLink(res.resetLink || '(link generated — check Supabase logs)');
+      toast.success('Reset link generated');
+    } catch (e: any) { toast.error('Failed to generate reset link: ' + (e.message || '')); }
+    finally { setResetting(false); }
+  };
 
   const filtered = users.filter(u => {
     const matchSearch = (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -1305,10 +1764,11 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                 <TableHead>Role</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Status</TableHead>
+                {isDeveloperAdmin && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No users found</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={isDeveloperAdmin ? 6 : 5} className="text-center text-gray-400 py-8">No users found</TableCell></TableRow>}
               {filtered.map(u => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-sm">{u.name || '—'}</TableCell>
@@ -1316,12 +1776,49 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                   <TableCell><StatusBadge status={u.role} /></TableCell>
                   <TableCell className="text-sm">{u.companyName || tenants.find(t => t.id === u.companyId)?.name || u.companyId || '—'}</TableCell>
                   <TableCell><StatusBadge status={u.status || 'active'} /></TableCell>
+                  {isDeveloperAdmin && (
+                    <TableCell>
+                      <Button size="sm" variant="ghost" title="Generate Password Reset Link"
+                        onClick={() => { setResetTarget({ email: u.email }); setResetLink(null); }}>
+                        <Key className="h-3.5 w-3.5 text-blue-500" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
+
+      {/* Reset password dialog */}
+      <Dialog open={!!resetTarget} onOpenChange={open => { if (!open) { setResetTarget(null); setResetLink(null); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Generate Password Reset Link</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">Send a password reset link for <strong>{resetTarget?.email}</strong>.</p>
+            {resetLink && (
+              <div className="space-y-1">
+                <Label>Reset Link</Label>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={resetLink} className="font-mono text-xs" />
+                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(resetLink); toast.success('Copied'); }}>
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-400">Send this link to the user. It expires after 24 hours.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetTarget(null); setResetLink(null); }}>Close</Button>
+            <Button onClick={generateReset} disabled={resetting}>
+              {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Key className="h-4 w-4 mr-2" />}
+              Generate Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1347,11 +1844,10 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/chat/threads', token);
-      invalidateCache('/ultimateadmin/users', token);
+      invalidateCache('/developer/chat/threads', token);
       const [threadData, userData] = await Promise.allSettled([
-        api('/ultimateadmin/chat/threads', { token }),
-        api('/ultimateadmin/users', { token }),
+        apiWithRouteFallback('/developer/chat/threads', { token }, ['/support/chat/threads']),
+        loadDeveloperUsersWithFallback(token),
       ]);
       // Check if routes are unavailable (old deployed function) vs real errors
       if (isRouteNotFound(threadData) || isRouteNotFound(userData)) {
@@ -1368,17 +1864,37 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
   }, [getToken]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
+  useEffect(() => {
+    const interval = setInterval(loadThreads, 30_000);
+    return () => clearInterval(interval);
+  }, [loadThreads]);
+  useEffect(() => {
+    if (!activeThread) return;
+    const interval = setInterval(async () => {
+      try {
+        const token = await getToken();
+        const data = await apiWithRouteFallback(
+          `/developer/chat/threads/${activeThread.id}`,
+          { token },
+          [`/support/chat/threads/${activeThread.id}`],
+        );
+        setMessages(Array.isArray(data.messages) ? data.messages : []);
+      } catch {
+        // silent background refresh failure
+      }
+    }, 15_000);
+    return () => clearInterval(interval);
+  }, [activeThread, getToken]);
 
   const loadThread = async (thread: any) => {
     setActiveThread(thread);
     setMsgLoading(true);
     try {
       const token = await getToken();
-      const data = await api(`/ultimateadmin/chat/threads/${thread.id}`, { token });
+      const data = await apiWithRouteFallback(`/developer/chat/threads/${thread.id}`, { token }, [`/support/chat/threads/${thread.id}`]);
       setMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (e: any) {
-      const msg = String(e?.message || '').toLowerCase();
-      if (!msg.includes('route not found') && e?.status !== 404) {
+      if (!isRouteNotFoundError(e)) {
         toast.error('Failed to load messages: ' + (e.message || ''));
       }
     }
@@ -1400,7 +1916,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
         recipientName: activeThread?.recipientName || selectedUser?.name || '',
         tenantId: activeThread?.tenantId || selectedUser?.companyId || '',
       };
-      const result = await api('/ultimateadmin/chat/send', { method: 'POST', token, body });
+      const result = await apiWithRouteFallback('/developer/chat/send', { method: 'POST', token, body }, ['/support/chat/send']);
       setNewMsg('');
       if (!activeThread) {
         // New thread created — load it
@@ -1409,13 +1925,13 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
         setRecipient('');
         // Find and open the new thread
         const freshToken = await getToken();
-        const freshThreads = await api('/ultimateadmin/chat/threads', { token: freshToken });
+        const freshThreads = await apiWithRouteFallback('/developer/chat/threads', { token: freshToken }, ['/support/chat/threads']);
         const newThread = freshThreads.find((t: any) => t.id === result.threadId);
         if (newThread) loadThread(newThread);
       } else {
         // Refresh messages
         const refreshToken = await getToken();
-        const data = await api(`/ultimateadmin/chat/threads/${activeThread.id}`, { token: refreshToken });
+        const data = await apiWithRouteFallback(`/developer/chat/threads/${activeThread.id}`, { token: refreshToken }, [`/support/chat/threads/${activeThread.id}`]);
         setMessages(Array.isArray(data.messages) ? data.messages : []);
       }
     } catch (e: any) { toast.error(e.message || 'Failed to send message'); }
@@ -1493,14 +2009,17 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {msgLoading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
-              {messages.map(m => (
-                <div key={m.id} className={`flex ${m.senderRole === 'ultimateadmin' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-lg p-2 text-sm ${m.senderRole === 'ultimateadmin' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
-                    <p>{m.message}</p>
-                    <p className={`text-xs mt-0.5 ${m.senderRole === 'ultimateadmin' ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(m.sentAt).toLocaleTimeString()}</p>
+              {messages.map(m => {
+                const isDeveloperMessage = ['developer', 'ultimateadmin'].includes(m.senderRole);
+                return (
+                  <div key={m.id} className={`flex ${isDeveloperMessage ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] rounded-lg p-2 text-sm ${isDeveloperMessage ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                      <p>{m.message}</p>
+                      <p className={`text-xs mt-0.5 ${isDeveloperMessage ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(m.sentAt).toLocaleTimeString()}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {messages.length === 0 && !msgLoading && <p className="text-center text-gray-400 text-sm py-4">No messages yet</p>}
             </div>
             <div className="p-3 border-t flex gap-2">
@@ -1553,24 +2072,52 @@ function AuditTrailPanel() {
   const { getToken } = useAuth();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [actionFilter, setActionFilter] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const token = await getToken();
-      invalidateCache('/ultimateadmin/support/audit', token);
-      const data = await api('/ultimateadmin/support/audit', { token });
+      const data = await loadSupportAuditWithFallback(token);
       setLogs(Array.isArray(data) ? data : []);
     } catch (e: any) { toast.error('Failed to load audit logs: ' + (e.message || '')); }
     finally { setLoading(false); }
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  const allActionTypes = [...new Set(logs.map(l => l.actionType).filter(Boolean))].sort();
+
+  const filtered = logs.filter(l => {
+    const matchSearch = !search ||
+      (l.actorEmail || '').toLowerCase().includes(search.toLowerCase()) ||
+      (l.description || '').toLowerCase().includes(search.toLowerCase()) ||
+      (l.tenantId || '').toLowerCase().includes(search.toLowerCase());
+    const matchAction = actionFilter === 'all' || l.actionType === actionFilter;
+    return matchSearch && matchAction;
+  });
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Input className="pl-8" placeholder="Search logs…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <Select value={actionFilter} onValueChange={setActionFilter}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="All actions" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Actions</SelectItem>
+            {allActionTypes.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Badge variant="secondary">{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Badge>
       </div>
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
@@ -1587,8 +2134,8 @@ function AuditTrailPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {logs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No audit logs yet</TableCell></TableRow>}
-              {logs.map(log => (
+              {filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-gray-400 py-8">No audit logs found</TableCell></TableRow>}
+              {filtered.map(log => (
                 <TableRow key={log.id}>
                   <TableCell className="text-xs text-gray-500 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</TableCell>
                   <TableCell className="text-sm">{log.actorEmail}</TableCell>
@@ -1610,18 +2157,36 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
   const { getToken } = useAuth();
   const [selectedTenant, setSelectedTenant] = useState('');
   const [running, setRunning] = useState<string | null>(null);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [generatingReset, setGeneratingReset] = useState(false);
 
   const runRepair = async (action: string) => {
     if (!selectedTenant) return toast.error('Select a tenant first');
     setRunning(action);
     try {
       const token = await getToken();
-      const result = await api(`/ultimateadmin/support/repair/${selectedTenant}`, {
+      const result = await apiWithRouteFallback(`/developer/support/repair/${selectedTenant}`, {
         method: 'POST', token, body: { action },
-      });
+      }, [`/support/repair/${selectedTenant}`]);
       toast.success(`✓ ${action} executed for ${result.tenantId}`);
     } catch (e: any) { toast.error('Repair action failed: ' + (e.message || '')); }
     finally { setRunning(null); }
+  };
+
+  const generateResetLink = async () => {
+    if (!resetEmail.trim()) return toast.error('Enter an email address');
+    setGeneratingReset(true);
+    setResetLink(null);
+    try {
+      const token = await getToken();
+      const res = await apiWithRouteFallback('/developer/support/generate-reset-link', {
+        method: 'POST', token, body: { email: resetEmail.trim() },
+      }, ['/support/generate-reset-link']);
+      setResetLink(res.resetLink || '(link generated — check Supabase logs)');
+      toast.success('Reset link generated');
+    } catch (e: any) { toast.error('Failed: ' + (e.message || '')); }
+    finally { setGeneratingReset(false); }
   };
 
   const tools = [
@@ -1634,7 +2199,7 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <Card className="border-orange-200 bg-orange-50">
         <CardContent className="flex items-center gap-2 pt-4">
           <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
@@ -1642,6 +2207,39 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
         </CardContent>
       </Card>
 
+      {/* Password Reset Link Generator */}
+      <Card>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Key className="h-4 w-4" />Generate Password Reset Link</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-500">Generate a password reset link for any user by email. Link expires after 24 hours.</p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="user@example.com"
+              type="email"
+              value={resetEmail}
+              onChange={e => { setResetEmail(e.target.value); setResetLink(null); }}
+              className="flex-1"
+            />
+            <Button onClick={generateResetLink} disabled={generatingReset || !resetEmail.trim()}>
+              {generatingReset ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Generate
+            </Button>
+          </div>
+          {resetLink && (
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">Reset Link (copy and send to user)</Label>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={resetLink} className="font-mono text-xs flex-1" />
+                <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(resetLink); toast.success('Copied to clipboard'); }}>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tenant Repair Tools */}
       <div>
         <Label>Target Tenant</Label>
         <Select value={selectedTenant} onValueChange={setSelectedTenant}>
@@ -1693,9 +2291,9 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
         <CardContent className="space-y-2">
           <p className="text-sm text-gray-600">
             Platform role assignment is managed by authorized platform administrators.
-            If you need Ultimateadmin or Customer Care access, contact Blumebyte support.
+            If you need Developer or Customer Care access, contact Blumebyte support.
           </p>
-          <p className="text-xs text-gray-500">Ultimateadmin → /developer dashboard. Customer Care → /customer-care dashboard.</p>
+          <p className="text-xs text-gray-500">Developer → /developer dashboard. Customer Care → /customer-care dashboard.</p>
         </CardContent>
       </Card>
     </div>
@@ -1725,29 +2323,34 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const token = await getToken();
-    // Invalidate caches so auto-refresh always fetches fresh data from the server
-    invalidateCache('/ultimateadmin/support/metrics', token);
-    invalidateCache('/ultimateadmin/support/tenants', token);
-    invalidateCache('/ultimateadmin/support/verify', token);
-    const [metricsResult, tenantsResult, profileResult] = await Promise.allSettled([
-      api('/ultimateadmin/support/metrics', { token }),
-      api('/ultimateadmin/support/tenants', { token }),
-      api('/ultimateadmin/support/verify', { token }),
-    ]);
-    if (metricsResult.status === 'fulfilled') setMetrics(metricsResult.value);
-    if (tenantsResult.status === 'fulfilled') setTenants(Array.isArray(tenantsResult.value) ? tenantsResult.value : []);
-    if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
+    try {
+      const token = await getToken();
+      // Invalidate caches so auto-refresh always fetches fresh data from the server
+      invalidateCache('/developer/support/metrics', token);
+      invalidateCache('/developer/support/verify', token);
+      const [metricsResult, tenantsResult, profileResult] = await Promise.allSettled([
+        apiWithRouteFallback('/developer/support/metrics', { token }, ['/support/metrics', '/developer/overview']),
+        loadSupportTenantsWithFallback(token),
+        apiWithRouteFallback('/developer/support/verify', { token }, ['/support/verify']),
+      ]);
+      const tenantList = tenantsResult.status === 'fulfilled' && Array.isArray(tenantsResult.value)
+        ? tenantsResult.value
+        : [];
+      if (tenantsResult.status === 'fulfilled') setTenants(tenantList);
+      if (metricsResult.status === 'fulfilled') setMetrics(normalizeMetricsPayload(metricsResult.value, tenantList));
+      if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
 
-    // Detect stale backend: both metrics and tenants fail with route-not-found
-    const bothMissing = isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
-    setBackendUnavailable(bothMissing);
+      // Detect stale backend: both metrics and tenants fail with route-not-found
+      const bothMissing = isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
+      setBackendUnavailable(bothMissing);
 
-    // Only show error toast if failure is NOT a simple route-not-found (that is handled by the empty-state UI)
-    if (tenantsResult.status === 'rejected' && !isRouteNotFound(tenantsResult)) {
-      toast.error('Failed to load tenant data');
+      // Only show error toast if failure is NOT a simple route-not-found (that is handled by the empty-state UI)
+      if (tenantsResult.status === 'rejected' && !isRouteNotFound(tenantsResult)) {
+        toast.error('Failed to load tenant data');
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [getToken]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -1787,7 +2390,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
             <Shield className="h-4 w-4 text-gray-900" />
           </div>
-          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Ultimateadmin</span>}
+          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Developer</span>}
           {/* Close button on mobile */}
           {!sidebarCollapsed && (
             <button
