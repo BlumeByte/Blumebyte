@@ -12039,22 +12039,65 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
-    const [allEmployees, allSubscriptions, allCompanies, allAgents, allTickets] = await Promise.all([
+    const [allEmployees, allSubscriptions, allCompanies, allAgents, allTickets, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
       kv.getByPrefix('company:'),
       getDynamicPlatformAgents(),
       getAllSupportTickets(),
+      listSupabasePlatformUsers(),
     ]);
 
+    const companyRecordMap = new Map<string, any>();
+    for (const company of allCompanies) {
+      const cid = company?.id || company?.companyId;
+      if (cid) companyRecordMap.set(cid, company);
+    }
+
     const companyMap = new Map<string, { id: string; name: string; usedLicenses: number; purchasedLicenses: number; status: string; createdAt?: string; plan?: string }>();
+    const tenantUserKeys = new Set<string>();
+    const uniqueUsers = new Map<string, { status: string; createdAt?: string }>();
+
+    const registerUser = (opts: { id?: string; email?: string; status?: string; createdAt?: string }) => {
+      const key = opts.id || opts.email;
+      if (!key) return;
+      const normalizedStatus = String(opts.status || '').toLowerCase() || 'unknown';
+      const existing = uniqueUsers.get(key);
+      if (!existing) {
+        uniqueUsers.set(key, { status: normalizedStatus, createdAt: opts.createdAt });
+        return;
+      }
+      const mergedStatus = existing.status === 'active' || normalizedStatus === 'active'
+        ? 'active'
+        : existing.status || normalizedStatus;
+      uniqueUsers.set(key, {
+        status: mergedStatus,
+        createdAt: existing.createdAt || opts.createdAt,
+      });
+    };
+
+    const registerTenantUsage = (companyId: string, userKey: string, status?: string) => {
+      if (!companyId || !userKey || !companyMap.has(companyId)) return;
+      const dedupeKey = `${companyId}:${userKey}`;
+      if (tenantUserKeys.has(dedupeKey)) return;
+      tenantUserKeys.add(dedupeKey);
+      if (String(status || '').toLowerCase() === 'active') companyMap.get(companyId)!.usedLicenses++;
+    };
+
     for (const emp of allEmployees) {
       const cid = emp.companyId || emp.company;
       if (!cid) continue;
       if (!companyMap.has(cid)) {
         companyMap.set(cid, { id: cid, name: emp.companyName || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'active' });
       }
-      if (emp.status === 'active') companyMap.get(cid)!.usedLicenses++;
+      const userKey = emp.id || emp.userId || emp.email;
+      registerTenantUsage(cid, userKey, emp.status);
+      registerUser({
+        id: emp.id || emp.userId,
+        email: emp.email,
+        status: emp.status,
+        createdAt: emp.createdAt,
+      });
     }
     for (const c of allCompanies) {
       const cid = c.id || c.companyId;
@@ -12068,9 +12111,48 @@ const getUltimateadminSupportMetrics = async (c: any) => {
         if (c.plan) entry.plan = c.plan;
       }
     }
+    for (const authUser of supabaseUsers) {
+      const meta = authUser?.user_metadata || {};
+      const cid = meta.companyId || meta.company;
+      if (cid && !companyMap.has(cid)) {
+        const companyRecord = companyRecordMap.get(cid);
+        companyMap.set(cid, {
+          id: cid,
+          name: companyRecord?.name || meta.companyName || authUser?.email || cid,
+          usedLicenses: 0,
+          purchasedLicenses: 0,
+          status: 'unknown',
+          createdAt: companyRecord?.createdAt || authUser?.created_at,
+          plan: companyRecord?.plan || meta.plan,
+        });
+      }
+      if (cid) {
+        const userKey = authUser?.id || authUser?.email;
+        registerTenantUsage(cid, userKey, meta.status);
+      }
+      registerUser({
+        id: authUser?.id,
+        email: authUser?.email,
+        status: meta.status,
+        createdAt: authUser?.created_at,
+      });
+    }
     for (const sub of allSubscriptions) {
       const cid = sub.companyId || sub.company;
-      if (cid && companyMap.has(cid)) {
+      if (!cid) continue;
+      if (!companyMap.has(cid)) {
+        const companyRecord = companyRecordMap.get(cid);
+        companyMap.set(cid, {
+          id: cid,
+          name: companyRecord?.name || sub.companyName || cid,
+          usedLicenses: 0,
+          purchasedLicenses: 0,
+          status: 'unknown',
+          createdAt: companyRecord?.createdAt,
+          plan: companyRecord?.plan || sub.plan || sub.planName,
+        });
+      }
+      if (companyMap.has(cid)) {
         const entry = companyMap.get(cid)!;
         entry.purchasedLicenses = sub.purchasedLicenses || sub.userCount || sub.licenses || 0;
         if (!entry.plan) entry.plan = sub.plan || sub.planName || entry.plan;
@@ -12111,8 +12193,8 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     }).length;
 
     // User stats
-    const totalUsers = allEmployees.length;
-    const activeUsers = allEmployees.filter((e: any) => e.status === 'active').length;
+    const totalUsers = uniqueUsers.size;
+    const activeUsers = [...uniqueUsers.values()].filter((u) => u.status === 'active').length;
 
     // New tenants / users in the last 30 days
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -12120,8 +12202,8 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       const d = t.createdAt ? new Date(t.createdAt) : null;
       return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
     }).length;
-    const newUsersLast30Days = allEmployees.filter((e: any) => {
-      const d = e.createdAt ? new Date(e.createdAt) : null;
+    const newUsersLast30Days = [...uniqueUsers.values()].filter((u) => {
+      const d = u.createdAt ? new Date(u.createdAt) : null;
       return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
     }).length;
 
@@ -12204,6 +12286,7 @@ const listUltimateadminSupportTenants = async (c: any) => {
 
     // Build tenant list from employee records (superadmin entries carry company metadata)
     const tenantMap = new Map<string, any>();
+    const tenantUserMap = new Map<string, Set<string>>();
     for (const emp of allEmployees) {
       const cid = emp.companyId || emp.company;
       if (!cid) continue;
@@ -12219,8 +12302,16 @@ const listUltimateadminSupportTenants = async (c: any) => {
         });
       }
       const t = tenantMap.get(cid)!;
-      t.totalUsers++;
-      if (emp.status === 'active') t.activeUsers++;
+      const userKey = String(emp.id || emp.userId || emp.email || '');
+      if (userKey) {
+        if (!tenantUserMap.has(cid)) tenantUserMap.set(cid, new Set());
+        const knownUsers = tenantUserMap.get(cid)!;
+        if (!knownUsers.has(userKey)) {
+          knownUsers.add(userKey);
+          t.totalUsers++;
+          if (String(emp.status || '').toLowerCase() === 'active') t.activeUsers++;
+        }
+      }
     }
 
     // Include tenant references from auth metadata (handles users that exist in auth
@@ -12241,8 +12332,16 @@ const listUltimateadminSupportTenants = async (c: any) => {
         });
       }
       const t = tenantMap.get(cid)!;
-      t.totalUsers++;
-      if (String(meta.status || '').toLowerCase() === 'active') t.activeUsers++;
+      const userKey = String(authUser?.id || authUser?.email || '');
+      if (userKey) {
+        if (!tenantUserMap.has(cid)) tenantUserMap.set(cid, new Set());
+        const knownUsers = tenantUserMap.get(cid)!;
+        if (!knownUsers.has(userKey)) {
+          knownUsers.add(userKey);
+          t.totalUsers++;
+          if (String(meta.status || '').toLowerCase() === 'active') t.activeUsers++;
+        }
+      }
     }
 
 
@@ -12262,10 +12361,17 @@ const listUltimateadminSupportTenants = async (c: any) => {
 
     const tenants = [...tenantMap.entries()].map(([cid, t]) => {
       const sub = subMap.get(cid);
+      const inferredStatus = (() => {
+        const endDate = sub?.endDate || sub?.expiresAt;
+        if (!endDate) return 'unknown';
+        const d = new Date(endDate);
+        if (Number.isNaN(d.getTime())) return 'unknown';
+        return d > new Date() ? 'active' : 'expired';
+      })();
       return {
         ...t,
-        licenseStatus: sub?.status || 'unknown',
-        purchasedLicenses: sub?.purchasedLicenses || 0,
+        licenseStatus: sub?.status || inferredStatus,
+        purchasedLicenses: sub?.purchasedLicenses || sub?.userCount || sub?.licenses || 0,
         plan: sub?.plan || sub?.planName || 'unknown',
         lastActivity: sub?.updatedAt || t.createdAt || '',
       };
@@ -12296,17 +12402,49 @@ const listUltimateadminSupportTenantUsers = async (c: any) => {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
-    const allEmployees = await kv.getByPrefix('employee:');
-    const users = allEmployees
+    const [allEmployees, supabaseUsers] = await Promise.all([
+      kv.getByPrefix('employee:'),
+      listSupabasePlatformUsers(),
+    ]);
+    const kvUsers = allEmployees
       .filter((e: any) => e.companyId === tenantId || e.company === tenantId)
       .map((e: any) => ({
-        id: e.id || e.userId,
-        name: e.name || e.fullName || e.email,
-        email: e.email,
-        role: e.role,
-        status: e.status,
+        id: e.id || e.userId || '',
+        name: e.name || e.fullName || e.email || '',
+        email: e.email || '',
+        role: e.role || '',
+        status: e.status || 'unknown',
       }));
-    return c.json(users);
+    const authUsers = supabaseUsers
+      .filter((u: any) => {
+        const meta = u?.user_metadata || {};
+        return meta.companyId === tenantId || meta.company === tenantId;
+      })
+      .map((u: any) => {
+        const meta = u?.user_metadata || {};
+        return {
+          id: u?.id || '',
+          name: meta.name || u?.email || '',
+          email: u?.email || '',
+          role: meta.role || '',
+          status: meta.status || 'unknown',
+        };
+      });
+
+    const usersById = new Map<string, any>();
+    for (const user of [...authUsers, ...kvUsers]) {
+      const idKey = user.id || user.email;
+      if (!idKey) continue;
+      const existing = usersById.get(idKey) || {};
+      usersById.set(idKey, {
+        id: user.id || existing.id || '',
+        name: user.name || existing.name || user.email || '',
+        email: user.email || existing.email || '',
+        role: user.role || existing.role || '',
+        status: user.status || existing.status || 'unknown',
+      });
+    }
+    return c.json([...usersById.values()]);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
