@@ -12061,7 +12061,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     const registerUser = (opts: { id?: string; email?: string; status?: string; createdAt?: string }) => {
       const key = opts.id || opts.email;
       if (!key) return;
-      const normalizedStatus = String(opts.status || '').toLowerCase() || 'unknown';
+      const normalizedStatus = String(opts.status || 'unknown').toLowerCase();
       const existing = uniqueUsers.get(key);
       if (!existing) {
         uniqueUsers.set(key, { status: normalizedStatus, createdAt: opts.createdAt });
@@ -12081,7 +12081,9 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       const dedupeKey = `${companyId}:${userKey}`;
       if (tenantUserKeys.has(dedupeKey)) return;
       tenantUserKeys.add(dedupeKey);
-      if (String(status || '').toLowerCase() === 'active') companyMap.get(companyId)!.usedLicenses++;
+      const entry = companyMap.get(companyId);
+      if (!entry) return;
+      if (String(status || '').toLowerCase() === 'active') entry.usedLicenses++;
     };
 
     for (const emp of allEmployees) {
@@ -12332,7 +12334,7 @@ const listUltimateadminSupportTenants = async (c: any) => {
         });
       }
       const t = tenantMap.get(cid)!;
-      const userKey = String(authUser?.id || authUser?.email || '');
+      const userKey = String(authUser?.id || authUser?.user_id || authUser?.email || '');
       if (userKey) {
         if (!tenantUserMap.has(cid)) tenantUserMap.set(cid, new Set());
         const knownUsers = tenantUserMap.get(cid)!;
@@ -12433,15 +12435,18 @@ const listUltimateadminSupportTenantUsers = async (c: any) => {
 
     const usersById = new Map<string, any>();
     for (const user of [...authUsers, ...kvUsers]) {
-      const idKey = user.id || user.email;
+      const idKey = String(user.id || user.email || '');
       if (!idKey) continue;
       const existing = usersById.get(idKey) || {};
+      const mergedStatus = existing.status === 'active' || user.status === 'active'
+        ? 'active'
+        : (user.status || existing.status || 'unknown');
       usersById.set(idKey, {
         id: user.id || existing.id || '',
         name: user.name || existing.name || user.email || '',
         email: user.email || existing.email || '',
         role: user.role || existing.role || '',
-        status: user.status || existing.status || 'unknown',
+        status: mergedStatus,
       });
     }
     return c.json([...usersById.values()]);
