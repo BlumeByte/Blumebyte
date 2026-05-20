@@ -111,7 +111,7 @@ async function loadSupportTenantsWithFallback(token?: string | null) {
 
 async function loadSupportTenantUsersWithFallback(tenantId: string, token?: string | null) {
   try {
-    const data = await apiWithRouteFallback(`/ultimateadmin/support/tenants/${tenantId}/users`, { token }, []);
+    const data = await apiWithRouteFallback(`/ultimateadmin/support/tenants/${tenantId}/users`, { token }, [`/support/tenants/${tenantId}/users`]);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -168,7 +168,7 @@ async function loadAssignmentsWithFallback(token?: string | null) {
 async function loadSupportTicketsWithFallback(token?: string | null) {
   invalidateCache('/ultimateadmin/support/tickets', token);
   try {
-    const data = await api('/ultimateadmin/support/tickets', { token });
+    const data = await apiWithRouteFallback('/ultimateadmin/support/tickets', { token }, ['/support/tickets']);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -180,7 +180,7 @@ async function loadSupportTicketsWithFallback(token?: string | null) {
 async function loadSupportAgentsWithFallback(token?: string | null) {
   invalidateCache('/ultimateadmin/support/agents', token);
   try {
-    const data = await api('/ultimateadmin/support/agents', { token });
+    const data = await apiWithRouteFallback('/ultimateadmin/support/agents', { token }, ['/support/agents']);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -203,7 +203,7 @@ async function loadSupportAgentsWithFallback(token?: string | null) {
 async function loadSupportAuditWithFallback(token?: string | null) {
   invalidateCache('/ultimateadmin/support/audit', token);
   try {
-    const data = await api('/ultimateadmin/support/audit', { token });
+    const data = await apiWithRouteFallback('/ultimateadmin/support/audit', { token }, ['/support/audit']);
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
@@ -217,6 +217,96 @@ async function loadSupportAuditWithFallback(token?: string | null) {
       description: entry.description || JSON.stringify(entry.details || {}),
     })) : [];
   }
+}
+
+function toNumber(value: any, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeMetricsPayload(raw: any, tenants: Tenant[]): Metrics {
+  const planBreakdown: Record<string, number> = {};
+  let purchased = 0;
+  let used = 0;
+  const recentTenants = [...tenants]
+    .filter((t) => !!t.createdAt)
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 10)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      status: t.licenseStatus || 'unknown',
+      createdAt: t.createdAt || '',
+      plan: t.plan || 'unknown',
+    }));
+
+  for (const tenant of tenants) {
+    const plan = String(tenant.plan || 'unknown').toLowerCase();
+    planBreakdown[plan] = (planBreakdown[plan] || 0) + 1;
+    purchased += toNumber(tenant.purchasedLicenses, 0);
+    used += toNumber(tenant.activeUsers, 0);
+  }
+
+  const totalTenants = toNumber(raw?.totalTenants, tenants.length);
+  const activeTenants = toNumber(
+    raw?.activeTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'active').length,
+  );
+  const expiredTenants = toNumber(
+    raw?.expiredTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'expired').length,
+  );
+  const suspendedTenants = toNumber(
+    raw?.suspendedTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'suspended').length,
+  );
+  const trialTenants = toNumber(
+    raw?.trialTenants,
+    tenants.filter((t) => (t.licenseStatus || '').toLowerCase() === 'trial').length,
+  );
+
+  const normalized: Metrics = {
+    totalTenants,
+    activeTenants,
+    expiredTenants,
+    suspendedTenants,
+    trialTenants,
+    openTickets: toNumber(raw?.openTickets, 0),
+    pendingTickets: toNumber(raw?.pendingTickets, 0),
+    criticalTickets: toNumber(raw?.criticalTickets, 0),
+    resolvedToday: toNumber(raw?.resolvedToday, 0),
+    totalAgents: toNumber(raw?.totalAgents, raw?.totalCustomerCareAgents || 0),
+    totalTickets: toNumber(raw?.totalTickets, raw?.openTickets || 0),
+    totalUsers: toNumber(raw?.totalUsers, 0),
+    activeUsers: toNumber(raw?.activeUsers, 0),
+    newTenantsLast30Days: toNumber(raw?.newTenantsLast30Days, 0),
+    newUsersLast30Days: toNumber(raw?.newUsersLast30Days, 0),
+    planBreakdown: (raw?.planBreakdown && Object.keys(raw.planBreakdown).length > 0)
+      ? raw.planBreakdown
+      : planBreakdown,
+    licenseUtilization: raw?.licenseUtilization && typeof raw.licenseUtilization === 'object'
+      ? {
+        purchased: toNumber(raw.licenseUtilization.purchased, purchased),
+        used: toNumber(raw.licenseUtilization.used, used),
+        available: toNumber(raw.licenseUtilization.available, Math.max(0, purchased - used)),
+      }
+      : {
+        purchased,
+        used,
+        available: Math.max(0, purchased - used),
+      },
+    recentTenants: Array.isArray(raw?.recentTenants) && raw.recentTenants.length > 0
+      ? raw.recentTenants.map((t: any) => ({
+        id: String(t?.id || t?.tenantId || ''),
+        name: t?.name || t?.companyName || 'Unknown Tenant',
+        status: t?.status || 'unknown',
+        createdAt: t?.createdAt || t?.created_at || '',
+        plan: t?.plan || 'unknown',
+      }))
+      : recentTenants,
+  };
+
+  return normalized;
 }
 
 const SIDEBAR_ITEMS = [
@@ -461,9 +551,9 @@ function TenantsPanel() {
     try {
       const token = await getToken();
       try {
-        await api(`/ultimateadmin/support/tenants/${tenant.id}/suspend`, {
+        await apiWithRouteFallback(`/ultimateadmin/support/tenants/${tenant.id}/suspend`, {
           method: 'POST', token, body: { restore: isSuspended },
-        });
+        }, [`/support/tenants/${tenant.id}/suspend`]);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api(`/developer/tenants/${tenant.id}/${isSuspended ? 'reinstate' : 'suspend'}`, {
@@ -492,7 +582,7 @@ function TenantsPanel() {
         body.durationUnit = licenseForm.durationUnit;
       }
       try {
-        await api(`/ultimateadmin/support/tenants/${selected.id}/license`, { method: 'PUT', token, body });
+        await apiWithRouteFallback(`/ultimateadmin/support/tenants/${selected.id}/license`, { method: 'PUT', token, body }, [`/support/tenants/${selected.id}/license`]);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         const legacyBody: any = {
@@ -513,9 +603,9 @@ function TenantsPanel() {
     setSaving(true);
     try {
       const token = await getToken();
-      await api('/ultimateadmin/support/tenants', {
+      await apiWithRouteFallback('/ultimateadmin/support/tenants', {
         method: 'POST', token, body: createForm,
-      });
+      }, ['/support/tenants']);
       toast.success(`Tenant "${createForm.name}" created`);
       setCreateDialog(false);
       setCreateForm({ name: '', industry: '', plan: 'custom', purchasedLicenses: '0', durationAmount: '30', durationUnit: 'days' });
@@ -530,9 +620,9 @@ function TenantsPanel() {
     setSaving(true);
     try {
       const token = await getToken();
-      const result = await api(`/ultimateadmin/support/tenants/${selected.id}/users`, {
+      const result = await apiWithRouteFallback(`/ultimateadmin/support/tenants/${selected.id}/users`, {
         method: 'POST', token, body: createUserForm,
-      });
+      }, [`/support/tenants/${selected.id}/users`]);
       toast.success(`User created${result.tempPassword ? ` — temp password: ${result.tempPassword}` : ''}`);
       setCreateUserDialog(false);
       setCreateUserForm({ name: '', email: '', role: 'superadmin', password: '' });
@@ -785,13 +875,17 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const createTicket = async () => {
     if (!form.subject.trim()) return toast.error('Subject required');
     setSaving(true);
     try {
       const token = await getToken();
-      await api('/ultimateadmin/support/tickets', { method: 'POST', token, body: form });
+      await apiWithRouteFallback('/ultimateadmin/support/tickets', { method: 'POST', token, body: form }, ['/support/tickets']);
       toast.success('Ticket created');
       setShowCreate(false);
       setForm({ tenantId: '', tenantName: '', issueType: 'general', priority: 'medium', subject: '', description: '' });
@@ -803,7 +897,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
   const updateTicket = async (id: string, patch: any) => {
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/support/tickets/${id}`, { method: 'PUT', token, body: patch });
+      await apiWithRouteFallback(`/ultimateadmin/support/tickets/${id}`, { method: 'PUT', token, body: patch }, [`/support/tickets/${id}`]);
       toast.success('Ticket updated');
       load();
       setSelected(null);
@@ -815,7 +909,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     setSaving(true);
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } });
+      await apiWithRouteFallback(`/ultimateadmin/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } }, [`/support/tickets/${selected.id}`]);
       toast.success('Note added');
       setNoteText('');
       load();
@@ -887,7 +981,12 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => setSelected(t)}><Eye className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => { const token = await getToken(); api(`/ultimateadmin/support/tickets/${t.id}`, { method: 'DELETE', token }).then(() => { toast.success('Deleted'); load(); }); }}>
+                      <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => {
+                        const token = await getToken();
+                        apiWithRouteFallback(`/ultimateadmin/support/tickets/${t.id}`, { method: 'DELETE', token }, [`/support/tickets/${t.id}`])
+                          .then(() => { toast.success('Deleted'); load(); })
+                          .catch((error: any) => toast.error('Delete failed: ' + (error?.message || '')));
+                      }}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -1004,15 +1103,24 @@ function LicenseIssuesPanel({ tenants, onRefresh }: { tenants: Tenant[]; onRefre
     setFixing(tenant.id);
     try {
       const token = await getToken();
-      await api(`/ultimateadmin/support/tenants/${tenant.id}/license`, {
-        method: 'PUT', token, body: {
-          status: 'active',
-          durationAmount: String(durationDays),
-          durationUnit: 'days',
-          purchasedLicenses: String(tenant.purchasedLicenses || 1),
-          plan: tenant.plan || 'custom',
-        },
-      });
+      try {
+        await apiWithRouteFallback(`/ultimateadmin/support/tenants/${tenant.id}/license`, {
+          method: 'PUT', token, body: {
+            status: 'active',
+            durationAmount: String(durationDays),
+            durationUnit: 'days',
+            purchasedLicenses: String(tenant.purchasedLicenses || 1),
+            plan: tenant.plan || 'custom',
+          },
+        }, [`/support/tenants/${tenant.id}/license`]);
+      } catch (error: any) {
+        if (!isRouteNotFoundError(error)) throw error;
+        await api(`/developer/tenants/${tenant.id}/license`, {
+          method: 'PUT',
+          token,
+          body: { licenses: tenant.purchasedLicenses || 1, plan: tenant.plan || 'custom' },
+        });
+      }
       toast.success(`License reactivated for ${tenant.name} (+${durationDays}d)`);
       onRefresh();
     } catch (e: any) { toast.error('Failed to fix license: ' + (e.message || '')); }
@@ -1090,6 +1198,10 @@ function AgentsPanel() {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const createAgent = async () => {
     if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
@@ -1097,7 +1209,7 @@ function AgentsPanel() {
     try {
       const token = await getToken();
       try {
-        await api('/ultimateadmin/support/agents', { method: 'POST', token, body: form });
+        await apiWithRouteFallback('/ultimateadmin/support/agents', { method: 'POST', token, body: form }, ['/support/agents']);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api('/developer/platform-users', {
@@ -1118,7 +1230,7 @@ function AgentsPanel() {
     try {
       const token = await getToken();
       try {
-        await api(`/ultimateadmin/support/agents/${agent.id}`, { method: 'PUT', token, body: { status: agent.status === 'active' ? 'inactive' : 'active' } });
+        await apiWithRouteFallback(`/ultimateadmin/support/agents/${agent.id}`, { method: 'PUT', token, body: { status: agent.status === 'active' ? 'inactive' : 'active' } }, [`/support/agents/${agent.id}`]);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api(`/developer/platform-users/${agent.id}`, {
@@ -1137,7 +1249,7 @@ function AgentsPanel() {
     try {
       const token = await getToken();
       try {
-        await api(`/ultimateadmin/support/agents/${agent.id}`, { method: 'DELETE', token });
+        await apiWithRouteFallback(`/ultimateadmin/support/agents/${agent.id}`, { method: 'DELETE', token }, [`/support/agents/${agent.id}`]);
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
         await api(`/developer/platform-users/${agent.id}`, { method: 'DELETE', token });
@@ -1237,6 +1349,10 @@ function PlatformUsersPanel() {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const saveUser = async () => {
     if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
@@ -1432,6 +1548,10 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const addAssignment = async () => {
     if (!selectedAgent || selectedTenants.length === 0) return toast.error('Select agent and at least one tenant');
@@ -1587,9 +1707,9 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
     setResetLink(null);
     try {
       const token = await getToken();
-      const res = await api('/ultimateadmin/support/generate-reset-link', {
+      const res = await apiWithRouteFallback('/ultimateadmin/support/generate-reset-link', {
         method: 'POST', token, body: { email: resetTarget.email },
-      });
+      }, ['/support/generate-reset-link']);
       setResetLink(res.resetLink || '(link generated — check Supabase logs)');
       toast.success('Reset link generated');
     } catch (e: any) { toast.error('Failed to generate reset link: ' + (e.message || '')); }
@@ -1717,7 +1837,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
       const token = await getToken();
       invalidateCache('/ultimateadmin/chat/threads', token);
       const [threadData, userData] = await Promise.allSettled([
-        api('/ultimateadmin/chat/threads', { token }),
+        apiWithRouteFallback('/ultimateadmin/chat/threads', { token }, ['/support/chat/threads']),
         loadUltimateadminUsersWithFallback(token),
       ]);
       // Check if routes are unavailable (old deployed function) vs real errors
@@ -1735,13 +1855,34 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
   }, [getToken]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
+  useEffect(() => {
+    const interval = setInterval(loadThreads, 20_000);
+    return () => clearInterval(interval);
+  }, [loadThreads]);
+  useEffect(() => {
+    if (!activeThread) return;
+    const interval = setInterval(async () => {
+      try {
+        const token = await getToken();
+        const data = await apiWithRouteFallback(
+          `/ultimateadmin/chat/threads/${activeThread.id}`,
+          { token },
+          [`/support/chat/threads/${activeThread.id}`],
+        );
+        setMessages(Array.isArray(data.messages) ? data.messages : []);
+      } catch {
+        // silent background refresh failure
+      }
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, [activeThread, getToken]);
 
   const loadThread = async (thread: any) => {
     setActiveThread(thread);
     setMsgLoading(true);
     try {
       const token = await getToken();
-      const data = await api(`/ultimateadmin/chat/threads/${thread.id}`, { token });
+      const data = await apiWithRouteFallback(`/ultimateadmin/chat/threads/${thread.id}`, { token }, [`/support/chat/threads/${thread.id}`]);
       setMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
@@ -1766,7 +1907,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
         recipientName: activeThread?.recipientName || selectedUser?.name || '',
         tenantId: activeThread?.tenantId || selectedUser?.companyId || '',
       };
-      const result = await api('/ultimateadmin/chat/send', { method: 'POST', token, body });
+      const result = await apiWithRouteFallback('/ultimateadmin/chat/send', { method: 'POST', token, body }, ['/support/chat/send']);
       setNewMsg('');
       if (!activeThread) {
         // New thread created — load it
@@ -1775,13 +1916,13 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
         setRecipient('');
         // Find and open the new thread
         const freshToken = await getToken();
-        const freshThreads = await api('/ultimateadmin/chat/threads', { token: freshToken });
+        const freshThreads = await apiWithRouteFallback('/ultimateadmin/chat/threads', { token: freshToken }, ['/support/chat/threads']);
         const newThread = freshThreads.find((t: any) => t.id === result.threadId);
         if (newThread) loadThread(newThread);
       } else {
         // Refresh messages
         const refreshToken = await getToken();
-        const data = await api(`/ultimateadmin/chat/threads/${activeThread.id}`, { token: refreshToken });
+        const data = await apiWithRouteFallback(`/ultimateadmin/chat/threads/${activeThread.id}`, { token: refreshToken }, [`/support/chat/threads/${activeThread.id}`]);
         setMessages(Array.isArray(data.messages) ? data.messages : []);
       }
     } catch (e: any) { toast.error(e.message || 'Failed to send message'); }
@@ -1933,6 +2074,10 @@ function AuditTrailPanel() {
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const allActionTypes = [...new Set(logs.map(l => l.actionType).filter(Boolean))].sort();
 
@@ -2009,9 +2154,9 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
     setRunning(action);
     try {
       const token = await getToken();
-      const result = await api(`/ultimateadmin/support/repair/${selectedTenant}`, {
+      const result = await apiWithRouteFallback(`/ultimateadmin/support/repair/${selectedTenant}`, {
         method: 'POST', token, body: { action },
-      });
+      }, [`/support/repair/${selectedTenant}`]);
       toast.success(`✓ ${action} executed for ${result.tenantId}`);
     } catch (e: any) { toast.error('Repair action failed: ' + (e.message || '')); }
     finally { setRunning(null); }
@@ -2023,9 +2168,9 @@ function DevToolsPanel({ tenants }: { tenants: Tenant[] }) {
     setResetLink(null);
     try {
       const token = await getToken();
-      const res = await api('/ultimateadmin/support/generate-reset-link', {
+      const res = await apiWithRouteFallback('/ultimateadmin/support/generate-reset-link', {
         method: 'POST', token, body: { email: resetEmail.trim() },
-      });
+      }, ['/support/generate-reset-link']);
       setResetLink(res.resetLink || '(link generated — check Supabase logs)');
       toast.success('Reset link generated');
     } catch (e: any) { toast.error('Failed: ' + (e.message || '')); }
@@ -2176,8 +2321,11 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
         loadSupportTenantsWithFallback(token),
         apiWithRouteFallback('/ultimateadmin/support/verify', { token }, ['/support/verify']),
       ]);
-      if (metricsResult.status === 'fulfilled') setMetrics(metricsResult.value);
-      if (tenantsResult.status === 'fulfilled') setTenants(Array.isArray(tenantsResult.value) ? tenantsResult.value : []);
+      const tenantList = tenantsResult.status === 'fulfilled' && Array.isArray(tenantsResult.value)
+        ? tenantsResult.value
+        : [];
+      if (tenantsResult.status === 'fulfilled') setTenants(tenantList);
+      if (metricsResult.status === 'fulfilled') setMetrics(normalizeMetricsPayload(metricsResult.value, tenantList));
       if (profileResult.status === 'fulfilled') setMyProfile(profileResult.value);
 
       // Detect stale backend: both metrics and tenants fail with route-not-found

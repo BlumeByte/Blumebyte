@@ -12049,12 +12049,12 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       getAllSupportTickets(),
     ]);
 
-    const companyMap = new Map<string, { name: string; usedLicenses: number; purchasedLicenses: number; status: string }>();
+    const companyMap = new Map<string, { id: string; name: string; usedLicenses: number; purchasedLicenses: number; status: string; createdAt?: string; plan?: string }>();
     for (const emp of allEmployees) {
       const cid = emp.companyId || emp.company;
       if (!cid) continue;
       if (!companyMap.has(cid)) {
-        companyMap.set(cid, { name: emp.companyName || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'active' });
+        companyMap.set(cid, { id: cid, name: emp.companyName || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'active' });
       }
       if (emp.status === 'active') companyMap.get(cid)!.usedLicenses++;
     }
@@ -12062,7 +12062,12 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       const cid = c.id || c.companyId;
       if (!cid) continue;
       if (!companyMap.has(cid)) {
-        companyMap.set(cid, { name: c.name || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'unknown' });
+        companyMap.set(cid, { id: cid, name: c.name || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'unknown', createdAt: c.createdAt, plan: c.plan });
+      } else {
+        const entry = companyMap.get(cid)!;
+        if (c.name) entry.name = c.name;
+        if (c.createdAt) entry.createdAt = c.createdAt;
+        if (c.plan) entry.plan = c.plan;
       }
     }
     for (const sub of allSubscriptions) {
@@ -12070,6 +12075,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       if (cid && companyMap.has(cid)) {
         const entry = companyMap.get(cid)!;
         entry.purchasedLicenses = sub.purchasedLicenses || sub.userCount || sub.licenses || 0;
+        if (!entry.plan) entry.plan = sub.plan || sub.planName || entry.plan;
         const fallbackEndDate = sub.endDate || sub.expiresAt;
         const parsedFallbackEndDate = fallbackEndDate ? new Date(fallbackEndDate) : null;
         const hasValidFallbackEndDate = !!parsedFallbackEndDate && !Number.isNaN(parsedFallbackEndDate.getTime());
@@ -12139,7 +12145,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       .filter(t => t.createdAt)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10)
-      .map(t => ({ id: t.name, name: t.name, status: t.status, createdAt: t.createdAt, plan: t.plan }));
+      .map(t => ({ id: t.id, name: t.name, status: t.status, createdAt: t.createdAt, plan: t.plan }));
 
     return c.json({
       totalTenants,
@@ -12618,7 +12624,7 @@ const setUltimateadminPlatformUser = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/set-platform-user')) app.post(route, setUltimateadminPlatformUser);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/set-platform-user', '/support/set-platform-user')) app.post(route, setUltimateadminPlatformUser);
 
 // POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (ultimateadmin only)
 const generateUltimateadminResetLink = async (c: any) => {
@@ -12647,7 +12653,7 @@ const generateUltimateadminResetLink = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/generate-reset-link')) app.post(route, generateUltimateadminResetLink);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/generate-reset-link', '/support/generate-reset-link')) app.post(route, generateUltimateadminResetLink);
 
 // POST /ultimateadmin/support/repair/:tenantId — run quick repair actions
 const repairUltimateadminTenant = async (c: any) => {
@@ -12671,7 +12677,7 @@ const repairUltimateadminTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/support/repair/:tenantId')) app.post(route, repairUltimateadminTenant);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/repair/:tenantId', '/support/repair/:tenantId')) app.post(route, repairUltimateadminTenant);
 
 // POST /ultimateadmin/support/tenants — create a new tenant without payment
 const createUltimateadminSupportTenant = async (c: any) => {
@@ -12850,7 +12856,7 @@ const listUltimateadminChatThreads = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/chat/threads')) app.get(route, listUltimateadminChatThreads);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads', '/support/chat/threads')) app.get(route, listUltimateadminChatThreads);
 
 // GET /ultimateadmin/chat/threads/:threadId — get thread messages
 const getUltimateadminChatThread = async (c: any) => {
@@ -12868,7 +12874,7 @@ const getUltimateadminChatThread = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/chat/threads/:threadId')) app.get(route, getUltimateadminChatThread);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads/:threadId', '/support/chat/threads/:threadId')) app.get(route, getUltimateadminChatThread);
 
 // POST /ultimateadmin/chat/send — send a message to a tenant user (creates thread if needed)
 const sendUltimateadminChatMessage = async (c: any) => {
@@ -12919,7 +12925,7 @@ const sendUltimateadminChatMessage = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePaths('/ultimateadmin/chat/send')) app.post(route, sendUltimateadminChatMessage);
+for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/send', '/support/chat/send')) app.post(route, sendUltimateadminChatMessage);
 
 // ── Ultimateadmin canonical aliases for /developer/* endpoints ─────────────────
 // Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
