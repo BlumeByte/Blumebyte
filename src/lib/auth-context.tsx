@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from './supabase';
 import { api } from './api-client';
 import { authLock } from './auth-lock';
+import type { Session } from '@supabase/supabase-js';
 
 interface User {
   id: string;
@@ -38,6 +39,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clockOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+
+  const buildSessionFallbackUser = useCallback((session: Session): User => {
+    const meta = session.user?.user_metadata || {};
+    const roleFromMeta = String(meta.role || '').toLowerCase().replace('-', '_');
+    return {
+      id: session.user.id,
+      email: session.user.email || '',
+      name: meta.name || session.user.email || '',
+      role: roleFromMeta || 'employee',
+    };
+  }, []);
 
   const fetchProfile = useCallback(async (token: string) => {
     try {
@@ -171,8 +183,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session) {
         setAccessToken(session.access_token);
+        setUser((prev) => prev || buildSessionFallbackUser(session));
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          await fetchProfile(session.access_token);
+          const profile = await fetchProfile(session.access_token);
+          if (!profile) {
+            setUser((prev) => prev || buildSessionFallbackUser(session));
+          }
         }
       } else {
         setUser(null);
@@ -199,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, buildSessionFallbackUser]);
 
   // Track user activity and page visibility
   useEffect(() => {
