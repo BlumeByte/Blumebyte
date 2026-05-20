@@ -701,7 +701,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
           </SelectContent>
         </Select>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
-        <Badge variant="secondary">{filtered.length} tickets</Badge>
+        <Badge variant="secondary">{filtered.length} {filtered.length === 1 ? 'ticket' : 'tickets'}</Badge>
         <Button size="sm" onClick={() => setShowCreate(true)}><UserPlus className="h-3.5 w-3.5 mr-1" />New Ticket</Button>
       </div>
 
@@ -1763,7 +1763,7 @@ function AuditTrailPanel() {
           </SelectContent>
         </Select>
         <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
-        <Badge variant="secondary">{filtered.length} entries</Badge>
+        <Badge variant="secondary">{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Badge>
       </div>
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
