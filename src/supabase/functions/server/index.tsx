@@ -12145,7 +12145,7 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       .filter(t => t.createdAt)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10)
-      .map(t => ({ id: t.id, name: t.name, status: t.status, createdAt: t.createdAt, plan: t.plan }));
+      .map(t => ({ id: t.id || t.name, name: t.name, status: t.status, createdAt: t.createdAt, plan: t.plan }));
 
     return c.json({
       totalTenants,

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+// Keep ultimateadmin for backward compatibility while developer is canonical.
 const ROLES = ['developer', 'ultimateadmin', 'customer_care'];
 const PLATFORM_ROLES = ['developer', 'customer_care'];
 
@@ -341,7 +342,7 @@ const SECTION_ACCESS_RULES: Record<string, string[]> = {
 
 function isSectionAllowed(sectionId: string, role: string) {
   const allowedRoles = SECTION_ACCESS_RULES[sectionId] || ['developer'];
-  return allowedRoles.includes(role);
+  return allowedRoles.includes(role === 'ultimateadmin' ? 'developer' : role);
 }
 
 const TICKET_STATUSES = ['open', 'pending', 'resolved', 'escalated'];
@@ -399,6 +400,7 @@ export default function CustomerCareDashboard() {
   const navigate = useNavigate();
   const { user, sessionLoading, getToken, logout } = useAuth();
   const normalizedRole = String(user?.role || '').toLowerCase().replace('-', '_');
+  const supportRole = normalizedRole === 'ultimateadmin' ? 'developer' : normalizedRole;
   // tri-state: null = verifying, true = authenticated, false = unauthenticated
   const [authState, setAuthState] = useState<boolean | null>(null);
 
@@ -443,7 +445,7 @@ export default function CustomerCareDashboard() {
     return null;
   }
 
-  return <SupportDashboard onLogout={handleLogout} role={normalizedRole === 'ultimateadmin' ? 'developer' : normalizedRole} />;
+  return <SupportDashboard onLogout={handleLogout} role={supportRole} />;
 }
 // ─── Metrics Cards ────────────────────────────────────────────────────────────
 function MetricsCards({ metrics }: { metrics: Metrics }) {
@@ -1689,7 +1691,8 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
   const [resetTarget, setResetTarget] = useState<{ email: string } | null>(null);
   const [resetLink, setResetLink] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
-  const isDeveloperAdmin = ['developer', 'ultimateadmin'].includes((authUser?.role || '').toLowerCase());
+  const normalizedSupportRole = String(authUser?.role || '').toLowerCase().replace('-', '_');
+  const isDeveloperAdmin = (normalizedSupportRole === 'ultimateadmin' ? 'developer' : normalizedSupportRole) === 'developer';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2006,14 +2009,17 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {msgLoading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
-              {messages.map(m => (
-                <div key={m.id} className={`flex ${['developer', 'ultimateadmin'].includes(m.senderRole) ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-lg p-2 text-sm ${['developer', 'ultimateadmin'].includes(m.senderRole) ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
-                    <p>{m.message}</p>
-                    <p className={`text-xs mt-0.5 ${['developer', 'ultimateadmin'].includes(m.senderRole) ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(m.sentAt).toLocaleTimeString()}</p>
+              {messages.map(m => {
+                const isDeveloperMessage = ['developer', 'ultimateadmin'].includes(m.senderRole);
+                return (
+                  <div key={m.id} className={`flex ${isDeveloperMessage ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] rounded-lg p-2 text-sm ${isDeveloperMessage ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                      <p>{m.message}</p>
+                      <p className={`text-xs mt-0.5 ${isDeveloperMessage ? 'text-gray-400' : 'text-gray-500'}`}>{new Date(m.sentAt).toLocaleTimeString()}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {messages.length === 0 && !msgLoading && <p className="text-center text-gray-400 text-sm py-4">No messages yet</p>}
             </div>
             <div className="p-3 border-t flex gap-2">
