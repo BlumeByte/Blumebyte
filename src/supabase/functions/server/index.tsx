@@ -11413,7 +11413,21 @@ const reportClientError = async (c: any) => {
       },
     };
 
-    await kv.set(`support-ticket:${ticketId}`, ticket);
+    // Persist into canonical support ticket stores so all dashboard variants can read it.
+    await saveSupportTicket(ticket);
+
+    // Seed ticket comments with the reported error so it appears in ticket message threads.
+    const initialComment = {
+      id: crypto.randomUUID(),
+      authorId: user.id,
+      authorEmail: user.email || '',
+      authorRole: normalizeCareRole(profile?.role || user?.user_metadata?.role || '') || 'reporter',
+      comment: details ? `${message}\n\n${details}` : message,
+      createdAt: now,
+      source: source || 'error-report',
+      location,
+    };
+    await kv.set(`ticket_comments:${ticketId}`, [initialComment]);
 
     await sendEmailNotification(
       user.id,
@@ -11432,13 +11446,47 @@ const reportClientError = async (c: any) => {
       `,
     );
 
-    const allEmployees = await kv.getByPrefix('employee:');
-    const platformAdmins = allEmployees.filter((emp: any) =>
-      emp?.isPlatformAdmin === true || ['developer'].includes(normalizeCareRole(emp?.role || ''))
-    );
-    await Promise.allSettled(platformAdmins.map((admin: any) =>
+    const [allEmployees, platformUsers, supportAgents, supabaseUsers] = await Promise.all([
+      kv.getByPrefix('employee:'),
+      kv.getByPrefix('platform_user:'),
+      kv.getByPrefix('support-agent:'),
+      listSupabasePlatformUsers(),
+    ]);
+
+    const developerRecipients: any[] = [];
+    const seenRecipients = new Set<string>();
+    const addRecipient = (candidate: any) => {
+      if (!candidate) return;
+      const role = normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
+      const isDeveloper = role === 'developer' || candidate?.isPlatformAdmin === true;
+      if (!isDeveloper) return;
+      const email = String(candidate?.email || '').trim().toLowerCase();
+      if (!email) return;
+      const key = String(candidate?.id || candidate?.userId || email).toLowerCase();
+      if (seenRecipients.has(key)) return;
+      seenRecipients.add(key);
+      developerRecipients.push({
+        id: candidate?.id || candidate?.userId || '',
+        email,
+        name: candidate?.name || candidate?.user_metadata?.name || '',
+      });
+    };
+
+    for (const emp of allEmployees) addRecipient(emp);
+    for (const pu of platformUsers) addRecipient(pu);
+    for (const sa of supportAgents) addRecipient(sa);
+    for (const su of supabaseUsers) {
+      addRecipient({
+        id: su?.id,
+        email: su?.email,
+        role: su?.user_metadata?.role,
+        name: su?.user_metadata?.name,
+      });
+    }
+
+    await Promise.allSettled(developerRecipients.map((admin: any) =>
       sendEmailNotification(
-        admin.id || admin.userId || '',
+        admin.id || '',
         admin.email || '',
         admin.name || '',
         `Blumebyte HR Error Report: ${source || 'Application'}`,
