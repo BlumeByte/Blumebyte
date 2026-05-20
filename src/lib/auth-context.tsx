@@ -183,6 +183,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session) {
         setAccessToken(session.access_token);
+        // Seed a session-derived user immediately so ProtectedRoute doesn't treat
+        // a valid session as logged-out while /profile is still loading or blocked.
         setUser((prev) => prev || buildSessionFallbackUser(session));
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           const profile = await fetchProfile(session.access_token);
