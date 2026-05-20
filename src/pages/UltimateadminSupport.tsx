@@ -65,9 +65,17 @@ async function loadUltimateadminUsersWithFallback(token?: string | null) {
     return Array.isArray(data) ? data : [];
   } catch (error) {
     if (!isRouteNotFoundError(error)) throw error;
-    invalidateCache('/support/users', token);
-    const data = await api('/support/users', { token });
-    return Array.isArray(data) ? data : [];
+    try {
+      invalidateCache('/support/users', token);
+      const data = await api('/support/users', { token });
+      return Array.isArray(data) ? data : [];
+    } catch (fallbackError: any) {
+      const wrapped: any = new Error(
+        `Failed to load users: ${fallbackError?.message || 'Unknown error'}`,
+      );
+      wrapped.status = fallbackError?.status;
+      throw wrapped;
+    }
   }
 }
 

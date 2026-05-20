@@ -12238,7 +12238,7 @@ const listUltimateadminSupportTenants = async (c: any) => {
       }
       const t = tenantMap.get(cid)!;
       t.totalUsers++;
-      if ((meta.status || 'active') === 'active') t.activeUsers++;
+      if (String(meta.status || '').toLowerCase() === 'active') t.activeUsers++;
     }
 
 
@@ -12763,13 +12763,17 @@ const listUltimateadminUsers = async (c: any) => {
     }
 
     const users: any[] = [];
-    const seen = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenEmails = new Set<string>();
     const addUser = (u: any) => {
-      const key = String(u?.id || u?.userId || u?.email || '').trim().toLowerCase();
-      if (!key || seen.has(key)) return;
-      seen.add(key);
+      const idKey = String(u?.id || u?.userId || '').trim().toLowerCase();
+      const emailKey = String(u?.email || '').trim().toLowerCase();
+      if (!idKey && !emailKey) return;
+      if ((idKey && seenIds.has(idKey)) || (emailKey && seenEmails.has(emailKey))) return;
+      if (idKey) seenIds.add(idKey);
+      if (emailKey) seenEmails.add(emailKey);
       users.push({
-        id: u.id || u.userId || key,
+        id: u.id || u.userId || emailKey,
         email: u.email || '',
         name: u.name || u.fullName || u.email || '',
         role: u.role || 'employee',
