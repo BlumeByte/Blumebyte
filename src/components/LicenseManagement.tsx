@@ -408,6 +408,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           { duration: 7000 }
         );
       }
+      await autoSyncAfterPayment();
       fetchLicenseInfo();
     } catch (err: any) {
       console.error('Verify renewal error:', err);
@@ -1385,6 +1386,10 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-md border border-orange-200 bg-white/70 px-3 py-2 text-xs text-orange-900">
+              Renewing account:{' '}
+              <strong>{licenseInfo?.companyName || licenseInfo?.companyId || 'Current tenant'}</strong>
+            </div>
             {/* Number of Licenses to Renew */}
             <div className="space-y-2">
               <Label className={isLicenseExpired ? 'text-orange-800' : 'text-yellow-800'}>

@@ -704,7 +704,9 @@ function isPublicJobPosting(job: any): boolean {
   });
   const isPublicByVisibility = !!visibility && JOB_PUBLIC_VISIBILITIES.has(visibility);
   const isExplicitlyPrivate = !!visibility && JOB_PRIVATE_VISIBILITIES.has(visibility);
-  if (isExplicitlyPrivate) return false;
+  // Explicit public flags should win over stale/private visibility fields so
+  // public_global jobs still appear on the hiring board.
+  if (isExplicitlyPrivate && !isExplicitlyPublic && !isPublicByVisibility) return false;
   const status = normalizeJobStatus(job.status);
   // Backward compatibility: old public postings may be missing status entirely.
   if (!status) return true;
@@ -7453,6 +7455,14 @@ const renewSubscriptionLicense = async (c: any) => {
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
+    let companyId: string | null = null;
+    let companyName = '';
+    try {
+      companyId = await getCompanyId(user.id);
+      companyName = companyId ? await resolveCompanyName(companyId) : '';
+    } catch (companyError) {
+      console.warn('Unable to resolve renewal tenant metadata:', companyError);
+    }
 
     // Convert USD amount to the configured Paystack currency (GHS/NGN/USD)
     const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
@@ -7462,7 +7472,7 @@ const renewSubscriptionLicense = async (c: any) => {
       return c.json({ error: `Computed payment amount is too low (${amountSmallestUnit} ${currency}). Please contact support.` }, 400);
     }
 
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+    let paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${paystackSecretKey}`,
@@ -7485,12 +7495,55 @@ const renewSubscriptionLicense = async (c: any) => {
             { display_name: 'Transaction Type', variable_name: 'type', value: 'renewal' },
             { display_name: 'Plan', variable_name: 'plan', value: plan },
             { display_name: 'Licenses', variable_name: 'user_count', value: String(licensesNum) },
+            { display_name: 'Tenant Account', variable_name: 'tenant_account', value: companyName || companyId || user.id },
           ],
         },
       }),
     });
 
-    const paystackData = await paystackResponse.json();
+    let paystackData = await paystackResponse.json();
+    let finalAmountSmallestUnit = amountSmallestUnit;
+    let finalCurrency = currency;
+
+    // Retry in USD when Paystack rejects converted amount for the configured currency.
+    if (!paystackData.status && /invalid amount/i.test(String(paystackData?.message || '')) && currency !== 'USD') {
+      const usdFallbackAmount = Math.round(amount * 100);
+      if (usdFallbackAmount >= 100) {
+        paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user.email,
+            amount: usdFallbackAmount,
+            currency: 'USD',
+            reference,
+            callback_url: callbackUrl,
+            metadata: {
+              userId: user.id,
+              plan,
+              userCount: licensesNum,
+              isRenewal: true,
+              saveCard: saveCard !== false,
+              amountUsd: amount,
+              paystackCurrencyFallback: true,
+              originalCurrency: currency,
+              custom_fields: [
+                { display_name: 'Tenant Account', variable_name: 'tenant_account', value: companyName || companyId || user.id },
+              ],
+            },
+          }),
+        });
+        paystackData = await paystackResponse.json();
+        if (paystackData.status) {
+          finalAmountSmallestUnit = usdFallbackAmount;
+          finalCurrency = 'USD';
+        }
+      }
+    }
+
     if (!paystackData.status) {
       return c.json({ error: paystackData.message || 'Failed to initialize renewal payment' }, 500);
     }
@@ -7500,8 +7553,8 @@ const renewSubscriptionLicense = async (c: any) => {
       plan,
       userCount: licensesNum,
       amount,
-      amountSmallestUnit,
-      currency,
+      amountSmallestUnit: finalAmountSmallestUnit,
+      currency: finalCurrency,
       reference,
       isRenewal: true,
       status: 'pending',
