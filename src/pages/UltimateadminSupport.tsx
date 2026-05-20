@@ -2311,11 +2311,11 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   const [myProfile, setMyProfile] = useState<{ email: string; name: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [backendUnavailable, setBackendUnavailable] = useState(false);
-  const normalizeSupportRole = (value: string) => {
+  const normalizeAndAliasSupportRole = (value: string) => {
     const normalized = String(value || '').toLowerCase().replace('-', '_');
     return normalized === 'ultimateadmin' ? 'developer' : normalized;
   };
-  const [effectiveRole, setEffectiveRole] = useState(() => normalizeSupportRole(role));
+  const [effectiveRole, setEffectiveRole] = useState(() => normalizeAndAliasSupportRole(role));
   const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => isSectionAllowed(item.id, effectiveRole));
   const quickActions = [
     { label: 'View Tenants', icon: Building2, section: 'tenants' },
@@ -2327,7 +2327,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   ].filter(item => isSectionAllowed(item.section, effectiveRole));
 
   useEffect(() => {
-    setEffectiveRole(normalizeSupportRole(role));
+    setEffectiveRole(normalizeAndAliasSupportRole(role));
   }, [role]);
 
   const loadData = useCallback(async () => {
@@ -2349,7 +2349,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
       if (metricsResult.status === 'fulfilled') setMetrics(normalizeMetricsPayload(metricsResult.value, tenantList));
       if (profileResult.status === 'fulfilled') {
         setMyProfile(profileResult.value);
-        const verifiedRole = normalizeSupportRole(profileResult.value?.role || '');
+        const verifiedRole = normalizeAndAliasSupportRole(profileResult.value?.role || '');
         if (verifiedRole) setEffectiveRole(verifiedRole);
       }
 

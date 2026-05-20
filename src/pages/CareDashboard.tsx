@@ -163,7 +163,17 @@ export default function CareDashboard() {
       return;
     }
     try {
-      const p = await apiWithRouteFallback('/care/profile', { token }, ['/developer/support/verify', '/support/verify']);
+      const profileResponse = await apiWithRouteFallback('/care/profile', { token }, ['/developer/support/verify', '/support/verify']);
+      // When /care/profile is unavailable on older deployments, /support/verify still
+      // provides the role/email needed to route this dashboard correctly.
+      const p = profileResponse?.allowed === true && !profileResponse?.id
+        ? {
+          id: user.id,
+          email: profileResponse?.email || user.email,
+          name: profileResponse?.name || user.name || user.email,
+          role: profileResponse?.role || user.role,
+        }
+        : profileResponse;
       const role = String(p?.role || '').toLowerCase().replace('-', '_');
       setCareProfile(p);
       const allowed = isCustomerCareRole(role) || role === 'developer' || role === 'ultimateadmin';
@@ -269,6 +279,8 @@ export default function CareDashboard() {
         await api(`/care/tickets/${ticketId}/escalate`, { method: 'POST', token, body: {} });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
+        // Legacy support endpoints do not expose a dedicated "escalate" route, so
+        // use ticket update semantics to set escalated status.
         await apiWithRouteFallback(
           `/developer/support/tickets/${ticketId}`,
           { method: 'PUT', token, body: { status: 'escalated', escalated: true } },
@@ -294,6 +306,7 @@ export default function CareDashboard() {
           await api(`/developer/tickets/${ticketId}/resolve`, { method: 'POST', token, body: {} });
         } catch (legacyError: any) {
           if (!isRouteNotFoundError(legacyError)) throw legacyError;
+          // Legacy support endpoints only expose ticket update for this flow.
           await apiWithRouteFallback(
             `/developer/support/tickets/${ticketId}`,
             { method: 'PUT', token, body: { status: 'resolved', chatClosed: true } },
