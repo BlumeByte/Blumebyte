@@ -11383,6 +11383,9 @@ const reportClientError = async (c: any) => {
     const companyId = profile?.companyId || profile?.company || '';
     const company = companyId ? await kv.get(`company_by_id:${companyId}`) : null;
     const tenantName = company?.name || profile?.companyName || profile?.company || '';
+    const extractNormalizedRole = (candidate: any) =>
+      normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
+    const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
 
     const ticketId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -11421,10 +11424,10 @@ const reportClientError = async (c: any) => {
       id: crypto.randomUUID(),
       authorId: user.id,
       authorEmail: user.email || '',
-      authorRole: normalizeCareRole(profile?.role || user?.user_metadata?.role || '') || 'reporter',
+      authorRole: reporterRole,
       comment: details ? `${message}\n\n${details}` : message,
       createdAt: now,
-      source: source || 'error-report',
+      source: source || 'unknown',
       location,
     };
     await kv.set(`ticket_comments:${ticketId}`, [initialComment]);
@@ -11457,7 +11460,7 @@ const reportClientError = async (c: any) => {
     const seenRecipients = new Set<string>();
     const addRecipient = (candidate: any) => {
       if (!candidate) return;
-      const role = normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
+      const role = extractNormalizedRole(candidate);
       const isDeveloper = role === 'developer' || candidate?.isPlatformAdmin === true;
       if (!isDeveloper) return;
       const email = String(candidate?.email || '').trim().toLowerCase();
