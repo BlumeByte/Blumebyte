@@ -12,7 +12,7 @@ import { migrateCompanyKeys } from "./migration-company-keys.tsx";
 import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-stats.tsx";
 
 const app = new Hono();
-const PREFIX = "/make-server-668731fc"; // v2.1 - Payment-first registration flow
+const PREFIX = "/make-server-a35148f0"; // v2.1 - Payment-first registration flow
 // Helpers that generate the full set of route paths for a given endpoint, covering:
 // 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
 // This prevents route mismatches across different Supabase function URL/path-forwarding modes.

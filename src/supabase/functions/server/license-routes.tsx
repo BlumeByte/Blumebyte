@@ -3,7 +3,7 @@ import * as kv from './kv_store.tsx';
 import { usdToPaystackAmount, getPaystackCurrency } from './currency-utils.tsx';
 import { recalculateCompanyStats } from './sync-company-stats.tsx';
 
-const PREFIX = '/make-server-668731fc';
+const PREFIX = '/make-server-a35148f0';
 const subscriptionRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
 

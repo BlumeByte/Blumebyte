@@ -78,7 +78,7 @@ echo ""
 echo "🔍 Verifying deployment..."
 echo ""
 
-HEALTH_URL="https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health"
+HEALTH_URL="https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health"
 
 echo "Testing health endpoint:"
 echo "  $HEALTH_URL"

@@ -12,7 +12,7 @@ export const SUPABASE_FUNCTION_NAME_CANDIDATES = Array.from(
   new Set(
     [
       trimSlashes(import.meta.env.VITE_SUPABASE_FUNCTION_NAME || ''),
-      'make-server-668731fc',
+      'make-server-a35148f0',
       'make-server',
     ].filter(Boolean),
   ),

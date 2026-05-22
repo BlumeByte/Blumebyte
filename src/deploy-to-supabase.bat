@@ -54,7 +54,7 @@ echo ====================================
 echo.
 echo Testing health endpoint...
 echo.
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 echo.
 echo.
 echo ====================================

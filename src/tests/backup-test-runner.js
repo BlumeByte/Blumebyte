@@ -39,7 +39,7 @@ const CONFIG = {
 
 // Auto-generate base URL
 if (!CONFIG.baseUrl) {
-  CONFIG.baseUrl = `https://${CONFIG.projectId}.supabase.co/functions/v1/make-server-668731fc`;
+  CONFIG.baseUrl = `https://${CONFIG.projectId}.supabase.co/functions/v1/make-server-a35148f0`;
 }
 
 // ============ TEST FRAMEWORK ============
