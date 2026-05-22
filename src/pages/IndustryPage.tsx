@@ -294,7 +294,7 @@ export default function IndustryPage() {
             Join other {currentIndustry.name.toLowerCase()} companies using Blumebyte
           </p>
           <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
-            Start Free Trial
+            Start Now
           </Button>
         </div>
       </section>

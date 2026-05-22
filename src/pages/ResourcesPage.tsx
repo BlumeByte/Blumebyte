@@ -126,7 +126,7 @@ export default function ResourcesPage() {
                 Visit YouTube Channel
               </Button>
               <Button onClick={() => navigate('/company-signup')} size="lg" variant="outline">
-                Get Started Free
+                Start Now
               </Button>
             </div>
           </div>

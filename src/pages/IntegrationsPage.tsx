@@ -275,7 +275,7 @@ export default function IntegrationsPage() {
             Start integrating with your favorite applications today
           </p>
           <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100">
-            Get Started Free
+            Start Now
           </Button>
         </div>
       </section>

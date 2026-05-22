@@ -434,7 +434,7 @@ export default function PricingPage() {
             </p>
             <div className="flex gap-4 justify-center">
               <Button size="lg" variant="secondary" onClick={() => navigate('/company-signup')} className="bg-mint-white text-mint-black hover:bg-mint-green-light">
-                Start Free Trial
+                Start Now
               </Button>
               <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="border-white bg-transparent text-white hover:bg-white hover:text-mint-black">
                 Contact Sales

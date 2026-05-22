@@ -88,7 +88,7 @@ export default function PlatformOverview() {
               </p>
               <div className="flex flex-wrap gap-3 pt-1">
                 <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-primary text-white hover:bg-primary/90 text-base px-7 shadow-md font-semibold">
-                  Get Started Free
+                  Start Now
                 </Button>
                 <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-black/20 bg-white text-gray-800 hover:bg-gray-50 text-base px-7 font-semibold">
                   View Pricing
@@ -245,7 +245,7 @@ export default function PlatformOverview() {
               <h2 className="text-3xl md:text-5xl font-black text-white leading-tight">Ready to get started?</h2>
               <p className="text-lg text-white/70 max-w-xl mx-auto">Join hundreds of companies using Blumebyte to transform how they manage their people and operations.</p>
               <div className="flex flex-wrap gap-4 justify-center pt-2">
-                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-bold">Start Free Trial</Button>
+                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-bold">Start Now</Button>
                 <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="border-white/30 bg-transparent text-white hover:bg-white/10 text-base px-8 font-semibold">Contact Sales</Button>
               </div>
               <p className="text-xs text-white/40 pt-1">No credit card required · 14-day free trial · Cancel anytime</p>

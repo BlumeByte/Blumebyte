@@ -200,7 +200,7 @@ export default function FeaturesPage() {
               </p>
               <div className="flex flex-wrap gap-3 pt-1">
                 <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-primary text-white hover:bg-primary/90 text-base px-7 shadow-md font-semibold">
-                  Start Free Trial
+                  Start Now
                 </Button>
                 <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-black/20 bg-white text-gray-800 hover:bg-gray-50 text-base px-7 font-semibold">
                   View Pricing
@@ -309,7 +309,7 @@ export default function FeaturesPage() {
               <h2 className="text-3xl md:text-5xl font-black text-white leading-tight">See all features in action</h2>
               <p className="text-lg text-white/70 max-w-xl mx-auto">Get started with Blumebyte today and transform your HR operations with 100+ powerful features.</p>
               <div className="flex flex-wrap gap-4 justify-center pt-2">
-                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-bold">Start Free Trial</Button>
+                <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-bold">Start Now</Button>
                 <Button size="lg" variant="outline" onClick={() => navigate('/pricing')} className="border-white/30 bg-transparent text-white hover:bg-white/10 text-base px-8 font-semibold">View Pricing</Button>
               </div>
               <p className="text-xs text-white/40 pt-1">No credit card required · 14-day free trial · Cancel anytime</p>
