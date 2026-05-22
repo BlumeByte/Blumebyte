@@ -5794,13 +5794,15 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
     const body = await c.req.json();
     const { userId, userName, email, loginTime, logoutTime, wasAutoClockedOut, logoutType } = body;
     
+    const sessionMsg = `${userName} (${email}) logged out at ${new Date(logoutTime).toLocaleString()}. Login: ${new Date(loginTime).toLocaleString()}${wasAutoClockedOut ? ' - Auto clocked out' : ''}`;
+
     // Get all SuperAdmins and Admins to notify
     const allEmployees = await kv.getByPrefix("employee:");
     const adminsAndSuperAdmins = allEmployees.filter((e: any) => 
       e.role === 'superadmin' || e.role === 'SuperAdmin' || e.role === 'admin' || e.role === 'Admin'
     );
     
-    // Create notifications for each admin
+    // Create KV notifications AND email each admin
     for (const admin of adminsAndSuperAdmins) {
       const nid = crypto.randomUUID();
       await kv.set(`notification:${nid}`, {
@@ -5808,13 +5810,21 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
         userId: admin.userId,
         type: "session",
         title: "User Session Ended",
-        message: `${userName} (${email}) logged out at ${new Date(logoutTime).toLocaleString()}. Login: ${new Date(loginTime).toLocaleString()}${wasAutoClockedOut ? ' - Auto clocked out' : ''}`,
+        message: sessionMsg,
         read: false,
         createdAt: new Date().toISOString(),
       });
+      if (admin.email) {
+        await sendEmailNotification(
+          admin.userId || admin.id || '',
+          admin.email,
+          admin.name || '',
+          `Session Report: ${userName} logged out — Blumebyte HR`,
+          `<p>${sessionMsg}</p>`,
+          'emailOnSessionReport'
+        );
+      }
     }
-    
-    // Log the session end
     
     return c.json({ success: true });
   } catch (e: any) {
@@ -5822,7 +5832,59 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/attendance/heartbeat`, async (c) => {
+// POST /auth/login-alert — called by the frontend after a successful login to
+// email the user a security alert, CC info@blumebyte.com, and log to developer dashboard.
+app.post(`${PREFIX}/auth/login-alert`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, email, name, loginTime, userAgent, ipAddress } = body;
+    if (!email) return c.json({ error: 'email is required' }, 400);
+
+    const loginAt = loginTime ? new Date(loginTime).toLocaleString('en-GB', { timeZone: 'UTC' }) + ' UTC' : new Date().toLocaleString('en-GB', { timeZone: 'UTC' }) + ' UTC';
+    const device = userAgent ? String(userAgent).slice(0, 200) : 'Unknown device';
+    const ip = ipAddress ? String(ipAddress) : 'Unknown';
+
+    // Email the user
+    await sendEmailNotification(
+      userId || '',
+      email,
+      name || '',
+      'New Login to Your Blumebyte HR Account',
+      `
+        <p>We detected a new sign-in to your Blumebyte HR account.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;width:120px;">Time</td><td style="padding:6px 0;color:#111827;font-size:13px;">${loginAt}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">Device</td><td style="padding:6px 0;color:#111827;font-size:13px;">${device}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">IP Address</td><td style="padding:6px 0;color:#111827;font-size:13px;">${ip}</td></tr>
+        </table>
+        <p style="color:#374151;">If this was you, no action is needed. If you did not perform this login, please change your password immediately and contact support.</p>
+      `,
+      'emailOnLogin'
+    );
+
+    // Also write a developer dashboard notification so platform developers can track login events.
+    const devNotifId = crypto.randomUUID();
+    await kv.set(`developer_notification:${devNotifId}`, {
+      id: devNotifId,
+      type: 'login_alert',
+      recipientId: userId || '',
+      recipientEmail: email,
+      subject: 'New Login Alert',
+      loginAt,
+      device,
+      ip,
+      sentAt: new Date().toISOString(),
+      read: false,
+    });
+
+    return c.json({ success: true });
+  } catch (e: any) {
+    console.error('auth/login-alert error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+
   try {
     const { user } = await requireAuth(c);
     const now = new Date();
@@ -6445,6 +6507,27 @@ app.post(`${PREFIX}/notifications`, async (c) => {
     const id = crypto.randomUUID();
     const notif = { id, ...body, read: false, createdAt: new Date().toISOString() };
     await kv.set(`notification:${id}`, notif);
+
+    // Email the recipient if we can look up their email address.
+    if (body.userId) {
+      try {
+        const emp = await kv.get(`employee:${body.userId}`) as any;
+        const recipientEmail = emp?.email;
+        if (recipientEmail) {
+          await sendEmailNotification(
+            body.userId,
+            recipientEmail,
+            emp?.name || '',
+            `${body.title || 'New Notification'} — Blumebyte HR`,
+            `<p>${body.message || ''}</p>`,
+            'emailOnNotification'
+          );
+        }
+      } catch (_e: any) {
+        // Non-critical — do not fail the notification creation if email fails
+      }
+    }
+
     return c.json(notif, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -11327,32 +11410,53 @@ async function sendEmailNotification(
       return;
     }
 
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #000; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+          <h2 style="color: #fff; margin: 0; font-size: 18px;">Blumebyte HR</h2>
+        </div>
+        <div style="padding: 24px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+          <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
+          ${htmlBody}
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
+            You received this email because you are a Blumebyte HR user and email notifications are active for your account.
+          </p>
+        </div>
+      </div>
+    `;
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: EMAIL_FROM,
         to: recipientEmail,
+        bcc: 'info@blumebyte.com',
         subject,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #000; padding: 20px 30px; border-radius: 8px 8px 0 0;">
-              <h2 style="color: #fff; margin: 0; font-size: 18px;">Blumebyte HR</h2>
-            </div>
-            <div style="padding: 24px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
-              <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
-              ${htmlBody}
-              <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
-                You received this email because you are a Blumebyte HR user and email notifications are active for your account.
-              </p>
-            </div>
-          </div>
-        `,
+        html: emailHtml,
       }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.error(`sendEmailNotification: Resend error ${res.status} for subject="${subject}"`, body.slice(0, 200));
+    }
+
+    // Mirror every user-facing notification to the developer dashboard via KV so
+    // developers can see all platform alerts in one place.
+    try {
+      const devNotifId = crypto.randomUUID();
+      await kv.set(`developer_notification:${devNotifId}`, {
+        id: devNotifId,
+        type: 'email_notification',
+        recipientId: recipientId || '',
+        recipientEmail,
+        subject,
+        prefKey: prefKey || '',
+        sentAt: new Date().toISOString(),
+        read: false,
+      });
+    } catch (_kvErr: any) {
+      // Non-critical — do not fail the main email send if KV write fails
     }
   } catch (err: any) {
     console.error('sendEmailNotification: unexpected error', err?.message || err);
@@ -11383,6 +11487,9 @@ const reportClientError = async (c: any) => {
     const companyId = profile?.companyId || profile?.company || '';
     const company = companyId ? await kv.get(`company_by_id:${companyId}`) : null;
     const tenantName = company?.name || profile?.companyName || profile?.company || '';
+    const extractNormalizedRole = (candidate: any) =>
+      normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
+    const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
 
     const ticketId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -11413,7 +11520,21 @@ const reportClientError = async (c: any) => {
       },
     };
 
-    await kv.set(`support-ticket:${ticketId}`, ticket);
+    // Persist into canonical support ticket stores so all dashboard variants can read it.
+    await saveSupportTicket(ticket);
+
+    // Seed ticket comments with the reported error so it appears in ticket message threads.
+    const initialComment = {
+      id: crypto.randomUUID(),
+      authorId: user.id,
+      authorEmail: user.email || '',
+      authorRole: reporterRole,
+      comment: details ? `${message}\n\n${details}` : message,
+      createdAt: now,
+      source: source || 'unknown',
+      location,
+    };
+    await kv.set(`ticket_comments:${ticketId}`, [initialComment]);
 
     await sendEmailNotification(
       user.id,
@@ -11432,13 +11553,47 @@ const reportClientError = async (c: any) => {
       `,
     );
 
-    const allEmployees = await kv.getByPrefix('employee:');
-    const platformAdmins = allEmployees.filter((emp: any) =>
-      emp?.isPlatformAdmin === true || ['developer'].includes(normalizeCareRole(emp?.role || ''))
-    );
-    await Promise.allSettled(platformAdmins.map((admin: any) =>
+    const [allEmployees, platformUsers, supportAgents, supabaseUsers] = await Promise.all([
+      kv.getByPrefix('employee:'),
+      kv.getByPrefix('platform_user:'),
+      kv.getByPrefix('support-agent:'),
+      listSupabasePlatformUsers(),
+    ]);
+
+    const developerRecipients: any[] = [];
+    const seenRecipients = new Set<string>();
+    const addRecipient = (candidate: any) => {
+      if (!candidate) return;
+      const role = extractNormalizedRole(candidate);
+      const isDeveloper = role === 'developer' || candidate?.isPlatformAdmin === true;
+      if (!isDeveloper) return;
+      const email = String(candidate?.email || '').trim().toLowerCase();
+      if (!email) return;
+      const key = String(candidate?.id || candidate?.userId || email).toLowerCase();
+      if (seenRecipients.has(key)) return;
+      seenRecipients.add(key);
+      developerRecipients.push({
+        id: candidate?.id || candidate?.userId || '',
+        email,
+        name: candidate?.name || candidate?.user_metadata?.name || '',
+      });
+    };
+
+    for (const emp of allEmployees) addRecipient(emp);
+    for (const pu of platformUsers) addRecipient(pu);
+    for (const sa of supportAgents) addRecipient(sa);
+    for (const su of supabaseUsers) {
+      addRecipient({
+        id: su?.id,
+        email: su?.email,
+        role: su?.user_metadata?.role,
+        name: su?.user_metadata?.name,
+      });
+    }
+
+    await Promise.allSettled(developerRecipients.map((admin: any) =>
       sendEmailNotification(
-        admin.id || admin.userId || '',
+        admin.id || '',
         admin.email || '',
         admin.name || '',
         `Blumebyte HR Error Report: ${source || 'Application'}`,
@@ -12039,22 +12194,67 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
-    const [allEmployees, allSubscriptions, allCompanies, allAgents, allTickets] = await Promise.all([
+    const [allEmployees, allSubscriptions, allCompanies, allAgents, allTickets, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
       kv.getByPrefix('company:'),
       getDynamicPlatformAgents(),
       getAllSupportTickets(),
+      listSupabasePlatformUsers(),
     ]);
 
+    const companyRecordMap = new Map<string, any>();
+    for (const company of allCompanies) {
+      const cid = company?.id || company?.companyId;
+      if (cid) companyRecordMap.set(cid, company);
+    }
+
     const companyMap = new Map<string, { id: string; name: string; usedLicenses: number; purchasedLicenses: number; status: string; createdAt?: string; plan?: string }>();
+    const tenantUserKeys = new Set<string>();
+    const uniqueUsers = new Map<string, { status: string; createdAt?: string }>();
+
+    const registerUser = (opts: { id?: string; email?: string; status?: string; createdAt?: string }) => {
+      const key = opts.id || opts.email;
+      if (!key) return;
+      const normalizedStatus = String(opts.status || 'unknown').toLowerCase();
+      const existing = uniqueUsers.get(key);
+      if (!existing) {
+        uniqueUsers.set(key, { status: normalizedStatus, createdAt: opts.createdAt });
+        return;
+      }
+      const mergedStatus = existing.status === 'active' || normalizedStatus === 'active'
+        ? 'active'
+        : existing.status || normalizedStatus;
+      uniqueUsers.set(key, {
+        status: mergedStatus,
+        createdAt: existing.createdAt || opts.createdAt,
+      });
+    };
+
+    const registerTenantUsage = (companyId: string, userKey: string, status?: string) => {
+      if (!companyId || !userKey || !companyMap.has(companyId)) return;
+      const dedupeKey = `${companyId}:${userKey}`;
+      if (tenantUserKeys.has(dedupeKey)) return;
+      tenantUserKeys.add(dedupeKey);
+      const entry = companyMap.get(companyId);
+      if (!entry) return;
+      if (String(status || '').toLowerCase() === 'active') entry.usedLicenses++;
+    };
+
     for (const emp of allEmployees) {
       const cid = emp.companyId || emp.company;
       if (!cid) continue;
       if (!companyMap.has(cid)) {
         companyMap.set(cid, { id: cid, name: emp.companyName || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'active' });
       }
-      if (emp.status === 'active') companyMap.get(cid)!.usedLicenses++;
+      const userKey = emp.id || emp.userId || emp.email;
+      registerTenantUsage(cid, userKey, emp.status);
+      registerUser({
+        id: emp.id || emp.userId,
+        email: emp.email,
+        status: emp.status,
+        createdAt: emp.createdAt,
+      });
     }
     for (const c of allCompanies) {
       const cid = c.id || c.companyId;
@@ -12068,9 +12268,48 @@ const getUltimateadminSupportMetrics = async (c: any) => {
         if (c.plan) entry.plan = c.plan;
       }
     }
+    for (const authUser of supabaseUsers) {
+      const meta = authUser?.user_metadata || {};
+      const cid = meta.companyId || meta.company;
+      if (cid && !companyMap.has(cid)) {
+        const companyRecord = companyRecordMap.get(cid);
+        companyMap.set(cid, {
+          id: cid,
+          name: companyRecord?.name || meta.companyName || authUser?.email || cid,
+          usedLicenses: 0,
+          purchasedLicenses: 0,
+          status: 'unknown',
+          createdAt: companyRecord?.createdAt || authUser?.created_at,
+          plan: companyRecord?.plan || meta.plan,
+        });
+      }
+      if (cid) {
+        const userKey = authUser?.id || authUser?.email;
+        registerTenantUsage(cid, userKey, meta.status);
+      }
+      registerUser({
+        id: authUser?.id,
+        email: authUser?.email,
+        status: meta.status,
+        createdAt: authUser?.created_at,
+      });
+    }
     for (const sub of allSubscriptions) {
       const cid = sub.companyId || sub.company;
-      if (cid && companyMap.has(cid)) {
+      if (!cid) continue;
+      if (!companyMap.has(cid)) {
+        const companyRecord = companyRecordMap.get(cid);
+        companyMap.set(cid, {
+          id: cid,
+          name: companyRecord?.name || sub.companyName || cid,
+          usedLicenses: 0,
+          purchasedLicenses: 0,
+          status: 'unknown',
+          createdAt: companyRecord?.createdAt,
+          plan: companyRecord?.plan || sub.plan || sub.planName,
+        });
+      }
+      if (companyMap.has(cid)) {
         const entry = companyMap.get(cid)!;
         entry.purchasedLicenses = sub.purchasedLicenses || sub.userCount || sub.licenses || 0;
         if (!entry.plan) entry.plan = sub.plan || sub.planName || entry.plan;
@@ -12111,8 +12350,8 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     }).length;
 
     // User stats
-    const totalUsers = allEmployees.length;
-    const activeUsers = allEmployees.filter((e: any) => e.status === 'active').length;
+    const totalUsers = uniqueUsers.size;
+    const activeUsers = [...uniqueUsers.values()].filter((u) => u.status === 'active').length;
 
     // New tenants / users in the last 30 days
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -12120,8 +12359,8 @@ const getUltimateadminSupportMetrics = async (c: any) => {
       const d = t.createdAt ? new Date(t.createdAt) : null;
       return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
     }).length;
-    const newUsersLast30Days = allEmployees.filter((e: any) => {
-      const d = e.createdAt ? new Date(e.createdAt) : null;
+    const newUsersLast30Days = [...uniqueUsers.values()].filter((u) => {
+      const d = u.createdAt ? new Date(u.createdAt) : null;
       return d && !Number.isNaN(d.getTime()) && d >= thirtyDaysAgo;
     }).length;
 
@@ -12204,6 +12443,7 @@ const listUltimateadminSupportTenants = async (c: any) => {
 
     // Build tenant list from employee records (superadmin entries carry company metadata)
     const tenantMap = new Map<string, any>();
+    const tenantUserMap = new Map<string, Set<string>>();
     for (const emp of allEmployees) {
       const cid = emp.companyId || emp.company;
       if (!cid) continue;
@@ -12219,8 +12459,16 @@ const listUltimateadminSupportTenants = async (c: any) => {
         });
       }
       const t = tenantMap.get(cid)!;
-      t.totalUsers++;
-      if (emp.status === 'active') t.activeUsers++;
+      const userKey = String(emp.id || emp.userId || emp.email || '');
+      if (userKey) {
+        if (!tenantUserMap.has(cid)) tenantUserMap.set(cid, new Set());
+        const knownUsers = tenantUserMap.get(cid)!;
+        if (!knownUsers.has(userKey)) {
+          knownUsers.add(userKey);
+          t.totalUsers++;
+          if (String(emp.status || '').toLowerCase() === 'active') t.activeUsers++;
+        }
+      }
     }
 
     // Include tenant references from auth metadata (handles users that exist in auth
@@ -12241,8 +12489,16 @@ const listUltimateadminSupportTenants = async (c: any) => {
         });
       }
       const t = tenantMap.get(cid)!;
-      t.totalUsers++;
-      if (String(meta.status || '').toLowerCase() === 'active') t.activeUsers++;
+      const userKey = String(authUser?.id || authUser?.user_id || authUser?.email || '');
+      if (userKey) {
+        if (!tenantUserMap.has(cid)) tenantUserMap.set(cid, new Set());
+        const knownUsers = tenantUserMap.get(cid)!;
+        if (!knownUsers.has(userKey)) {
+          knownUsers.add(userKey);
+          t.totalUsers++;
+          if (String(meta.status || '').toLowerCase() === 'active') t.activeUsers++;
+        }
+      }
     }
 
 
@@ -12262,10 +12518,17 @@ const listUltimateadminSupportTenants = async (c: any) => {
 
     const tenants = [...tenantMap.entries()].map(([cid, t]) => {
       const sub = subMap.get(cid);
+      const inferredStatus = (() => {
+        const endDate = sub?.endDate || sub?.expiresAt;
+        if (!endDate) return 'unknown';
+        const d = new Date(endDate);
+        if (Number.isNaN(d.getTime())) return 'unknown';
+        return d > new Date() ? 'active' : 'expired';
+      })();
       return {
         ...t,
-        licenseStatus: sub?.status || 'unknown',
-        purchasedLicenses: sub?.purchasedLicenses || 0,
+        licenseStatus: sub?.status || inferredStatus,
+        purchasedLicenses: sub?.purchasedLicenses || sub?.userCount || sub?.licenses || 0,
         plan: sub?.plan || sub?.planName || 'unknown',
         lastActivity: sub?.updatedAt || t.createdAt || '',
       };
@@ -12296,17 +12559,52 @@ const listUltimateadminSupportTenantUsers = async (c: any) => {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
-    const allEmployees = await kv.getByPrefix('employee:');
-    const users = allEmployees
+    const [allEmployees, supabaseUsers] = await Promise.all([
+      kv.getByPrefix('employee:'),
+      listSupabasePlatformUsers(),
+    ]);
+    const kvUsers = allEmployees
       .filter((e: any) => e.companyId === tenantId || e.company === tenantId)
       .map((e: any) => ({
-        id: e.id || e.userId,
-        name: e.name || e.fullName || e.email,
-        email: e.email,
-        role: e.role,
-        status: e.status,
+        id: e.id || e.userId || '',
+        name: e.name || e.fullName || e.email || '',
+        email: e.email || '',
+        role: e.role || '',
+        status: e.status || 'unknown',
       }));
-    return c.json(users);
+    const authUsers = supabaseUsers
+      .filter((u: any) => {
+        const meta = u?.user_metadata || {};
+        return meta.companyId === tenantId || meta.company === tenantId;
+      })
+      .map((u: any) => {
+        const meta = u?.user_metadata || {};
+        return {
+          id: u?.id || '',
+          name: meta.name || u?.email || '',
+          email: u?.email || '',
+          role: meta.role || '',
+          status: meta.status || 'unknown',
+        };
+      });
+
+    const usersById = new Map<string, any>();
+    for (const user of [...authUsers, ...kvUsers]) {
+      const idKey = String(user.id || user.email || '');
+      if (!idKey) continue;
+      const existing = usersById.get(idKey) || {};
+      const mergedStatus = existing.status === 'active' || user.status === 'active'
+        ? 'active'
+        : (user.status || existing.status || 'unknown');
+      usersById.set(idKey, {
+        id: user.id || existing.id || '',
+        name: user.name || existing.name || user.email || '',
+        email: user.email || existing.email || '',
+        role: user.role || existing.role || '',
+        status: mergedStatus,
+      });
+    }
+    return c.json([...usersById.values()]);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }

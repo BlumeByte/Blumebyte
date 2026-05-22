@@ -726,7 +726,7 @@ export default function LandingPage() {
                   onClick={() => navigate('/company-signup')}
                   className="bg-primary text-white hover:bg-primary/90 text-base px-7 shadow-md font-semibold"
                 >
-                  Start Free Trial
+                  Start Now
                 </Button>
                 <Button
                   size="lg"
@@ -995,7 +995,7 @@ export default function LandingPage() {
                       className={`w-full font-semibold ${plan.popular ? 'bg-white text-black hover:bg-gray-100' : 'bg-primary text-white hover:bg-primary/90'}`}
                       onClick={() => navigate('/company-signup')}
                     >
-                      {plan.popular ? 'Get Started Free' : 'Start Free Trial'}
+                      {'Start Now'}
                     </Button>
                   )}
                 </div>
@@ -1040,7 +1040,7 @@ export default function LandingPage() {
                   onClick={() => navigate('/company-signup')}
                   className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-bold"
                 >
-                  Start Free Trial
+                  Start Now
                 </Button>
                 <Button
                   size="lg"
