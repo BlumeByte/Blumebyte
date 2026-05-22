@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
 import { supabase } from '../lib/supabase';
+import { normalizeRole } from '../lib/role-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,6 +12,14 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 const SUPPORT_EMAIL = 'info@blumebyte.com';
+const SUPPORT_REPORT_ENDPOINTS = ['/support/report-error', '/support/error-report', '/report-error', '/error-report'] as const;
+
+const isRetryableSupportRouteError = (error: any) => {
+  const status = typeof error?.status === 'number' ? error.status : 0;
+  if (status === 404 || status === 405) return true;
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('route not found') || message.includes('method not allowed');
+};
 
 interface SubscriptionEnforcementProps {
   children: React.ReactNode;
@@ -44,7 +53,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
       let sessionRole: string | null = null;
       try {
         const { data: sessionData } = await supabase.auth.getSession();
-        sessionRole = sessionData?.session?.user?.user_metadata?.role || null;
+        sessionRole = normalizeRole(sessionData?.session?.user?.user_metadata?.role) || null;
       } catch { /* ignore */ }
 
       if (!user && !sessionRole) {
@@ -168,7 +177,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     // Check auth-context user first, then the raw Supabase session role
     // (needed when /profile is blocked by CORS and user.role is null).
     const isSuperAdmin =
-      user?.role === 'superadmin' ||
+      normalizeRole(user?.role) === 'superadmin' ||
       subscriptionStatus.sessionRole === 'superadmin';
     const canPay = subscriptionStatus.canManageSubscription || isSuperAdmin;
     return <SubscriptionLockedScreen canPay={canPay} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
@@ -217,23 +226,57 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
     setSubmitting(true);
     try {
       const token = await getToken();
-      await api('/support/report-error', {
-        method: 'POST',
-        token,
-        body: {
+      const session = !token ? await supabase.auth.getSession().catch(() => null) : null;
+      const resolvedToken = token || session?.data?.session?.access_token || null;
+      if (!resolvedToken) throw new Error('Missing authentication token');
+
+      const payload = {
+        source: 'subscription_locked',
+        location: window.location.pathname,
+        message: supportForm.message,
+        details: [
+          `Contact name: ${supportForm.name || 'N/A'}`,
+          `Contact email: ${supportForm.email || user?.email || 'N/A'}`,
+          `User email: ${user?.email || 'N/A'}`,
+          `User role: ${user?.role || 'N/A'}`,
+        ].join('\n'),
+        context: {
           type: 'subscription_locked',
           subject: 'Subscription Payment Required — System Locked',
-          message: supportForm.message,
-          contactEmail: supportForm.email || user?.email,
-          contactName: supportForm.name,
-          userEmail: user?.email,
-          userRole: user?.role,
+          contactEmail: supportForm.email || user?.email || '',
+          contactName: supportForm.name || '',
+          userEmail: user?.email || '',
+          userRole: user?.role || '',
         },
-      });
+      };
+
+      let lastError: any = null;
+      let sent = false;
+      for (const endpoint of SUPPORT_REPORT_ENDPOINTS) {
+        try {
+          await api(endpoint, {
+            method: 'POST',
+            token: resolvedToken,
+            body: payload,
+          });
+          sent = true;
+          break;
+        } catch (error: any) {
+          lastError = error;
+          if (!isRetryableSupportRouteError(error)) break;
+        }
+      }
+      if (!sent) throw lastError || new Error('Failed to send support request');
+
       toast.success(`Support request sent to ${SUPPORT_EMAIL} — we will contact you shortly.`);
       setShowSupportForm(false);
-    } catch {
-      toast.error(`Failed to send support request. Please email ${SUPPORT_EMAIL} directly.`);
+      setSupportForm((prev) => ({ ...prev, message: '' }));
+    } catch (error: any) {
+      toast.error(
+        error?.message?.toLowerCase().includes('authentication')
+          ? 'Your session expired. Please sign in again and retry.'
+          : `Failed to send support request. Please email ${SUPPORT_EMAIL} directly.`,
+      );
     } finally {
       setSubmitting(false);
     }

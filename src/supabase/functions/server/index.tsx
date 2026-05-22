@@ -332,7 +332,7 @@ async function requireAuth(c: any) {
   if (!user) throw new Error("Unauthorized");
   const kvData = await kv.get(`employee:${user.id}`);
   const rawRole = kvData?.role || user.user_metadata?.role || "employee";
-  const role = rawRole === "customer-care" ? "customer_care" : rawRole;
+  const role = normalizeCareRole(String(rawRole || ""));
   
   // SUBSCRIPTION LOGIC TEMPORARILY DEACTIVATED
   // Just return the user data without subscription/license checks
@@ -366,7 +366,8 @@ async function requireAuth(c: any) {
 
 async function requireRole(c: any, roles: string[]) {
   const data = await requireAuth(c);
-  if (!roles.includes(data.role)) throw new Error("Forbidden");
+  const normalizedAllowedRoles = new Set(roles.map((role) => normalizeCareRole(String(role || ''))));
+  if (!normalizedAllowedRoles.has(normalizeCareRole(String(data.role || '')))) throw new Error("Forbidden");
   return data;
 }
 
@@ -7206,7 +7207,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
 });
 
 // Get license information (used by LicenseManagement and LicenseStatusBanner)
-app.get(`${PREFIX}/subscription/license-info`, async (c) => {
+for (const route of subscriptionRoutePaths('/subscription/license-info')) app.get(route, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     
@@ -7230,7 +7231,7 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
     );
     
     // Find superadmin in this company
-    const superadmin = companyEmployees.find((emp: any) => emp.role === 'superadmin');
+    const superadmin = companyEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin');
     
     if (!superadmin) {
       return c.json({ 
@@ -13408,10 +13409,19 @@ async function writeDeveloperAudit(actor: any, action: string, details: any = {}
 }
 
 function normalizeCareRole(role: string) {
-  if (role === 'ultimateadmin' || role === 'ultimate_admin') return 'developer';
-  if (role === 'customer-care') return 'customer_care';
-  if (role === 'customer_care_agent' || role === 'care' || role === 'support' || role === 'support_manager') return 'customer_care';
-  return role;
+  const normalized = String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) return '';
+  const compact = normalized.replace(/_/g, '');
+  if (compact === 'ultimateadmin') return 'developer';
+  if (compact === 'superadmin') return 'superadmin';
+  if (
+    compact === 'customercare' ||
+    compact === 'customercareagent' ||
+    compact === 'care' ||
+    compact === 'support' ||
+    compact === 'supportmanager'
+  ) return 'customer_care';
+  return normalized;
 }
 
 async function getCareAssignmentsForAgent(agentId: string): Promise<string[]> {
