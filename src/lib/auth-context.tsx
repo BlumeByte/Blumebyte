@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from './supabase';
 import { api } from './api-client';
 import { authLock } from './auth-lock';
+import { normalizeRole } from './role-utils';
 import type { Session } from '@supabase/supabase-js';
 
 interface User {
@@ -40,18 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clockOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
 
-  const normalizeRole = useCallback((value: unknown): string => {
-    const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (!raw) return '';
-    const compact = raw.replace(/[\s_-]+/g, '');
-    if (compact === 'superadmin') return 'superadmin';
-    if (compact === 'ultimateadmin') return 'ultimateadmin';
-    if (compact === 'developer') return 'developer';
-    if (compact === 'customercare') return 'customer_care';
-    if (compact === 'admin' || compact === 'manager' || compact === 'employee') return compact;
-    return raw.replace(/-/g, '_');
-  }, []);
-
   const buildSessionFallbackUser = useCallback((session: Session): User => {
     const meta = session.user?.user_metadata || {};
     const roleFromMeta = [
@@ -70,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: meta.name || session.user.email || '',
       role: roleFromMeta || 'employee',
     };
-  }, [normalizeRole]);
+  }, []);
 
   const fetchProfile = useCallback(async (token: string) => {
     try {
@@ -85,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Failed to fetch profile:', e);
       return null;
     }
-  }, [normalizeRole]);
+  }, []);
 
   const getToken = useCallback(async (): Promise<string | null> => {
     // If already fetching, wait for that promise

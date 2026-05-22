@@ -3,21 +3,13 @@ import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 import { Loader2 } from 'lucide-react';
 import { ForcePasswordChange } from './ForcePasswordChange';
-import { getRoleDashboardPath } from '../lib/role-utils';
+import { getRoleDashboardPath, normalizeRole } from '../lib/role-utils';
 import { SubscriptionEnforcement } from './SubscriptionEnforcement';
 
 export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) {
   const { user, sessionLoading } = useAuth();
   const location = useLocation();
-  const normalizedRole = (() => {
-    const raw = String(user?.role || '').trim().toLowerCase();
-    if (!raw) return '';
-    const compact = raw.replace(/[\s_-]+/g, '');
-    if (compact === 'superadmin') return 'superadmin';
-    if (compact === 'customercare') return 'customer_care';
-    if (compact === 'ultimateadmin') return 'ultimateadmin';
-    return raw.replace(/-/g, '_');
-  })();
+  const normalizedRole = normalizeRole(user?.role);
 
   if (sessionLoading) {
     return (

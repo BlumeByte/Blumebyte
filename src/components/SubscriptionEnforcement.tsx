@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
 import { supabase } from '../lib/supabase';
+import { normalizeRole } from '../lib/role-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,16 +12,6 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 const SUPPORT_EMAIL = 'info@blumebyte.com';
-
-const normalizeRole = (value: unknown): string => {
-  const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
-  if (!raw) return '';
-  const compact = raw.replace(/[\s_-]+/g, '');
-  if (compact === 'superadmin') return 'superadmin';
-  if (compact === 'customercare') return 'customer_care';
-  if (compact === 'ultimateadmin') return 'ultimateadmin';
-  return raw.replace(/-/g, '_');
-};
 
 interface SubscriptionEnforcementProps {
   children: React.ReactNode;
