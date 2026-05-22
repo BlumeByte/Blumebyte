@@ -12,6 +12,16 @@ import { toast } from 'sonner';
 
 const SUPPORT_EMAIL = 'info@blumebyte.com';
 
+const normalizeRole = (value: unknown): string => {
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!raw) return '';
+  const compact = raw.replace(/[\s_-]+/g, '');
+  if (compact === 'superadmin') return 'superadmin';
+  if (compact === 'customercare') return 'customer_care';
+  if (compact === 'ultimateadmin') return 'ultimateadmin';
+  return raw.replace(/-/g, '_');
+};
+
 interface SubscriptionEnforcementProps {
   children: React.ReactNode;
 }
@@ -44,7 +54,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
       let sessionRole: string | null = null;
       try {
         const { data: sessionData } = await supabase.auth.getSession();
-        sessionRole = sessionData?.session?.user?.user_metadata?.role || null;
+        sessionRole = normalizeRole(sessionData?.session?.user?.user_metadata?.role) || null;
       } catch { /* ignore */ }
 
       if (!user && !sessionRole) {
@@ -168,7 +178,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     // Check auth-context user first, then the raw Supabase session role
     // (needed when /profile is blocked by CORS and user.role is null).
     const isSuperAdmin =
-      user?.role === 'superadmin' ||
+      normalizeRole(user?.role) === 'superadmin' ||
       subscriptionStatus.sessionRole === 'superadmin';
     const canPay = subscriptionStatus.canManageSubscription || isSuperAdmin;
     return <SubscriptionLockedScreen canPay={canPay} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
