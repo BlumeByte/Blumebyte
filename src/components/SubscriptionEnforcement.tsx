@@ -209,6 +209,12 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
   const [supportForm, setSupportForm] = useState({ name: '', email: user?.email || '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [autoRenewing, setAutoRenewing] = useState(false);
+  const isRetryableSupportRouteError = (error: any) => {
+    const status = typeof error?.status === 'number' ? error.status : 0;
+    if (status === 404 || status === 405 || status === 501) return true;
+    const message = String(error?.message || '').toLowerCase();
+    return message.includes('route not found') || message.includes('method not allowed');
+  };
 
   const submitSupportRequest = async () => {
     if (!supportForm.message.trim()) {
@@ -218,23 +224,58 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
     setSubmitting(true);
     try {
       const token = await getToken();
-      await api('/support/report-error', {
-        method: 'POST',
-        token,
-        body: {
+      const session = !token ? await supabase.auth.getSession().catch(() => null) : null;
+      const resolvedToken = token || session?.data?.session?.access_token || null;
+      if (!resolvedToken) throw new Error('Missing authentication token');
+
+      const payload = {
+        source: 'subscription_locked',
+        location: window.location.pathname,
+        message: supportForm.message,
+        details: [
+          `Contact name: ${supportForm.name || 'N/A'}`,
+          `Contact email: ${supportForm.email || user?.email || 'N/A'}`,
+          `User email: ${user?.email || 'N/A'}`,
+          `User role: ${user?.role || 'N/A'}`,
+        ].join('\n'),
+        context: {
           type: 'subscription_locked',
           subject: 'Subscription Payment Required — System Locked',
-          message: supportForm.message,
-          contactEmail: supportForm.email || user?.email,
-          contactName: supportForm.name,
-          userEmail: user?.email,
-          userRole: user?.role,
+          contactEmail: supportForm.email || user?.email || '',
+          contactName: supportForm.name || '',
+          userEmail: user?.email || '',
+          userRole: user?.role || '',
         },
-      });
+      };
+
+      const endpoints = ['/support/report-error', '/support/error-report', '/report-error', '/error-report'] as const;
+      let lastError: any = null;
+      let sent = false;
+      for (const endpoint of endpoints) {
+        try {
+          await api(endpoint, {
+            method: 'POST',
+            token: resolvedToken,
+            body: payload,
+          });
+          sent = true;
+          break;
+        } catch (error: any) {
+          lastError = error;
+          if (!isRetryableSupportRouteError(error)) break;
+        }
+      }
+      if (!sent) throw lastError || new Error('Failed to send support request');
+
       toast.success(`Support request sent to ${SUPPORT_EMAIL} — we will contact you shortly.`);
       setShowSupportForm(false);
-    } catch {
-      toast.error(`Failed to send support request. Please email ${SUPPORT_EMAIL} directly.`);
+      setSupportForm((prev) => ({ ...prev, message: '' }));
+    } catch (error: any) {
+      toast.error(
+        error?.message?.toLowerCase().includes('authentication')
+          ? 'Your session expired. Please sign in again and retry.'
+          : `Failed to send support request. Please email ${SUPPORT_EMAIL} directly.`,
+      );
     } finally {
       setSubmitting(false);
     }
