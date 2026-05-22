@@ -13411,8 +13411,10 @@ async function writeDeveloperAudit(actor: any, action: string, details: any = {}
 function normalizeCareRole(role: string) {
   const normalized = String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   if (!normalized) return '';
-  if (normalized === 'ultimateadmin' || normalized === 'ultimate_admin') return 'developer';
-  if (normalized === 'super_admin') return 'superadmin';
+  const compact = normalized.replace(/_/g, '');
+  if (compact === 'ultimateadmin') return 'developer';
+  if (compact === 'superadmin') return 'superadmin';
+  if (compact === 'customercareagent') return 'customer_care';
   if (normalized === 'customer_care_agent' || normalized === 'care' || normalized === 'support' || normalized === 'support_manager') return 'customer_care';
   return normalized;
 }

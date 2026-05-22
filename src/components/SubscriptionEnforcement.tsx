@@ -211,7 +211,7 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
   const [autoRenewing, setAutoRenewing] = useState(false);
   const isRetryableSupportRouteError = (error: any) => {
     const status = typeof error?.status === 'number' ? error.status : 0;
-    if (status === 404 || status === 405 || status === 501) return true;
+    if (status === 404 || status === 405) return true;
     const message = String(error?.message || '').toLowerCase();
     return message.includes('route not found') || message.includes('method not allowed');
   };

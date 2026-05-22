@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profile = await api('/profile', { token });
       const normalizedProfile = {
         ...profile,
-        role: normalizeRole(profile?.role) || String(profile?.role || '').trim(),
+        role: normalizeRole(profile?.role) || 'employee',
       };
       setUser(normalizedProfile);
       return normalizedProfile;
