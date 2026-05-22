@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const buildSessionFallbackUser = useCallback((session: Session): User => {
     const meta = session.user?.user_metadata || {};
-    const roleFromMeta = [
+    const resolvedRole = [
       meta.role,
       (meta as any).userRole,
       (meta as any).user_role,
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: session.user.id,
       email: session.user.email || '',
       name: meta.name || session.user.email || '',
-      role: roleFromMeta || 'employee',
+      role: resolvedRole || 'employee',
     };
   }, []);
 
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profile = await api('/profile', { token });
       const normalizedProfile = {
         ...profile,
-        role: normalizeRole(profile?.role) || 'employee',
+        role: normalizeRole(profile?.role) || String(profile?.role || '').trim(),
       };
       setUser(normalizedProfile);
       return normalizedProfile;
