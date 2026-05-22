@@ -107,7 +107,7 @@ curl https://your-app.vercel.app
 Your API should still work via Supabase (not affected by Vercel):
 ```bash
 # Test health endpoint
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 
 # Expected response:
 # {"status":"ok","version":"2.1-payment-flow-UPDATED"}

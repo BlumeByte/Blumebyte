@@ -6,12 +6,12 @@ This document provides comprehensive tests for the backup and restore endpoints 
 ## Prerequisites
 - SuperAdmin account with valid access token
 - At least one test company with sample data
-- API access to the server at `https://{projectId}.supabase.co/functions/v1/make-server-668731fc`
+- API access to the server at `https://{projectId}.supabase.co/functions/v1/make-server-a35148f0`
 
 ## Test Cases
 
 ### Test 1: Backup Endpoint - Authentication
-**Endpoint:** `GET /make-server-668731fc/backup`
+**Endpoint:** `GET /make-server-a35148f0/backup`
 
 **Test Steps:**
 1. Send request WITHOUT authorization header
@@ -27,7 +27,7 @@ This document provides comprehensive tests for the backup and restore endpoints 
 ```bash
 # Valid request
 curl -X GET \
-  https://{PROJECT_ID}.supabase.co/functions/v1/make-server-668731fc/backup \
+  https://{PROJECT_ID}.supabase.co/functions/v1/make-server-a35148f0/backup \
   -H "Authorization: Bearer {SUPERADMIN_ACCESS_TOKEN}" \
   -H "Content-Type: application/json"
 ```
@@ -35,7 +35,7 @@ curl -X GET \
 ---
 
 ### Test 2: Backup Endpoint - Response Format
-**Endpoint:** `GET /make-server-668731fc/backup`
+**Endpoint:** `GET /make-server-a35148f0/backup`
 
 **Test Steps:**
 1. Call backup endpoint with valid SuperAdmin token
@@ -70,7 +70,7 @@ curl -X GET \
 ---
 
 ### Test 3: Backup Endpoint - Multi-Tenant Isolation
-**Endpoint:** `GET /make-server-668731fc/backup`
+**Endpoint:** `GET /make-server-a35148f0/backup`
 
 **Test Steps:**
 1. Create two test companies (Company A and Company B)
@@ -98,7 +98,7 @@ console.assert(!hasOtherCompanyData, 'Backup contains data from other companies!
 ---
 
 ### Test 4: Backup Endpoint - Data Completeness
-**Endpoint:** `GET /make-server-668731fc/backup`
+**Endpoint:** `GET /make-server-a35148f0/backup`
 
 **Test Steps:**
 1. Create test data across multiple modules:
@@ -119,7 +119,7 @@ console.assert(!hasOtherCompanyData, 'Backup contains data from other companies!
 ---
 
 ### Test 5: Restore Endpoint - Authentication
-**Endpoint:** `POST /make-server-668731fc/backup/restore`
+**Endpoint:** `POST /make-server-a35148f0/backup/restore`
 
 **Test Steps:**
 1. Send request WITHOUT authorization header
@@ -134,7 +134,7 @@ console.assert(!hasOtherCompanyData, 'Backup contains data from other companies!
 **cURL Example:**
 ```bash
 curl -X POST \
-  https://{PROJECT_ID}.supabase.co/functions/v1/make-server-668731fc/backup/restore \
+  https://{PROJECT_ID}.supabase.co/functions/v1/make-server-a35148f0/backup/restore \
   -H "Authorization: Bearer {SUPERADMIN_ACCESS_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -148,7 +148,7 @@ curl -X POST \
 ---
 
 ### Test 6: Restore Endpoint - Invalid Data Handling
-**Endpoint:** `POST /make-server-668731fc/backup/restore`
+**Endpoint:** `POST /make-server-a35148f0/backup/restore`
 
 **Test Steps:**
 1. Send request with empty body
@@ -164,7 +164,7 @@ curl -X POST \
 ---
 
 ### Test 7: Restore Endpoint - Data Restoration
-**Endpoint:** `POST /make-server-668731fc/backup/restore`
+**Endpoint:** `POST /make-server-a35148f0/backup/restore`
 
 **Test Steps:**
 1. Create initial test data (3 employees)
@@ -181,7 +181,7 @@ curl -X POST \
 ---
 
 ### Test 8: Restore Endpoint - Multi-Tenant Safety
-**Endpoint:** `POST /make-server-668731fc/backup/restore`
+**Endpoint:** `POST /make-server-a35148f0/backup/restore`
 
 **Test Steps:**
 1. Login as SuperAdmin from Company A
@@ -288,7 +288,7 @@ const projectId = 'YOUR_PROJECT_ID';
 // Test 1: Create Backup
 async function testBackup() {
   const response = await fetch(
-    `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/backup`,
+    `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/backup`,
     {
       method: 'GET',
       headers: {
@@ -318,7 +318,7 @@ async function testRestore() {
   }
   
   const response = await fetch(
-    `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/backup/restore`,
+    `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/backup/restore`,
     {
       method: 'POST',
       headers: {

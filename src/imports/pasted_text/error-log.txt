@@ -7,7 +7,7 @@ fl @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 iT @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:1
 tT @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:1Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/attendance 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/attendance 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79179
 await in u
@@ -19,7 +19,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/leaves 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/leaves 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79178
 await in u
@@ -31,7 +31,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/superadmin/meeting-1on1 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/superadmin/meeting-1on1 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:80213
 vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
@@ -41,7 +41,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/superadmin/meeting-1on1 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/superadmin/meeting-1on1 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:80213
 vp @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
@@ -51,7 +51,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/financial-years 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75440
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75448
@@ -62,7 +62,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/tax-configurations 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75735
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:75743
@@ -117,7 +117,7 @@ EA @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 ST @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
 Pg @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5
 RW @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:5Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/attendance 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/attendance 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79179
 await in u
@@ -129,7 +129,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/leaves 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/leaves 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79178
 await in u
@@ -141,7 +141,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/admin/training-programs 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/admin/training-programs 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78725
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78741
@@ -152,7 +152,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/admin/training-programs 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/admin/training-programs 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78725
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78741
@@ -163,7 +163,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/admin/training-programs 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/admin/training-programs 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78725
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:78741
@@ -174,7 +174,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:81567  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/subscription/license-info 401 (Unauthorized)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:81567  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/subscription/license-info 401 (Unauthorized)
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81567
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81588
 await in (anonymous)
@@ -186,7 +186,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:81567  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/subscription/license-info 401 (Unauthorized)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:81567  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/subscription/license-info 401 (Unauthorized)
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81567
 (anonymous) @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:81588
 await in (anonymous)
@@ -198,7 +198,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/attendance 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/attendance 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79179
 await in u
@@ -210,7 +210,7 @@ Ui @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a9
 JN @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8
 zs @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6
 (anonymous) @ sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:8Understand this error
-2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/leaves 404 (Not Found)
+2294e0588310873b8cd1576c188ff8a8446d279a.js:26778  GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/leaves 404 (Not Found)
 Z @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:26778
 u @ 2294e0588310873b8cd1576c188ff8a8446d279a.js:79178
 await in u

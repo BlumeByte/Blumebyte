@@ -104,7 +104,7 @@ After deployment, verify:
 2. Verify edge function deployed: `supabase functions list`
 3. Test endpoint directly:
    ```bash
-   curl -X GET "https://YOUR_PROJECT.supabase.co/functions/v1/make-server-668731fc/reference-data" \
+   curl -X GET "https://YOUR_PROJECT.supabase.co/functions/v1/make-server-a35148f0/reference-data" \
      -H "Authorization: Bearer YOUR_TOKEN"
    ```
 4. Clear browser cache and reload

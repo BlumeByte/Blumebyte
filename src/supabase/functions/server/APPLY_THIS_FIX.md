@@ -114,7 +114,7 @@ app.post(`${PREFIX}/admin/migrate-company-keys`, async (c) => {
 
 Run the migration endpoint first, which will create `company_by_id:` keys for all existing companies:
 ```
-POST /make-server-668731fc/admin/migrate-company-keys
+POST /make-server-a35148f0/admin/migrate-company-keys
 Authorization: Bearer <superadmin-token>
 ```
 

@@ -310,13 +310,13 @@ After deploying these fixes:
 ### 1. Deploy Server Code
 ```bash
 cd /path/to/project
-supabase functions deploy make-server-668731fc
+supabase functions deploy make-server-a35148f0
 ```
 
 ### 2. Verify Deployment
 ```bash
 # Check health endpoint
-curl https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/health
+curl https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/health
 
 # Should return: {"status":"ok"}
 ```
@@ -344,7 +344,7 @@ location.reload();
 ```javascript
 // In browser console after login:
 const token = localStorage.getItem('auth-token');
-fetch('https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/company-settings', {
+fetch('https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/company-settings', {
   headers: { 'Authorization': `Bearer ${token}` }
 })
 .then(r => r.json())
@@ -358,7 +358,7 @@ fetch('https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/compan
 ```javascript
 // In browser console:
 const token = localStorage.getItem('auth-token');
-fetch('https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/reference-data', {
+fetch('https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/reference-data', {
   headers: { 'Authorization': `Bearer ${token}` }
 })
 .then(r => r.json())
@@ -374,7 +374,7 @@ console.log('Departments:', data.departments.length); // Should match current co
 ```javascript
 // In browser console:
 const token = localStorage.getItem('auth-token');
-fetch('https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/subscription/license-info', {
+fetch('https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/subscription/license-info', {
   headers: { 'Authorization': `Bearer ${token}` }
 })
 .then(r => r.json())

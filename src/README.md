@@ -80,7 +80,7 @@ failed with status 403
 
 After fixing, visit:
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 Expected: `{"status":"ok","version":"2.1-payment-flow-UPDATED",...}`

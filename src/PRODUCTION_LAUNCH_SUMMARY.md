@@ -35,7 +35,7 @@
 URL: /production-cleanup
 
 # OR use API
-curl -X POST https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+curl -X POST https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "X-Cleanup-Key: YOUR-SECRET-KEY"
 ```
 
@@ -501,8 +501,8 @@ DevSettings: /dev-settings
 **API Endpoints:**
 
 ```
-Cleanup:     POST /make-server-668731fc/production/cleanup
-Health:      GET  /make-server-668731fc/health
+Cleanup:     POST /make-server-a35148f0/production/cleanup
+Health:      GET  /make-server-a35148f0/health
 ```
 
 ---

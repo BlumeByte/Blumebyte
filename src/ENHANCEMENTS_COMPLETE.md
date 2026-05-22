@@ -504,7 +504,7 @@ supabase functions deploy server
 
 **Verify Deployment**:
 ```bash
-curl https://your-project.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project.supabase.co/functions/v1/make-server-a35148f0/health
 
 # Should return:
 {

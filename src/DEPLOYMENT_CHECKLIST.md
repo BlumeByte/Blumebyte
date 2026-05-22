@@ -47,7 +47,7 @@
 ### 2. Backend Server
 - [ ] **IMPORTANT:** Deploy the updated server code
   - The server must be redeployed for fixes to take effect
-  - Run: `supabase functions deploy make-server-668731fc`
+  - Run: `supabase functions deploy make-server-a35148f0`
   - Or redeploy via Supabase dashboard
 
 ### 3. Database Verification
@@ -180,18 +180,18 @@ supabase db dump --data-only > backup_$(date +%Y%m%d).sql
 ### Step 2: Deploy Server Changes
 ```bash
 # Deploy the updated server function
-supabase functions deploy make-server-668731fc
+supabase functions deploy make-server-a35148f0
 
 # Or if using Supabase dashboard:
 # 1. Go to Functions
-# 2. Select make-server-668731fc
+# 2. Select make-server-a35148f0
 # 3. Click "Deploy"
 ```
 
 ### Step 3: Verify Server Deployment
 ```bash
 # Test the health endpoint
-curl https://YOUR_PROJECT_ID.supabase.co/functions/v1/make-server-668731fc/health
+curl https://YOUR_PROJECT_ID.supabase.co/functions/v1/make-server-a35148f0/health
 
 # Expected response:
 {
@@ -235,7 +235,7 @@ curl https://YOUR_PROJECT_ID.supabase.co/functions/v1/make-server-668731fc/healt
 ### Immediate Rollback:
 ```bash
 # Restore previous server version
-supabase functions deploy make-server-668731fc --project-ref YOUR_REF --version PREVIOUS_VERSION
+supabase functions deploy make-server-a35148f0 --project-ref YOUR_REF --version PREVIOUS_VERSION
 
 # Or redeploy previous code
 ```
@@ -272,7 +272,7 @@ async function verifyDataIntegrity() {
   
   for (const endpoint of endpoints) {
     const response = await fetch(
-      `https://YOUR_PROJECT_ID.supabase.co/functions/v1/make-server-668731fc/${endpoint}`,
+      `https://YOUR_PROJECT_ID.supabase.co/functions/v1/make-server-a35148f0/${endpoint}`,
       {
         headers: { 
           'Authorization': `Bearer ${publicAnonKey}`,

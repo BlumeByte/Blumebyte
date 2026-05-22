@@ -65,7 +65,7 @@ const CONFIG = {
   accessToken: 'YOUR_ACCESS_TOKEN'    // From Step 1
 };
 
-const baseUrl = `https://${CONFIG.projectId}.supabase.co/functions/v1/make-server-668731fc`;
+const baseUrl = `https://${CONFIG.projectId}.supabase.co/functions/v1/make-server-a35148f0`;
 
 async function quickBackupTest() {
   console.log('🧪 Starting Quick Backup Test...\n');
@@ -324,7 +324,7 @@ After quick test passes, run comprehensive tests:
 
 **Backup Endpoint:**
 ```
-GET https://{projectId}.supabase.co/functions/v1/make-server-668731fc/backup
+GET https://{projectId}.supabase.co/functions/v1/make-server-a35148f0/backup
 Headers: Authorization: Bearer {token}
 ```
 

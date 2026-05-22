@@ -24,20 +24,20 @@ Your application **works perfectly** without the `make-server` function:
 
 ```
 ✅ Edge Function: /server
-   └── Handles route: /make-server-668731fc/*
+   └── Handles route: /make-server-a35148f0/*
        └── All 100+ API endpoints working
 ```
 
 **All your API calls** use this pattern:
 ```typescript
-const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-668731fc`;
+const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0`;
 ```
 
 This routes to the **server** edge function, NOT to a `make-server` edge function.
 
 ## The Route Name vs Function Name Confusion
 
-- **Route prefix**: `/make-server-668731fc/` (a path in your server function)
+- **Route prefix**: `/make-server-a35148f0/` (a path in your server function)
 - **Function name**: `server` (the actual Supabase edge function)
 - **Non-existent**: `make-server` (what Figma Make thinks exists)
 

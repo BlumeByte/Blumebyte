@@ -52,7 +52,7 @@ WHY THIS HAPPENED:
 - Deployment path: Based on folder name
 - Your folder was named "server"
 - Figma Make expected "make-server"
-- Runtime PREFIX "/make-server-668731fc" is different from deployment name
+- Runtime PREFIX "/make-server-a35148f0" is different from deployment name
 
 ═══════════════════════════════════════════════════════════════
 
@@ -71,7 +71,7 @@ Structure should be:
 VERIFY SUCCESS:
 ===============
 Test this URL after deployment:
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 
 Should return: {"status":"ok"}
 

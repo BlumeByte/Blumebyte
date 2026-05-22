@@ -210,11 +210,11 @@ After applying any fix, verify it worked:
 ### Step 1: Test Health Endpoint
 
 **Option A - Browser:**
-Visit: `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health`
+Visit: `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health`
 
 **Option B - Command Line:**
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Expected Response:**

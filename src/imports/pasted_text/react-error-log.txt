@@ -1,13 +1,13 @@
 Uncaught SyntaxError: Unexpected token '<'Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
-ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/financial-years:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
+ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/tax-configurations:1  Failed to load resource: the server responded with a status of 404 ()Understand this error
 84f8da4f4a06f84fec0af1c9fab4750fcd410606.js:46783 Error handled by React Router default ErrorBoundary: Error: Minified React error #31; visit https://reactjs.org/docs/error-decoder.html?invariant=31&args[]=object%20with%20keys%20%7Bid%2C%20name%2C%20status%2C%20companyId%2C%20createdAt%2C%20updatedAt%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
     at H_ (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:6314)
     at T (sites-runtime.04f66058feafef354e13705358698cf2ae30f1cd1c6baaa2efc88d31da9a91ed.js:6:11369)

@@ -14,7 +14,6 @@ export const SUPABASE_FUNCTION_NAME_CANDIDATES = Array.from(
       trimSlashes(import.meta.env.VITE_SUPABASE_FUNCTION_NAME || ''),
       'server',
       'make-server-a35148f0',
-      'make-server-668731fc',
       'make-server',
     ].filter(Boolean),
   ),

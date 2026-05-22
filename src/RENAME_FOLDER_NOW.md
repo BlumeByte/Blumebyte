@@ -137,13 +137,13 @@ I've already updated your `/figma.json` to:
 ## 💡 Common Questions
 
 **Q: Will this break my code?**  
-A: No! The folder name is just for deployment. Your code uses `/make-server-668731fc` which is the PREFIX, not the folder name.
+A: No! The folder name is just for deployment. Your code uses `/make-server-a35148f0` which is the PREFIX, not the folder name.
 
 **Q: Do I need to change any imports?**  
 A: No! All imports use relative paths (`./kv_store.tsx`) which work regardless of the parent folder name.
 
 **Q: Will this affect my frontend?**  
-A: No! Your frontend calls `/make-server-668731fc` which is the runtime path, not the folder name.
+A: No! Your frontend calls `/make-server-a35148f0` which is the runtime path, not the folder name.
 
 **Q: What if I don't have access to rename the folder?**  
 A: You can copy all files from `/supabase/functions/server/` to a new folder `/supabase/functions/make-server/`, then delete the old `server` folder.
@@ -154,7 +154,7 @@ A: You can copy all files from `/supabase/functions/server/` to a new folder `/s
 
 After deployment succeeds, this URL should work:
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 Returns:

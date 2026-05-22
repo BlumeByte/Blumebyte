@@ -64,7 +64,7 @@ Despite the error:
 
 **Test your API:**
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 If this returns `{"status": "ok", ...}`, your app is fully functional.

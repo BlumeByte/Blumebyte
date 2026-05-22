@@ -294,7 +294,7 @@ Employee: Dashboard loads ✅
 3. Check server logs
 4. Test API endpoint directly:
    ```
-   GET /make-server-668731fc/subscription/license-info
+   GET /make-server-a35148f0/subscription/license-info
    Authorization: Bearer <token>
    ```
 5. Check accessToken is valid
@@ -323,7 +323,7 @@ Employee: Dashboard loads ✅
 
 5. **Test API endpoint**:
    ```
-   GET /make-server-668731fc/reports/users
+   GET /make-server-a35148f0/reports/users
    Authorization: Bearer <token>
    ```
    - Should return array of users
@@ -434,7 +434,7 @@ The fallback in `resolveCompanyScope` handles legacy users automatically:
 If you want to update all legacy users:
 
 ```bash
-POST /make-server-668731fc/superadmin/fix-company-scope
+POST /make-server-a35148f0/superadmin/fix-company-scope
 Authorization: Bearer <superadmin-token>
 ```
 

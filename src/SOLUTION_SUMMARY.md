@@ -171,7 +171,7 @@ supabase functions deploy make-server
 │ Visit:                                           │
 │ https://ivohczdtuxasyfoiphqu.supabase.co/       │
 │ functions/v1/make-server/                        │
-│ make-server-668731fc/health                      │
+│ make-server-a35148f0/health                      │
 │                                                  │
 │ Should return: {"status":"ok"}                   │
 └─────────────────────────────────────────────────┘

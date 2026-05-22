@@ -191,7 +191,7 @@ supabase functions deploy server
 Expected output:
 ```
 ✓ Deployed Function server
-Function URL: https://your-project.supabase.co/functions/v1/make-server-668731fc
+Function URL: https://your-project.supabase.co/functions/v1/make-server-a35148f0
 ```
 
 ### Step 2: Test Scroll to Top (Issue 1)

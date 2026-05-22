@@ -305,7 +305,7 @@ If you want to permanently update all legacy users:
 
 1. **Call the migration endpoint** (already exists):
    ```bash
-   POST /make-server-668731fc/superadmin/fix-company-scope
+   POST /make-server-a35148f0/superadmin/fix-company-scope
    Authorization: Bearer <superadmin-token>
    ```
 

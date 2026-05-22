@@ -27,7 +27,7 @@ Figma Make's internal state was tracking a `make-server` edge function and tryin
 ```
 ✅ Supabase Edge Function: server
    ├── Deployed via Supabase CLI (not Figma Make)
-   ├── Handles route: /make-server-668731fc/*
+   ├── Handles route: /make-server-a35148f0/*
    └── 100+ API endpoints working perfectly
 
 ❌ Figma Make Edge Function Deployment
@@ -41,7 +41,7 @@ Your `server` edge function is **already deployed** and working at:
 https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/
 ```
 
-All API calls route through `/make-server-668731fc/` which is handled by this function.
+All API calls route through `/make-server-a35148f0/` which is handled by this function.
 
 ## How to Update the Edge Function
 
@@ -112,7 +112,7 @@ enabled = false  # ← Disables Figma Make deployment
 
 Test that your edge function still works:
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 Expected response:

@@ -202,7 +202,7 @@ After applying any fix, verify success by:
 ### 1. Check Health Endpoint
 Visit in browser:
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 Expected response:

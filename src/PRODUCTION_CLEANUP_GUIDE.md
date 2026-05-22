@@ -97,14 +97,14 @@ After cleanup completes:
 ### Direct API Endpoint
 
 ```bash
-POST https://your-project-id.supabase.co/functions/v1/make-server-668731fc/production/cleanup
+POST https://your-project-id.supabase.co/functions/v1/make-server-a35148f0/production/cleanup
 ```
 
 ### With Secret Key (if configured)
 
 ```bash
 curl -X POST \
-  https://your-project-id.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+  https://your-project-id.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "Content-Type: application/json" \
   -H "X-Cleanup-Key: your-secret-key"
 ```
@@ -113,7 +113,7 @@ curl -X POST \
 
 ```bash
 curl -X POST \
-  https://your-project-id.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+  https://your-project-id.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "Content-Type: application/json"
 ```
 
@@ -273,7 +273,7 @@ After cleanup, verify the system is ready:
 
 ```bash
 # Call the health endpoint
-curl https://your-project-id.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project-id.supabase.co/functions/v1/make-server-a35148f0/health
 ```
 
 ### 2. Verify Auth Users Deleted
@@ -355,7 +355,7 @@ This is **EXPECTED**! After cleanup:
 
 ### API Endpoint
 ```
-POST /make-server-668731fc/production/cleanup
+POST /make-server-a35148f0/production/cleanup
 ```
 
 ### Confirmation Text

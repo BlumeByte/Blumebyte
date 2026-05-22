@@ -95,7 +95,7 @@ Most people succeed with the first method
 ### Step 3: Verify It Worked (30 seconds)
 Visit this URL in your browser:
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 You should see:

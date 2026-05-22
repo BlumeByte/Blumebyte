@@ -219,7 +219,7 @@ deploy-to-supabase.bat
 ```
 
 ### **Step 2: Verify Deployment**
-Visit: `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health`
+Visit: `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health`
 
 Should return: `{"status":"ok"}`
 

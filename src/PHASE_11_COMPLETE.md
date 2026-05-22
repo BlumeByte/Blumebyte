@@ -163,7 +163,7 @@ After successful deployment:
 
 ### **1. Health Check**
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 Expected:
@@ -317,7 +317,7 @@ Hard refresh: Ctrl+Shift+R (Windows/Linux)
 **Debug:**
 ```javascript
 // In browser console:
-fetch('https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health')
+fetch('https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health')
   .then(r => r.json())
   .then(console.log)
 ```
@@ -373,7 +373,7 @@ You'll know everything is working when:
 | Supabase Dashboard | https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu |
 | Edge Functions | https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu/functions |
 | Function Logs | https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu/logs |
-| Health Endpoint | https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health |
+| Health Endpoint | https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health |
 
 ---
 

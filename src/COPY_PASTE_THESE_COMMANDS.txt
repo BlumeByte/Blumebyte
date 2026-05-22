@@ -23,7 +23,7 @@ Open Terminal and copy/paste these commands ONE BY ONE:
    supabase functions deploy make-server --no-verify-jwt
 
 5. Test it worked:
-   curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health"
+   curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health"
 
 DONE! Should see: {"status":"ok","version":"2.1-payment-flow-UPDATED",...}
 
@@ -46,7 +46,7 @@ Open Command Prompt or PowerShell and copy/paste these commands ONE BY ONE:
    supabase functions deploy make-server --no-verify-jwt
 
 5. Test it worked:
-   curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health"
+   curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health"
 
 DONE! Should see: {"status":"ok","version":"2.1-payment-flow-UPDATED",...}
 
@@ -72,7 +72,7 @@ Click "Save" for each.
 ================================================================================
 
 Open this URL in your browser:
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 
 Should return:
 {"status":"ok","version":"2.1-payment-flow-UPDATED",...}

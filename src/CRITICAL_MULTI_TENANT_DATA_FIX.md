@@ -198,7 +198,7 @@ If you see this error:
 
 This means the user's `assignedCompanies` field is not set. Run the fix endpoint:
 ```
-POST /make-server-668731fc/superadmin/fix-company-scope
+POST /make-server-a35148f0/superadmin/fix-company-scope
 ```
 
 ## Files Modified

@@ -529,7 +529,7 @@ useRealtimeRefresh({ channelName: 'messages', onRefresh: load })
 
 ### Check Server Health
 ```bash
-curl https://your-project.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project.supabase.co/functions/v1/make-server-a35148f0/health
 ```
 
 ### Check Company Record

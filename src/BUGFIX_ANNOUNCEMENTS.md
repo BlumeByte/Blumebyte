@@ -70,7 +70,7 @@ Modified `/components/ManagerDashboard.tsx`:
 ```
 
 ### API Endpoint:
-- **GET** `/make-server-668731fc/announcements`
+- **GET** `/make-server-a35148f0/announcements`
 - Returns array of announcements sorted by date
 - Company-scoped (multi-tenant safe)
 - Role-based filtering applied server-side

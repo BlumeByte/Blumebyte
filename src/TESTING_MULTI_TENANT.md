@@ -383,7 +383,7 @@ async function testMultiTenantIsolation() {
   for (const test of tests) {
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-668731fc/${test.endpoint}`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-a35148f0/${test.endpoint}`,
         {
           headers: { 
             'Authorization': `Bearer ${publicKey}`,

@@ -24,7 +24,7 @@ const [licenseInfo, setLicenseInfo] = useState<any>(null);
 const fetchLicenseInfo = useCallback(async () => {
   try {
     const response = await fetch(
-      `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-668731fc/subscription/license-info`,
+      `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/subscription/license-info`,
       {
         method: 'GET',
         headers: {

@@ -44,7 +44,7 @@ supabase login
 supabase functions deploy server --project-ref ivohczdtuxasyfoiphqu
 
 # 4. Test
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 **OR use our deployment script:**
@@ -71,7 +71,7 @@ After trying any option above, test if it worked:
 
 ```bash
 # Should return JSON with status "ok"
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 **Expected response:**

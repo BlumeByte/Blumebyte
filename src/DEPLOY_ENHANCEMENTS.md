@@ -8,7 +8,7 @@ cd supabase/functions
 supabase functions deploy server
 
 # 2. Verify deployment
-curl https://your-project.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project.supabase.co/functions/v1/make-server-a35148f0/health
 
 # 3. Test in production
 # - Open dashboard
@@ -51,14 +51,14 @@ supabase functions deploy server
 ```
 Deploying function server...
 ✓ Deployed function server
-  URL: https://xxx.supabase.co/functions/v1/make-server-668731fc
+  URL: https://xxx.supabase.co/functions/v1/make-server-a35148f0
   Version: xxx
 ```
 
 **Verify Deployment**:
 ```bash
 # Test health endpoint
-curl https://your-project.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project.supabase.co/functions/v1/make-server-a35148f0/health
 
 # Expected response:
 {
@@ -453,7 +453,7 @@ supabase functions logs server --tail
 // Open browser console
 // Try manual API call
 const response = await fetch(
-  'https://xxx.supabase.co/functions/v1/make-server-668731fc/superadmin/company',
+  'https://xxx.supabase.co/functions/v1/make-server-a35148f0/superadmin/company',
   { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('accessToken') }}
 );
 const data = await response.json();
@@ -597,7 +597,7 @@ const recentData = allData.filter(item =>
 cd supabase/functions && supabase functions deploy server
 
 # 2. Test health
-curl https://your-project.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project.supabase.co/functions/v1/make-server-a35148f0/health
 
 # 3. Test in browser
 # - Open dashboard
