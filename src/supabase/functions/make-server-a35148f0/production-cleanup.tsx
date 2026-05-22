@@ -196,9 +196,9 @@ async function clearStorageBuckets() {
 
     console.log(`Found ${buckets.length} storage buckets`);
 
-    // Only delete buckets that belong to this app (prefixed with make-668731fc)
+    // Only delete buckets that belong to this app (prefixed with make-server-a35148f0)
     for (const bucket of buckets) {
-      if (bucket.name.startsWith('make-668731fc')) {
+      if (bucket.name.startsWith('make-server-a35148f0')) {
         try {
           // List all files in bucket
           const { data: files } = await sb.storage.from(bucket.name).list();
