@@ -2486,7 +2486,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                           The Supabase Edge Function hasn't been updated yet — tenant, metrics, and chat routes return 404. Deploy the function to see live data here.
                         </p>
                         <code className="mt-2 block text-xs bg-amber-100 text-amber-900 rounded px-2 py-1 font-mono">
-                          supabase functions deploy make-server-668731fc
+                          supabase functions deploy make-server-a35148f0
                         </code>
                       </div>
                     </div>

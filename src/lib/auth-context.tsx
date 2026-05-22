@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from './supabase';
 import { api } from './api-client';
 import { authLock } from './auth-lock';
+import { normalizeRole } from './role-utils';
 import type { Session } from '@supabase/supabase-js';
 
 interface User {
@@ -42,20 +43,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const buildSessionFallbackUser = useCallback((session: Session): User => {
     const meta = session.user?.user_metadata || {};
-    const roleFromMeta = String(meta.role || '').toLowerCase().replace('-', '_');
+    const resolvedRole = [
+      meta.role,
+      (meta as any).userRole,
+      (meta as any).user_role,
+      session.user?.app_metadata?.role,
+      (session.user?.app_metadata as any)?.userRole,
+      (session.user?.app_metadata as any)?.user_role,
+    ]
+      .map((candidate) => normalizeRole(candidate))
+      .find(Boolean);
     return {
       id: session.user.id,
       email: session.user.email || '',
       name: meta.name || session.user.email || '',
-      role: roleFromMeta || 'employee',
+      role: resolvedRole || 'employee',
     };
   }, []);
 
   const fetchProfile = useCallback(async (token: string) => {
     try {
       const profile = await api('/profile', { token });
-      setUser(profile);
-      return profile;
+      const normalizedProfile = {
+        ...profile,
+        role: normalizeRole(profile?.role) || 'employee',
+      };
+      setUser(normalizedProfile);
+      return normalizedProfile;
     } catch (e) {
       console.log('Failed to fetch profile:', e);
       return null;

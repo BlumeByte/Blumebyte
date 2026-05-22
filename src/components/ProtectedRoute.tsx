@@ -3,12 +3,13 @@ import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 import { Loader2 } from 'lucide-react';
 import { ForcePasswordChange } from './ForcePasswordChange';
-import { getRoleDashboardPath } from '../lib/role-utils';
+import { getRoleDashboardPath, normalizeRole } from '../lib/role-utils';
 import { SubscriptionEnforcement } from './SubscriptionEnforcement';
 
 export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) {
   const { user, sessionLoading } = useAuth();
   const location = useLocation();
+  const normalizedRole = normalizeRole(user?.role);
 
   if (sessionLoading) {
     return (
@@ -23,8 +24,8 @@ export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: strin
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (!allowedRoles.includes(user.role)) {
-    return <Navigate to={getRoleDashboardPath(user.role)} replace />;
+  if (!allowedRoles.includes(normalizedRole)) {
+    return <Navigate to={getRoleDashboardPath(normalizedRole)} replace />;
   }
 
   // Force password change on first login (admin-created accounts)
@@ -35,7 +36,7 @@ export function ProtectedRoute({ allowedRoles, children }: { allowedRoles: strin
   const subscriptionProtectedRoles = ['superadmin', 'admin', 'manager', 'employee'];
   const subscriptionExemptPaths = new Set(['/subscription', '/payment-verify', '/payment-verify-license']);
   const shouldEnforceSubscription =
-    subscriptionProtectedRoles.includes(user.role) &&
+    subscriptionProtectedRoles.includes(normalizedRole) &&
     !subscriptionExemptPaths.has(location.pathname);
 
   if (shouldEnforceSubscription) {
