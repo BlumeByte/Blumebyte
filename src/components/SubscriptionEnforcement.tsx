@@ -12,6 +12,14 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 const SUPPORT_EMAIL = 'info@blumebyte.com';
+const SUPPORT_REPORT_ENDPOINTS = ['/support/report-error', '/support/error-report', '/report-error', '/error-report'] as const;
+
+const isRetryableSupportRouteError = (error: any) => {
+  const status = typeof error?.status === 'number' ? error.status : 0;
+  if (status === 404 || status === 405) return true;
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('route not found') || message.includes('method not allowed');
+};
 
 interface SubscriptionEnforcementProps {
   children: React.ReactNode;
@@ -209,12 +217,6 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
   const [supportForm, setSupportForm] = useState({ name: '', email: user?.email || '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [autoRenewing, setAutoRenewing] = useState(false);
-  const isRetryableSupportRouteError = (error: any) => {
-    const status = typeof error?.status === 'number' ? error.status : 0;
-    if (status === 404 || status === 405) return true;
-    const message = String(error?.message || '').toLowerCase();
-    return message.includes('route not found') || message.includes('method not allowed');
-  };
 
   const submitSupportRequest = async () => {
     if (!supportForm.message.trim()) {
@@ -248,10 +250,9 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
         },
       };
 
-      const endpoints = ['/support/report-error', '/support/error-report', '/report-error', '/error-report'] as const;
       let lastError: any = null;
       let sent = false;
-      for (const endpoint of endpoints) {
+      for (const endpoint of SUPPORT_REPORT_ENDPOINTS) {
         try {
           await api(endpoint, {
             method: 'POST',

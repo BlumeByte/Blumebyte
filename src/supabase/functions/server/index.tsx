@@ -13414,8 +13414,13 @@ function normalizeCareRole(role: string) {
   const compact = normalized.replace(/_/g, '');
   if (compact === 'ultimateadmin') return 'developer';
   if (compact === 'superadmin') return 'superadmin';
-  if (compact === 'customercareagent') return 'customer_care';
-  if (normalized === 'customer_care_agent' || normalized === 'care' || normalized === 'support' || normalized === 'support_manager') return 'customer_care';
+  if (
+    compact === 'customercare' ||
+    compact === 'customercareagent' ||
+    compact === 'care' ||
+    compact === 'support' ||
+    compact === 'supportmanager'
+  ) return 'customer_care';
   return normalized;
 }
 
