@@ -5794,13 +5794,15 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
     const body = await c.req.json();
     const { userId, userName, email, loginTime, logoutTime, wasAutoClockedOut, logoutType } = body;
     
+    const sessionMsg = `${userName} (${email}) logged out at ${new Date(logoutTime).toLocaleString()}. Login: ${new Date(loginTime).toLocaleString()}${wasAutoClockedOut ? ' - Auto clocked out' : ''}`;
+
     // Get all SuperAdmins and Admins to notify
     const allEmployees = await kv.getByPrefix("employee:");
     const adminsAndSuperAdmins = allEmployees.filter((e: any) => 
       e.role === 'superadmin' || e.role === 'SuperAdmin' || e.role === 'admin' || e.role === 'Admin'
     );
     
-    // Create notifications for each admin
+    // Create KV notifications AND email each admin
     for (const admin of adminsAndSuperAdmins) {
       const nid = crypto.randomUUID();
       await kv.set(`notification:${nid}`, {
@@ -5808,13 +5810,21 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
         userId: admin.userId,
         type: "session",
         title: "User Session Ended",
-        message: `${userName} (${email}) logged out at ${new Date(logoutTime).toLocaleString()}. Login: ${new Date(loginTime).toLocaleString()}${wasAutoClockedOut ? ' - Auto clocked out' : ''}`,
+        message: sessionMsg,
         read: false,
         createdAt: new Date().toISOString(),
       });
+      if (admin.email) {
+        await sendEmailNotification(
+          admin.userId || admin.id || '',
+          admin.email,
+          admin.name || '',
+          `Session Report: ${userName} logged out — Blumebyte HR`,
+          `<p>${sessionMsg}</p>`,
+          'emailOnSessionReport'
+        );
+      }
     }
-    
-    // Log the session end
     
     return c.json({ success: true });
   } catch (e: any) {
@@ -5822,7 +5832,59 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/attendance/heartbeat`, async (c) => {
+// POST /auth/login-alert — called by the frontend after a successful login to
+// email the user a security alert, CC info@blumebyte.com, and log to developer dashboard.
+app.post(`${PREFIX}/auth/login-alert`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, email, name, loginTime, userAgent, ipAddress } = body;
+    if (!email) return c.json({ error: 'email is required' }, 400);
+
+    const loginAt = loginTime ? new Date(loginTime).toLocaleString('en-GB', { timeZone: 'UTC' }) + ' UTC' : new Date().toLocaleString('en-GB', { timeZone: 'UTC' }) + ' UTC';
+    const device = userAgent ? String(userAgent).slice(0, 200) : 'Unknown device';
+    const ip = ipAddress ? String(ipAddress) : 'Unknown';
+
+    // Email the user
+    await sendEmailNotification(
+      userId || '',
+      email,
+      name || '',
+      'New Login to Your Blumebyte HR Account',
+      `
+        <p>We detected a new sign-in to your Blumebyte HR account.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;width:120px;">Time</td><td style="padding:6px 0;color:#111827;font-size:13px;">${loginAt}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">Device</td><td style="padding:6px 0;color:#111827;font-size:13px;">${device}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">IP Address</td><td style="padding:6px 0;color:#111827;font-size:13px;">${ip}</td></tr>
+        </table>
+        <p style="color:#374151;">If this was you, no action is needed. If you did not perform this login, please change your password immediately and contact support.</p>
+      `,
+      'emailOnLogin'
+    );
+
+    // Also write a developer dashboard notification so platform developers can track login events.
+    const devNotifId = crypto.randomUUID();
+    await kv.set(`developer_notification:${devNotifId}`, {
+      id: devNotifId,
+      type: 'login_alert',
+      recipientId: userId || '',
+      recipientEmail: email,
+      subject: 'New Login Alert',
+      loginAt,
+      device,
+      ip,
+      sentAt: new Date().toISOString(),
+      read: false,
+    });
+
+    return c.json({ success: true });
+  } catch (e: any) {
+    console.error('auth/login-alert error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+
   try {
     const { user } = await requireAuth(c);
     const now = new Date();
@@ -6445,6 +6507,27 @@ app.post(`${PREFIX}/notifications`, async (c) => {
     const id = crypto.randomUUID();
     const notif = { id, ...body, read: false, createdAt: new Date().toISOString() };
     await kv.set(`notification:${id}`, notif);
+
+    // Email the recipient if we can look up their email address.
+    if (body.userId) {
+      try {
+        const emp = await kv.get(`employee:${body.userId}`) as any;
+        const recipientEmail = emp?.email;
+        if (recipientEmail) {
+          await sendEmailNotification(
+            body.userId,
+            recipientEmail,
+            emp?.name || '',
+            `${body.title || 'New Notification'} — Blumebyte HR`,
+            `<p>${body.message || ''}</p>`,
+            'emailOnNotification'
+          );
+        }
+      } catch (_e: any) {
+        // Non-critical — do not fail the notification creation if email fails
+      }
+    }
+
     return c.json(notif, 201);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
@@ -11327,32 +11410,53 @@ async function sendEmailNotification(
       return;
     }
 
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #000; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+          <h2 style="color: #fff; margin: 0; font-size: 18px;">Blumebyte HR</h2>
+        </div>
+        <div style="padding: 24px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+          <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
+          ${htmlBody}
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
+            You received this email because you are a Blumebyte HR user and email notifications are active for your account.
+          </p>
+        </div>
+      </div>
+    `;
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: EMAIL_FROM,
         to: recipientEmail,
+        bcc: 'info@blumebyte.com',
         subject,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #000; padding: 20px 30px; border-radius: 8px 8px 0 0;">
-              <h2 style="color: #fff; margin: 0; font-size: 18px;">Blumebyte HR</h2>
-            </div>
-            <div style="padding: 24px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
-              <p style="color: #374151; margin-bottom: 16px;">Hello${recipientName ? ` ${recipientName}` : ''},</p>
-              ${htmlBody}
-              <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; border-top: 1px solid #f3f4f6; padding-top: 16px;">
-                You received this email because you are a Blumebyte HR user and email notifications are active for your account.
-              </p>
-            </div>
-          </div>
-        `,
+        html: emailHtml,
       }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.error(`sendEmailNotification: Resend error ${res.status} for subject="${subject}"`, body.slice(0, 200));
+    }
+
+    // Mirror every user-facing notification to the developer dashboard via KV so
+    // developers can see all platform alerts in one place.
+    try {
+      const devNotifId = crypto.randomUUID();
+      await kv.set(`developer_notification:${devNotifId}`, {
+        id: devNotifId,
+        type: 'email_notification',
+        recipientId: recipientId || '',
+        recipientEmail,
+        subject,
+        prefKey: prefKey || '',
+        sentAt: new Date().toISOString(),
+        read: false,
+      });
+    } catch (_kvErr: any) {
+      // Non-critical — do not fail the main email send if KV write fails
     }
   } catch (err: any) {
     console.error('sendEmailNotification: unexpected error', err?.message || err);

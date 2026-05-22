@@ -301,6 +301,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data?.session) {
         setAccessToken(data.session.access_token);
         const profile = await fetchProfile(data.session.access_token);
+
+        // Fire login alert email (non-blocking, best-effort)
+        try {
+          await api('/auth/login-alert', {
+            method: 'POST',
+            token: data.session.access_token,
+            body: JSON.stringify({
+              userId: data.session.user.id,
+              email: data.session.user.email || email,
+              name: profile?.name || data.session.user.user_metadata?.name || '',
+              loginTime: new Date().toISOString(),
+              userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+            }),
+          });
+        } catch (_alertErr) {
+          // Non-critical — do not fail login if alert email fails
+        }
         
         // Auto clock-in: Only for non-admin users (employee, manager)
         if (profile && (profile.role === 'employee' || profile.role === 'manager')) {
