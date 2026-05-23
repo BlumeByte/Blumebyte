@@ -14,12 +14,9 @@ import {
   Loader2, RefreshCw, Search, CheckCircle, XCircle, Eye, UserCheck,
   Clock, FileText, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { useBranding } from '../lib/branding-context';
-import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 
 export function HiringApprovalPanel() {
   const { accessToken } = useAuth();
-  const { branding } = useBranding();
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
