@@ -381,7 +381,12 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const usedLicenses = stats.usedLicenses || companyUsers.length;
       
       // Get purchased licenses from subscription OR company record
-      const purchasedLicenses = subscription?.purchasedLicenses || company?.licenses || 0;
+      const purchasedLicenses = Number(
+        getCanonicalSubscriptionLicenses(subscription) ||
+        company?.licenses ||
+        company?.subscription?.licenses ||
+        0
+      ) || 0;
       const availableLicenses = Math.max(0, purchasedLicenses - usedLicenses);
       const status = subscription?.status || company?.subscriptionStatus || 'none';
       const plan = subscription?.plan || company?.subscriptionPlan || 'none';

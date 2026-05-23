@@ -12624,6 +12624,24 @@ const listUltimateadminSupportTenants = async (c: any) => {
       }
     }
 
+    // Include subscription-only tenants (e.g. billing records created before
+    // company/employee mirrors are fully synced).
+    for (const sub of allSubscriptions) {
+      const cid = sub.companyId || sub.company;
+      if (!cid) continue;
+      if (!tenantMap.has(cid)) {
+        const companyRecord = companyMap.get(cid);
+        tenantMap.set(cid, {
+          id: cid,
+          name: companyRecord?.name || sub.companyName || cid,
+          industry: companyRecord?.industry || '',
+          createdAt: companyRecord?.createdAt || sub.createdAt || sub.startDate || '',
+          activeUsers: 0,
+          totalUsers: 0,
+        });
+      }
+    }
+
 
     // Also include companies with no employees yet
     for (const [cid, company] of companyMap.entries()) {
@@ -12641,6 +12659,7 @@ const listUltimateadminSupportTenants = async (c: any) => {
 
     const tenants = [...tenantMap.entries()].map(([cid, t]) => {
       const sub = subMap.get(cid);
+      const companyRecord = companyMap.get(cid);
       const inferredStatus = (() => {
         const endDate = sub?.endDate || sub?.expiresAt;
         if (!endDate) return 'unknown';
@@ -12648,12 +12667,20 @@ const listUltimateadminSupportTenants = async (c: any) => {
         if (Number.isNaN(d.getTime())) return 'unknown';
         return d > new Date() ? 'active' : 'expired';
       })();
+      const purchasedLicenses = Number(
+        sub?.purchasedLicenses ??
+        sub?.userCount ??
+        sub?.licenses ??
+        companyRecord?.licenses ??
+        companyRecord?.subscription?.licenses ??
+        0
+      ) || 0;
       return {
         ...t,
-        licenseStatus: sub?.status || inferredStatus,
-        purchasedLicenses: sub?.purchasedLicenses || sub?.userCount || sub?.licenses || 0,
-        plan: sub?.plan || sub?.planName || 'unknown',
-        lastActivity: sub?.updatedAt || t.createdAt || '',
+        licenseStatus: sub?.status || companyRecord?.subscriptionStatus || companyRecord?.status || inferredStatus,
+        purchasedLicenses,
+        plan: sub?.plan || sub?.planName || companyRecord?.subscriptionPlan || companyRecord?.plan || 'unknown',
+        lastActivity: sub?.updatedAt || companyRecord?.updatedAt || t.createdAt || '',
       };
     });
 
