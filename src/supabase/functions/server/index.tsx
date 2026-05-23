@@ -12143,12 +12143,13 @@ async function listSupabasePlatformUsers() {
 }
 
 async function getDynamicPlatformAgents() {
-  const [platformUsers, customerCareUsers, supportAgents, allEmployees, supabaseUsers] = await Promise.all([
+  const [platformUsers, customerCareUsers, supportAgents, allEmployees, supabaseUsers, allTickets] = await Promise.all([
     kv.getByPrefix('platform_user:'),
     kv.getByPrefix('customer_care_users:'),
     kv.getByPrefix('support-agent:'),
     kv.getByPrefix('employee:'),
     listSupabasePlatformUsers(),
+    getAllSupportTickets(),
   ]);
 
   const employeePlatformUsers = allEmployees.filter((u: any) => isPlatformSupportRole(u?.role || ''));
@@ -12183,7 +12184,25 @@ async function getDynamicPlatformAgents() {
     });
   }
 
-  return merged.filter((u: any) => isPlatformSupportRole(u.role || ''));
+  return await Promise.all(
+    merged
+      .filter((u: any) => isPlatformSupportRole(u.role || ''))
+      .map(async (u: any) => {
+        const existingAssignments = Array.isArray(u.assignedTenants) ? u.assignedTenants : [];
+        const persistedAssignments = await getCareAssignmentsForAgent(u.userId || u.id || '');
+        const assignedTenants = [...new Set([...existingAssignments, ...persistedAssignments])];
+        const scopedTickets = u.role === 'customer_care'
+          ? allTickets.filter((t: any) => assignedTenants.includes(t.tenantId))
+          : allTickets;
+        const resolvedTickets = scopedTickets.filter((t: any) => t.status === 'resolved').length;
+        return {
+          ...u,
+          assignedTenants,
+          openTickets: scopedTickets.length - resolvedTickets,
+          resolvedTickets,
+        };
+      })
+  );
 }
 
 async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
@@ -12822,7 +12841,8 @@ const listUltimateadminSupportAgents = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    const agents = await kv.getByPrefix('support-agent:');
+    const agents = (await getDynamicPlatformAgents())
+      .filter((agent: any) => normalizeCareRole(agent?.role || '') === 'customer_care');
     return c.json(agents);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
@@ -14138,35 +14158,7 @@ for (const route of compatibleRoutePaths('/care/tickets')) app.get(route, listCa
 app.get(`${PREFIX}/developer/platform-users`, async (c) => {
   try {
     await requireDeveloper(c);
-    // Gather from both legacy support-agent: and newer customer_care_users: prefixes
-    const [ccUsers, supportAgents] = await Promise.all([
-      kv.getByPrefix('customer_care_users:'),
-      kv.getByPrefix('support-agent:'),
-    ]);
-    // Also include developer/ultimateadmin accounts from employee records
-    const allEmps = await kv.getByPrefix('employee:');
-    const platformRoles = new Set(['developer', 'customer_care']);
-    const devUsers = allEmps.filter((u: any) => platformRoles.has(u.role));
-
-    // Deduplicate by userId/id/email
-    const seen = new Set<string>();
-    const merged = [];
-    for (const u of [...ccUsers, ...supportAgents, ...devUsers]) {
-      const key = u.userId || u.id || u.email;
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      const normalizedRole = normalizeCareRole(u.role || 'customer_care');
-      merged.push({
-        id: u.id || u.userId || key,
-        userId: u.userId || u.id || key,
-        name: u.name || '',
-        email: u.email || '',
-        role: normalizedRole,
-        status: u.status || 'active',
-        assignedTenants: u.assignedTenants || [],
-        createdAt: u.createdAt || '',
-      });
-    }
+    const merged = await getDynamicPlatformAgents();
     return c.json(merged);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
