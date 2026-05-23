@@ -182,7 +182,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
     if (isSuperAdmin) {
       return <>{children}</>;
     }
-    return <SubscriptionLockedScreen canPay={false} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
+    return <SubscriptionLockedScreen canPay={subscriptionStatus.canManageSubscription} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
   }
 
   // Generic error
@@ -373,6 +373,7 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
                 <div className="space-y-2 bg-white p-3 rounded-lg border">
                   <p className="text-xs font-semibold text-gray-700">Send a support request to our team</p>
                   <Textarea
+                    aria-label="Describe your issue"
                     placeholder="Describe your issue (company name, subscription plan, what happened)…"
                     value={supportForm.message}
                     onChange={e => setSupportForm(f => ({ ...f, message: e.target.value }))}
