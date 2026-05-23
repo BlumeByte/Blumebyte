@@ -1,6 +1,6 @@
 import { Hono } from 'npm:hono@4.7.7';
 import * as kv from './kv_store.tsx';
-import { usdToPaystackAmount, getPaystackCurrency } from './currency-utils.tsx';
+import { usdToPaystackAmount } from './currency-utils.tsx';
 import { recalculateCompanyStats } from './sync-company-stats.tsx';
 
 const PREFIX = '/make-server-a35148f0';

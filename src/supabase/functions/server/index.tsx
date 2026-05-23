@@ -12258,8 +12258,9 @@ async function getDynamicPlatformAgents() {
         const existingAssignments = Array.isArray(u.assignedTenants) ? u.assignedTenants : [];
         const persistedAssignments = await getCareAssignmentsForAgent(u.userId || u.id || '');
         const assignedTenants = [...new Set([...existingAssignments, ...persistedAssignments])];
+        const assignedTenantSet = new Set(assignedTenants);
         const scopedTickets = u.role === 'customer_care'
-          ? allTickets.filter((t: any) => assignedTenants.includes(t.tenantId))
+          ? allTickets.filter((t: any) => assignedTenantSet.has(t.tenantId))
           : allTickets;
         const resolvedTickets = scopedTickets.filter((t: any) => t.status === 'resolved').length;
         return {
