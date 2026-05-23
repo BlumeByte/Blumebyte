@@ -24,7 +24,7 @@ export function getRoleDashboardPath(role: string | null | undefined): string {
   if (!normalizedRole) return '/login';
   // developer is the canonical platform admin role; 'ultimateadmin' is a legacy alias
   if (normalizedRole === 'developer' || normalizedRole === 'ultimateadmin') return '/developer';
-  if (isCustomerCareRole(normalizedRole)) return '/customer-care';
+  if (isCustomerCareRole(normalizedRole)) return '/support';
   if (normalizedRole === 'superadmin' || normalizedRole === 'admin' || normalizedRole === 'manager' || normalizedRole === 'employee') return `/${normalizedRole}`;
   return '/login';
 }

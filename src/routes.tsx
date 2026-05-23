@@ -368,11 +368,11 @@ export const router = createBrowserRouter([
       },
       {
         path: '/care-dashboard',
-        element: <Navigate to="/customer-care" replace />,
+        element: <Navigate to="/support" replace />,
       },
       {
         path: '/care',
-        element: <Navigate to="/customer-care" replace />,
+        element: <Navigate to="/support" replace />,
       },
       {
         path: '/ultimateadmin/support',
@@ -388,11 +388,15 @@ export const router = createBrowserRouter([
       },
       {
         path: '/customer_care',
-        element: <Navigate to="/customer-care" replace />,
+        element: <Navigate to="/support" replace />,
+      },
+      {
+        path: '/support',
+        Component: CustomerCarePage,
       },
       {
         path: '/customer-care',
-        Component: CustomerCarePage,
+        element: <Navigate to="/support" replace />,
       },
       {
         path: '*',

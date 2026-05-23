@@ -2293,7 +2293,7 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
             Platform role assignment is managed by authorized platform administrators.
             If you need Developer or Customer Care access, contact Blumebyte support.
           </p>
-          <p className="text-xs text-gray-500">Developer → /developer dashboard. Customer Care → /customer-care dashboard.</p>
+          <p className="text-xs text-gray-500">Developer → /developer dashboard. Support → /support dashboard.</p>
         </CardContent>
       </Card>
     </div>
