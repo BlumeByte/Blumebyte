@@ -276,16 +276,51 @@ async function getUserProfile(userId: string) {
   return profile || null;
 }
 
+function toValidDate(value: any): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function deriveSubscriptionLifecycle(subscription: any) {
+  const now = new Date();
+  const plan = String(subscription?.plan || '').toLowerCase();
+  let endDate = toValidDate(subscription?.endDate) || toValidDate(subscription?.expiresAt);
+  if (!endDate) {
+    const startDate = toValidDate(subscription?.startDate) || toValidDate(subscription?.createdAt);
+    if (startDate && (plan === 'monthly' || plan === 'yearly')) {
+      endDate = new Date(startDate);
+      if (plan === 'monthly') endDate.setDate(endDate.getDate() + 30);
+      else endDate.setDate(endDate.getDate() + 365);
+    }
+  }
+
+  const fallbackActive = String(subscription?.status || '').toLowerCase() === 'active';
+  const isActive = !!subscription && (endDate ? now < endDate : fallbackActive);
+  const daysRemaining = endDate
+    ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    : (isActive ? 0 : -1);
+
+  return {
+    isActive,
+    endDateIso: endDate ? endDate.toISOString() : (subscription?.endDate || subscription?.expiresAt || null),
+    daysRemaining: Math.max(0, daysRemaining),
+  };
+}
+
 // Helper to verify subscription and license availability
 async function verifySubscriptionAndLicenses(superAdminId: string, requiresActiveLicense = true) {
   const subscription = await kv.get(`subscription:${superAdminId}`);
+  const lifecycle = deriveSubscriptionLifecycle(subscription);
   
   // Check if subscription exists and is active
-  if (!subscription || subscription.status !== 'active') {
+  if (!subscription || !lifecycle.isActive) {
     return {
       valid: false,
-      reason: 'no_subscription',
-      message: 'No active subscription found. SuperAdmin must purchase licenses first.',
+      reason: subscription ? 'subscription_expired' : 'no_subscription',
+      message: subscription
+        ? 'The subscription has expired. SuperAdmin must renew the subscription.'
+        : 'No active subscription found. SuperAdmin must purchase licenses first.',
       subscription: null
     };
   }
@@ -332,15 +367,10 @@ async function requireAuth(c: any) {
   if (!user) throw new Error("Unauthorized");
   const kvData = await kv.get(`employee:${user.id}`);
   const rawRole = kvData?.role || user.user_metadata?.role || "employee";
-  const role = rawRole === "customer-care" ? "customer_care" : rawRole;
-  
-  // SUBSCRIPTION LOGIC TEMPORARILY DEACTIVATED
-  // Just return the user data without subscription/license checks
-  return { user, role, kvData };
-  
-  /*
+  const role = normalizeCareRole(String(rawRole || ""));
+
   // SuperAdmin is always allowed (they need to access payment pages)
-  if (role === 'superadmin') {
+  if (role === 'superadmin' || role === 'developer' || role === 'customer_care') {
     return { user, role, kvData };
   }
   
@@ -349,24 +379,19 @@ async function requireAuth(c: any) {
     throw new Error("AccountInactive");
   }
   
-  // Verify SuperAdmin has active subscription
-  const superAdmin = await getSuperAdmin();
-  if (!superAdmin) {
-    throw new Error("NoSuperAdmin");
-  }
-  
-  const verification = await verifySubscriptionAndLicenses(superAdmin.id || superAdmin.userId, false);
-  if (!verification.valid) {
+  const { subscription } = await resolveBillingSubscriptionContext(user.id);
+  const lifecycle = deriveSubscriptionLifecycle(subscription);
+  if (!subscription || !lifecycle.isActive) {
     throw new Error("SubscriptionInactive");
   }
   
   return { user, role, kvData };
-  */
 }
 
 async function requireRole(c: any, roles: string[]) {
   const data = await requireAuth(c);
-  if (!roles.includes(data.role)) throw new Error("Forbidden");
+  const normalizedAllowedRoles = new Set(roles.map((role) => normalizeCareRole(String(role || ''))));
+  if (!normalizedAllowedRoles.has(normalizeCareRole(String(data.role || '')))) throw new Error("Forbidden");
   return data;
 }
 
@@ -7129,38 +7154,6 @@ async function triggerSuperadminSubscriptionExpiryAlert(
 app.get(`${PREFIX}/subscription/status`, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
-
-    const toValidDate = (value: any): Date | null => {
-      if (!value) return null;
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    };
-
-    const deriveSubscriptionLifecycle = (subscription: any) => {
-      const now = new Date();
-      const plan = String(subscription?.plan || '').toLowerCase();
-      let endDate = toValidDate(subscription?.endDate);
-      if (!endDate) {
-        const startDate = toValidDate(subscription?.startDate) || toValidDate(subscription?.createdAt);
-        if (startDate && (plan === 'monthly' || plan === 'yearly')) {
-          endDate = new Date(startDate);
-          if (plan === 'monthly') endDate.setDate(endDate.getDate() + 30);
-          else endDate.setDate(endDate.getDate() + 365);
-        }
-      }
-
-      const fallbackActive = String(subscription?.status || '').toLowerCase() === 'active';
-      const isActive = endDate ? now < endDate : fallbackActive;
-      const daysRemaining = endDate
-        ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        : (isActive ? 0 : -1);
-
-      return {
-        isActive,
-        endDateIso: endDate ? endDate.toISOString() : (subscription?.endDate || null),
-        daysRemaining: Math.max(0, daysRemaining),
-      };
-    };
     
     // For non-superadmins, they're covered under the superadmin's subscription
     if (role !== 'superadmin') {
@@ -7251,13 +7244,12 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     });
   } catch (e: any) {
     console.error('Error checking subscription status:', e);
-    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
-    return c.json({ error: e.message }, 500);
+    return handleError(e, c, 'subscription-status');
   }
 });
 
 // Get license information (used by LicenseManagement and LicenseStatusBanner)
-app.get(`${PREFIX}/subscription/license-info`, async (c) => {
+for (const route of subscriptionRoutePaths('/subscription/license-info')) app.get(route, async (c) => {
   try {
     const { user, role } = await requireAuth(c);
     
@@ -7281,7 +7273,7 @@ app.get(`${PREFIX}/subscription/license-info`, async (c) => {
     );
     
     // Find superadmin in this company
-    const superadmin = companyEmployees.find((emp: any) => emp.role === 'superadmin');
+    const superadmin = companyEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin');
     
     if (!superadmin) {
       return c.json({ 
@@ -11945,20 +11937,9 @@ const listCareTenants = async (c: any) => {
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
     const companies = await kv.getByPrefix('company:');
-    let allowed = companies;
-
-    // Non-developer care agents can only see their assigned tenants
-    if (!access.isDeveloper) {
-      const assignedByKey = await kv.get(`care_assignments:${access.user.id}`);
-      const assignedTenants = Array.isArray(assignedByKey)
-        ? assignedByKey
-        : (access.profile?.assignedTenants || []);
-      if (assignedTenants.length > 0) {
-        allowed = companies.filter((co: any) => assignedTenants.includes(co.id));
-      } else {
-        allowed = [];
-      }
-    }
+    const assignedTenants = await getCareAssignmentsForAgent(access.user.id);
+    const assignedSet = new Set(assignedTenants);
+    const allowed = companies.filter((co: any) => assignedSet.has(co.id));
 
     return c.json(allowed.map((co: any) => {
       const stats = co.stats || {};
@@ -11985,13 +11966,8 @@ const listCareTenantUsers = async (c: any) => {
     const access = await verifyCareAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
-    if (!access.isDeveloper) {
-      const assignedByKey = await kv.get(`care_assignments:${access.user.id}`);
-      const assignedTenants = Array.isArray(assignedByKey)
-        ? assignedByKey
-        : (access.profile?.assignedTenants || []);
-      if (!assignedTenants.includes(tenantId)) return c.json({ error: 'Forbidden' }, 403);
-    }
+    const assignedTenants = await getCareAssignmentsForAgent(access.user.id);
+    if (!assignedTenants.includes(tenantId)) return c.json({ error: 'Forbidden' }, 403);
 
     const all = await kv.getByPrefix('employee:');
     const users = all.filter((u: any) => u.companyId === tenantId || u.company === tenantId);
@@ -13564,10 +13540,19 @@ async function writeDeveloperAudit(actor: any, action: string, details: any = {}
 }
 
 function normalizeCareRole(role: string) {
-  if (role === 'ultimateadmin' || role === 'ultimate_admin') return 'developer';
-  if (role === 'customer-care') return 'customer_care';
-  if (role === 'customer_care_agent' || role === 'care' || role === 'support' || role === 'support_manager') return 'customer_care';
-  return role;
+  const normalized = String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) return '';
+  const compact = normalized.replace(/_/g, '');
+  if (compact === 'ultimateadmin') return 'developer';
+  if (compact === 'superadmin') return 'superadmin';
+  if (
+    compact === 'customercare' ||
+    compact === 'customercareagent' ||
+    compact === 'care' ||
+    compact === 'support' ||
+    compact === 'supportmanager'
+  ) return 'customer_care';
+  return normalized;
 }
 
 async function getCareAssignmentsForAgent(agentId: string): Promise<string[]> {
