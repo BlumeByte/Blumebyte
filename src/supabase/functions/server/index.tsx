@@ -11545,11 +11545,18 @@ const reportClientError = async (c: any) => {
     const extractNormalizedRole = (candidate: any) =>
       normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
     const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
-    const activeCareAgents = (await getDynamicPlatformAgents())
-      .filter((agent: any) =>
-        normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
-        String(agent?.status || 'active').toLowerCase() === 'active'
-      );
+    // Wrap getDynamicPlatformAgents in try/catch so a Supabase admin-API failure
+    // doesn't abort ticket creation — the ticket is more important than agent assignment.
+    let activeCareAgents: any[] = [];
+    try {
+      activeCareAgents = (await getDynamicPlatformAgents())
+        .filter((agent: any) =>
+          normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
+          String(agent?.status || 'active').toLowerCase() === 'active'
+        );
+    } catch (agentErr: any) {
+      console.warn('reportClientError: getDynamicPlatformAgents failed, continuing without agent assignment:', agentErr?.message || agentErr);
+    }
     const tenantAssignedCareAgents = companyId
       ? activeCareAgents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
       : [];
@@ -11626,7 +11633,7 @@ const reportClientError = async (c: any) => {
       kv.getByPrefix('platform_user:'),
       kv.getByPrefix('customer_care_users:'),
       kv.getByPrefix('support-agent:'),
-      listSupabasePlatformUsers(),
+      listSupabasePlatformUsers().catch(() => [] as any[]),
     ]);
 
     const supportRecipients: any[] = [];
