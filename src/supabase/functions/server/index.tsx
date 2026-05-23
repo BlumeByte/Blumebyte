@@ -12668,11 +12668,9 @@ const listUltimateadminSupportTenants = async (c: any) => {
         return d > new Date() ? 'active' : 'expired';
       })();
       const purchasedLicensesRaw =
-        sub?.purchasedLicenses ??
-        sub?.userCount ??
-        sub?.licenses ??
-        companyRecord?.licenses ??
-        companyRecord?.subscription?.licenses ??
+        getCanonicalSubscriptionLicenses(sub) ||
+        companyRecord?.licenses ||
+        companyRecord?.subscription?.licenses ||
         0;
       const purchasedLicensesNumber = Number(purchasedLicensesRaw);
       const purchasedLicenses = Number.isFinite(purchasedLicensesNumber) ? purchasedLicensesNumber : 0;
