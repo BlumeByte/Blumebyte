@@ -290,8 +290,8 @@ function deriveSubscriptionLifecycle(subscription: any) {
     const startDate = toValidDate(subscription?.startDate) || toValidDate(subscription?.createdAt);
     if (startDate && (plan === 'monthly' || plan === 'yearly')) {
       endDate = new Date(startDate);
-      if (plan === 'monthly') endDate.setDate(endDate.getDate() + 30);
-      else endDate.setDate(endDate.getDate() + 365);
+      if (plan === 'monthly') endDate.setMonth(endDate.getMonth() + 1);
+      else endDate.setFullYear(endDate.getFullYear() + 1);
     }
   }
 
