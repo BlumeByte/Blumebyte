@@ -197,13 +197,13 @@ const DeveloperDashboardWrapper = () => <DeveloperDashboard />;
 const CustomerCareDashboardWrapper = () => <CustomerCareDashboard />;
 
 const DeveloperPage = () => (
-  <ProtectedRoute allowedRoles={['developer', 'ultimateadmin']}>
+  <ProtectedRoute allowedRoles={['developer']}>
     <DeveloperDashboardWrapper />
   </ProtectedRoute>
 );
 
 const CustomerCarePage = () => (
-  <ProtectedRoute allowedRoles={[...CUSTOMER_CARE_ROLES, 'developer', 'ultimateadmin']}>
+  <ProtectedRoute allowedRoles={[...CUSTOMER_CARE_ROLES, 'developer']}>
     <CustomerCareDashboardWrapper />
   </ProtectedRoute>
 );
