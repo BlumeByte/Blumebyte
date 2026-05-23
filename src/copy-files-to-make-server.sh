@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Script to copy all files from server/ to make-server/
+# Script to copy all files from server/ to make-server-a35148f0/
 # This fixes the 403 deployment error
 
 echo "========================================="
-echo "Copying files to make-server directory"
+echo "Copying files to make-server-a35148f0 directory"
 echo "========================================="
 echo
 
 SOURCE_DIR="supabase/functions/server"
-DEST_DIR="supabase/functions/make-server"
+DEST_DIR="supabase/functions/make-server-a35148f0"
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -45,7 +45,7 @@ ls -la "$DEST_DIR"
 echo
 echo "========================================="
 echo "Next steps:"
-echo "1. Verify index.tsx exists in make-server/"
+echo "1. Verify index.tsx exists in make-server-a35148f0/"
 echo "2. Deploy using Figma Make OR"
-echo "3. Run: supabase functions deploy make-server"
+echo "3. Run: supabase functions deploy make-server-a35148f0"
 echo "========================================="

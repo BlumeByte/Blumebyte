@@ -117,7 +117,7 @@ supabase functions deploy server --project-ref ivohczdtuxasyfoiphqu
 
 ### Step 6: Verify Deployment
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 Should return:
@@ -135,7 +135,7 @@ Should return:
 
 The error shows deployment path: `/edge_functions/make-server/deploy`
 
-But your function prefix is: `/make-server-668731fc`
+But your function prefix is: `/make-server-a35148f0`
 
 ### Potential Issue:
 The deployment may be looking for a function named `make-server` but your actual function directory is `server`.
@@ -183,13 +183,13 @@ After implementing any solution above:
 
 ### 1. Test Edge Function is Accessible
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 ### 2. Test from Your App
 In your browser console on the deployed app:
 ```javascript
-fetch('https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health')
+fetch('https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health')
   .then(r => r.json())
   .then(console.log)
 ```
@@ -281,7 +281,7 @@ You'll know it's fixed when:
 
 - Your edge function code is **correct** - this is purely a deployment/permissions issue
 - The function is at: `/supabase/functions/server/index.tsx`
-- It uses prefix: `/make-server-668731fc`
+- It uses prefix: `/make-server-a35148f0`
 - Your Supabase project: `ivohczdtuxasyfoiphqu`
 
 **The 403 error is preventing deployment - not a code issue.**
@@ -294,17 +294,17 @@ Once deployed, verify these endpoints work:
 
 1. **Health Check**:
    ```
-   GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+   GET https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
    ```
 
 2. **Test Payment**:
    ```
-   POST https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/test-payment
+   POST https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/test-payment
    ```
 
 3. **Init Payment**:
    ```
-   POST https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/init-payment
+   POST https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/init-payment
    ```
 
 All should return proper JSON responses (not 403).

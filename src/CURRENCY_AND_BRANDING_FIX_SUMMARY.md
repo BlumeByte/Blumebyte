@@ -282,14 +282,14 @@ Fields:
 
 ### **Backend Endpoints:**
 ```
-PUT /make-server-668731fc/companies/:id/currency
+PUT /make-server-a35148f0/companies/:id/currency
 Body: {
   currency?: string,  // Standard currency code
   customCurrencyCode?: string,  // Custom code
   customCurrencySymbol?: string  // Custom symbol
 }
 
-GET /make-server-668731fc/company-settings
+GET /make-server-a35148f0/company-settings
 Returns: {
   currencyCode, currencySymbol, isCustomCurrency,
   companyName, primaryColor, logoUrl, ...

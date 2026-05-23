@@ -80,7 +80,7 @@ This deploys directly from your `/supabase/functions/make-server/` directory!
 ### **Verify Deployment**
 
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 Should return: `{"status":"ok"}`
@@ -144,7 +144,7 @@ echo ✅ DEPLOYMENT SUCCESSFUL!
 echo ====================================
 echo.
 echo Testing health endpoint...
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 echo.
 echo.
 echo Done! Your function is deployed.
@@ -202,7 +202,7 @@ echo "✅ DEPLOYMENT SUCCESSFUL!"
 echo "===================================="
 echo
 echo "Testing health endpoint..."
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 echo
 echo
 echo "Done! Your function is deployed."
@@ -267,7 +267,7 @@ supabase link --project-ref ivohczdtuxasyfoiphqu
 supabase functions deploy make-server
 
 # Test
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **This bypasses Figma Make entirely and deploys directly to Supabase!** ✅

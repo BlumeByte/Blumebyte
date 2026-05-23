@@ -62,7 +62,7 @@ echo [INFO] Deploying 'server' edge function...
 echo        This may take 1-2 minutes...
 echo.
 
-supabase functions deploy server --no-verify-jwt
+supabase functions deploy make-server-a35148f0 --no-verify-jwt
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -85,7 +85,7 @@ REM Verify deployment
 echo [INFO] Verifying deployment...
 echo.
 
-set HEALTH_URL=https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+set HEALTH_URL=https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/make-server-a35148f0/health
 
 echo Testing health endpoint:
 echo   %HEALTH_URL%

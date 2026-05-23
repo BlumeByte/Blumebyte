@@ -58,7 +58,7 @@ cd supabase/functions
 supabase functions deploy make-server --project-ref ivohczdtuxasyfoiphqu
 
 # 5. Test deployment
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 ---
@@ -109,7 +109,7 @@ ls -la /supabase/functions/make-server/
 supabase functions deploy make-server --project-ref ivohczdtuxasyfoiphqu --no-verify-jwt
 
 # Step 5: Verify
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 
 # Expected response:
 # {"status":"ok","version":"2.1-payment-flow-UPDATED","timestamp":"..."}
@@ -123,11 +123,11 @@ After deployment succeeds, verify all endpoints:
 
 ```bash
 # Health check
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 
 # Test payment
 curl -X POST \
-  https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/company/test-payment \
+  https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/company/test-payment \
   -H "Content-Type: application/json" \
   -d '{"test": "data"}'
 ```

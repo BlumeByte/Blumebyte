@@ -64,7 +64,7 @@ supabase link --project-ref ivohczdtuxasyfoiphqu
 supabase functions deploy make-server
 
 # Test deployment
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Expected Response:**
@@ -108,7 +108,7 @@ curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-serv
 After deploying, run this command:
 
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **If you see:**

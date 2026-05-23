@@ -94,7 +94,7 @@ supabase functions deploy server --no-verify-jwt
 
 #### **Step 5: Verify**
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 Should return:
@@ -255,7 +255,7 @@ You'll know deployment succeeded when:
 2. **Function Appears:** Listed in Supabase Dashboard → Edge Functions
 3. **Health Check Works:**
    ```bash
-   curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+   curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
    ```
    Returns JSON with `"status": "ok"`
 4. **Console Logs Appear:** After deployment, you see debug emojis in logs

@@ -90,7 +90,7 @@ Watch the deployment progress - should take 30-60 seconds.
 ### **5. Verify Deployment**
 
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 Should return: `{"status":"ok","version":"2.1-payment-flow-UPDATED"}`
@@ -122,7 +122,7 @@ supabase link --project-ref ivohczdtuxasyfoiphqu
 supabase functions deploy make-server
 
 # Test
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 ---

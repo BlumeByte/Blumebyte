@@ -102,7 +102,7 @@ supabase functions deploy make-server
 
 #### **Step 5: Test Deployment**
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 Should return:
@@ -165,7 +165,7 @@ deploy-to-supabase.bat
 
 ### **Step 4: Test** ✅
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 ### **Step 5: Done!** 🎉

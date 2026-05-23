@@ -65,7 +65,7 @@ cd supabase/functions && supabase functions deploy server
 ```bash
 # After deploy, test with curl:
 curl -H "Authorization: Bearer YOUR_SUPERADMIN_TOKEN" \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/users
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/users
 
 # Should return array of ALL users (not empty)
 ```

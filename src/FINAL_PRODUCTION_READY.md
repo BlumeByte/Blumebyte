@@ -243,7 +243,7 @@ The portal includes:
 
 #### Access
 - **Web UI:** `/production-cleanup`
-- **API:** `POST /make-server-668731fc/production/cleanup`
+- **API:** `POST /make-server-a35148f0/production/cleanup`
 - **Documentation:** [PRODUCTION_CLEANUP_GUIDE.md](./PRODUCTION_CLEANUP_GUIDE.md)
 
 #### Safety
@@ -312,7 +312,7 @@ Click "Execute Production Cleanup"
 
 # Option B: Use API
 curl -X POST \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "X-Cleanup-Key: your-secret-key"
 ```
 

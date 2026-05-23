@@ -493,7 +493,7 @@ console.log('Role:', localStorage.getItem('role'));
 console.log('Company:', localStorage.getItem('companyId'));
 
 // Check API responses
-// Network tab → Filter: make-server-668731fc
+// Network tab → Filter: make-server-a35148f0
 // Check each request:
 // - Status should be 200
 // - Response should have data with correct companyId

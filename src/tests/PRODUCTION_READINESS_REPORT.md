@@ -131,8 +131,8 @@ The Blumebyte HR Management Platform has undergone comprehensive testing and cod
 - Proper error handling and logging
 
 **Endpoints:**
-- `GET /make-server-668731fc/backup` - Create backup
-- `POST /make-server-668731fc/backup/restore` - Restore from backup
+- `GET /make-server-a35148f0/backup` - Create backup
+- `POST /make-server-a35148f0/backup/restore` - Restore from backup
 
 **Frontend:**
 - `/components/BackupRestore.tsx` - SuperAdmin UI for backup management
@@ -153,7 +153,7 @@ The Blumebyte HR Management Platform has undergone comprehensive testing and cod
 - Results reporting
 
 **Endpoint:**
-- `POST /make-server-668731fc/production/cleanup`
+- `POST /make-server-a35148f0/production/cleanup`
 - Optional secret key protection (`X-Cleanup-Key` header)
 
 **Frontend:**
@@ -352,7 +352,7 @@ CLEANUP_SECRET_KEY=your-cleanup-secret  # Optional
 ### Step 3: Test Endpoints
 ```bash
 # Test health endpoint
-curl https://your-project.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project.supabase.co/functions/v1/make-server-a35148f0/health
 
 # Expected response:
 # {
@@ -381,7 +381,7 @@ runAllTests();
 ```bash
 # Clear all test data before launch
 curl -X POST \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "X-Cleanup-Key: your-secret-key"
 ```
 

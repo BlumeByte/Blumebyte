@@ -274,7 +274,7 @@ export default function SecurityPolicy() {
               
               <ul className="list-disc list-inside space-y-1 ml-4">
                 <li>Main application (app.blumebyte.com)</li>
-                <li>API endpoints (*.supabase.co/functions/v1/make-server-668731fc/*)</li>
+                <li>API endpoints (*.supabase.co/functions/v1/make-server-a35148f0/*)</li>
                 <li>Employee portal</li>
                 <li>Company signup and authentication flows</li>
                 <li>Payment processing integration</li>

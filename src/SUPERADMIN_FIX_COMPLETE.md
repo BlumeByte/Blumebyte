@@ -264,7 +264,7 @@ supabase functions deploy server
 **Expected Output:**
 ```
 ✓ Deployed Function server
-Function URL: https://your-project.supabase.co/functions/v1/make-server-668731fc
+Function URL: https://your-project.supabase.co/functions/v1/make-server-a35148f0
 ```
 
 ### Step 2: Test Immediately
@@ -276,7 +276,7 @@ After deploying, test SuperAdmin access right away:
 # Then test the endpoint:
 
 curl -H "Authorization: Bearer YOUR_SUPERADMIN_TOKEN" \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/users
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/users
 
 # Should return ALL users, not an empty array
 ```
@@ -363,15 +363,15 @@ Look for these log patterns:
 ```bash
 # Test users endpoint
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/users
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/users
 
 # Test users for messages endpoint  
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/users/for-messages
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/users/for-messages
 
 # Test reports endpoint
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/reports/users
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/reports/users
 ```
 
 All should return full arrays of users for SuperAdmin.

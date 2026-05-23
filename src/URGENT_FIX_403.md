@@ -81,8 +81,8 @@ The `/supabase/functions/server/` directory contains:
 ## ⚠️ Why This Works
 
 - **Deployment path**: Based on directory name (`make-server`)
-- **Runtime path**: Based on PREFIX in code (`/make-server-668731fc`)
-- **Your frontend**: Already calls correct path (`/make-server-668731fc`)
+- **Runtime path**: Based on PREFIX in code (`/make-server-a35148f0`)
+- **Your frontend**: Already calls correct path (`/make-server-a35148f0`)
 
 Everything else is already correct! Just the directory name needed to match.
 
@@ -109,7 +109,7 @@ Then retry deployment - **should work!** 🎉
 
 After deployment works, test:
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 Should return:

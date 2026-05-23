@@ -73,7 +73,7 @@ If renaming manually, these files need to be in `/supabase/functions/make-server
 
 The function name in Figma Make's deployment path is derived from:
 - The function directory name in `/supabase/functions/`
-- NOT from the PREFIX in your code (`/make-server-668731fc`)
+- NOT from the PREFIX in your code (`/make-server-a35148f0`)
 
 The PREFIX is for routing AFTER deployment, but the directory name determines the deployment target.
 

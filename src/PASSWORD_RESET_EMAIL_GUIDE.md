@@ -212,7 +212,7 @@ This link will expire in 1 hour.
 
 ## API Endpoints
 
-### POST `/make-server-668731fc/auth/forgot-password`
+### POST `/make-server-a35148f0/auth/forgot-password`
 **Request:**
 ```json
 {

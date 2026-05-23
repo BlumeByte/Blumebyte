@@ -120,7 +120,7 @@ If you have any test data you want to keep:
 
 ```bash
 curl -X POST \
-  https://your-project-id.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+  https://your-project-id.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "X-Cleanup-Key: your-secret-key"
 ```
 

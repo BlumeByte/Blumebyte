@@ -72,7 +72,7 @@ Copy-Item supabase/functions/server/*.tsx supabase/functions/make-server/
 supabase functions deploy make-server
 
 # Verify it worked
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Expected response:**
@@ -117,7 +117,7 @@ After you take action, the error will be gone and you'll see:
 3. **Edge function visible** in Supabase Dashboard
 4. **Health endpoint works:**
    ```
-   https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+   https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
    ```
    Should return: `{"status":"ok",...}`
 

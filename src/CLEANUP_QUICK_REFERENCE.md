@@ -21,7 +21,7 @@ URL: /production-cleanup
 ### Direct API Call
 ```bash
 curl -X POST \
-  https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+  https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "Content-Type: application/json" \
   -H "X-Cleanup-Key: YOUR-SECRET-KEY"
 ```
@@ -196,18 +196,18 @@ For complete details, see:
 
 ### Check if cleanup is needed
 ```bash
-curl https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/check-setup
+curl https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/check-setup
 ```
 
 ### Run cleanup (no secret key)
 ```bash
-curl -X POST https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/production/cleanup
+curl -X POST https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/production/cleanup
 ```
 
 ### Run cleanup (with secret key)
 ```bash
 curl -X POST \
-  https://YOUR-PROJECT.supabase.co/functions/v1/make-server-668731fc/production/cleanup \
+  https://YOUR-PROJECT.supabase.co/functions/v1/make-server-a35148f0/production/cleanup \
   -H "X-Cleanup-Key: YOUR-SECRET-KEY"
 ```
 

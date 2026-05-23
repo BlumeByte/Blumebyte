@@ -116,7 +116,7 @@ console.log(localStorage.getItem('companyId')); // Should show: "uuid-v4"
 **Console Check:**
 ```javascript
 // As Company A admin
-const response = await fetch('https://your-project.supabase.co/functions/v1/make-server-668731fc/users', {
+const response = await fetch('https://your-project.supabase.co/functions/v1/make-server-a35148f0/users', {
   headers: {
     'Authorization': 'Bearer ' + localStorage.getItem('accessToken')
   }
@@ -211,7 +211,7 @@ console.log('Company B users:', users.length); // Should be 3
 const token = localStorage.getItem('accessToken');
 
 // Test 1: Fetch employees
-const response1 = await fetch('https://your-project.supabase.co/functions/v1/make-server-668731fc/users', {
+const response1 = await fetch('https://your-project.supabase.co/functions/v1/make-server-a35148f0/users', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 const users = await response1.json();
@@ -219,7 +219,7 @@ console.log('My company users:', users);
 console.log('All users have same companyId:', new Set(users.map(u => u.companyId)).size === 1);
 
 // Test 2: Try to create employee for different company (should fail)
-const response2 = await fetch('https://your-project.supabase.co/functions/v1/make-server-668731fc/users', {
+const response2 = await fetch('https://your-project.supabase.co/functions/v1/make-server-a35148f0/users', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${token}`,
@@ -237,7 +237,7 @@ console.log('Create result:', result);
 // Server should ignore the companyId and use YOUR company instead
 
 // Test 3: Fetch departments
-const response3 = await fetch('https://your-project.supabase.co/functions/v1/make-server-668731fc/admin/departments', {
+const response3 = await fetch('https://your-project.supabase.co/functions/v1/make-server-a35148f0/admin/departments', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 const departments = await response3.json();
@@ -308,7 +308,7 @@ supabase functions logs server --tail
 
 async function runMultiTenantTests() {
   const token = localStorage.getItem('accessToken');
-  const baseUrl = 'https://your-project.supabase.co/functions/v1/make-server-668731fc';
+  const baseUrl = 'https://your-project.supabase.co/functions/v1/make-server-a35148f0';
   
   console.log('🧪 Starting Multi-Tenant Tests...\n');
   
@@ -418,7 +418,7 @@ runMultiTenantTests();
 ```javascript
 // Check user data
 const token = localStorage.getItem('accessToken');
-const response = await fetch('https://your-project.supabase.co/functions/v1/make-server-668731fc/users', {
+const response = await fetch('https://your-project.supabase.co/functions/v1/make-server-a35148f0/users', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 // If returns 401: Re-login

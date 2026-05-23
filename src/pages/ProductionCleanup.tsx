@@ -294,7 +294,7 @@ export default function ProductionCleanup() {
               <p className="font-semibold mb-2">2. Alternative: Direct API Call</p>
               <p className="text-gray-600 mb-2">You can also trigger cleanup via API:</p>
               <pre className="bg-gray-100 p-3 rounded text-xs overflow-x-auto">
-{`POST /make-server-668731fc/production/cleanup
+{`POST /make-server-a35148f0/production/cleanup
 Headers: X-Cleanup-Key: your-secret-key (if configured)
 
 Response:

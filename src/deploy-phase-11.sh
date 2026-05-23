@@ -56,7 +56,7 @@ echo "🚀 Deploying 'server' edge function..."
 echo "   This may take 1-2 minutes..."
 echo ""
 
-supabase functions deploy server --no-verify-jwt
+supabase functions deploy make-server-a35148f0 --no-verify-jwt
 
 if [ $? -ne 0 ]; then
     echo ""
@@ -78,7 +78,7 @@ echo ""
 echo "🔍 Verifying deployment..."
 echo ""
 
-HEALTH_URL="https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health"
+HEALTH_URL="https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/make-server-a35148f0/health"
 
 echo "Testing health endpoint:"
 echo "  $HEALTH_URL"

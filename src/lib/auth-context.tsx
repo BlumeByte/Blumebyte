@@ -76,6 +76,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const isFatalAuthError = (error: unknown) => {
+    const message = String((error as any)?.message || '').toLowerCase();
+    return (
+      message.includes('refresh token') ||
+      message.includes('invalid_grant') ||
+      message.includes('invalid refresh') ||
+      message.includes('jwt expired') ||
+      message.includes('session not found')
+    );
+  };
+
   const getToken = useCallback(async (): Promise<string | null> => {
     // If already fetching, wait for that promise
     if (tokenFetchingRef.current) {
@@ -88,11 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const { data, error } = await supabase.auth.getSession();
           if (error) {
-            console.log('getSession error (likely expired refresh token):', error.message);
-            // Invalid refresh token – clear state so user is sent back to login
-            setUser(null);
-            setAccessToken(null);
-            await supabase.auth.signOut().catch(() => {});
+            console.log('getSession error:', error.message);
+            if (isFatalAuthError(error)) {
+              setUser(null);
+              setAccessToken(null);
+              await supabase.auth.signOut().catch(() => {});
+            }
             return null;
           }
           if (!data?.session) return null;
@@ -103,11 +115,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (payload.exp - now < 60) {
               const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
               if (refreshError) {
-                console.log('Refresh token expired/invalid:', refreshError.message);
-                setUser(null);
-                setAccessToken(null);
-                await supabase.auth.signOut().catch(() => {});
-                return null;
+                console.log('Refresh session failed:', refreshError.message);
+                if (isFatalAuthError(refreshError)) {
+                  setUser(null);
+                  setAccessToken(null);
+                  await supabase.auth.signOut().catch(() => {});
+                  return null;
+                }
+                // For transient refresh errors, keep current session instead of forcing logout.
+                return token;
               }
               if (refreshed?.session) {
                 setAccessToken(refreshed.session.access_token);
@@ -118,8 +134,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return token;
         } catch (e: any) {
           console.log('getToken unexpected error:', e.message);
-          setUser(null);
-          setAccessToken(null);
+          if (isFatalAuthError(e)) {
+            setUser(null);
+            setAccessToken(null);
+          }
           return null;
         }
       });

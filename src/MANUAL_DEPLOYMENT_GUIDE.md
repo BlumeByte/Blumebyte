@@ -52,7 +52,7 @@ DEPLOY_VIA_CLI.bat
   - `PAYSTACK_PUBLIC_KEY` = your_paystack_public_key
 
 **6. Test it works**
-Visit: https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+Visit: https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 
 Should see: `{"status":"ok","version":"2.1-payment-flow-UPDATED",...}`
 
@@ -106,7 +106,7 @@ The function needs these files - upload them one by one:
   - `PAYSTACK_PUBLIC_KEY` = your_paystack_public_key
 
 ### Step 7: Test Deployment
-Visit: https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+Visit: https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 
 Should return: `{"status":"ok",...}`
 
@@ -160,7 +160,7 @@ supabase functions deploy make-server --no-verify-jwt
 
 After deployment, verify these:
 
-- [ ] Health endpoint responds: `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health`
+- [ ] Health endpoint responds: `https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health`
 - [ ] Returns `{"status":"ok","version":"2.1-payment-flow-UPDATED",...}`
 - [ ] Environment variables are set in Supabase Dashboard
 - [ ] Your Blumebyte app can make API calls

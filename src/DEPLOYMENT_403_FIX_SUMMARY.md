@@ -149,7 +149,7 @@ chmod +x deploy-edge-function.sh
 **Action:** Test the edge function is live
 
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 **Expected Response:**
@@ -174,7 +174,7 @@ curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-66
 - **Name:** `server`
 - **Directory:** `/supabase/functions/server/`
 - **Entry Point:** `index.tsx`
-- **Prefix:** `/make-server-668731fc`
+- **Prefix:** `/make-server-a35148f0`
 - **Version:** 2.1 - Payment-First Registration
 
 ### Project Information
@@ -184,10 +184,10 @@ curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-66
 
 ### Deployment Endpoints (After Fix)
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/init-payment
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/test-payment
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/payment-status/:reference
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/init-payment
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/test-payment
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/payment-status/:reference
 ```
 
 ---

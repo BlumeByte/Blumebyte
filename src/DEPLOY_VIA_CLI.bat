@@ -27,18 +27,18 @@ supabase link --project-ref ivohczdtuxasyfoiphqu
 
 echo.
 echo Step 3: Copying all function files to make-server...
-copy /Y supabase\functions\server\index.tsx supabase\functions\make-server\
-copy /Y supabase\functions\server\kv_store.tsx supabase\functions\make-server\
-copy /Y supabase\functions\server\currency-utils.tsx supabase\functions\make-server\
-copy /Y supabase\functions\server\company-utils.tsx supabase\functions\make-server\
-copy /Y supabase\functions\server\license-routes.tsx supabase\functions\make-server\ 2>nul
-copy /Y supabase\functions\server\user-creation-fixed.tsx supabase\functions\make-server\ 2>nul
+copy /Y supabase\functions\server\index.tsx supabase\functions\make-server-a35148f0\
+copy /Y supabase\functions\server\kv_store.tsx supabase\functions\make-server-a35148f0\
+copy /Y supabase\functions\server\currency-utils.tsx supabase\functions\make-server-a35148f0\
+copy /Y supabase\functions\server\company-utils.tsx supabase\functions\make-server-a35148f0\
+copy /Y supabase\functions\server\license-routes.tsx supabase\functions\make-server-a35148f0\ 2>nul
+copy /Y supabase\functions\server\user-creation-fixed.tsx supabase\functions\make-server-a35148f0\ 2>nul
 
 echo Files copied
 
 echo.
 echo Step 4: Deploying edge function...
-supabase functions deploy make-server --no-verify-jwt
+supabase functions deploy make-server-a35148f0 --no-verify-jwt
 
 echo.
 echo Step 5: Setting environment variables...
@@ -49,7 +49,7 @@ echo    2. Add secrets: PAYSTACK_SECRET_KEY, PAYSTACK_PUBLIC_KEY
 echo.
 echo Step 6: Testing deployment...
 echo Calling health endpoint...
-curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health"
+curl "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server-a35148f0/make-server-a35148f0/health"
 
 echo.
 echo.

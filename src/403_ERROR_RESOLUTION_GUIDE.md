@@ -123,7 +123,7 @@ https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu
 
 ```bash
 # Test health endpoint
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 
 # Or use npm script
 npm run test:edge-function
@@ -181,7 +181,7 @@ We've added convenient scripts to your `package.json`:
 {
   "scripts": {
     "deploy:edge-function": "bash deploy-edge-function.sh",
-    "test:edge-function": "curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health"
+    "test:edge-function": "curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health"
   }
 }
 ```
@@ -202,15 +202,15 @@ npm run test:edge-function
 ### Edge Function Info
 - **Name:** server
 - **Path:** `/supabase/functions/server/`
-- **Prefix:** `/make-server-668731fc`
+- **Prefix:** `/make-server-a35148f0`
 - **Version:** 2.1 - Payment-First Registration
 
 ### Endpoints (After Deployment)
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/init-payment
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/test-payment
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/company/payment-status/:reference
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/init-payment
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/test-payment
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/company/payment-status/:reference
 ```
 
 ---

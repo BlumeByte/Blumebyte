@@ -208,7 +208,7 @@ Go to dashboard    Show company creation form
 
 ### New OAuth Endpoint
 
-**`POST /make-server-668731fc/oauth/create-company`**
+**`POST /make-server-a35148f0/oauth/create-company`**
 
 **Headers:**
 ```

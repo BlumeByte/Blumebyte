@@ -175,10 +175,10 @@ UPDATE employee SET assignedCompanies = ARRAY[companyId] WHERE userId = 'user-id
 **Solution:**
 ```bash
 # Deploy the updated server code
-supabase functions deploy make-server-668731fc
+supabase functions deploy make-server-a35148f0
 
 # Verify deployment
-curl https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-668731fc/health
+curl https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-a35148f0/health
 ```
 
 ---
@@ -225,7 +225,7 @@ console.log('Assigned Companies:', user.assignedCompanies);
 ```javascript
 // In browser console (after login):
 const token = localStorage.getItem('auth-token');
-fetch('https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-668731fc/companies', {
+fetch('https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-a35148f0/companies', {
   headers: { 'Authorization': `Bearer ${token}` }
 })
 .then(r => r.json())
@@ -236,7 +236,7 @@ fetch('https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-668731fc/com
 ```javascript
 // In browser console (after login):
 const token = localStorage.getItem('auth-token');
-fetch('https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-668731fc/company-settings', {
+fetch('https://YOUR-PROJECT-ID.supabase.co/functions/v1/make-server-a35148f0/company-settings', {
   headers: { 'Authorization': `Bearer ${token}` }
 })
 .then(r => r.json())
@@ -280,7 +280,7 @@ Approved Leaves: 0
 
 1. **Deploy Server:**
    ```bash
-   supabase functions deploy make-server-668731fc
+   supabase functions deploy make-server-a35148f0
    ```
 
 2. **Clear Test Data (if needed):**
@@ -309,7 +309,7 @@ If issues persist after deployment:
 
 1. **Check Server Logs:**
    ```bash
-   supabase functions logs make-server-668731fc
+   supabase functions logs make-server-a35148f0
    ```
 
 2. **Verify Employee Record:**

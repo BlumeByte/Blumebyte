@@ -53,7 +53,7 @@ DEPLOY_VIA_CLI.bat
 ### Step 6: Verify It Worked
 Open this URL in your browser:
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Expected response:**

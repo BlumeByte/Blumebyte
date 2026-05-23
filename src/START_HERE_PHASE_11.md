@@ -83,7 +83,7 @@ After successful deployment:
 
 Open this URL in your browser:
 ```
-https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 Should return:

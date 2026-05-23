@@ -82,7 +82,7 @@ supabase link --project-ref ivohczdtuxasyfoiphqu
 supabase functions deploy make-server
 
 # 6. Verify deployment
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Expected Response:**
@@ -193,7 +193,7 @@ After deployment succeeds, verify:
 
 ### 1. Health Endpoint:
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Expected:** `{"status":"ok",...}`
@@ -201,7 +201,7 @@ curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-serv
 ### 2. Test Payment Endpoint:
 ```bash
 curl -X POST \
-  https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/company/test-payment \
+  https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/company/test-payment \
   -H "Content-Type: application/json" \
   -d '{"test":"data"}'
 ```

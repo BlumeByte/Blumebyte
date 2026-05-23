@@ -76,7 +76,7 @@ mv server make-server
 - Needs to match the `functionName` in `figma.json`
 
 **Runtime path** (URL after deployment):
-- Based on **PREFIX** in your code: `/make-server-668731fc`
+- Based on **PREFIX** in your code: `/make-server-a35148f0`
 - Already correct in your frontend!
 
 **They're different**, which is fine! But the folder must be named `make-server` for deployment to work.
@@ -140,7 +140,7 @@ For detailed guides, see:
 2. **Retry deployment** in Figma Make
 3. **Verify success** by checking:
    ```
-   https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+   https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
    ```
    Should return: `{"status":"ok"}`
 

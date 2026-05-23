@@ -162,11 +162,11 @@ git push
 ### Check These Endpoints
 ```bash
 # Health check
-curl https://your-project.supabase.co/functions/v1/make-server-668731fc/health
+curl https://your-project.supabase.co/functions/v1/make-server-a35148f0/health
 
 # Test messages endpoint (with auth token)
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  https://your-project.supabase.co/functions/v1/make-server-668731fc/users/for-messages
+  https://your-project.supabase.co/functions/v1/make-server-a35148f0/users/for-messages
 ```
 
 ### Monitor Logs

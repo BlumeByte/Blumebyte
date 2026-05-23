@@ -56,7 +56,7 @@ supabase link --project-ref ivohczdtuxasyfoiphqu
 supabase functions deploy make-server
 
 # 5. Verify
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Success rate:** 95% | **Time:** 5 minutes
@@ -115,7 +115,7 @@ After deployment, verify these endpoints:
 
 ### 1. Health Check
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 **Expected:**
@@ -135,7 +135,7 @@ curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-serv
 ### 2. Test Payment Endpoint
 ```bash
 curl -X POST \
-  https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/company/test-payment \
+  https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/company/test-payment \
   -H "Content-Type: application/json" \
   -d '{"test": "data"}'
 ```
@@ -224,7 +224,7 @@ https://supabase.com/dashboard/project/ivohczdtuxasyfoiphqu/settings/general
 ### "Command not found: curl"
 On Windows, use PowerShell:
 ```powershell
-Invoke-WebRequest -Uri "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health"
+Invoke-WebRequest -Uri "https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health"
 ```
 
 ---

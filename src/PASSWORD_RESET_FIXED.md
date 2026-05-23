@@ -122,7 +122,7 @@ Valid until: 1/15/2024, 10:30:00 AM
 
 ## API Endpoints
 
-### POST `/make-server-668731fc/auth/forgot-password`
+### POST `/make-server-a35148f0/auth/forgot-password`
 
 **Request:**
 ```json
@@ -141,7 +141,7 @@ Valid until: 1/15/2024, 10:30:00 AM
 }
 ```
 
-### POST `/make-server-668731fc/auth/validate-reset-token`
+### POST `/make-server-a35148f0/auth/validate-reset-token`
 
 **Request:**
 ```json
@@ -165,7 +165,7 @@ Valid until: 1/15/2024, 10:30:00 AM
 }
 ```
 
-### POST `/make-server-668731fc/auth/reset-password`
+### POST `/make-server-a35148f0/auth/reset-password`
 
 **Request:**
 ```json

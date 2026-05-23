@@ -68,7 +68,7 @@ No error!
 ```
 Edge Functions:
 ├── server (MAIN)
-│   ├── All API routes at /make-server-668731fc/*
+│   ├── All API routes at /make-server-a35148f0/*
 │   ├── Authentication endpoints
 │   ├── Company management
 │   ├── Employee CRUD
@@ -83,7 +83,7 @@ Edge Functions:
 
 ### ✅ No Impact Whatsoever
 - Your app uses the `server` function exclusively
-- All API calls go to `/functions/v1/server/make-server-668731fc/`
+- All API calls go to `/functions/v1/server/make-server-a35148f0/`
 - The stub function is never called by your app
 - Zero performance impact
 - Zero functionality changes
@@ -105,14 +105,14 @@ Expected response:
 ```json
 {
   "message": "This is a stub function. All API requests are handled by the 'server' function.",
-  "redirect": "Use the 'server' function at /functions/v1/server/make-server-668731fc/",
+  "redirect": "Use the 'server' function at /functions/v1/server/make-server-a35148f0/",
   "status": "stub"
 }
 ```
 
 ### Test Your Actual API (still works):
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/server/make-server-a35148f0/health
 ```
 
 Expected response:

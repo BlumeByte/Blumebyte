@@ -69,7 +69,7 @@ supabase link --project-ref ivohczdtuxasyfoiphqu
 supabase functions deploy make-server
 
 # 4. Test it
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 
 ### **Expected Output:**
@@ -286,7 +286,7 @@ After deployment, test these:
 
 ### **1. Health Endpoint:**
 ```bash
-curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-668731fc/health
+curl https://ivohczdtuxasyfoiphqu.supabase.co/functions/v1/make-server/make-server-a35148f0/health
 ```
 Should return: `{"status":"ok","version":"2.1-payment-flow-UPDATED"}`
 
@@ -301,7 +301,7 @@ All should work! ✅
 
 ### **3. Browser DevTools:**
 Check Network tab:
-- API calls to `/make-server-668731fc/` should return **200 OK**
+- API calls to `/make-server-a35148f0/` should return **200 OK**
 - No more **403 errors**! ✅
 
 ---

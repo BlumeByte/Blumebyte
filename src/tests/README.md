@@ -140,7 +140,7 @@ runAllTests().then(results => console.log(results));
 
 ## 🧪 Test Coverage Summary
 
-### Backup Endpoint (`GET /make-server-668731fc/backup`)
+### Backup Endpoint (`GET /make-server-a35148f0/backup`)
 | Test Area | Manual Test | Automated Test | Status |
 |-----------|-------------|----------------|--------|
 | Authentication | ✅ Test 1 | ✅ testBackupAuthentication | COVERED |
@@ -149,7 +149,7 @@ runAllTests().then(results => console.log(results));
 | Data Completeness | ✅ Test 4 | ✅ testBackupDataCompleteness | COVERED |
 | Performance | ✅ Test 10 | ✅ testBackupPerformance | COVERED |
 
-### Restore Endpoint (`POST /make-server-668731fc/backup/restore`)
+### Restore Endpoint (`POST /make-server-a35148f0/backup/restore`)
 | Test Area | Manual Test | Automated Test | Status |
 |-----------|-------------|----------------|--------|
 | Authentication | ✅ Test 5 | ✅ testRestoreAuthentication | COVERED |
