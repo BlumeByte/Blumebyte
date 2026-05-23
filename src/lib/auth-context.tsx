@@ -202,8 +202,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Use onAuthStateChange as the single source of truth for session state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'TOKEN_REFRESHED' && !session) {
-        // Refresh failed – stale session, force logout
-        console.log('Token refresh failed, logging out');
+        // Verify the session is truly gone before forcing logout — TOKEN_REFRESHED
+        // with a null session can fire as a spurious event due to race conditions in
+        // some Supabase client versions.  A false logout here would kick superadmins
+        // (and others) out while they are actively using the app (e.g. licence selection).
+        const { data: sessionCheck } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (sessionCheck?.session) {
+          // Session still valid — update the access token and continue normally.
+          setAccessToken(sessionCheck.session.access_token);
+          setUser((prev) => prev || buildSessionFallbackUser(sessionCheck.session!));
+          if (!initializedRef.current) {
+            initializedRef.current = true;
+            setSessionLoading(false);
+          }
+          return;
+        }
+        // Confirmed: session is gone — force logout.
+        console.log('Token refresh failed (confirmed), logging out');
         setUser(null);
         setAccessToken(null);
         if (!initializedRef.current) {

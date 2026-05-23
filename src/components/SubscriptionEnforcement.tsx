@@ -5,13 +5,11 @@ import { supabase } from '../lib/supabase';
 import { normalizeRole } from '../lib/role-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { AlertCircle, CreditCard, Lock, Mail, Loader2 } from 'lucide-react';
+import { AlertCircle, CreditCard, Lock, MessageSquare, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
-const SUPPORT_EMAIL = 'info@blumebyte.com';
 const SUPPORT_REPORT_ENDPOINTS = ['/support/report-error', '/support/error-report', '/report-error', '/error-report'] as const;
 
 const isRetryableSupportRouteError = (error: any) => {
@@ -173,14 +171,18 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
 
   // Subscription is inactive
   if (subscriptionStatus.subscriptionInactive) {
-    // SuperAdmin can always manage their subscription.
-    // Check auth-context user first, then the raw Supabase session role
-    // (needed when /profile is blocked by CORS and user.role is null).
+    // SuperAdmin should always be able to access the dashboard (including the billing
+    // tab) so they can renew/purchase without being blocked.  Showing the locked
+    // screen while they are mid-interaction (e.g. the licence-selector dialog is open)
+    // appeared as a spurious "logout".  Let them through and let the dashboard's own
+    // billing tab surface the renewal options.
     const isSuperAdmin =
       normalizeRole(user?.role) === 'superadmin' ||
       subscriptionStatus.sessionRole === 'superadmin';
-    const canPay = subscriptionStatus.canManageSubscription || isSuperAdmin;
-    return <SubscriptionLockedScreen canPay={canPay} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
+    if (isSuperAdmin) {
+      return <>{children}</>;
+    }
+    return <SubscriptionLockedScreen canPay={subscriptionStatus.canManageSubscription} autoRenewEligible={subscriptionStatus.autoRenewEligible} />;
   }
 
   // Generic error
@@ -214,7 +216,7 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
   const navigate = useNavigate();
   const { user, getToken } = useAuth();
   const [showSupportForm, setShowSupportForm] = useState(false);
-  const [supportForm, setSupportForm] = useState({ name: '', email: user?.email || '', message: '' });
+  const [supportForm, setSupportForm] = useState({ name: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [autoRenewing, setAutoRenewing] = useState(false);
 
@@ -236,14 +238,12 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
         message: supportForm.message,
         details: [
           `Contact name: ${supportForm.name || 'N/A'}`,
-          `Contact email: ${supportForm.email || user?.email || 'N/A'}`,
           `User email: ${user?.email || 'N/A'}`,
           `User role: ${user?.role || 'N/A'}`,
         ].join('\n'),
         context: {
           type: 'subscription_locked',
           subject: 'Subscription Payment Required — System Locked',
-          contactEmail: supportForm.email || user?.email || '',
           contactName: supportForm.name || '',
           userEmail: user?.email || '',
           userRole: user?.role || '',
@@ -268,14 +268,14 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
       }
       if (!sent) throw lastError || new Error('Failed to send support request');
 
-      toast.success(`Support request sent to ${SUPPORT_EMAIL} — we will contact you shortly.`);
+      toast.success('Support request sent to our team — we will contact you shortly.');
       setShowSupportForm(false);
       setSupportForm((prev) => ({ ...prev, message: '' }));
     } catch (error: any) {
       toast.error(
         error?.message?.toLowerCase().includes('authentication')
           ? 'Your session expired. Please sign in again and retry.'
-          : `Failed to send support request. Please email ${SUPPORT_EMAIL} directly.`,
+          : 'Failed to send support request. Please try again later.',
       );
     } finally {
       setSubmitting(false);
@@ -366,25 +366,14 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
             <div className="border-t pt-3">
               {!showSupportForm ? (
                 <Button variant="outline" size="sm" className="w-full" onClick={() => setShowSupportForm(true)}>
-                  <Mail className="w-3.5 h-3.5 mr-2" />
+                  <MessageSquare className="w-3.5 h-3.5 mr-2" />
                   Contact Blumebyte Support
                 </Button>
               ) : (
                 <div className="space-y-2 bg-white p-3 rounded-lg border">
-                  <p className="text-xs font-semibold text-gray-700">Send a support request to {SUPPORT_EMAIL}</p>
-                  <Input
-                    placeholder="Your name"
-                    value={supportForm.name}
-                    onChange={e => setSupportForm(f => ({ ...f, name: e.target.value }))}
-                    className="text-sm"
-                  />
-                  <Input
-                    placeholder="Your email"
-                    value={supportForm.email}
-                    onChange={e => setSupportForm(f => ({ ...f, email: e.target.value }))}
-                    className="text-sm"
-                  />
+                  <p className="text-xs font-semibold text-gray-700">Send a support request to our team</p>
                   <Textarea
+                    aria-label="Describe your issue"
                     placeholder="Describe your issue (company name, subscription plan, what happened)…"
                     value={supportForm.message}
                     onChange={e => setSupportForm(f => ({ ...f, message: e.target.value }))}
@@ -394,7 +383,7 @@ function SubscriptionLockedScreen({ canPay, autoRenewEligible }: { canPay: boole
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => setShowSupportForm(false)}>Cancel</Button>
                     <Button size="sm" className="flex-1" onClick={submitSupportRequest} disabled={submitting}>
-                      {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Mail className="w-3.5 h-3.5 mr-1" />}
+                      {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <MessageSquare className="w-3.5 h-3.5 mr-1" />}
                       Send Request
                     </Button>
                   </div>

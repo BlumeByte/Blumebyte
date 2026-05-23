@@ -11545,11 +11545,18 @@ const reportClientError = async (c: any) => {
     const extractNormalizedRole = (candidate: any) =>
       normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
     const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
-    const activeCareAgents = (await getDynamicPlatformAgents())
-      .filter((agent: any) =>
-        normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
-        String(agent?.status || 'active').toLowerCase() === 'active'
-      );
+    // Wrap getDynamicPlatformAgents in try/catch so a Supabase admin-API failure
+    // doesn't abort ticket creation — the ticket is more important than agent assignment.
+    let activeCareAgents: any[] = [];
+    try {
+      activeCareAgents = (await getDynamicPlatformAgents())
+        .filter((agent: any) =>
+          normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
+          String(agent?.status || 'active').toLowerCase() === 'active'
+        );
+    } catch (agentErr: any) {
+      console.warn('reportClientError: getDynamicPlatformAgents failed, continuing without agent assignment:', agentErr?.message || agentErr);
+    }
     const tenantAssignedCareAgents = companyId
       ? activeCareAgents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
       : [];
@@ -11626,7 +11633,7 @@ const reportClientError = async (c: any) => {
       kv.getByPrefix('platform_user:'),
       kv.getByPrefix('customer_care_users:'),
       kv.getByPrefix('support-agent:'),
-      listSupabasePlatformUsers(),
+      listSupabasePlatformUsers().catch(() => [] as any[]),
     ]);
 
     const supportRecipients: any[] = [];
@@ -12624,6 +12631,24 @@ const listUltimateadminSupportTenants = async (c: any) => {
       }
     }
 
+    // Include subscription-only tenants (e.g. billing records created before
+    // company/employee mirrors are fully synced).
+    for (const sub of allSubscriptions) {
+      const cid = sub.companyId || sub.company;
+      if (!cid) continue;
+      if (!tenantMap.has(cid)) {
+        const companyRecord = companyMap.get(cid);
+        tenantMap.set(cid, {
+          id: cid,
+          name: companyRecord?.name || sub.companyName || cid,
+          industry: companyRecord?.industry || '',
+          createdAt: companyRecord?.createdAt || sub.createdAt || sub.startDate || '',
+          activeUsers: 0,
+          totalUsers: 0,
+        });
+      }
+    }
+
 
     // Also include companies with no employees yet
     for (const [cid, company] of companyMap.entries()) {
@@ -12641,6 +12666,7 @@ const listUltimateadminSupportTenants = async (c: any) => {
 
     const tenants = [...tenantMap.entries()].map(([cid, t]) => {
       const sub = subMap.get(cid);
+      const companyRecord = companyMap.get(cid);
       const inferredStatus = (() => {
         const endDate = sub?.endDate || sub?.expiresAt;
         if (!endDate) return 'unknown';
@@ -12648,12 +12674,19 @@ const listUltimateadminSupportTenants = async (c: any) => {
         if (Number.isNaN(d.getTime())) return 'unknown';
         return d > new Date() ? 'active' : 'expired';
       })();
+      const purchasedLicensesRaw =
+        getCanonicalSubscriptionLicenses(sub) ||
+        companyRecord?.licenses ||
+        companyRecord?.subscription?.licenses ||
+        0;
+      const purchasedLicensesNumber = Number(purchasedLicensesRaw);
+      const purchasedLicenses = Number.isFinite(purchasedLicensesNumber) ? purchasedLicensesNumber : 0;
       return {
         ...t,
-        licenseStatus: sub?.status || inferredStatus,
-        purchasedLicenses: sub?.purchasedLicenses || sub?.userCount || sub?.licenses || 0,
-        plan: sub?.plan || sub?.planName || 'unknown',
-        lastActivity: sub?.updatedAt || t.createdAt || '',
+        licenseStatus: sub?.status || companyRecord?.subscriptionStatus || companyRecord?.status || inferredStatus,
+        purchasedLicenses,
+        plan: sub?.plan || sub?.planName || companyRecord?.subscriptionPlan || companyRecord?.plan || 'unknown',
+        lastActivity: sub?.updatedAt || companyRecord?.updatedAt || t.createdAt || '',
       };
     });
 
