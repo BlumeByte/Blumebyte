@@ -16,6 +16,44 @@ function getCanonicalSubscriptionLicenses(subscription: any): number {
   ) || 0;
 }
 
+function normalizeSubscriptionRole(role: any): string {
+  return String(role || '').trim().toLowerCase().replace(/[_-]/g, '');
+}
+
+async function resolveBillingSubscriptionContext(userId: string): Promise<{
+  companyId: string | null;
+  ownerUserId: string | null;
+  subscription: any | null;
+}> {
+  const employeeRecord = await kv.get(`employee:${userId}`);
+  const companyId = employeeRecord?.companyId || employeeRecord?.company || null;
+  let ownerUserId: string | null = userId;
+
+  if (companyId) {
+    const allEmployees = await kv.getByPrefix('employee:');
+    const companySuperAdmin = allEmployees.find((emp: any) =>
+      normalizeSubscriptionRole(emp?.role) === 'superadmin' &&
+      (emp?.companyId === companyId || emp?.company === companyId)
+    );
+    ownerUserId = String(companySuperAdmin?.userId || companySuperAdmin?.id || userId || '').trim() || null;
+  }
+
+  const candidates = [...new Set(
+    [userId, ownerUserId, companyId]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  )];
+
+  for (const candidate of candidates) {
+    const subscription = await kv.get(`subscription:${candidate}`);
+    if (subscription) {
+      return { companyId, ownerUserId, subscription };
+    }
+  }
+
+  return { companyId, ownerUserId, subscription: null };
+}
+
 async function syncCompanySubscriptionMirror(userId: string, subscription: any) {
   const employee = await kv.get(`employee:${userId}`);
   const companyId = employee?.companyId || employee?.company;
@@ -323,7 +361,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Get subscription AND company record (licenses can be in either)
-      const subscription = await kv.get(`subscription:${user.id}`);
+      const { subscription } = await resolveBillingSubscriptionContext(user.id);
       const company = await kv.get(`company:${companyId}`);
       
       // Recalculate company stats to ensure accuracy
@@ -385,7 +423,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Get subscription
-      const subscription = await kv.get(`subscription:${user.id}`);
+      const { subscription } = await resolveBillingSubscriptionContext(user.id);
       
       if (!subscription || subscription.status !== 'active') {
         return c.json({ 
@@ -583,7 +621,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       if (!pendingLicense) {
         // Could mean verification was already processed (idempotency)
         // Check if subscription already reflects this payment
-        const subscription = await kv.get(`subscription:${user.id}`);
+        const { subscription } = await resolveBillingSubscriptionContext(user.id);
         if (subscription?.lastPaymentReference === reference) {
           return c.json({
             success: true,
@@ -607,7 +645,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       if (pendingLicense.status === 'processing') {
         // Brief wait to let the first request finish, then return the result
         await new Promise(r => setTimeout(r, 3000));
-        const subscription = await kv.get(`subscription:${user.id}`);
+        const { subscription } = await resolveBillingSubscriptionContext(user.id);
         if (subscription?.lastPaymentReference === reference) {
           return c.json({
             success: true,
@@ -767,7 +805,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
     try {
       const { user, role } = await requireSuperAdmin(c);
       
-      const subscription = await kv.get(`subscription:${user.id}`);
+      const { ownerUserId, subscription } = await resolveBillingSubscriptionContext(user.id);
       
       if (!subscription) {
         return c.json({ error: 'No subscription found' }, 404);
@@ -849,8 +887,9 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       subscription.lastPaymentAmount = amount;
       subscription.lastPaymentReference = paystackData.data.reference;
       
-      await kv.set(`subscription:${user.id}`, subscription);
-      await syncCompanySubscriptionMirror(user.id, subscription);
+      const writeUserId = ownerUserId || user.id;
+      await kv.set(`subscription:${writeUserId}`, subscription);
+      await syncCompanySubscriptionMirror(writeUserId, subscription);
       
       await logAudit({
         userId: user.id,
@@ -1173,7 +1212,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
 
       // First check if already processed (subscription has this reference)
-      const subscription = await kv.get(`subscription:${user.id}`);
+      const { subscription } = await resolveBillingSubscriptionContext(user.id);
       if (subscription?.lastPaymentReference === reference || subscription?.paymentReference === reference) {
         return c.json({
           status: 'completed',
@@ -1235,12 +1274,14 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   for (const route of subscriptionRoutePaths('/subscription/card')) app.delete(route, async (c: any) => {
     try {
       const { user } = await requireSuperAdmin(c);
-      const subscription = await kv.get(`subscription:${user.id}`);
+      const { ownerUserId, subscription } = await resolveBillingSubscriptionContext(user.id);
       if (!subscription) return c.json({ error: 'No subscription found' }, 404);
       const updated = { ...subscription };
       delete updated.cardAuthorization;
       updated.autoRenew = false;
-      await kv.set(`subscription:${user.id}`, updated);
+      const writeUserId = ownerUserId || user.id;
+      await kv.set(`subscription:${writeUserId}`, updated);
+      await syncCompanySubscriptionMirror(writeUserId, updated);
       await logAudit({ userId: user.id, userName: user.email || 'Unknown', action: 'UPDATE', resourceType: 'subscription-card', resourceId: user.id, details: { action: 'remove_card' } });
       return c.json({ success: true, message: 'Saved card removed. Auto-renewal disabled.' });
     } catch (e: any) {
@@ -1255,13 +1296,15 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
     try {
       const { user } = await requireSuperAdmin(c);
       const { enabled } = await c.req.json();
-      const subscription = await kv.get(`subscription:${user.id}`);
+      const { ownerUserId, subscription } = await resolveBillingSubscriptionContext(user.id);
       if (!subscription) return c.json({ error: 'No subscription found' }, 404);
       if (enabled && !subscription.cardAuthorization) {
         return c.json({ error: 'No card saved. Please save a card before enabling auto-renewal.' }, 400);
       }
       const updated = { ...subscription, autoRenew: !!enabled };
-      await kv.set(`subscription:${user.id}`, updated);
+      const writeUserId = ownerUserId || user.id;
+      await kv.set(`subscription:${writeUserId}`, updated);
+      await syncCompanySubscriptionMirror(writeUserId, updated);
       await logAudit({ userId: user.id, userName: user.email || 'Unknown', action: 'UPDATE', resourceType: 'subscription-auto-renew', resourceId: user.id, details: { autoRenew: !!enabled } });
       return c.json({ success: true, autoRenew: !!enabled });
     } catch (e: any) {

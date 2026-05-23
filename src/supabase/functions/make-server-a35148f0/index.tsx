@@ -501,6 +501,57 @@ function getCanonicalSubscriptionLicenses(subscription: any): number {
   ) || 0;
 }
 
+async function resolveBillingSubscriptionContext(userId: string): Promise<{
+  companyId: string | null;
+  ownerUserId: string | null;
+  subscription: any | null;
+  source: 'user' | 'owner' | 'company' | 'none';
+}> {
+  const companyId = await getCompanyId(userId);
+  let ownerUserId: string | null = userId;
+
+  if (companyId) {
+    const allEmployees = await kv.getByPrefix('employee:');
+    const companySuperAdmin = allEmployees.find((emp: any) =>
+      normalizeCareRole(String(emp?.role || '')) === 'superadmin' &&
+      (emp?.companyId === companyId || emp?.company === companyId)
+    );
+    ownerUserId = String(companySuperAdmin?.userId || companySuperAdmin?.id || userId || '').trim() || null;
+  }
+
+  const candidates: Array<{ id: string; source: 'user' | 'owner' | 'company' }> = [];
+  const seen = new Set<string>();
+  for (const [id, source] of [
+    [userId, 'user'],
+    [ownerUserId, 'owner'],
+    [companyId, 'company'],
+  ] as Array<[string | null, 'user' | 'owner' | 'company']>) {
+    const normalizedId = String(id || '').trim();
+    if (!normalizedId || seen.has(normalizedId)) continue;
+    seen.add(normalizedId);
+    candidates.push({ id: normalizedId, source });
+  }
+
+  for (const candidate of candidates) {
+    const subscription = await kv.get(`subscription:${candidate.id}`);
+    if (subscription) {
+      return {
+        companyId,
+        ownerUserId,
+        subscription,
+        source: candidate.source,
+      };
+    }
+  }
+
+  return {
+    companyId,
+    ownerUserId,
+    subscription: null,
+    source: 'none',
+  };
+}
+
 async function syncCompanySubscriptionMirror(userId: string, subscription: any) {
   const companyId = await getCompanyId(userId);
   if (!companyId) return null;
@@ -7151,7 +7202,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     }
     
     // For superadmins, check their own subscription
-    const subscription = await kv.get(`subscription:${user.id}`);
+    const { subscription } = await resolveBillingSubscriptionContext(user.id);
     
     if (!subscription) {
       return c.json({ status: 'none', message: 'No subscription found' }, 200);
@@ -7511,7 +7562,11 @@ const renewSubscriptionLicense = async (c: any) => {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
 
-    const existingSubscription = await kv.get(`subscription:${user.id}`);
+    const {
+      companyId: resolvedCompanyId,
+      ownerUserId,
+      subscription: existingSubscription,
+    } = await resolveBillingSubscriptionContext(user.id);
     const purchasedLicenses = Number(
       existingSubscription?.purchasedLicenses ||
       existingSubscription?.userCount ||
@@ -7538,10 +7593,9 @@ const renewSubscriptionLicense = async (c: any) => {
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-    let companyId: string | null = null;
+    let companyId: string | null = resolvedCompanyId || null;
     let companyName = '';
     try {
-      companyId = await getCompanyId(user.id);
       companyName = companyId ? await resolveCompanyName(companyId) : '';
     } catch (companyError) {
       console.warn('Unable to resolve renewal tenant metadata:', companyError);
@@ -7632,7 +7686,7 @@ const renewSubscriptionLicense = async (c: any) => {
     }
 
     await kv.set(`pending-subscription:${reference}`, {
-      userId: user.id,
+      userId: ownerUserId || user.id,
       plan,
       userCount: licensesNum,
       amount,
@@ -11490,6 +11544,19 @@ const reportClientError = async (c: any) => {
     const extractNormalizedRole = (candidate: any) =>
       normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
     const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
+    const activeCareAgents = (await getDynamicPlatformAgents())
+      .filter((agent: any) =>
+        normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
+        String(agent?.status || 'active').toLowerCase() === 'active'
+      );
+    const tenantAssignedCareAgents = companyId
+      ? activeCareAgents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
+      : [];
+    const selectedCareAgent = [...(tenantAssignedCareAgents.length > 0 ? tenantAssignedCareAgents : activeCareAgents)]
+      .sort((a: any, b: any) =>
+        Number(a?.openTickets || 0) - Number(b?.openTickets || 0) ||
+        new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime()
+      )[0] || null;
 
     const ticketId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -11502,8 +11569,8 @@ const reportClientError = async (c: any) => {
       subject: `[Error Report] ${source || 'Application'}: ${message.slice(0, 120)}`,
       description: message,
       status: 'open',
-      assignedAgentId: '',
-      assignedAgentName: '',
+      assignedAgentId: selectedCareAgent?.userId || selectedCareAgent?.id || '',
+      assignedAgentName: selectedCareAgent?.name || selectedCareAgent?.email || '',
       creatorId: user.id,
       creatorEmail: user.email,
       createdAt: now,
@@ -14132,10 +14199,12 @@ const listCareTickets = async (c: any) => {
   try {
     const auth = await requireCustomerCare(c);
     const assigned = await getCareAssignmentsForAgent(auth.user.id);
-    if (assigned.length === 0) return c.json([]);
     const assignedSet = new Set(assigned);
     const allTickets = await getAllSupportTickets();
-    return c.json(allTickets.filter((t: any) => assignedSet.has(t.tenantId)));
+    return c.json(allTickets.filter((t: any) =>
+      assignedSet.has(t.tenantId) ||
+      t.assignedAgentId === auth.user.id
+    ));
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
