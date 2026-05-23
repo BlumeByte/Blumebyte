@@ -11556,7 +11556,7 @@ const reportClientError = async (c: any) => {
     const selectedCareAgent = [...(tenantAssignedCareAgents.length > 0 ? tenantAssignedCareAgents : activeCareAgents)]
       .sort((a: any, b: any) =>
         Number(a?.openTickets || 0) - Number(b?.openTickets || 0) ||
-        new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime()
+        new Date(a?.createdAt || Date.now()).getTime() - new Date(b?.createdAt || Date.now()).getTime()
       )[0] || null;
 
     const ticketId = crypto.randomUUID();

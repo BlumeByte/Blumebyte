@@ -493,7 +493,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const callbackUrl = callbackOrigin ? `${callbackOrigin}/payment-verify-license` : '';
       
       // Convert USD to configured Paystack currency
-      const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+      const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
 
       // Guard against zero/invalid amounts that Paystack would reject
       if (!amountSmallestUnit || amountSmallestUnit < 100) {
@@ -1125,7 +1125,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const callbackUrl = callbackOrigin ? `${callbackOrigin}/payment-verify-license` : '';
       
       // Convert USD to configured Paystack currency
-      const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+      const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
 
       // Guard against zero/invalid amounts that Paystack would reject
       if (!amountSmallestUnit || amountSmallestUnit < 100) {
