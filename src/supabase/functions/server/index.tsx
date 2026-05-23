@@ -12667,14 +12667,15 @@ const listUltimateadminSupportTenants = async (c: any) => {
         if (Number.isNaN(d.getTime())) return 'unknown';
         return d > new Date() ? 'active' : 'expired';
       })();
-      const purchasedLicenses = Number(
+      const purchasedLicensesRaw =
         sub?.purchasedLicenses ??
         sub?.userCount ??
         sub?.licenses ??
         companyRecord?.licenses ??
         companyRecord?.subscription?.licenses ??
-        0
-      ) || 0;
+        0;
+      const purchasedLicensesNumber = Number(purchasedLicensesRaw);
+      const purchasedLicenses = Number.isFinite(purchasedLicensesNumber) ? purchasedLicensesNumber : 0;
       return {
         ...t,
         licenseStatus: sub?.status || companyRecord?.subscriptionStatus || companyRecord?.status || inferredStatus,
