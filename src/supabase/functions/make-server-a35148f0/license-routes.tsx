@@ -1,6 +1,6 @@
 import { Hono } from 'npm:hono@4.7.7';
 import * as kv from './kv_store.tsx';
-import { usdToPaystackAmount, getPaystackCurrency } from './currency-utils.tsx';
+import { usdToPaystackAmount } from './currency-utils.tsx';
 import { recalculateCompanyStats } from './sync-company-stats.tsx';
 
 const PREFIX = '/make-server-a35148f0';
@@ -179,7 +179,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   // Debug endpoint to check Paystack configuration
   for (const route of subscriptionRoutePaths('/subscription/paystack-debug')) app.get(route, async (c: any) => {
     try {
-      const { user, role } = await requireSuperAdmin(c);
+      await requireSuperAdmin(c);
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
       const paystackPublicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY');
@@ -203,7 +203,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   // Test Paystack connection endpoint
   for (const route of subscriptionRoutePaths('/subscription/test-paystack')) app.post(route, async (c: any) => {
     try {
-      const { user, role } = await requireSuperAdmin(c);
+      const { user } = await requireSuperAdmin(c);
       
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
       if (!paystackSecretKey) {
@@ -426,7 +426,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   // Purchase additional licenses
   for (const route of subscriptionRoutePaths('/subscription/purchase-licenses')) app.post(route, async (c: any) => {
     try {
-      const { user, role } = await requireSuperAdmin(c);
+      const { user } = await requireSuperAdmin(c);
       const body = await c.req.json();
       const { licenses, plan, saveCard } = body;
       
@@ -455,7 +455,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const callbackUrl = callbackOrigin ? `${callbackOrigin}/payment-verify-license` : '';
       
       // Convert USD to configured Paystack currency
-      const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+      const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
 
       // Guard against zero/invalid amounts that Paystack would reject
       if (!amountSmallestUnit || amountSmallestUnit < 100) {
@@ -765,7 +765,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   // Auto-renew subscription (charge saved card)
   for (const route of subscriptionRoutePaths('/subscription/auto-renew')) app.post(route, async (c: any) => {
     try {
-      const { user, role } = await requireSuperAdmin(c);
+      const { user } = await requireSuperAdmin(c);
       
       const subscription = await kv.get(`subscription:${user.id}`);
       
@@ -882,7 +882,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   // Get all users for license selection (SuperAdmin only)
   for (const route of subscriptionRoutePaths('/subscription/all-users')) app.get(route, async (c: any) => {
     try {
-      const { user, role } = await requireSuperAdmin(c);
+      await requireSuperAdmin(c);
       
       const allUsers = await kv.getByPrefix('employee:');
       
@@ -967,10 +967,6 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         } else {
           endDate.setDate(endDate.getDate() + 365);
         }
-
-        const licensesToAssign = Array.isArray(pendingLicense.selectedUserIds) 
-            ? pendingLicense.selectedUserIds.length 
-            : pendingLicense.licenses;
 
         subscription.plan = pendingLicense.plan;
         subscription.status = 'active';
@@ -1057,7 +1053,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
   // Purchase licenses with user selection (handles deactivation)
   for (const route of subscriptionRoutePaths('/subscription/purchase-licenses-with-selection')) app.post(route, async (c: any) => {
     try {
-      const { user, role } = await requireSuperAdmin(c);
+      const { user } = await requireSuperAdmin(c);
       const body = await c.req.json();
       const { licenses, plan, saveCard, selectedUserIds } = body;
       
@@ -1086,7 +1082,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const callbackUrl = callbackOrigin ? `${callbackOrigin}/payment-verify-license` : '';
       
       // Convert USD to configured Paystack currency
-      const { amountSmallestUnit, amountDisplay, currency } = await usdToPaystackAmount(amount);
+      const { amountSmallestUnit, currency } = await usdToPaystackAmount(amount);
 
       // Guard against zero/invalid amounts that Paystack would reject
       if (!amountSmallestUnit || amountSmallestUnit < 100) {
