@@ -11553,34 +11553,41 @@ const reportClientError = async (c: any) => {
       `,
     );
 
-    const [allEmployees, platformUsers, supportAgents, supabaseUsers] = await Promise.all([
+    const [allEmployees, platformUsers, customerCareUsers, supportAgents, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('platform_user:'),
+      kv.getByPrefix('customer_care_users:'),
       kv.getByPrefix('support-agent:'),
       listSupabasePlatformUsers(),
     ]);
 
-    const developerRecipients: any[] = [];
+    const supportRecipients: any[] = [];
     const seenRecipients = new Set<string>();
     const addRecipient = (candidate: any) => {
       if (!candidate) return;
       const role = extractNormalizedRole(candidate);
-      const isDeveloper = role === 'developer' || candidate?.isPlatformAdmin === true;
-      if (!isDeveloper) return;
+      const isSupportRecipient =
+        role === 'developer' ||
+        role === 'customer_care' ||
+        candidate?.isPlatformAdmin === true;
+      if (!isSupportRecipient) return;
+      const recipientId = String(candidate?.id || candidate?.userId || '').trim();
       const email = String(candidate?.email || '').trim().toLowerCase();
-      if (!email) return;
-      const key = String(candidate?.id || candidate?.userId || email).toLowerCase();
+      const key = String(recipientId || email).toLowerCase();
+      if (!key) return;
       if (seenRecipients.has(key)) return;
       seenRecipients.add(key);
-      developerRecipients.push({
-        id: candidate?.id || candidate?.userId || '',
+      supportRecipients.push({
+        id: recipientId,
         email,
         name: candidate?.name || candidate?.user_metadata?.name || '',
+        role: role || (candidate?.isPlatformAdmin === true ? 'developer' : ''),
       });
     };
 
     for (const emp of allEmployees) addRecipient(emp);
     for (const pu of platformUsers) addRecipient(pu);
+    for (const cu of customerCareUsers) addRecipient(cu);
     for (const sa of supportAgents) addRecipient(sa);
     for (const su of supabaseUsers) {
       addRecipient({
@@ -11591,6 +11598,34 @@ const reportClientError = async (c: any) => {
       });
     }
 
+    const supportNotificationTitle = `Tenant Error Report: ${source || 'Application'}`;
+    const supportNotificationMessage = `${tenantName || 'Unknown tenant'} reported an error${location ? ` at ${location}` : ''}: ${message}`.slice(0, 280);
+    await Promise.allSettled(supportRecipients.map((recipient: any) => {
+      if (!recipient.id) return Promise.resolve(null);
+      const notificationId = crypto.randomUUID();
+      return kv.set(`notification:${notificationId}`, {
+        id: notificationId,
+        userId: recipient.id,
+        type: 'support-ticket',
+        title: supportNotificationTitle,
+        message: supportNotificationMessage,
+        read: false,
+        createdAt: now,
+        metadata: {
+          ticketId,
+          tenantId: companyId || '',
+          tenantName: tenantName || '',
+          reporterEmail: user.email || '',
+          source: source || 'unknown',
+          location: location || '',
+          priority: 'high',
+        },
+      });
+    }));
+
+    const developerRecipients = supportRecipients.filter((recipient: any) =>
+      recipient.role === 'developer'
+    );
     await Promise.allSettled(developerRecipients.map((admin: any) =>
       sendEmailNotification(
         admin.id || '',
