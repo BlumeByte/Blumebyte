@@ -501,6 +501,57 @@ function getCanonicalSubscriptionLicenses(subscription: any): number {
   ) || 0;
 }
 
+async function resolveBillingSubscriptionContext(userId: string): Promise<{
+  companyId: string | null;
+  ownerUserId: string | null;
+  subscription: any | null;
+  source: 'user' | 'owner' | 'company' | 'none';
+}> {
+  const companyId = await getCompanyId(userId);
+  let ownerUserId: string | null = userId;
+
+  if (companyId) {
+    const allEmployees = await kv.getByPrefix('employee:');
+    const companySuperAdmin = allEmployees.find((emp: any) =>
+      normalizeCareRole(String(emp?.role || '')) === 'superadmin' &&
+      (emp?.companyId === companyId || emp?.company === companyId)
+    );
+    ownerUserId = String(companySuperAdmin?.userId || companySuperAdmin?.id || userId || '').trim() || null;
+  }
+
+  const candidates: Array<{ id: string; source: 'user' | 'owner' | 'company' }> = [];
+  const seen = new Set<string>();
+  for (const [id, source] of [
+    [userId, 'user'],
+    [ownerUserId, 'owner'],
+    [companyId, 'company'],
+  ] as Array<[string | null, 'user' | 'owner' | 'company']>) {
+    const normalizedId = String(id || '').trim();
+    if (!normalizedId || seen.has(normalizedId)) continue;
+    seen.add(normalizedId);
+    candidates.push({ id: normalizedId, source });
+  }
+
+  for (const candidate of candidates) {
+    const subscription = await kv.get(`subscription:${candidate.id}`);
+    if (subscription) {
+      return {
+        companyId,
+        ownerUserId,
+        subscription,
+        source: candidate.source,
+      };
+    }
+  }
+
+  return {
+    companyId,
+    ownerUserId,
+    subscription: null,
+    source: 'none',
+  };
+}
+
 async function syncCompanySubscriptionMirror(userId: string, subscription: any) {
   const companyId = await getCompanyId(userId);
   if (!companyId) return null;
@@ -7151,7 +7202,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     }
     
     // For superadmins, check their own subscription
-    const subscription = await kv.get(`subscription:${user.id}`);
+    const { subscription } = await resolveBillingSubscriptionContext(user.id);
     
     if (!subscription) {
       return c.json({ status: 'none', message: 'No subscription found' }, 200);
@@ -7511,7 +7562,11 @@ const renewSubscriptionLicense = async (c: any) => {
       return c.json({ error: 'Invalid plan. Must be "monthly" or "yearly"' }, 400);
     }
 
-    const existingSubscription = await kv.get(`subscription:${user.id}`);
+    const {
+      companyId: resolvedCompanyId,
+      ownerUserId,
+      subscription: existingSubscription,
+    } = await resolveBillingSubscriptionContext(user.id);
     const purchasedLicenses = Number(
       existingSubscription?.purchasedLicenses ||
       existingSubscription?.userCount ||
@@ -7538,10 +7593,9 @@ const renewSubscriptionLicense = async (c: any) => {
 
     const reference = `RENEW_${user.id}_${Date.now()}`;
     const callbackUrl = `${c.req.header('origin') || ''}/payment-verify`;
-    let companyId: string | null = null;
+    let companyId: string | null = resolvedCompanyId || null;
     let companyName = '';
     try {
-      companyId = await getCompanyId(user.id);
       companyName = companyId ? await resolveCompanyName(companyId) : '';
     } catch (companyError) {
       console.warn('Unable to resolve renewal tenant metadata:', companyError);
@@ -7632,7 +7686,7 @@ const renewSubscriptionLicense = async (c: any) => {
     }
 
     await kv.set(`pending-subscription:${reference}`, {
-      userId: user.id,
+      userId: ownerUserId || user.id,
       plan,
       userCount: licensesNum,
       amount,
@@ -11490,6 +11544,19 @@ const reportClientError = async (c: any) => {
     const extractNormalizedRole = (candidate: any) =>
       normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
     const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
+    const activeCareAgents = (await getDynamicPlatformAgents())
+      .filter((agent: any) =>
+        normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
+        String(agent?.status || 'active').toLowerCase() === 'active'
+      );
+    const tenantAssignedCareAgents = companyId
+      ? activeCareAgents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
+      : [];
+    const selectedCareAgent = [...(tenantAssignedCareAgents.length > 0 ? tenantAssignedCareAgents : activeCareAgents)]
+      .sort((a: any, b: any) =>
+        Number(a?.openTickets || 0) - Number(b?.openTickets || 0) ||
+        new Date(a?.createdAt || Date.now()).getTime() - new Date(b?.createdAt || Date.now()).getTime()
+      )[0] || null;
 
     const ticketId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -11502,8 +11569,8 @@ const reportClientError = async (c: any) => {
       subject: `[Error Report] ${source || 'Application'}: ${message.slice(0, 120)}`,
       description: message,
       status: 'open',
-      assignedAgentId: '',
-      assignedAgentName: '',
+      assignedAgentId: selectedCareAgent?.userId || selectedCareAgent?.id || '',
+      assignedAgentName: selectedCareAgent?.name || selectedCareAgent?.email || '',
       creatorId: user.id,
       creatorEmail: user.email,
       createdAt: now,
@@ -11553,34 +11620,41 @@ const reportClientError = async (c: any) => {
       `,
     );
 
-    const [allEmployees, platformUsers, supportAgents, supabaseUsers] = await Promise.all([
+    const [allEmployees, platformUsers, customerCareUsers, supportAgents, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('platform_user:'),
+      kv.getByPrefix('customer_care_users:'),
       kv.getByPrefix('support-agent:'),
       listSupabasePlatformUsers(),
     ]);
 
-    const developerRecipients: any[] = [];
+    const supportRecipients: any[] = [];
     const seenRecipients = new Set<string>();
     const addRecipient = (candidate: any) => {
       if (!candidate) return;
       const role = extractNormalizedRole(candidate);
-      const isDeveloper = role === 'developer' || candidate?.isPlatformAdmin === true;
-      if (!isDeveloper) return;
+      const isSupportRecipient =
+        role === 'developer' ||
+        role === 'customer_care' ||
+        candidate?.isPlatformAdmin === true;
+      if (!isSupportRecipient) return;
+      const recipientId = String(candidate?.id || candidate?.userId || '').trim();
       const email = String(candidate?.email || '').trim().toLowerCase();
-      if (!email) return;
-      const key = String(candidate?.id || candidate?.userId || email).toLowerCase();
+      const key = String(recipientId || email).toLowerCase();
+      if (!key) return;
       if (seenRecipients.has(key)) return;
       seenRecipients.add(key);
-      developerRecipients.push({
-        id: candidate?.id || candidate?.userId || '',
+      supportRecipients.push({
+        id: recipientId,
         email,
         name: candidate?.name || candidate?.user_metadata?.name || '',
+        role: role || (candidate?.isPlatformAdmin === true ? 'developer' : ''),
       });
     };
 
     for (const emp of allEmployees) addRecipient(emp);
     for (const pu of platformUsers) addRecipient(pu);
+    for (const cu of customerCareUsers) addRecipient(cu);
     for (const sa of supportAgents) addRecipient(sa);
     for (const su of supabaseUsers) {
       addRecipient({
@@ -11591,6 +11665,34 @@ const reportClientError = async (c: any) => {
       });
     }
 
+    const supportNotificationTitle = `Tenant Error Report: ${source || 'Application'}`;
+    const supportNotificationMessage = `${tenantName || 'Unknown tenant'} reported an error${location ? ` at ${location}` : ''}: ${message}`.slice(0, 280);
+    await Promise.allSettled(supportRecipients.map((recipient: any) => {
+      if (!recipient.id) return Promise.resolve(null);
+      const notificationId = crypto.randomUUID();
+      return kv.set(`notification:${notificationId}`, {
+        id: notificationId,
+        userId: recipient.id,
+        type: 'support-ticket',
+        title: supportNotificationTitle,
+        message: supportNotificationMessage,
+        read: false,
+        createdAt: now,
+        metadata: {
+          ticketId,
+          tenantId: companyId || '',
+          tenantName: tenantName || '',
+          reporterEmail: user.email || '',
+          source: source || 'unknown',
+          location: location || '',
+          priority: 'high',
+        },
+      });
+    }));
+
+    const developerRecipients = supportRecipients.filter((recipient: any) =>
+      recipient.role === 'developer'
+    );
     await Promise.allSettled(developerRecipients.map((admin: any) =>
       sendEmailNotification(
         admin.id || '',
@@ -12107,12 +12209,13 @@ async function listSupabasePlatformUsers() {
 }
 
 async function getDynamicPlatformAgents() {
-  const [platformUsers, customerCareUsers, supportAgents, allEmployees, supabaseUsers] = await Promise.all([
+  const [platformUsers, customerCareUsers, supportAgents, allEmployees, supabaseUsers, allTickets] = await Promise.all([
     kv.getByPrefix('platform_user:'),
     kv.getByPrefix('customer_care_users:'),
     kv.getByPrefix('support-agent:'),
     kv.getByPrefix('employee:'),
     listSupabasePlatformUsers(),
+    getAllSupportTickets(),
   ]);
 
   const employeePlatformUsers = allEmployees.filter((u: any) => isPlatformSupportRole(u?.role || ''));
@@ -12147,7 +12250,26 @@ async function getDynamicPlatformAgents() {
     });
   }
 
-  return merged.filter((u: any) => isPlatformSupportRole(u.role || ''));
+  return await Promise.all(
+    merged
+      .filter((u: any) => isPlatformSupportRole(u.role || ''))
+      .map(async (u: any) => {
+        const existingAssignments = Array.isArray(u.assignedTenants) ? u.assignedTenants : [];
+        const persistedAssignments = await getCareAssignmentsForAgent(u.userId || u.id || '');
+        const assignedTenants = [...new Set([...existingAssignments, ...persistedAssignments])];
+        const assignedTenantSet = new Set(assignedTenants);
+        const scopedTickets = u.role === 'customer_care'
+          ? allTickets.filter((t: any) => assignedTenantSet.has(t.tenantId) || t.assignedAgentId === (u.userId || u.id))
+          : allTickets;
+        const resolvedTickets = scopedTickets.filter((t: any) => t.status === 'resolved').length;
+        return {
+          ...u,
+          assignedTenants,
+          openTickets: scopedTickets.length - resolvedTickets,
+          resolvedTickets,
+        };
+      })
+  );
 }
 
 async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
@@ -12786,7 +12908,8 @@ const listUltimateadminSupportAgents = async (c: any) => {
   try {
     const access = await verifyUltimateAdminAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    const agents = await kv.getByPrefix('support-agent:');
+    const agents = (await getDynamicPlatformAgents())
+      .filter((agent: any) => normalizeCareRole(agent?.role || '') === 'customer_care');
     return c.json(agents);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
@@ -14077,10 +14200,12 @@ const listCareTickets = async (c: any) => {
   try {
     const auth = await requireCustomerCare(c);
     const assigned = await getCareAssignmentsForAgent(auth.user.id);
-    if (assigned.length === 0) return c.json([]);
     const assignedSet = new Set(assigned);
     const allTickets = await getAllSupportTickets();
-    return c.json(allTickets.filter((t: any) => assignedSet.has(t.tenantId)));
+    return c.json(allTickets.filter((t: any) =>
+      assignedSet.has(t.tenantId) ||
+      t.assignedAgentId === auth.user.id
+    ));
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
@@ -14093,35 +14218,7 @@ for (const route of compatibleRoutePaths('/care/tickets')) app.get(route, listCa
 app.get(`${PREFIX}/developer/platform-users`, async (c) => {
   try {
     await requireDeveloper(c);
-    // Gather from both legacy support-agent: and newer customer_care_users: prefixes
-    const [ccUsers, supportAgents] = await Promise.all([
-      kv.getByPrefix('customer_care_users:'),
-      kv.getByPrefix('support-agent:'),
-    ]);
-    // Also include developer/ultimateadmin accounts from employee records
-    const allEmps = await kv.getByPrefix('employee:');
-    const platformRoles = new Set(['developer', 'customer_care']);
-    const devUsers = allEmps.filter((u: any) => platformRoles.has(u.role));
-
-    // Deduplicate by userId/id/email
-    const seen = new Set<string>();
-    const merged = [];
-    for (const u of [...ccUsers, ...supportAgents, ...devUsers]) {
-      const key = u.userId || u.id || u.email;
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      const normalizedRole = normalizeCareRole(u.role || 'customer_care');
-      merged.push({
-        id: u.id || u.userId || key,
-        userId: u.userId || u.id || key,
-        name: u.name || '',
-        email: u.email || '',
-        role: normalizedRole,
-        status: u.status || 'active',
-        assignedTenants: u.assignedTenants || [],
-        createdAt: u.createdAt || '',
-      });
-    }
+    const merged = await getDynamicPlatformAgents();
     return c.json(merged);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);

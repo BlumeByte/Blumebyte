@@ -5,6 +5,14 @@ import { Button } from '../components/ui/button';
 import { CheckCircle2, Users, BarChart3, Shield, Clock, FileText, Zap, DollarSign, UserCheck, Trophy, ChevronDown, Star, TrendingUp, Award, MessageSquare, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { HomepageChatAgent } from '../components/HomepageChatAgent';
 import { PublicNavbar, PublicFooter } from '../components/PublicNavFooter';
+import {
+  LANDING_CONTACT_URL,
+  LANDING_DASHBOARD_PREVIEW_URL,
+  LANDING_PRICING_ANNUAL_BILLING_CYCLE,
+  LANDING_PRICING_ANNUAL_PRICE,
+  LANDING_PRICING_MONTHLY_BILLING_CYCLE,
+  LANDING_PRICING_MONTHLY_PRICE,
+} from '../lib/developer-config';
 
 
 
@@ -67,7 +75,7 @@ function DashboardMockup() {
             <div className="w-3 h-3 rounded-full bg-green-400" />
           </div>
           <div className="flex-1 mx-3 h-5 rounded bg-white/15 flex items-center px-2">
-            <span className="text-[10px] text-white/60">hr.blumebyte.com/dashboard</span>
+            <span className="text-[10px] text-white/60">{LANDING_DASHBOARD_PREVIEW_URL}</span>
           </div>
         </div>
 
@@ -584,9 +592,9 @@ export default function LandingPage() {
   const pricingPlans = [
     {
       name: 'Monthly',
-      price: billingAnnual ? '$2.55' : '$3.55',
+      price: billingAnnual ? LANDING_PRICING_ANNUAL_PRICE : LANDING_PRICING_MONTHLY_PRICE,
       period: '/employee/month',
-      billingCycle: billingAnnual ? 'Billed annually ($30.60/year)' : 'Billed monthly',
+      billingCycle: billingAnnual ? LANDING_PRICING_ANNUAL_BILLING_CYCLE : LANDING_PRICING_MONTHLY_BILLING_CYCLE,
       description: 'For growing teams',
       features: [
         'People Management',
@@ -602,9 +610,9 @@ export default function LandingPage() {
     },
     {
       name: 'Business',
-      price: billingAnnual ? '$2.55' : '$3.55',
+      price: billingAnnual ? LANDING_PRICING_ANNUAL_PRICE : LANDING_PRICING_MONTHLY_PRICE,
       period: '/employee/month',
-      billingCycle: billingAnnual ? 'Billed annually ($30.60/year)' : 'Billed monthly',
+      billingCycle: billingAnnual ? LANDING_PRICING_ANNUAL_BILLING_CYCLE : LANDING_PRICING_MONTHLY_BILLING_CYCLE,
       description: 'Best value for scale',
       popular: true,
       features: [
@@ -634,7 +642,7 @@ export default function LandingPage() {
         'Custom SLA',
         'On-site Onboarding',
       ],
-      contactLink: 'https://blumebyte.com/contact/',
+      contactLink: LANDING_CONTACT_URL,
     },
   ];
 
@@ -731,7 +739,7 @@ export default function LandingPage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={() => window.open('https://blumebyte.com/contact/', '_blank')}
+                  onClick={() => window.open(LANDING_CONTACT_URL, '_blank')}
                   className="border-black/20 bg-white text-gray-800 hover:bg-gray-50 text-base px-7 font-semibold"
                 >
                   Book a Demo
