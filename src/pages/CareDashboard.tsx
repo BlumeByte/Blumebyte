@@ -421,7 +421,7 @@ export default function CareDashboard() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2 min-w-0">
               <Shield className="h-5 w-5 flex-shrink-0" />
-              <span className="font-semibold truncate text-sm md:text-base">Blumebyte Customer Care</span>
+              <span className="font-semibold truncate text-sm md:text-base">Blumebyte Support</span>
               {careProfile && (
                 <Badge variant="secondary" className="text-xs hidden sm:inline-flex flex-shrink-0">
                   Support Agent
