@@ -2301,12 +2301,20 @@ function SettingsPanel({ myProfile }: { myProfile: { email: string; name: string
 }
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
+/** Returns the appropriate fallback text for cards that depend on metrics. */
+function metricsPlaceholder(metricsLoaded: boolean, errorOccurred: boolean, emptyText: string) {
+  if (metricsLoaded) return emptyText;
+  if (errorOccurred) return 'Failed to load';
+  return 'Loading…';
+}
+
 function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: string }) {
   const { getToken } = useAuth();
   const [activeSection, setActiveSection] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [metricsLoadError, setMetricsLoadError] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [myProfile, setMyProfile] = useState<{ email: string; name: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2346,7 +2354,13 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
         ? tenantsResult.value
         : [];
       if (tenantsResult.status === 'fulfilled') setTenants(tenantList);
-      if (metricsResult.status === 'fulfilled') setMetrics(normalizeMetricsPayload(metricsResult.value, tenantList));
+      if (metricsResult.status === 'fulfilled') {
+        setMetrics(normalizeMetricsPayload(metricsResult.value, tenantList));
+        setMetricsLoadError(false);
+      } else if (!isRouteNotFound(metricsResult)) {
+        setMetricsLoadError(true);
+        toast.error('Failed to load platform metrics');
+      }
       if (profileResult.status === 'fulfilled') {
         setMyProfile(profileResult.value);
         const verifiedRole = normalizeAndAliasSupportRole(profileResult.value?.role || '');
@@ -2491,6 +2505,19 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                       </div>
                     </div>
                   )}
+                  {/* Metrics load error notice */}
+                  {metricsLoadError && !metrics && (
+                    <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4">
+                      <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-red-800 text-sm">Failed to load platform metrics</p>
+                        <p className="text-xs text-red-700 mt-0.5">Dashboard data could not be retrieved. Check your connection or server status.</p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={loadData} className="shrink-0" aria-label="Retry loading metrics">
+                        <RefreshCw className="h-3.5 w-3.5 mr-1" />Retry
+                      </Button>
+                    </div>
+                  )}
                   {metrics && <MetricsCards metrics={metrics} />}
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -2512,17 +2539,22 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                       <CardHeader><CardTitle className="text-base">Platform Health</CardTitle></CardHeader>
                       <CardContent className="space-y-3">
                         {[
-                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} active` : '—', ok: (metrics?.expiredTenants || 0) === 0 && (metrics?.suspendedTenants || 0) === 0 },
-                          { label: 'Open Tickets', value: `${metrics?.openTickets || 0} open · ${metrics?.pendingTickets || 0} pending`, ok: (metrics?.openTickets || 0) < 10 },
-                          { label: 'Critical Issues', value: `${metrics?.criticalTickets || 0} critical tickets`, ok: (metrics?.criticalTickets || 0) === 0 },
-                          { label: 'Support Coverage', value: `${metrics?.totalAgents || 0} agents`, ok: (metrics?.totalAgents || 0) > 0 },
-                          { label: 'Suspended Tenants', value: `${metrics?.suspendedTenants || 0} suspended`, ok: (metrics?.suspendedTenants || 0) === 0 },
+                          { label: 'License Health', value: metrics ? `${metrics.activeTenants}/${metrics.totalTenants} active` : '—', ok: metrics ? (metrics.expiredTenants === 0 && metrics.suspendedTenants === 0) : null },
+                          { label: 'Open Tickets', value: metrics ? `${metrics.openTickets} open · ${metrics.pendingTickets} pending` : '—', ok: metrics ? metrics.openTickets < 10 : null },
+                          { label: 'Critical Issues', value: metrics ? `${metrics.criticalTickets} critical tickets` : '—', ok: metrics ? metrics.criticalTickets === 0 : null },
+                          { label: 'Support Coverage', value: metrics ? `${metrics.totalAgents} agents` : '—', ok: metrics ? metrics.totalAgents > 0 : null },
+                          { label: 'Suspended Tenants', value: metrics ? `${metrics.suspendedTenants} suspended` : '—', ok: metrics ? metrics.suspendedTenants === 0 : null },
                         ].map(item => (
                           <div key={item.label} className="flex items-center justify-between text-sm">
                             <span className="text-gray-600">{item.label}</span>
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-gray-700">{item.value}</span>
-                              {item.ok ? <CheckCircle className="h-3.5 w-3.5 text-green-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />}
+                              {item.ok === null
+                                ? <span className="h-3.5 w-3.5 rounded-full bg-gray-200 inline-block" />
+                                : item.ok
+                                  ? <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                  : <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                              }
                             </div>
                           </div>
                         ))}
@@ -2566,7 +2598,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                               </div>
                             </>
                           );
-                        })() : <p className="text-sm text-gray-400 text-center py-4">Loading…</p>}
+                        })() : <p className="text-sm text-gray-400 text-center py-4">{metricsPlaceholder(!!metrics, metricsLoadError, 'No data available')}</p>}
                       </CardContent>
                     </Card>
                   </div>
@@ -2604,7 +2636,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                               })}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-400 text-center py-4">{metrics ? 'No subscription data yet' : 'Loading…'}</p>
+                          <p className="text-sm text-gray-400 text-center py-4">{metricsPlaceholder(!!metrics, metricsLoadError, 'No subscription data yet')}</p>
                         )}
                       </CardContent>
                     </Card>
@@ -2634,7 +2666,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-400 text-center py-4">{metrics ? 'No tenants yet' : 'Loading…'}</p>
+                          <p className="text-sm text-gray-400 text-center py-4">{metricsPlaceholder(!!metrics, metricsLoadError, 'No tenants yet')}</p>
                         )}
                       </CardContent>
                     </Card>
