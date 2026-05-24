@@ -698,7 +698,8 @@ const JOB_TRUTHY_PUBLIC_VALUES = new Set([
   'public_global',
   'publicglobal',
 ]);
-const PUBLIC_HIRING_KV_PREFIXES = ['job-posting:', 'recruitment:'];
+const PUBLIC_HIRING_MIRROR_PREFIX = 'public-job-posting:';
+const PUBLIC_HIRING_KV_PREFIXES = [PUBLIC_HIRING_MIRROR_PREFIX, 'job-posting:', 'recruitment:'];
 
 function normalizeJobStatus(raw: any): string {
   return String(raw ?? '')
@@ -793,6 +794,24 @@ function isPublicJobPosting(job: any): boolean {
   // Default behavior: active open vacancies are public unless explicitly private.
   if (JOB_ACTIVE_STATUSES.has(status)) return true;
   return false;
+}
+
+async function syncPublicHiringMirror(job: any) {
+  if (!job?.id) return;
+  if (isPublicJobPosting(job)) {
+    await kv.set(`${PUBLIC_HIRING_MIRROR_PREFIX}${job.id}`, {
+      ...job,
+      mirroredFrom: 'job-posting',
+      mirroredAt: new Date().toISOString(),
+    });
+    return;
+  }
+  await kv.del(`${PUBLIC_HIRING_MIRROR_PREFIX}${job.id}`);
+}
+
+async function removePublicHiringMirror(jobId: string) {
+  if (!jobId) return;
+  await kv.del(`${PUBLIC_HIRING_MIRROR_PREFIX}${jobId}`);
 }
 
 async function buildPublicJobResponse(job: any) {
@@ -4530,7 +4549,7 @@ makeCrud("superadmin/workflow", "workflow:", requireSuperAdmin);
 // CUSTOM: superadmin/job-posting GET — show all job postings scoped to the
 // SuperAdmin's company. Falls back to all postings with a company if the strict
 // per-UUID scope filter would return nothing (handles scope/name mismatches).
-app.get(`${PREFIX}/superadmin/job-posting`, async (c) => {
+for (const route of compatibleRoutePaths('/superadmin/job-posting')) app.get(route, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const all = await kv.getByPrefix("job-posting:");
@@ -4570,7 +4589,7 @@ app.get(`${PREFIX}/superadmin/job-posting`, async (c) => {
 });
 
 // CUSTOM: superadmin/job-posting POST/PUT with auto-populated companyName
-app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
+for (const route of compatibleRoutePaths('/superadmin/job-posting')) app.post(route, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const body = await c.req.json();
@@ -4603,6 +4622,7 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
     // Only set companyId/company when we actually have a value (avoid null polluting the record)
     if (companyId) { item.companyId = companyId; item.company = companyId; }
     await kv.set(`job-posting:${id}`, item);
+    await syncPublicHiringMirror(item);
     await broadcastUpdate('job-posting', 'INSERT', id, item);
     return c.json(item, 201);
   } catch (e: any) {
@@ -4612,7 +4632,7 @@ app.post(`${PREFIX}/superadmin/job-posting`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/superadmin/job-posting/:id')) app.put(route, async (c) => {
   try {
     const { user } = await requireSuperAdmin(c);
     const id = c.req.param('id');
@@ -4644,8 +4664,31 @@ app.put(`${PREFIX}/superadmin/job-posting/:id`, async (c) => {
       updatedAt: new Date().toISOString(),
     };
     await kv.set(`job-posting:${id}`, item);
+    await syncPublicHiringMirror(item);
     await broadcastUpdate('job-posting', 'UPDATE', id, item);
     return c.json(item);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/superadmin/job-posting/:id')) app.delete(route, async (c) => {
+  try {
+    const { user } = await requireSuperAdmin(c);
+    const id = c.req.param('id');
+    const existing = await kv.get(`job-posting:${id}`);
+    if (existing) {
+      const itemCompany = existing.companyId || existing.company;
+      if (itemCompany && !(await isItemInUserCompany(user.id, itemCompany))) {
+        return c.json({ error: "Not found" }, 404);
+      }
+    }
+    await kv.del(`job-posting:${id}`);
+    await removePublicHiringMirror(id);
+    await broadcastUpdate('job-posting', 'DELETE', id, { id });
+    return c.json({ success: true });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
@@ -4889,7 +4932,7 @@ app.get(`${PREFIX}/holidays`, async (c) => {
 });
 // CUSTOM: admin/job-postings GET — list company job postings with a fallback
 // when strict applyCompanyFilter returns nothing (scope/name mismatch scenarios).
-app.get(`${PREFIX}/admin/job-postings`, async (c) => {
+for (const route of compatibleRoutePaths('/admin/job-postings')) app.get(route, async (c) => {
   try {
     const { user } = await requireAdminOrAbove(c);
     const all = await kv.getByPrefix("job-posting:");
@@ -4920,7 +4963,7 @@ app.get(`${PREFIX}/admin/job-postings`, async (c) => {
   }
 });
 // CUSTOM: admin/job-postings POST/PUT with auto-populated companyName and status normalization
-app.post(`${PREFIX}/admin/job-postings`, async (c) => {
+for (const route of compatibleRoutePaths('/admin/job-postings')) app.post(route, async (c) => {
   try {
     const { user } = await requireAdminOrAbove(c);
     const body = await c.req.json();
@@ -4947,6 +4990,7 @@ app.post(`${PREFIX}/admin/job-postings`, async (c) => {
       updatedAt: new Date().toISOString(),
     };
     await kv.set(`job-posting:${id}`, item);
+    await syncPublicHiringMirror(item);
     await broadcastUpdate('job-posting', 'INSERT', id, item);
     return c.json(item, 201);
   } catch (e: any) {
@@ -4956,7 +5000,7 @@ app.post(`${PREFIX}/admin/job-postings`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/admin/job-postings/:id')) app.put(route, async (c) => {
   try {
     const { user } = await requireAdminOrAbove(c);
     const id = c.req.param('id');
@@ -4984,8 +5028,31 @@ app.put(`${PREFIX}/admin/job-postings/:id`, async (c) => {
       updatedAt: new Date().toISOString(),
     };
     await kv.set(`job-posting:${id}`, item);
+    await syncPublicHiringMirror(item);
     await broadcastUpdate('job-posting', 'UPDATE', id, item);
     return c.json(item);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/admin/job-postings/:id')) app.delete(route, async (c) => {
+  try {
+    const { user } = await requireAdminOrAbove(c);
+    const id = c.req.param('id');
+    const existing = await kv.get(`job-posting:${id}`);
+    if (existing) {
+      const itemCompany = existing.companyId || existing.company;
+      if (itemCompany && !(await isItemInUserCompany(user.id, itemCompany))) {
+        return c.json({ error: "Not found" }, 404);
+      }
+    }
+    await kv.del(`job-posting:${id}`);
+    await removePublicHiringMirror(id);
+    await broadcastUpdate('job-posting', 'DELETE', id, { id });
+    return c.json({ success: true });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
@@ -5904,7 +5971,7 @@ app.post(`${PREFIX}/session/logout-report`, async (c) => {
 
 // POST /auth/login-alert — called by the frontend after a successful login to
 // email the user a security alert, CC info@blumebyte.com, and log to developer dashboard.
-app.post(`${PREFIX}/auth/login-alert`, async (c) => {
+for (const route of compatibleRoutePaths('/auth/login-alert')) app.post(route, async (c) => {
   try {
     const body = await c.req.json();
     const { userId, email, name, loginTime, userAgent, ipAddress } = body;
@@ -10432,7 +10499,7 @@ app.post(`${PREFIX}/automation/workflows/:id/execute`, async (c) => {
 });
 
 // --- Alias: /attendance/today -> same logic as /attendance/my-today ---
-app.get(`${PREFIX}/attendance/today`, async (c) => {
+for (const route of compatibleRoutePaths('/attendance/today')) app.get(route, async (c) => {
   try {
     const { user } = await requireAuth(c);
     const now = new Date();
@@ -13598,7 +13665,7 @@ async function requireCareTenantAccess(c: any, tenantId: string) {
 }
 
 // /developer/*
-app.get(`${PREFIX}/developer/overview`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/overview')) app.get(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const [companies, users, tickets, careAgents] = await Promise.all([
@@ -13631,7 +13698,7 @@ app.get(`${PREFIX}/developer/overview`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/tenants`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tenants')) app.get(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const companies = await kv.getByPrefix('company:');
@@ -13644,7 +13711,7 @@ app.get(`${PREFIX}/developer/tenants`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/tenants/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tenants/:id')) app.get(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
@@ -13665,7 +13732,7 @@ app.get(`${PREFIX}/developer/tenants/:id`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/tenants/:id/users`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tenants/:id/users')) app.get(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
@@ -13680,7 +13747,7 @@ app.get(`${PREFIX}/developer/tenants/:id/users`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/developer/tenants/:id/impersonate`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tenants/:id/impersonate')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const tenantId = c.req.param('id');
@@ -13708,7 +13775,7 @@ app.post(`${PREFIX}/developer/tenants/:id/impersonate`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/developer/tenants/:id/suspend`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tenants/:id/suspend')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const tenantId = c.req.param('id');
@@ -13726,7 +13793,7 @@ app.post(`${PREFIX}/developer/tenants/:id/suspend`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/developer/tenants/:id/reinstate`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tenants/:id/reinstate')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const tenantId = c.req.param('id');
@@ -13744,7 +13811,7 @@ app.post(`${PREFIX}/developer/tenants/:id/reinstate`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/developer/tenants/:id/license`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tenants/:id/license')) app.put(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const tenantId = c.req.param('id');
@@ -13781,7 +13848,7 @@ app.put(`${PREFIX}/developer/tenants/:id/license`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/customer-care-agents`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/customer-care-agents')) app.get(route, async (c) => {
   try {
     await requireDeveloper(c);
     const agents = await kv.getByPrefix('customer_care_users:');
@@ -13793,7 +13860,7 @@ app.get(`${PREFIX}/developer/customer-care-agents`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/developer/customer-care-agents`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/customer-care-agents')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const body = await c.req.json();
@@ -13820,7 +13887,7 @@ app.post(`${PREFIX}/developer/customer-care-agents`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/developer/customer-care-agents/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/customer-care-agents/:id')) app.delete(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
@@ -13836,7 +13903,7 @@ app.delete(`${PREFIX}/developer/customer-care-agents/:id`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/assignments`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/assignments')) app.get(route, async (c) => {
   try {
     await requireDeveloper(c);
     const assignments = await kv.getByPrefix('care_assignments_record:');
@@ -13848,7 +13915,7 @@ app.get(`${PREFIX}/developer/assignments`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/developer/assignments`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/assignments')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const body = await c.req.json();
@@ -13876,7 +13943,7 @@ app.post(`${PREFIX}/developer/assignments`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/developer/assignments/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/assignments/:id')) app.delete(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const assignmentId = c.req.param('id');
@@ -13897,7 +13964,7 @@ app.delete(`${PREFIX}/developer/assignments/:id`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/tickets`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tickets')) app.get(route, async (c) => {
   try {
     await requireDeveloper(c);
     const tickets = await getAllSupportTickets();
@@ -13909,7 +13976,7 @@ app.get(`${PREFIX}/developer/tickets`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/tickets/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tickets/:id')) app.get(route, async (c) => {
   try {
     await requireDeveloper(c);
     const ticketId = c.req.param('id');
@@ -13924,7 +13991,7 @@ app.get(`${PREFIX}/developer/tickets/:id`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/developer/tickets/:id/resolve`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tickets/:id/resolve')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const ticketId = c.req.param('id');
@@ -13941,7 +14008,7 @@ app.post(`${PREFIX}/developer/tickets/:id/resolve`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/developer/tickets/:id/comment`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/tickets/:id/comment')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const ticketId = c.req.param('id');
@@ -13970,7 +14037,7 @@ app.post(`${PREFIX}/developer/tickets/:id/comment`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/system-health`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/system-health')) app.get(route, async (c) => {
   try {
     await requireDeveloper(c);
     const start = Date.now();
@@ -13993,7 +14060,7 @@ app.get(`${PREFIX}/developer/system-health`, async (c) => {
   }
 });
 
-app.get(`${PREFIX}/developer/audit-log`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/audit-log')) app.get(route, async (c) => {
   try {
     await requireDeveloper(c);
     const logs = await kv.getByPrefix('developer_audit_log:');
@@ -14226,7 +14293,7 @@ const listCareTickets = async (c: any) => {
 for (const route of compatibleRoutePaths('/care/tickets')) app.get(route, listCareTickets);
 
 // GET /developer/platform-users — list all developer and customer care platform users
-app.get(`${PREFIX}/developer/platform-users`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/platform-users')) app.get(route, async (c) => {
   try {
     await requireDeveloper(c);
     const merged = await getDynamicPlatformAgents();
@@ -14239,7 +14306,7 @@ app.get(`${PREFIX}/developer/platform-users`, async (c) => {
 });
 
 // POST /developer/platform-users — create a new developer or care account record
-app.post(`${PREFIX}/developer/platform-users`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/platform-users')) app.post(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const body = await c.req.json();
@@ -14272,7 +14339,7 @@ app.post(`${PREFIX}/developer/platform-users`, async (c) => {
 });
 
 // PUT /developer/platform-users/:id — update a developer or care account
-app.put(`${PREFIX}/developer/platform-users/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/platform-users/:id')) app.put(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
@@ -14304,7 +14371,7 @@ app.put(`${PREFIX}/developer/platform-users/:id`, async (c) => {
 });
 
 // DELETE /developer/platform-users/:id — remove a developer or care account
-app.delete(`${PREFIX}/developer/platform-users/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/developer/platform-users/:id')) app.delete(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
