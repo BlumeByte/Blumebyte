@@ -4375,20 +4375,18 @@ app.get(`${PREFIX}/superadmin/company`, async (c) => {
     const { user, role } = await requireSuperAdmin(c);
     let companies = await kv.getByPrefix('company:');
     
-    // CRITICAL FIX: Filter companies by SuperAdmin's company scope
-    // Each SuperAdmin should see their own company AND any sub-companies they created
-    const superAdminCompany = await getCompanyId(user.id);
-    
-    if (superAdminCompany) {
-      // Filter to show: 1) The tenant's main company record, 2) Any companies owned by this tenant
-      companies = companies.filter((company: any) => 
-        company.id === superAdminCompany || // The tenant's main company record
-        company.companyId === superAdminCompany || // Company owned by this tenant
-        company.company === superAdminCompany // Legacy field compatibility
-      );
-    } else {
-      // If SuperAdmin has no company assignment, return empty array
+    // CRITICAL FIX: Strictly scope by resolved tenant scope values (IDs and/or names)
+    // Never include companies by owner/parent fields, which can leak cross-tenant data.
+    const scope = await resolveCompanyScope(user.id);
+    if (!scope?.length) {
       companies = [];
+    } else {
+      const scopeLower = new Set(scope.map((v: string) => String(v || '').toLowerCase()).filter(Boolean));
+      companies = companies.filter((company: any) => {
+        const companyId = String(company?.id || '').toLowerCase();
+        const companyName = String(company?.name || company?.companyName || '').toLowerCase();
+        return (companyId && scopeLower.has(companyId)) || (companyName && scopeLower.has(companyName));
+      });
     }
     
     // Enrich each company with license counts
