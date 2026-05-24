@@ -537,7 +537,7 @@ function TenantsPanel() {
   // Auto-refresh every 30 seconds so new users/tenants appear without manual reload
   useEffect(() => {
     const interval = setInterval(() => {
-      const refreshPaused = saving || !!actionLoading || createDialog || createUserDialog || licenseDialog || showUsers;
+      const refreshPaused = saving || actionLoading || createDialog || createUserDialog || licenseDialog || showUsers;
       if (refreshPaused || document.visibilityState !== 'visible') return;
       load({ silent: true });
     }, 30_000);
@@ -2421,6 +2421,12 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   }, [loadData]);
 
   const sectionTitle = visibleSidebarItems.find(s => s.id === activeSection)?.label || 'Overview';
+  const supabaseStatusClass = supabaseConnected
+    ? 'bg-green-100 text-green-700 hover:bg-green-100'
+    : 'bg-amber-100 text-amber-700 hover:bg-amber-100';
+  const supabaseStatusText = supabaseConnected
+    ? (backgroundRefreshing ? 'Supabase syncing…' : 'Supabase connected')
+    : 'Supabase reconnecting';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -2505,9 +2511,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className={supabaseConnected ? 'bg-green-100 text-green-700 hover:bg-green-100' : 'bg-amber-100 text-amber-700 hover:bg-amber-100'}>
-              {supabaseConnected ? (backgroundRefreshing ? 'Supabase syncing…' : 'Supabase connected') : 'Supabase reconnecting'}
-            </Badge>
+            <Badge className={supabaseStatusClass}>{supabaseStatusText}</Badge>
             {lastRealtimeSyncAt && (
               <span className="text-xs text-gray-500 hidden sm:inline">
                 Live sync {lastRealtimeSyncAt.toLocaleTimeString()}
