@@ -2422,11 +2422,15 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
 
   const sectionTitle = visibleSidebarItems.find(s => s.id === activeSection)?.label || 'Overview';
   const supabaseStatusClass = supabaseConnected
-    ? 'bg-green-100 text-green-700 hover:bg-green-100'
-    : 'bg-amber-100 text-amber-700 hover:bg-amber-100';
-  const supabaseStatusText = supabaseConnected
-    ? (backgroundRefreshing ? 'Supabase syncing…' : 'Supabase connected')
-    : 'Supabase reconnecting';
+    ? 'bg-green-100 text-green-700'
+    : supabaseConnected === null
+      ? 'bg-blue-100 text-blue-700'
+      : 'bg-amber-100 text-amber-700';
+  const supabaseStatusText = supabaseConnected === null
+    ? 'Checking Supabase…'
+    : supabaseConnected
+      ? (backgroundRefreshing ? 'Supabase syncing…' : 'Supabase connected')
+      : 'Supabase reconnecting';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
