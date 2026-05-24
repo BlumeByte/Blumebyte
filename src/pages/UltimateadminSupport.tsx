@@ -29,8 +29,7 @@ const PLATFORM_ROLES = ['developer', 'customer_care'];
 
 function canonicalPlatformRole(value: unknown): string {
   const normalized = normalizeRole(value);
-  if (normalized === 'developer' || normalized === 'customer_care') return normalized;
-  return typeof value === 'string' ? value : '';
+  return normalized || '';
 }
 
 /** Returns true when an API error represents a route that simply doesn't exist yet
@@ -496,8 +495,7 @@ function MetricsCards({ metrics }: { metrics: Metrics }) {
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
-  const normalized = normalizeRole(status);
-  const label = normalized === 'developer' ? 'developer' : status;
+  const label = status === 'ultimateadmin' ? 'developer' : status;
   const map: Record<string, string> = {
     active: 'bg-green-100 text-green-700', open: 'bg-red-100 text-red-700',
     pending: 'bg-yellow-100 text-yellow-700', resolved: 'bg-green-100 text-green-700',
@@ -1719,7 +1717,7 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
     try {
       const token = await getToken();
       const data = await loadDeveloperUsersWithFallback(token);
-      setUsers(Array.isArray(data) ? data.map((u: any) => ({ ...u, role: canonicalPlatformRole(u?.role) || u?.role })) : []);
+      setUsers(Array.isArray(data) ? data.map((u: any) => ({ ...u, role: canonicalPlatformRole(u?.role) })) : []);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
         toast.error('Failed to load users: ' + (e.message || ''));
