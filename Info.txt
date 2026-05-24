@@ -15,7 +15,7 @@ Use this exact instruction as your base prompt when recreating the app:
 - Frontend framework: React 18 + TypeScript
 - Bundler: Vite 6
 - UI: Tailwind CSS + shadcn/ui + Radix UI
-- Routing: react-router (not react-router-dom)
+- Routing: this repository imports routing APIs from react-router (see src/routes.tsx and src/App.tsx)
 - Charts: recharts
 - Toasts: sonner
 - Backend: Supabase Edge Functions (Hono)
