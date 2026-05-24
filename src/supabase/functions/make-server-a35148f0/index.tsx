@@ -3852,10 +3852,7 @@ app.get(`${PREFIX}/deletion-requests`, async (c) => {
       const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.id || e.userId));
       
       
-      all = all.filter((r: any) => {
-        const hasMatch = companyEmployeeIds.has(r.targetUserId);
-        return hasMatch;
-      });
+      all = all.filter((r: any) => companyEmployeeIds.has(r.targetUserId));
       return c.json(all.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     }
     
