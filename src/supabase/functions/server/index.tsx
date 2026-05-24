@@ -3858,6 +3858,8 @@ app.get(`${PREFIX}/deletion-requests`, async (c) => {
         }
         return hasMatch;
       });
+      return c.json(all.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    }
     
     const filtered = all.filter((r: any) => r.requestedBy === user.id);
     return c.json(filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
@@ -7979,9 +7981,8 @@ app.get(`${PREFIX}/companies`, async (c) => {
     // CRITICAL FIX: SuperAdmin should only see their own company for multi-tenant isolation
     // All users (including SuperAdmin) see only their assigned companies
     const scope = await resolveCompanyScope(user.id);
-    if (scope?.length) {
-      companies = companies.filter((c: any) => scope.includes(c.id) || scope.includes(c.name));
-    }
+    if (!scope?.length) return c.json([]);
+    companies = companies.filter((c: any) => scope.includes(c.id) || scope.includes(c.name));
     return c.json(companies || []);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
