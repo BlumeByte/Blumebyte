@@ -4375,8 +4375,8 @@ app.get(`${PREFIX}/superadmin/company`, async (c) => {
     const { user, role } = await requireSuperAdmin(c);
     let companies = await kv.getByPrefix('company:');
     
-    // CRITICAL FIX: Strictly scope by resolved tenant scope values (IDs and/or names)
-    // Never include companies by owner/parent fields, which can leak cross-tenant data.
+    // CRITICAL FIX: Strictly scope by resolved tenant company IDs only.
+    // Never include companies by owner/parent fields or name matching, which can leak data.
     const scope = await resolveCompanyScope(user.id);
     if (!scope?.length) {
       companies = [];
@@ -4384,8 +4384,7 @@ app.get(`${PREFIX}/superadmin/company`, async (c) => {
       const scopeLower = new Set(scope.map((v: string) => String(v || '').toLowerCase()).filter(Boolean));
       companies = companies.filter((company: any) => {
         const companyId = String(company?.id || '').toLowerCase();
-        const companyName = String(company?.name || company?.companyName || '').toLowerCase();
-        return (companyId && scopeLower.has(companyId)) || (companyName && scopeLower.has(companyName));
+        return companyId && scopeLower.has(companyId);
       });
     }
     
