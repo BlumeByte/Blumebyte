@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
+import { isCustomerCareRole, normalizeRole } from '../lib/role-utils';
 import {
   LayoutDashboard, Building2, Users, Shield, Search, Loader2, RefreshCw,
   Eye, Trash2, LogOut, AlertCircle, Copy, CheckCircle, Settings,
@@ -23,9 +24,14 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-// Keep ultimateadmin for backward compatibility while developer is canonical.
-const ROLES = ['developer', 'ultimateadmin', 'customer_care'];
+const ROLES = ['developer', 'customer_care'];
 const PLATFORM_ROLES = ['developer', 'customer_care'];
+
+function canonicalPlatformRole(value: unknown): string {
+  const normalized = normalizeRole(value);
+  if (normalized === 'developer' || normalized === 'customer_care') return normalized;
+  return typeof value === 'string' ? value : '';
+}
 
 /** Returns true when an API error represents a route that simply doesn't exist yet
  *  (stale backend). These are handled by UI empty-states rather than error toasts. */
@@ -151,11 +157,15 @@ async function loadPlatformUsersWithFallback(token?: string | null) {
   invalidateCache('/developer/platform-users', token);
   try {
     const data = await api('/developer/platform-users', { token });
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data)
+      ? data.map((u: any) => ({ ...u, role: canonicalPlatformRole(u?.role) || 'customer_care' }))
+      : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
-    const data = await api('/ultimateadmin/platform-users', { token });
-    return Array.isArray(data) ? data : [];
+    const data = await api('/platform-users', { token });
+    return Array.isArray(data)
+      ? data.map((u: any) => ({ ...u, role: canonicalPlatformRole(u?.role) || 'customer_care' }))
+      : [];
   }
 }
 
@@ -166,7 +176,7 @@ async function loadAssignmentsWithFallback(token?: string | null) {
     return Array.isArray(data) ? data : [];
   } catch (error: any) {
     if (!isRouteNotFoundError(error)) throw error;
-    const data = await api('/ultimateadmin/assignments', { token });
+    const data = await api('/assignments', { token });
     return Array.isArray(data) ? data : [];
   }
 }
@@ -192,12 +202,12 @@ async function loadSupportAgentsWithFallback(token?: string | null) {
     if (!isRouteNotFoundError(error)) throw error;
     const platformUsers = await loadPlatformUsersWithFallback(token);
     return platformUsers
-      .filter((u: any) => String(u?.role || '') === 'customer_care')
+      .filter((u: any) => canonicalPlatformRole(u?.role) === 'customer_care')
       .map((u: any) => ({
         id: u.id,
         name: u.name || u.email,
         email: u.email,
-        role: u.role || 'customer_care',
+        role: canonicalPlatformRole(u?.role) || 'customer_care',
         assignedTenants: u.assignedTenants || [],
         status: u.status || 'active',
         openTickets: u.openTickets || 0,
@@ -347,7 +357,7 @@ const SECTION_ACCESS_RULES: Record<string, string[]> = {
 
 function isSectionAllowed(sectionId: string, role: string) {
   const allowedRoles = SECTION_ACCESS_RULES[sectionId] || ['developer'];
-  return allowedRoles.includes(role === 'ultimateadmin' ? 'developer' : role);
+  return allowedRoles.includes(canonicalPlatformRole(role));
 }
 
 const TICKET_STATUSES = ['open', 'pending', 'resolved', 'escalated'];
@@ -357,11 +367,9 @@ const ISSUE_TYPES = ['general', 'billing', 'license', 'technical', 'data', 'acco
 // ─── Session helpers ───────────────────────────────────────────────────────────
 function setSupportSession() {
   sessionStorage.setItem('developer_support_session', '1');
-  sessionStorage.removeItem('ultimateadmin_support_session');
 }
 function clearSupportSession() {
   sessionStorage.removeItem('developer_support_session');
-  sessionStorage.removeItem('ultimateadmin_support_session');
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -404,14 +412,14 @@ interface AuditLog {
 export default function CustomerCareDashboard() {
   const navigate = useNavigate();
   const { user, sessionLoading, getToken, logout } = useAuth();
-  const normalizedRole = String(user?.role || '').toLowerCase().replace('-', '_');
-  const supportRole = normalizedRole === 'ultimateadmin' ? 'developer' : normalizedRole;
+  const normalizedRole = normalizeRole(user?.role);
+  const supportRole = canonicalPlatformRole(normalizedRole);
   // tri-state: null = verifying, true = authenticated, false = unauthenticated
   const [authState, setAuthState] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (sessionLoading) return;
-    if (!user || !ROLES.includes(normalizedRole) && normalizedRole !== 'developer') {
+    if (!user || (normalizedRole !== 'developer' && !isCustomerCareRole(normalizedRole))) {
       clearSupportSession();
       setAuthState(false);
       return;
@@ -488,6 +496,8 @@ function MetricsCards({ metrics }: { metrics: Metrics }) {
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
+  const normalized = normalizeRole(status);
+  const label = normalized === 'developer' ? 'developer' : status;
   const map: Record<string, string> = {
     active: 'bg-green-100 text-green-700', open: 'bg-red-100 text-red-700',
     pending: 'bg-yellow-100 text-yellow-700', resolved: 'bg-green-100 text-green-700',
@@ -497,8 +507,8 @@ function StatusBadge({ status }: { status: string }) {
     medium: 'bg-yellow-100 text-yellow-700', low: 'bg-blue-100 text-blue-700',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>
-      {status}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[label] || 'bg-gray-100 text-gray-600'}`}>
+      {label}
     </span>
   );
 }
@@ -1384,7 +1394,7 @@ function PlatformUsersPanel() {
           await api(`/developer/platform-users/${editUser.id}`, { method: 'PUT', token, body });
         } catch (error: any) {
           if (!isRouteNotFoundError(error)) throw error;
-          await api(`/ultimateadmin/platform-users/${editUser.id}`, { method: 'PUT', token, body });
+          await api(`/platform-users/${editUser.id}`, { method: 'PUT', token, body });
         }
         toast.success('User updated');
         setTempPassword(null);
@@ -1396,7 +1406,7 @@ function PlatformUsersPanel() {
           result = await api('/developer/platform-users', { method: 'POST', token, body });
         } catch (error: any) {
           if (!isRouteNotFoundError(error)) throw error;
-          result = await api('/ultimateadmin/platform-users', { method: 'POST', token, body });
+          result = await api('/platform-users', { method: 'POST', token, body });
         }
         if (result?.tempPassword) {
           setTempPassword(result.tempPassword);
@@ -1423,7 +1433,7 @@ function PlatformUsersPanel() {
         await api(`/developer/platform-users/${u.id}`, { method: 'DELETE', token });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
-        await api(`/ultimateadmin/platform-users/${u.id}`, { method: 'DELETE', token });
+        await api(`/platform-users/${u.id}`, { method: 'DELETE', token });
       }
       toast.success('User removed');
       load();
@@ -1432,7 +1442,7 @@ function PlatformUsersPanel() {
 
   const openEdit = (u: any) => {
     setEditUser(u);
-    setForm({ name: u.name || '', email: u.email || '', role: u.role || 'customer_care', password: '' });
+    setForm({ name: u.name || '', email: u.email || '', role: canonicalPlatformRole(u?.role) || 'customer_care', password: '' });
     setTempPassword(null);
     setShowCreate(true);
   };
@@ -1556,7 +1566,7 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
         loadAssignmentsWithFallback(token),
       ]);
       const agents = Array.isArray(agentsData) ? agentsData.filter((u: any) => {
-        const r = u.role || '';
+        const r = canonicalPlatformRole(u?.role);
         return r === 'customer_care';
       }) : [];
       setCareAgents(agents);
@@ -1580,7 +1590,7 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
         await api('/developer/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
-        await api('/ultimateadmin/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
+        await api('/assignments', { method: 'POST', token, body: { careAgentId: selectedAgent, tenantIds: selectedTenants } });
       }
       toast.success('Assignment saved');
       setSelectedAgent('');
@@ -1597,7 +1607,7 @@ function AssignmentsPanel({ tenants }: { tenants: Tenant[] }) {
         await api(`/developer/assignments/${assignmentId}`, { method: 'DELETE', token });
       } catch (error: any) {
         if (!isRouteNotFoundError(error)) throw error;
-        await api(`/ultimateadmin/assignments/${assignmentId}`, { method: 'DELETE', token });
+        await api(`/assignments/${assignmentId}`, { method: 'DELETE', token });
       }
       toast.success('Assignment removed');
       load();
@@ -1701,15 +1711,15 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
   const [resetTarget, setResetTarget] = useState<{ email: string } | null>(null);
   const [resetLink, setResetLink] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
-  const normalizedSupportRole = String(authUser?.role || '').toLowerCase().replace('-', '_');
-  const isDeveloperAdmin = (normalizedSupportRole === 'ultimateadmin' ? 'developer' : normalizedSupportRole) === 'developer';
+  const normalizedSupportRole = canonicalPlatformRole(authUser?.role);
+  const isDeveloperAdmin = normalizedSupportRole === 'developer';
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const token = await getToken();
       const data = await loadDeveloperUsersWithFallback(token);
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data.map((u: any) => ({ ...u, role: canonicalPlatformRole(u?.role) || u?.role })) : []);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
         toast.error('Failed to load users: ' + (e.message || ''));
@@ -1739,11 +1749,11 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
     const matchSearch = (u.name || '').toLowerCase().includes(search.toLowerCase()) ||
       (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
       (u.companyName || '').toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    const matchRole = roleFilter === 'all' || canonicalPlatformRole(u.role) === roleFilter;
     return matchSearch && matchRole;
   });
 
-  const allRoles = [...new Set(users.map((u: any) => u.role).filter(Boolean))];
+  const allRoles = [...new Set(users.map((u: any) => canonicalPlatformRole(u.role)).filter(Boolean))];
 
   return (
     <div className="space-y-4">
@@ -2020,7 +2030,7 @@ function GlobalChatPanel({ tenants }: { tenants: Tenant[] }) {
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {msgLoading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
               {messages.map(m => {
-                const isDeveloperMessage = ['developer', 'ultimateadmin'].includes(m.senderRole);
+                const isDeveloperMessage = canonicalPlatformRole(m.senderRole) === 'developer';
                 return (
                   <div key={m.id} className={`flex ${isDeveloperMessage ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[75%] rounded-lg p-2 text-sm ${isDeveloperMessage ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
@@ -2341,10 +2351,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
   const [lastRealtimeSyncAt, setLastRealtimeSyncAt] = useState<Date | null>(null);
   const [backendUnavailable, setBackendUnavailable] = useState(false);
-  const normalizeAndAliasSupportRole = (value: string) => {
-    const normalized = String(value || '').toLowerCase().replace('-', '_');
-    return normalized === 'ultimateadmin' ? 'developer' : normalized;
-  };
+  const normalizeAndAliasSupportRole = (value: string) => canonicalPlatformRole(value);
   const [effectiveRole, setEffectiveRole] = useState(() => normalizeAndAliasSupportRole(role));
   const visibleSidebarItems = SIDEBAR_ITEMS.filter(item => isSectionAllowed(item.id, effectiveRole));
   const quickActions = [

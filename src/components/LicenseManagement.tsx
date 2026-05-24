@@ -186,7 +186,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
           const supportTicketError = await parseApiErrorMessage(supportTicketResponse);
           if (isRetryableMissingRoute(supportTicketResponse.status, supportTicketError)) {
             supportTicketResponse = await apiClient.post(
-              '/ultimateadmin/support/tickets',
+              '/support/tickets',
               buildSupportTicketPayload(),
               freshToken,
             );
