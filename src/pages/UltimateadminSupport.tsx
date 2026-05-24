@@ -42,7 +42,12 @@ function isStaleBackendMessage(message: unknown): boolean {
     normalized.includes('cannot post') ||
     normalized.includes('cannot put') ||
     normalized.includes('cannot patch') ||
-    normalized.includes('cannot delete')
+    normalized.includes('cannot delete') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('networkerror when attempting to fetch resource') ||
+    normalized.includes('load failed') ||
+    normalized.includes('fetch failed')
   );
 }
 

@@ -54,7 +54,12 @@ function isRouteNotFoundError(error: any): boolean {
     message.includes('cannot post') ||
     message.includes('cannot put') ||
     message.includes('cannot patch') ||
-    message.includes('cannot delete')
+    message.includes('cannot delete') ||
+    message.includes('failed to fetch') ||
+    message.includes('network request failed') ||
+    message.includes('networkerror when attempting to fetch resource') ||
+    message.includes('load failed') ||
+    message.includes('fetch failed')
   );
 }
 
