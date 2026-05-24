@@ -516,8 +516,9 @@ function TenantsPanel() {
   const [createUserForm, setCreateUserForm] = useState({ name: '', email: '', role: 'superadmin', password: '' });
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
+    if (!silent) setLoading(true);
     try {
       const token = await getToken();
       const data = await loadSupportTenantsWithFallback(token);
@@ -527,7 +528,7 @@ function TenantsPanel() {
         toast.error('Failed to load tenants: ' + (e.message || 'Unknown error'));
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [getToken]);
 
@@ -535,9 +536,13 @@ function TenantsPanel() {
 
   // Auto-refresh every 30 seconds so new users/tenants appear without manual reload
   useEffect(() => {
-    const interval = setInterval(load, 30_000);
+    const interval = setInterval(() => {
+      const refreshPaused = saving || !!actionLoading || createDialog || createUserDialog || licenseDialog || showUsers;
+      if (refreshPaused || document.visibilityState !== 'visible') return;
+      load({ silent: true });
+    }, 30_000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, saving, actionLoading, createDialog, createUserDialog, licenseDialog, showUsers]);
 
   const loadUsers = async (tenant: Tenant) => {
     setSelected(tenant);
@@ -2318,6 +2323,9 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [myProfile, setMyProfile] = useState<{ email: string; name: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
+  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
+  const [lastRealtimeSyncAt, setLastRealtimeSyncAt] = useState<Date | null>(null);
   const [backendUnavailable, setBackendUnavailable] = useState(false);
   const normalizeAndAliasSupportRole = (value: string) => {
     const normalized = String(value || '').toLowerCase().replace('-', '_');
@@ -2338,8 +2346,13 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
     setEffectiveRole(normalizeAndAliasSupportRole(role));
   }, [role]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
+    if (silent) {
+      setBackgroundRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const token = await getToken();
       // Invalidate caches so auto-refresh always fetches fresh data from the server
@@ -2359,7 +2372,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
         setMetricsLoadError(false);
       } else if (!isRouteNotFound(metricsResult)) {
         setMetricsLoadError(true);
-        toast.error('Failed to load platform metrics');
+        if (!silent) toast.error('Failed to load platform metrics');
       }
       if (profileResult.status === 'fulfilled') {
         setMyProfile(profileResult.value);
@@ -2370,13 +2383,23 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
       // Detect stale backend: both metrics and tenants fail with route-not-found
       const bothMissing = isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
       setBackendUnavailable(bothMissing);
+      const hasLiveData =
+        metricsResult.status === 'fulfilled' ||
+        tenantsResult.status === 'fulfilled' ||
+        profileResult.status === 'fulfilled';
+      setSupabaseConnected(hasLiveData && !bothMissing);
+      if (hasLiveData && !bothMissing) setLastRealtimeSyncAt(new Date());
 
       // Only show error toast if failure is NOT a simple route-not-found (that is handled by the empty-state UI)
-      if (tenantsResult.status === 'rejected' && !isRouteNotFound(tenantsResult)) {
+      if (!silent && tenantsResult.status === 'rejected' && !isRouteNotFound(tenantsResult)) {
         toast.error('Failed to load tenant data');
       }
     } finally {
-      setLoading(false);
+      if (silent) {
+        setBackgroundRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [getToken]);
 
@@ -2390,7 +2413,10 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
 
   // Auto-refresh metrics and tenant list every 30 seconds
   useEffect(() => {
-    const interval = setInterval(loadData, 30_000);
+    const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      loadData({ silent: true });
+    }, 30_000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -2478,9 +2504,19 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
               {myProfile && <p className="text-xs text-gray-500 hidden sm:block">{myProfile.email} · <StatusBadge status={myProfile.role} /></p>}
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={loadData}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Badge className={supabaseConnected ? 'bg-green-100 text-green-700 hover:bg-green-100' : 'bg-amber-100 text-amber-700 hover:bg-amber-100'}>
+              {supabaseConnected ? (backgroundRefreshing ? 'Supabase syncing…' : 'Supabase connected') : 'Supabase reconnecting'}
+            </Badge>
+            {lastRealtimeSyncAt && (
+              <span className="text-xs text-gray-500 hidden sm:inline">
+                Live sync {lastRealtimeSyncAt.toLocaleTimeString()}
+              </span>
+            )}
+            <Button variant="outline" size="sm" onClick={() => loadData()}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh
+            </Button>
+          </div>
         </header>
 
         <div className="p-4 md:p-6 space-y-6">
