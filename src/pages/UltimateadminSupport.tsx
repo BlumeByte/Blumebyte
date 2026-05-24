@@ -537,8 +537,8 @@ function TenantsPanel() {
   // Auto-refresh every 30 seconds so new users/tenants appear without manual reload
   useEffect(() => {
     const interval = setInterval(() => {
-      const refreshPaused = saving || actionLoading || createDialog || createUserDialog || licenseDialog || showUsers;
-      if (refreshPaused || document.visibilityState !== 'visible') return;
+      const isRefreshPaused = saving || actionLoading || createDialog || createUserDialog || licenseDialog || showUsers;
+      if (isRefreshPaused || document.visibilityState !== 'visible') return;
       load({ silent: true });
     }, 30_000);
     return () => clearInterval(interval);
@@ -2313,6 +2313,15 @@ function metricsPlaceholder(metricsLoaded: boolean, errorOccurred: boolean, empt
   return 'Loading…';
 }
 
+function getSupabaseStatusText(
+  supabaseConnected: boolean | null,
+  backgroundRefreshing: boolean,
+) {
+  if (supabaseConnected === null) return 'Checking Supabase…';
+  if (supabaseConnected) return backgroundRefreshing ? 'Supabase syncing…' : 'Supabase connected';
+  return 'Supabase reconnecting';
+}
+
 function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: string }) {
   const { getToken } = useAuth();
   const [activeSection, setActiveSection] = useState('overview');
@@ -2426,11 +2435,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
     : supabaseConnected === null
       ? 'bg-blue-100 text-blue-700'
       : 'bg-amber-100 text-amber-700';
-  const supabaseStatusText = supabaseConnected === null
-    ? 'Checking Supabase…'
-    : supabaseConnected
-      ? (backgroundRefreshing ? 'Supabase syncing…' : 'Supabase connected')
-      : 'Supabase reconnecting';
+  const supabaseStatusText = getSupabaseStatusText(supabaseConnected, backgroundRefreshing);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
