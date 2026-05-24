@@ -3643,6 +3643,13 @@ function UserManagementView() {
       : null),
     [companies, selectedCompanyId]
   );
+  const currentCompanyId = selectedCompanyId !== 'all'
+    ? selectedCompanyId
+    : String(user?.companyId || companies[0]?.id || '').trim();
+  const currentCompanyName = selectedCompanyId !== 'all'
+    ? selectedCompanyName
+    : String(user?.companyName || user?.company || companies[0]?.name || branding.companyName || '').trim();
+  const currentCompanyFilter = currentCompanyId || currentCompanyName;
 
   const fetchLicenseInfo = useCallback(async () => {
     try {
@@ -3681,9 +3688,9 @@ function UserManagementView() {
         return;
       }
 
-      const resolvedCompanyId = selectedCompanyRecord?.id || formData.companyId || companies[0]?.id || '';
+      const resolvedCompanyId = selectedCompanyRecord?.id || currentCompanyId || formData.companyId || companies[0]?.id || '';
       const resolvedCompanyName = selectedCompanyRecord?.name
-        || selectedCompanyName
+        || currentCompanyName
         || formData.company
         || formData.companyName
         || branding.companyName
@@ -3755,7 +3762,13 @@ function UserManagementView() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+  const companyScopedUsers = currentCompanyFilter
+    ? users.filter((u) => itemMatchesCompany(u, currentCompanyFilter, currentCompanyName))
+    : users;
+
+  const filtered = companyScopedUsers.filter(u =>
+    !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="p-4 md:p-8">
@@ -3772,7 +3785,7 @@ function UserManagementView() {
             <p className="font-medium mb-1">No Active Licenses</p>
             <p className="text-amber-700">
               You can create up to <strong>5 users</strong> before purchasing licenses. 
-              Currently: <strong>{filtered.length}/5 users</strong>. 
+              Currently: <strong>{companyScopedUsers.length}/5 users</strong>. 
               <span className="ml-1">Need more users? Purchase licenses in Billings & Subscriptions.</span>
             </p>
           </div>

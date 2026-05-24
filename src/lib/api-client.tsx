@@ -51,13 +51,19 @@ export async function api(path: string, options: RequestInit & { token?: string 
     data = JSON.parse(text);
   } catch (parseError) {
     console.error(`API response for ${method} ${path}: ${res.status}`, text.substring(0, 500));
-    
+     
     // If server returned HTML or non-JSON, provide a cleaner error
     if (text.trim().startsWith('<')) {
-      throw new Error(`Server error (${res.status}). Please check the server logs or try again later.`);
+      const error: any = new Error(`Server error (${res.status}). Please check the server logs or try again later.`);
+      error.status = res.status;
+      error.responseText = text;
+      throw error;
     }
-    
-    throw new Error(`Invalid server response for ${path} (${res.status}). Response: ${text.substring(0, 100)}`);
+     
+    const error: any = new Error(`Invalid server response for ${path} (${res.status}). Response: ${text.substring(0, 100)}`);
+    error.status = res.status;
+    error.responseText = text;
+    throw error;
   }
   
   if (!res.ok) {
@@ -120,7 +126,10 @@ export async function apiUpload(path: string, formData: FormData, token?: string
     data = JSON.parse(text);
   } catch (parseError) {
     console.error(`Upload API response for ${path}: ${res.status}`, text);
-    throw new Error(`Server returned an invalid response for ${path} (${res.status}). Please try again later.`);
+    const error: any = new Error(`Server returned an invalid response for ${path} (${res.status}). Please try again later.`);
+    error.status = res.status;
+    error.responseText = text;
+    throw error;
   }
   
   if (!res.ok) {

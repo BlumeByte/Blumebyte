@@ -41,7 +41,9 @@ function isStaleBackendStatus(status: unknown): boolean {
 function isStaleBackendMessage(message: unknown): boolean {
   const normalized = String(message || '').toLowerCase();
   return (
+    normalized.includes('invalid server response') ||
     normalized.includes('route not found') ||
+    normalized.includes('404 not found') ||
     normalized.includes('method not allowed') ||
     normalized.includes('cannot get') ||
     normalized.includes('cannot post') ||

@@ -17,6 +17,11 @@ const PRESET_COLORS = [
   '#84cc16', '#06b6d4', '#d946ef', '#dc2626', '#eab308',
 ];
 
+function isMissingBrandingRoute(error: any) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.status === 404 || message.includes('404 not found') || message.includes('invalid server response');
+}
+
 export function CompanyBrandingSettings() {
   const { accessToken, user } = useAuth();
   const { branding, refresh: refreshBranding } = useBranding();
@@ -45,11 +50,20 @@ export function CompanyBrandingSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api('/superadmin/company-branding', { 
-        method: 'PUT', 
-        body: settings, 
-        token: accessToken 
-      });
+      try {
+        await api('/superadmin/company-branding', {
+          method: 'PUT',
+          body: settings,
+          token: accessToken
+        });
+      } catch (error: any) {
+        if (!isMissingBrandingRoute(error)) throw error;
+        await api('/admin/company-settings', {
+          method: 'PUT',
+          body: settings,
+          token: accessToken
+        });
+      }
       
       toast.success('Company branding updated successfully!');
       
