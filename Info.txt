@@ -1,0 +1,348 @@
+BLUMEBYTE HR - COMPLETE REBUILD / FIX REFERENCE
+Generated: 2026-05-24
+Repository: /home/runner/work/Blumebyte/Blumebyte
+
+==================================================
+1) MASTER RECREATION PROMPT (FOR AI / FIGMA MAKE)
+==================================================
+Use this exact instruction as your base prompt when recreating the app:
+
+"Build a production-ready multi-tenant HR SaaS called BLUMEBYTE HR (BB HRIS) using React + TypeScript + Vite + Tailwind CSS + shadcn/ui + lucide-react + sonner + recharts + Supabase (Auth + Edge Functions + KV store). Use React Router with createBrowserRouter + RouterProvider from react-router. Frontend must include marketing/public pages, auth pages, role-based dashboards (superadmin, admin, manager, employee), hiring pages, developer support dashboard, and customer care dashboard. Backend must be a Supabase Edge Function (Hono) using a KV table (kv_store_a35148f0) and Supabase Auth integration. Use dual-header API pattern: Authorization Bearer uses public anon key for edge gateway and X-User-Token carries user JWT. Include company-scoped multi-tenant filtering, subscription/license management, payroll/attendance/leave/performance/recruitment workflows, support ticketing, notifications, and public job listing/apply endpoints. Implement function-name fallback routing: env override, then make-server-a35148f0, then make-server, then server. Keep route aliases compatible. Preserve responsive behavior and mobile optimizations (scroll to top, mobile menu, responsive grid/table/dialog patterns)."
+
+==================================================
+2) VERIFIED TECH STACK + RUNTIME
+==================================================
+- Frontend framework: React 18 + TypeScript
+- Bundler: Vite 6
+- UI: Tailwind CSS + shadcn/ui + Radix UI
+- Routing: this repository imports routing APIs from react-router (see src/routes.tsx and src/App.tsx)
+- Charts: recharts
+- Toasts: sonner
+- Backend: Supabase Edge Functions (Hono)
+- Data layer: kv_store_a35148f0 (JSONB key-value pattern)
+- Auth: Supabase Auth (PKCE flow on frontend client)
+
+Build command:
+- npm run build
+
+Notes:
+- No npm lint script is defined.
+- No npm test script is defined.
+
+==================================================
+3) CORE FILE SYSTEM / STRUCTURE MAP
+==================================================
+Top-level important files:
+- /home/runner/work/Blumebyte/Blumebyte/package.json
+- /home/runner/work/Blumebyte/Blumebyte/.env.example
+- /home/runner/work/Blumebyte/Blumebyte/vite.config.ts
+- /home/runner/work/Blumebyte/Blumebyte/vercel.json
+- /home/runner/work/Blumebyte/Blumebyte/README.md
+
+Primary source root:
+- /home/runner/work/Blumebyte/Blumebyte/src
+
+Important subfolders inside src:
+- components/               -> dashboards, modules, shared UI logic
+- pages/                    -> route page components
+- lib/                      -> auth/api/supabase/config/runtime helpers
+- supabase/functions/       -> edge function code
+  - server/                 -> primary backend function code
+  - make-server-a35148f0/   -> synced deployment-compatible copy
+  - make-server/            -> alternate function folder
+- supabase/sql/             -> SQL scripts/migrations
+- utils/supabase/           -> projectId/publicAnonKey constants
+- public/                   -> static public files
+- styles/                   -> global styles
+
+Critical backend files:
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/functions/server/index.tsx
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/functions/server/license-routes.tsx
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/functions/server/kv_store.tsx
+
+Critical frontend integration files:
+- /home/runner/work/Blumebyte/Blumebyte/src/routes.tsx
+- /home/runner/work/Blumebyte/Blumebyte/src/lib/supabase.ts
+- /home/runner/work/Blumebyte/Blumebyte/src/lib/functions-base.ts
+- /home/runner/work/Blumebyte/Blumebyte/src/lib/api-client.tsx
+- /home/runner/work/Blumebyte/Blumebyte/src/lib/auth-context.tsx
+
+Reference command to print full tree locally:
+- find /home/runner/work/Blumebyte/Blumebyte -maxdepth 5 -not -path '*/node_modules/*' -not -path '*/.git/*' | sort
+
+==================================================
+4) FRONTEND ROUTES -> PAGES -> PURPOSE
+==================================================
+Router file:
+- /home/runner/work/Blumebyte/Blumebyte/src/routes.tsx
+
+Public / shared pages:
+- /                          -> LandingPage
+- /login                     -> LoginPage
+- /company-signup            -> CompanySignup
+- /auth/callback             -> AuthCallback
+- /auth-callback             -> AuthCallback
+- /oauth/consent             -> OAuthConsent
+- /password-reset            -> PasswordReset
+- /security-policy           -> SecurityPolicy
+- /privacy-policy            -> PrivacyPolicy
+- /terms-conditions          -> TermsConditions
+- /pricing                   -> PricingPage
+- /platform-overview         -> PlatformOverview
+- /features                  -> FeaturesPage
+- /integrations              -> IntegrationsPage
+- /industry/:industry        -> IndustryPage
+- /resources                 -> ResourcesPage
+- /hirings                   -> HiringsPage (public hiring listing)
+- /hirings/:jobId            -> HiringDetailPage (public job detail + apply)
+
+Role-protected functional pages:
+- /subscription              -> Subscription management (superadmin)
+- /payment-verify            -> PaymentVerification (superadmin)
+- /payment-verify-license    -> LicensePaymentVerification (superadmin)
+- /superadmin                -> SuperAdminDashboard
+- /admin                     -> AdminDashboard
+- /manager                   -> ManagerDashboard
+- /employee                  -> EmployeeDashboard
+- /employee-portal           -> EmployeePortal
+- /notifications             -> NotificationsPage (superadmin/admin/manager/employee)
+
+HR module marketing pages:
+- /hr-data-reporting         -> HRDataReportingPage
+- /time-attendance           -> TimeAttendancePage
+- /payroll                   -> PayrollPage
+- /performance-management    -> PerformanceManagementPage
+- /compensation              -> CompensationPage
+- /applicant-tracking        -> ApplicantTrackingPage
+- /onboarding                -> OnboardingPage
+- /employee-experience       -> EmployeeExperiencePage
+
+Platform support pages:
+- /developer                 -> UltimateadminSupport dashboard (role: developer)
+- /support                   -> CareDashboard (customer care + developer)
+
+Legacy redirects / aliases:
+- /care-dashboard -> /support
+- /care -> /support
+- /ultimateadmin/support -> /developer
+- /ultimateadmin -> /developer
+- /customer_care -> /support
+- /customer-care -> /support
+- /two-factor-verification -> /login
+- * -> /login
+
+==================================================
+5) ROLE / ACCESS MODEL (FRONTEND)
+==================================================
+Roles used in app behavior:
+- superadmin
+- admin
+- manager
+- employee
+- developer (canonical platform role, ultimateadmin maps to developer)
+- customer care roles (from CUSTOMER_CARE_ROLES)
+
+ProtectedRoute gates pages by role arrays in routes.tsx.
+
+==================================================
+6) SUPABASE CONNECTIONS + FUNCTION ROUTING
+==================================================
+Environment values (.env.example):
+- VITE_SUPABASE_URL=https://ivohczdtuxasyfoiphqu.supabase.co
+- VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+- VITE_SUPABASE_FUNCTION_NAME=make-server-a35148f0
+
+Project constants:
+- /home/runner/work/Blumebyte/Blumebyte/src/utils/supabase/info.tsx
+  - projectId = ivohczdtuxasyfoiphqu
+  - publicAnonKey = hardcoded anon key string
+
+Supabase client:
+- /home/runner/work/Blumebyte/Blumebyte/src/lib/supabase.ts
+  - Uses createClient(url, anonKey)
+  - auth.storageKey = sb-${projectId}-auth-token
+  - autoRefreshToken true, persistSession true, detectSessionInUrl true, flowType 'pkce'
+
+Function URL builder + fallback:
+- /home/runner/work/Blumebyte/Blumebyte/src/lib/functions-base.ts
+- Candidate order:
+  1) VITE_SUPABASE_FUNCTION_NAME (if set)
+  2) make-server-a35148f0
+  3) make-server
+  4) server
+- fetchFunctionsUrl retries across candidates on statuses 404/405/501
+
+API header contract:
+- /home/runner/work/Blumebyte/Blumebyte/src/lib/api-client.tsx
+- Authorization: Bearer <publicAnonKey>
+- X-User-Token: <real-user-jwt>
+
+Supabase backend config:
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/config.toml
+  - project_id = ivohczdtuxasyfoiphqu
+  - auth site_url and callback URLs configured
+  - functions.verify_jwt = false
+
+==================================================
+7) BACKEND (EDGE FUNCTION) OVERVIEW
+==================================================
+Primary server code:
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/functions/server/index.tsx
+
+KV layer:
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/functions/server/kv_store.tsx
+- Table: kv_store_a35148f0
+- API: get/set/del/mget/mset/mdel/getByPrefix
+
+Main backend capabilities (route families):
+- health + setup
+- auth + password reset + OAuth support
+- profile / employee self-service
+- users CRUD + admin/superadmin user controls
+- company registration + company settings/branding/working-hours
+- subscription + payment + license flows (plus license-routes.tsx)
+- attendance (clock-in/out, today/history, admin reports/manual)
+- leave requests + approvals
+- payroll + tax config + payslips
+- performance reviews + questionnaires + self-assessments
+- training/onboarding/tasks/assignments
+- recruitment/job postings/public hiring apply
+- announcements/messages/chat/notifications
+- AI assistant + automation workflows
+- support/care dashboard APIs
+- developer/ultimateadmin platform APIs
+- reporting/audit/logging/debug endpoints
+
+Alias compatibility:
+- Backend registers compatible route variants (function-prefix compatible paths).
+
+==================================================
+8) DATABASE + SQL LAYER
+==================================================
+Current pattern:
+- KV key-value architecture in Postgres table kv_store_a35148f0
+- Many domain objects stored as JSON with prefixes
+
+Representative key prefixes used across docs/code:
+- employee:
+- company:
+- subscription:
+- leave-request:
+- notification:
+- payslip:
+- attendance:
+- audit:
+- announcement:
+- training:
+
+SQL scripts present:
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/sql/2026-05-20-migrate-ultimateadmin-role-to-developer.sql
+- /home/runner/work/Blumebyte/Blumebyte/src/supabase/sql/2026-05-22-enable-pg-net-and-edge-webhook.sql
+
+==================================================
+9) MOBILE VIEW / RESPONSIVE STATUS
+==================================================
+Primary mobile guidance doc:
+- /home/runner/work/Blumebyte/Blumebyte/src/MOBILE_DASHBOARD_GUIDE.md
+
+Documented completed improvements:
+- scroll-to-top on navigation
+- mobile hamburger menu for website
+- responsive tab layout wrapping
+- touch-friendly button sizing work
+
+Known mobile gaps documented:
+- fixed sidebar behavior on small screens
+- table overflow/wrapping on small screens
+- cramped forms in some screens
+- some card stacking/layout issues
+
+Recommended implementation patterns already documented:
+- collapsible sidebar overlay
+- responsive content margins
+- mobile table wrappers / card tables
+- responsive dialog widths
+- optional bottom navigation for mobile
+
+==================================================
+10) DOCUMENTATION INDEX (MOST IMPORTANT FOR FIX/REBUILD)
+==================================================
+Start here:
+- /home/runner/work/Blumebyte/Blumebyte/src/MASTER_DOCUMENTATION_INDEX.md
+
+Core rebuild/setup docs:
+- /home/runner/work/Blumebyte/Blumebyte/src/BLUMEBYTE_SETUP.md
+- /home/runner/work/Blumebyte/Blumebyte/src/SUPABASE_DATABASE_SETUP.md
+- /home/runner/work/Blumebyte/Blumebyte/src/SUPABASE_QUICK_REFERENCE.md
+- /home/runner/work/Blumebyte/Blumebyte/src/DEPLOYMENT_CHECKLIST.md
+- /home/runner/work/Blumebyte/Blumebyte/src/PRODUCTION_CLEANUP_GUIDE.md
+
+OAuth/auth docs:
+- /home/runner/work/Blumebyte/Blumebyte/src/OAUTH_CONFIGURATION_COMPLETE.md
+- /home/runner/work/Blumebyte/Blumebyte/src/OAUTH_SETUP_GUIDE.md
+- /home/runner/work/Blumebyte/Blumebyte/src/SUPABASE_OAUTH_CONFIG.md
+
+Billing/license docs:
+- /home/runner/work/Blumebyte/Blumebyte/src/LICENSE_SUBSCRIPTION_GUIDE.md
+- /home/runner/work/Blumebyte/Blumebyte/src/LICENSE_SYSTEM_SETUP_GUIDE.md
+- /home/runner/work/Blumebyte/Blumebyte/src/PAYSTACK_SUBSCRIPTION_GUIDE.md
+
+Testing/verification docs:
+- /home/runner/work/Blumebyte/Blumebyte/src/TESTING_GUIDE.md
+- /home/runner/work/Blumebyte/Blumebyte/src/TESTING_MULTI_TENANT.md
+- /home/runner/work/Blumebyte/Blumebyte/src/NEW_TENANT_ISOLATION_VERIFICATION.md
+
+Existing long-form prompt source:
+- /home/runner/work/Blumebyte/Blumebyte/src/imports/blumebye-hr-figma-prompt.md (actual filename uses \"blumebye\")
+
+==================================================
+11) RECREATE / RECOVERY RUNBOOK (PRACTICAL)
+==================================================
+A) Local startup:
+1. npm i
+2. npm run dev
+3. npm run build (sanity)
+
+B) Supabase alignment:
+1. Verify project URL + anon key + function name in .env
+2. Confirm function deployed: make-server-a35148f0 (and fallback names if needed)
+3. Confirm kv_store_a35148f0 exists
+4. Confirm required edge secrets (service role key, payment keys, app URL)
+
+C) Route integrity checks:
+1. Frontend route file: src/routes.tsx
+2. Backend function base routing: src/lib/functions-base.ts
+3. API client headers: src/lib/api-client.tsx
+4. Edge route registrations: src/supabase/functions/server/index.tsx
+
+D) Core smoke checks:
+1. / (landing)
+2. /login
+3. /company-signup
+4. role dashboards (/superadmin /admin /manager /employee)
+5. /hirings and /hirings/:jobId
+6. /developer and /support
+7. subscription/payment verification pages
+
+E) If broken:
+1. Check function-name mismatch first (fallback chain)
+2. Check Bearer + X-User-Token header behavior
+3. Check role mapping (ultimateadmin -> developer)
+4. Check KV records for missing companyId/company scope
+
+==================================================
+12) IMPORTANT REBUILD NOTES
+==================================================
+- This codebase contains many operational docs in /src; treat MASTER_DOCUMENTATION_INDEX.md as navigation root.
+- There are mirrored edge function folders (server and make-server-a35148f0). Use copy script when syncing:
+  - /home/runner/work/Blumebyte/Blumebyte/src/copy-files-to-make-server.sh
+- Build is currently validated via Vite build.
+- For a full ground-up recreation, prioritize:
+  1) auth/session
+  2) role-based routing
+  3) API header contract
+  4) Supabase edge function deployment + function naming
+  5) KV schema conventions + company scoping
+  6) dashboard modules
+
+END OF FILE
