@@ -293,7 +293,7 @@ Testing/verification docs:
 - /home/runner/work/Blumebyte/Blumebyte/src/NEW_TENANT_ISOLATION_VERIFICATION.md
 
 Existing long-form prompt source:
-- /home/runner/work/Blumebyte/Blumebyte/src/imports/blumebye-hr-figma-prompt.md
+- /home/runner/work/Blumebyte/Blumebyte/src/imports/blumebye-hr-figma-prompt.md (actual filename uses \"blumebye\")
 
 ==================================================
 11) RECREATE / RECOVERY RUNBOOK (PRACTICAL)
