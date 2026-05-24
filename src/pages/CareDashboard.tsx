@@ -17,7 +17,7 @@ import {
   Ticket, MessageSquare, Send
 } from 'lucide-react';
 import { api } from '../lib/api-client';
-import { isCustomerCareRole } from '../lib/role-utils';
+import { isCustomerCareRole, normalizeRole } from '../lib/role-utils';
 import { useAuth } from '../lib/auth-context';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,7 +54,12 @@ function isRouteNotFoundError(error: any): boolean {
     message.includes('cannot post') ||
     message.includes('cannot put') ||
     message.includes('cannot patch') ||
-    message.includes('cannot delete')
+    message.includes('cannot delete') ||
+    message.includes('failed to fetch') ||
+    message.includes('network request failed') ||
+    message.includes('networkerror when attempting to fetch resource') ||
+    message.includes('load failed') ||
+    message.includes('fetch failed')
   );
 }
 
@@ -174,9 +179,9 @@ export default function CareDashboard() {
           role: profileResponse?.role || user.role,
         }
         : profileResponse;
-      const role = String(p?.role || '').toLowerCase().replace('-', '_');
+      const role = normalizeRole(p?.role);
       setCareProfile(p);
-      const allowed = isCustomerCareRole(role) || role === 'developer' || role === 'ultimateadmin';
+      const allowed = isCustomerCareRole(role) || role === 'developer';
       setAuthenticated(allowed);
     } catch (e: any) {
       if (e?.status === 401 || e?.status === 403) {
@@ -189,8 +194,8 @@ export default function CareDashboard() {
         name: user.name,
         role: user.role,
       });
-      const role = String(user.role || '').toLowerCase().replace('-', '_');
-      setAuthenticated(isCustomerCareRole(role) || role === 'developer' || role === 'ultimateadmin');
+      const role = normalizeRole(user.role);
+      setAuthenticated(isCustomerCareRole(role) || role === 'developer');
     }
   }, [user]);
 
