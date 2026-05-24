@@ -399,7 +399,7 @@ const requireSuperAdmin = (c: any) => requireRole(c, ["superadmin"]);
 const requireAdminOrAbove = (c: any) => requireRole(c, ["superadmin", "admin"]);
 const requireManagerOrAbove = (c: any) => requireRole(c, ["superadmin", "admin", "manager"]);
 const CUSTOMER_CARE_ROLES = ["customer_care", "customer-care"];
-const requireDeveloper = (c: any) => requireRole(c, ["developer", "ultimateadmin"]);
+const requireDeveloper = (c: any) => requireRole(c, ["developer"]);
 const requireCustomerCare = (c: any) => requireRole(c, CUSTOMER_CARE_ROLES);
 
 // --- Temp password generator ---
@@ -3446,13 +3446,14 @@ app.get(`${PREFIX}/superadmin/pending-approvals`, async (c) => {
     
     // CRITICAL FIX: Filter approvals by company for multi-tenant isolation
     const scope = await resolveCompanyScope(user.id);
-    if (scope?.length) {
-      // Filter approvals to only show those from the SuperAdmin's company
-      allApprovals = allApprovals.filter((a: any) => {
-        // Check if the approval request has a companyId or relates to a company employee
-        return companyMatches(scope, a.companyId) || companyMatches(scope, a.company);
-      });
+    if (!scope?.length) {
+      // Strict isolation: no company scope = no approvals
+      return c.json([]);
     }
+    allApprovals = allApprovals.filter((a: any) => {
+      // Check if the approval request has a companyId or relates to a company employee
+      return companyMatches(scope, a.companyId) || companyMatches(scope, a.company);
+    });
     
     const pending = allApprovals.filter((a: any) => a.status === 'pending');
     return c.json(pending.sort((a: any, b: any) => 
@@ -3842,20 +3843,16 @@ app.get(`${PREFIX}/deletion-requests`, async (c) => {
       // SuperAdmin/Admin see deletion requests for employees in their company only
       const scope = await resolveCompanyScope(user.id);
       
-      if (scope?.length) {
-        const employees = await kv.getByPrefix("employee:");
-        const companyEmployees = employees.filter((e: any) => companyMatches(scope, e.companyId) || companyMatches(scope, e.company));
-        const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.id || e.userId));
-        
-        
-        all = all.filter((r: any) => {
-          const hasMatch = companyEmployeeIds.has(r.targetUserId);
-          if (!hasMatch && all.length < 10) {
-          }
-          return hasMatch;
-        });
-        
+      if (!scope?.length) {
+        // Strict isolation: no company scope = no deletion requests
+        return c.json([]);
       }
+      const employees = await kv.getByPrefix("employee:");
+      const companyEmployees = employees.filter((e: any) => companyMatches(scope, e.companyId) || companyMatches(scope, e.company));
+      const companyEmployeeIds = new Set(companyEmployees.map((e: any) => e.id || e.userId));
+      
+      
+      all = all.filter((r: any) => companyEmployeeIds.has(r.targetUserId));
       return c.json(all.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     }
     
@@ -7979,9 +7976,8 @@ app.get(`${PREFIX}/companies`, async (c) => {
     // CRITICAL FIX: SuperAdmin should only see their own company for multi-tenant isolation
     // All users (including SuperAdmin) see only their assigned companies
     const scope = await resolveCompanyScope(user.id);
-    if (scope?.length) {
-      companies = companies.filter((c: any) => scope.includes(c.id) || scope.includes(c.name));
-    }
+    if (!scope?.length) return c.json([]);
+    companies = companies.filter((c: any) => scope.includes(c.id) || scope.includes(c.name));
     return c.json(companies || []);
   } catch (e: any) {
     if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);

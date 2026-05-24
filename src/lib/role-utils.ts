@@ -6,7 +6,7 @@ export function normalizeRole(value: unknown): string {
   const normalized = raw.replace(/[\s-]+/g, '_');
   const compact = normalized.replace(/_/g, '');
   if (compact === 'superadmin') return 'superadmin';
-  if (compact === 'ultimateadmin') return 'ultimateadmin';
+  if (compact === 'ultimateadmin') return 'developer';
   if (compact === 'developer') return 'developer';
   if (compact === 'customercare') return 'customer_care';
   if (compact === 'admin' || compact === 'manager' || compact === 'employee') return compact;
@@ -22,8 +22,8 @@ export function isCustomerCareRole(role: string | null | undefined): boolean {
 export function getRoleDashboardPath(role: string | null | undefined): string {
   const normalizedRole = normalizeRole(role);
   if (!normalizedRole) return '/login';
-  // developer is the canonical platform admin role; 'ultimateadmin' is a legacy alias
-  if (normalizedRole === 'developer' || normalizedRole === 'ultimateadmin') return '/developer';
+  // developer is the canonical platform admin role; 'ultimateadmin' normalizes to 'developer'
+  if (normalizedRole === 'developer') return '/developer';
   if (isCustomerCareRole(normalizedRole)) return '/support';
   if (normalizedRole === 'superadmin' || normalizedRole === 'admin' || normalizedRole === 'manager' || normalizedRole === 'employee') return `/${normalizedRole}`;
   return '/login';
