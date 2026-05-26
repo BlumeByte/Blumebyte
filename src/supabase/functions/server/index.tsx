@@ -12315,7 +12315,7 @@ async function getDynamicPlatformAgents() {
   );
 }
 
-async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
+async function verifyDeveloperAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
   const token = extractUserToken(c);
   if (!token) return null;
   const sb = supabaseAdmin();
@@ -12339,24 +12339,24 @@ async function verifyUltimateAdminAccess(c: any): Promise<{ user: any; profile: 
   return { user: data.user, profile, role: normalizedRole };
 }
 
-// GET /ultimateadmin/support/verify
-const verifyUltimateadminSupport = async (c: any) => {
+// GET /developer/support/verify
+const verifyDeveloperSupport = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ allowed: false }, 403);
     return c.json({ allowed: true, role: access.role, email: access.user.email, name: access.profile?.name || access.user.email });
   } catch {
     return c.json({ allowed: false }, 403);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/verify', '/support/verify', '/developer/support/verify')) {
-  app.get(route, verifyUltimateadminSupport);
+for (const route of compatibleRoutePathsForAliases('/developer/support/verify', '/support/verify')) {
+  app.get(route, verifyDeveloperSupport);
 }
 
-// GET /ultimateadmin/support/metrics — overview counts
-const getUltimateadminSupportMetrics = async (c: any) => {
+// GET /developer/support/metrics — overview counts
+const getDeveloperSupportMetrics = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
     const [allEmployees, allSubscriptions, allCompanies, allAgents, allTickets, supabaseUsers] = await Promise.all([
@@ -12577,14 +12577,14 @@ const getUltimateadminSupportMetrics = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/metrics', '/support/metrics', '/developer/support/metrics')) {
-  app.get(route, getUltimateadminSupportMetrics);
+for (const route of compatibleRoutePathsForAliases('/developer/support/metrics', '/support/metrics')) {
+  app.get(route, getDeveloperSupportMetrics);
 }
 
-// GET /ultimateadmin/support/tenants — all tenants with stats
-const listUltimateadminSupportTenants = async (c: any) => {
+// GET /developer/support/tenants — all tenants with stats
+const listDeveloperSupportTenants = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
     const [allEmployees, allSubscriptions, allCompanies, supabaseUsers] = await Promise.all([
@@ -12740,14 +12740,14 @@ const listUltimateadminSupportTenants = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants', '/developer/support/tenants')) {
-  app.get(route, listUltimateadminSupportTenants);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tenants', '/support/tenants')) {
+  app.get(route, listDeveloperSupportTenants);
 }
 
-// GET /ultimateadmin/support/tenants/:id/users
-const listUltimateadminSupportTenantUsers = async (c: any) => {
+// GET /developer/support/tenants/:id/users
+const listDeveloperSupportTenantUsers = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
     const [allEmployees, supabaseUsers] = await Promise.all([
@@ -12800,12 +12800,12 @@ const listUltimateadminSupportTenantUsers = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users', '/developer/support/tenants/:id/users')) app.get(route, listUltimateadminSupportTenantUsers);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tenants/:id/users', '/support/tenants/:id/users')) app.get(route, listDeveloperSupportTenantUsers);
 
-// POST /ultimateadmin/support/tenants/:id/suspend
-const suspendUltimateadminSupportTenant = async (c: any) => {
+// POST /developer/support/tenants/:id/suspend
+const suspendDeveloperSupportTenant = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
     const body = await c.req.json().catch(() => ({}));
@@ -12826,12 +12826,12 @@ const suspendUltimateadminSupportTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/suspend', '/support/tenants/:id/suspend', '/developer/support/tenants/:id/suspend')) app.post(route, suspendUltimateadminSupportTenant);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tenants/:id/suspend', '/support/tenants/:id/suspend')) app.post(route, suspendDeveloperSupportTenant);
 
-// PUT /ultimateadmin/support/tenants/:id/license
-const updateUltimateadminSupportTenantLicense = async (c: any) => {
+// PUT /developer/support/tenants/:id/license
+const updateDeveloperSupportTenantLicense = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
     const body = await c.req.json();
@@ -12887,12 +12887,12 @@ const updateUltimateadminSupportTenantLicense = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/license', '/support/tenants/:id/license', '/developer/support/tenants/:id/license')) app.put(route, updateUltimateadminSupportTenantLicense);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tenants/:id/license', '/support/tenants/:id/license')) app.put(route, updateDeveloperSupportTenantLicense);
 
-// GET /ultimateadmin/support/tickets
-const listUltimateadminSupportTickets = async (c: any) => {
+// GET /developer/support/tickets
+const listDeveloperSupportTickets = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     let tickets = await getAllSupportTickets();
     // Care agents only see tickets for their assigned tenants
@@ -12907,12 +12907,12 @@ const listUltimateadminSupportTickets = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets', '/developer/support/tickets')) app.get(route, listUltimateadminSupportTickets);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tickets', '/support/tickets')) app.get(route, listDeveloperSupportTickets);
 
-// POST /ultimateadmin/support/tickets
-const createUltimateadminSupportTicket = async (c: any) => {
+// POST /developer/support/tickets
+const createDeveloperSupportTicket = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.json();
     const id = crypto.randomUUID();
@@ -12932,12 +12932,12 @@ const createUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets', '/support/tickets', '/developer/support/tickets')) app.post(route, createUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tickets', '/support/tickets')) app.post(route, createDeveloperSupportTicket);
 
-// PUT /ultimateadmin/support/tickets/:id
-const updateUltimateadminSupportTicket = async (c: any) => {
+// PUT /developer/support/tickets/:id
+const updateDeveloperSupportTicket = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -12956,12 +12956,12 @@ const updateUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id', '/developer/support/tickets/:id')) app.put(route, updateUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tickets/:id', '/support/tickets/:id')) app.put(route, updateDeveloperSupportTicket);
 
-// DELETE /ultimateadmin/support/tickets/:id
-const deleteUltimateadminSupportTicket = async (c: any) => {
+// DELETE /developer/support/tickets/:id
+const deleteDeveloperSupportTicket = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const id = c.req.param('id');
     await kv.del(`support-ticket:${id}`);
@@ -12970,12 +12970,12 @@ const deleteUltimateadminSupportTicket = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tickets/:id', '/support/tickets/:id', '/developer/support/tickets/:id')) app.delete(route, deleteUltimateadminSupportTicket);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tickets/:id', '/support/tickets/:id')) app.delete(route, deleteDeveloperSupportTicket);
 
-// GET /ultimateadmin/support/agents
-const listUltimateadminSupportAgents = async (c: any) => {
+// GET /developer/support/agents
+const listDeveloperSupportAgents = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const agents = (await getDynamicPlatformAgents())
       .filter((agent: any) => normalizeCareRole(agent?.role || '') === 'customer_care');
@@ -12984,12 +12984,12 @@ const listUltimateadminSupportAgents = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents', '/developer/support/agents')) app.get(route, listUltimateadminSupportAgents);
+for (const route of compatibleRoutePathsForAliases('/developer/support/agents', '/support/agents')) app.get(route, listDeveloperSupportAgents);
 
-// POST /ultimateadmin/support/agents
-const createUltimateadminSupportAgent = async (c: any) => {
+// POST /developer/support/agents
+const createDeveloperSupportAgent = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer' && !access.profile?.isPlatformAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
@@ -13008,12 +13008,12 @@ const createUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents', '/support/agents', '/developer/support/agents')) app.post(route, createUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/developer/support/agents', '/support/agents')) app.post(route, createDeveloperSupportAgent);
 
-// PUT /ultimateadmin/support/agents/:id
-const updateUltimateadminSupportAgent = async (c: any) => {
+// PUT /developer/support/agents/:id
+const updateDeveloperSupportAgent = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -13026,12 +13026,12 @@ const updateUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id', '/developer/support/agents/:id')) app.put(route, updateUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/developer/support/agents/:id', '/support/agents/:id')) app.put(route, updateDeveloperSupportAgent);
 
-// DELETE /ultimateadmin/support/agents/:id
-const deleteUltimateadminSupportAgent = async (c: any) => {
+// DELETE /developer/support/agents/:id
+const deleteDeveloperSupportAgent = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer' && !access.profile?.isPlatformAdmin) {
       return c.json({ error: 'Forbidden' }, 403);
@@ -13049,12 +13049,12 @@ const deleteUltimateadminSupportAgent = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/agents/:id', '/support/agents/:id', '/developer/support/agents/:id')) app.delete(route, deleteUltimateadminSupportAgent);
+for (const route of compatibleRoutePathsForAliases('/developer/support/agents/:id', '/support/agents/:id')) app.delete(route, deleteDeveloperSupportAgent);
 
-// GET /ultimateadmin/support/audit — audit trail
-const listUltimateadminSupportAudit = async (c: any) => {
+// GET /developer/support/audit — audit trail
+const listDeveloperSupportAudit = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const logs = await kv.getByPrefix('support-audit:');
     logs.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -13063,12 +13063,12 @@ const listUltimateadminSupportAudit = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/audit', '/support/audit', '/developer/support/audit')) app.get(route, listUltimateadminSupportAudit);
+for (const route of compatibleRoutePathsForAliases('/developer/support/audit', '/support/audit')) app.get(route, listDeveloperSupportAudit);
 
-// POST /ultimateadmin/support/set-platform-user — set role+name for developer/care platform users
-const setUltimateadminPlatformUser = async (c: any) => {
+// POST /developer/support/set-platform-user — set role+name for developer/care platform users
+const setDeveloperPlatformUser = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
@@ -13113,12 +13113,12 @@ const setUltimateadminPlatformUser = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/set-platform-user', '/support/set-platform-user', '/developer/support/set-platform-user')) app.post(route, setUltimateadminPlatformUser);
+for (const route of compatibleRoutePathsForAliases('/developer/support/set-platform-user', '/support/set-platform-user')) app.post(route, setDeveloperPlatformUser);
 
-// POST /ultimateadmin/support/generate-reset-link — generate password reset link for any user (developer only)
-const generateUltimateadminResetLink = async (c: any) => {
+// POST /developer/support/generate-reset-link — generate password reset link for any user (developer only)
+const generateDeveloperResetLink = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
@@ -13142,12 +13142,12 @@ const generateUltimateadminResetLink = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/generate-reset-link', '/support/generate-reset-link', '/developer/support/generate-reset-link')) app.post(route, generateUltimateadminResetLink);
+for (const route of compatibleRoutePathsForAliases('/developer/support/generate-reset-link', '/support/generate-reset-link')) app.post(route, generateDeveloperResetLink);
 
-// POST /ultimateadmin/support/repair/:tenantId — run quick repair actions
-const repairUltimateadminTenant = async (c: any) => {
+// POST /developer/support/repair/:tenantId — run quick repair actions
+const repairDeveloperTenant = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('tenantId');
     const body = await c.req.json().catch(() => ({}));
@@ -13166,12 +13166,12 @@ const repairUltimateadminTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/repair/:tenantId', '/support/repair/:tenantId', '/developer/support/repair/:tenantId')) app.post(route, repairUltimateadminTenant);
+for (const route of compatibleRoutePathsForAliases('/developer/support/repair/:tenantId', '/support/repair/:tenantId')) app.post(route, repairDeveloperTenant);
 
-// POST /ultimateadmin/support/tenants — create a new tenant without payment
-const createUltimateadminSupportTenant = async (c: any) => {
+// POST /developer/support/tenants — create a new tenant without payment
+const createDeveloperSupportTenant = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
@@ -13216,12 +13216,12 @@ const createUltimateadminSupportTenant = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants', '/support/tenants', '/developer/support/tenants')) app.post(route, createUltimateadminSupportTenant);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tenants', '/support/tenants')) app.post(route, createDeveloperSupportTenant);
 
-// POST /ultimateadmin/support/tenants/:id/users — create a user for a tenant without payment
-const createUltimateadminSupportTenantUser = async (c: any) => {
+// POST /developer/support/tenants/:id/users — create a user for a tenant without payment
+const createDeveloperSupportTenantUser = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const tenantId = c.req.param('id');
@@ -13265,12 +13265,12 @@ const createUltimateadminSupportTenantUser = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/support/tenants/:id/users', '/support/tenants/:id/users', '/developer/support/tenants/:id/users')) app.post(route, createUltimateadminSupportTenantUser);
+for (const route of compatibleRoutePathsForAliases('/developer/support/tenants/:id/users', '/support/tenants/:id/users')) app.post(route, createDeveloperSupportTenantUser);
 
-// GET /ultimateadmin/users — all users across all tenants
-const listUltimateadminUsers = async (c: any) => {
+// GET /developer/users — all users across all tenants
+const listDeveloperUsers = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const [allEmployees, allCompanies, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
@@ -13325,50 +13325,50 @@ const listUltimateadminUsers = async (c: any) => {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/users', '/support/users', '/developer/users')) {
-  app.get(route, listUltimateadminUsers);
+for (const route of compatibleRoutePathsForAliases('/developer/users', '/support/users')) {
+  app.get(route, listDeveloperUsers);
 }
 
-// ── Ultimateadmin Global Chat ───────────────────────────────────────────────────
-// Ultimateadmin can chat with any tenant user directly
+// ── Developer Global Chat ───────────────────────────────────────────────────
+// Developer can chat with any tenant user directly
 
-// GET /ultimateadmin/chat/threads — list all chat threads
-const listUltimateadminChatThreads = async (c: any) => {
+// GET /developer/chat/threads — list all chat threads
+const listDeveloperChatThreads = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
-    const threads = await kv.getByPrefix('ultimateadmin_chat_thread:');
+    const threads = await kv.getByPrefix('developer_chat_thread:');
     threads.sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
     return c.json(threads);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads', '/support/chat/threads', '/developer/chat/threads')) app.get(route, listUltimateadminChatThreads);
+for (const route of compatibleRoutePathsForAliases('/developer/chat/threads', '/support/chat/threads')) app.get(route, listDeveloperChatThreads);
 
-// GET /ultimateadmin/chat/threads/:threadId — get thread messages
-const getUltimateadminChatThread = async (c: any) => {
+// GET /developer/chat/threads/:threadId — get thread messages
+const getDeveloperChatThread = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const threadId = c.req.param('threadId');
-    const thread = await kv.get(`ultimateadmin_chat_thread:${threadId}`);
+    const thread = await kv.get(`developer_chat_thread:${threadId}`);
     if (!thread) return c.json({ error: 'Thread not found' }, 404);
-    const messages = await kv.getByPrefix(`ultimateadmin_chat_msg:${threadId}:`);
+    const messages = await kv.getByPrefix(`developer_chat_msg:${threadId}:`);
     messages.sort((a: any, b: any) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
     return c.json({ thread, messages });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/threads/:threadId', '/support/chat/threads/:threadId', '/developer/chat/threads/:threadId')) app.get(route, getUltimateadminChatThread);
+for (const route of compatibleRoutePathsForAliases('/developer/chat/threads/:threadId', '/support/chat/threads/:threadId')) app.get(route, getDeveloperChatThread);
 
-// POST /ultimateadmin/chat/send — send a message to a tenant user (creates thread if needed)
-const sendUltimateadminChatMessage = async (c: any) => {
+// POST /developer/chat/send — send a message to a tenant user (creates thread if needed)
+const sendDeveloperChatMessage = async (c: any) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
@@ -13381,7 +13381,7 @@ const sendUltimateadminChatMessage = async (c: any) => {
     let threadId = existingThreadId;
     if (!threadId) {
       // Try to find existing thread
-      const allThreads = await kv.getByPrefix('ultimateadmin_chat_thread:');
+      const allThreads = await kv.getByPrefix('developer_chat_thread:');
       const existing = allThreads.find((t: any) =>
         (recipientId && t.recipientId === recipientId) ||
         (recipientEmail && t.recipientEmail?.toLowerCase() === recipientEmail?.toLowerCase())
@@ -13389,7 +13389,7 @@ const sendUltimateadminChatMessage = async (c: any) => {
       threadId = existing?.id || crypto.randomUUID();
     }
 
-    const thread = (await kv.get(`ultimateadmin_chat_thread:${threadId}`)) || {
+    const thread = (await kv.get(`developer_chat_thread:${threadId}`)) || {
       id: threadId, recipientId: recipientId || '',
       recipientEmail: recipientEmail || '',
       recipientName: recipientName || recipientEmail || '',
@@ -13399,7 +13399,7 @@ const sendUltimateadminChatMessage = async (c: any) => {
     };
     thread.updatedAt = now;
     thread.lastMessage = message.trim();
-    await kv.set(`ultimateadmin_chat_thread:${threadId}`, thread);
+    await kv.set(`developer_chat_thread:${threadId}`, thread);
 
     const msgId = crypto.randomUUID();
     const msg = {
@@ -13408,21 +13408,21 @@ const sendUltimateadminChatMessage = async (c: any) => {
       recipientId: recipientId || '', recipientEmail: recipientEmail || '',
       message: message.trim(), sentAt: now,
     };
-    await kv.set(`ultimateadmin_chat_msg:${threadId}:${msgId}`, msg);
+    await kv.set(`developer_chat_msg:${threadId}:${msgId}`, msg);
     return c.json({ success: true, threadId, messageId: msgId, sentAt: now });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
 };
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/chat/send', '/support/chat/send', '/developer/chat/send')) app.post(route, sendUltimateadminChatMessage);
+for (const route of compatibleRoutePathsForAliases('/developer/chat/send', '/support/chat/send')) app.post(route, sendDeveloperChatMessage);
 
-// ── Ultimateadmin canonical aliases for /developer/* endpoints ─────────────────
-// Mirrors /developer/platform-users and /developer/assignments under /ultimateadmin/*
+// ── Developer platform-users and assignments aliases ─────────────────
+// Mirrors /platform-users and /assignments under /developer/*
 
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users', '/platform-users')) app.get(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/developer/platform-users', '/platform-users')) app.get(route, async (c) => {
   // Return platform user records for canonical and legacy-compatible paths
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const merged = await getDynamicPlatformAgents();
@@ -13432,9 +13432,9 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   }
 });
 
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users', '/platform-users')) app.post(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/developer/platform-users', '/platform-users')) app.post(route, async (c) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
@@ -13470,9 +13470,9 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   }
 });
 
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users/:id', '/platform-users/:id')) app.put(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/developer/platform-users/:id', '/platform-users/:id')) app.put(route, async (c) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const userId = c.req.param('id');
@@ -13497,9 +13497,9 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   }
 });
 
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-users/:id', '/platform-users/:id')) app.delete(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/developer/platform-users/:id', '/platform-users/:id')) app.delete(route, async (c) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const userId = c.req.param('id');
@@ -13513,9 +13513,9 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/platform-user
   }
 });
 
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments', '/assignments')) app.get(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/developer/assignments', '/assignments')) app.get(route, async (c) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const assignments = await kv.getByPrefix('care_assignments_record:');
@@ -13525,9 +13525,9 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments',
   }
 });
 
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments', '/assignments')) app.post(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/developer/assignments', '/assignments')) app.post(route, async (c) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
@@ -13550,9 +13550,9 @@ for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments',
   }
 });
 
-for (const route of compatibleRoutePathsForAliases('/ultimateadmin/assignments/:id', '/assignments/:id')) app.delete(route, async (c) => {
+for (const route of compatibleRoutePathsForAliases('/developer/assignments/:id', '/assignments/:id')) app.delete(route, async (c) => {
   try {
-    const access = await verifyUltimateAdminAccess(c);
+    const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const assignmentId = c.req.param('id');
@@ -13603,7 +13603,7 @@ function normalizeCareRole(role: string) {
   const normalized = String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   if (!normalized) return '';
   const compact = normalized.replace(/_/g, '');
-  if (compact === 'ultimateadmin') return 'developer';
+  if (compact === 'ultimateadmin') return 'developer'; // backward compat alias
   if (compact === 'superadmin') return 'superadmin';
   if (
     compact === 'customercare' ||

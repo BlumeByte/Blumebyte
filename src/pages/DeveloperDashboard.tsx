@@ -497,7 +497,7 @@ function MetricsCards({ metrics }: { metrics: Metrics }) {
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
-  const label = status === 'ultimateadmin' ? 'developer' : status;
+  const label = normalizeRole(status) || status;
   const map: Record<string, string> = {
     active: 'bg-green-100 text-green-700', open: 'bg-red-100 text-red-700',
     pending: 'bg-yellow-100 text-yellow-700', resolved: 'bg-green-100 text-green-700',

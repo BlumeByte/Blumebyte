@@ -38,7 +38,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import EmployeeExperiencePage from './pages/EmployeeExperiencePage';
 import HiringsPage from './pages/HiringsPage';
 import HiringDetailPage from './pages/HiringDetailPage';
-import DeveloperDashboard from './pages/UltimateadminSupport';
+import DeveloperDashboard from './pages/DeveloperDashboard';
 import CustomerCareDashboard from './pages/CareDashboard';
 import { CUSTOMER_CARE_ROLES } from './lib/role-utils';
 
@@ -373,14 +373,6 @@ export const router = createBrowserRouter([
       {
         path: '/care',
         element: <Navigate to="/support" replace />,
-      },
-      {
-        path: '/ultimateadmin/support',
-        element: <Navigate to="/developer" replace />,
-      },
-      {
-        path: '/ultimateadmin',
-        element: <Navigate to="/developer" replace />,
       },
       {
         path: '/developer',
