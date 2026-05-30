@@ -36,6 +36,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        # No VITE_GITHUB_PAGES env: custom domain (hr.blumebyte.com via CNAME) means
+        # assets are served from root "/", not "/Blumebyte/", so base "/" is correct.
         run: npm run build
 
       - name: Upload artifact
