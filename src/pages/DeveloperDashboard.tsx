@@ -2404,12 +2404,14 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
       // Detect stale backend: both metrics and tenants fail with route-not-found
       const bothMissing = isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
       setBackendUnavailable(bothMissing);
+      const verifySucceeded = profileResult.status === 'fulfilled';
       const hasLiveData =
         metricsResult.status === 'fulfilled' ||
         tenantsResult.status === 'fulfilled' ||
-        profileResult.status === 'fulfilled';
-      setSupabaseConnected(hasLiveData && !bothMissing);
-      if (hasLiveData && !bothMissing) setLastRealtimeSyncAt(new Date());
+        verifySucceeded;
+      const connectionHealthy = verifySucceeded || (hasLiveData && !bothMissing);
+      setSupabaseConnected(connectionHealthy);
+      if (connectionHealthy) setLastRealtimeSyncAt(new Date());
 
       // Only show error toast if failure is NOT a simple route-not-found (that is handled by the empty-state UI)
       if (!silent && tenantsResult.status === 'rejected' && !isRouteNotFound(tenantsResult)) {
