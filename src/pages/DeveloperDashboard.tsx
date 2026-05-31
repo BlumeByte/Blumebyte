@@ -2401,15 +2401,16 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
         if (verifiedRole) setEffectiveRole(verifiedRole);
       }
 
-      // Detect stale backend: both metrics and tenants fail with route-not-found
-      const bothMissing = isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
-      setBackendUnavailable(bothMissing);
       const verifySucceeded = profileResult.status === 'fulfilled';
+      // Detect stale backend: both metrics and tenants fail with route-not-found,
+      // and even the verify endpoint cannot confirm developer access.
+      const backendMissing = !verifySucceeded && isRouteNotFound(metricsResult) && isRouteNotFound(tenantsResult);
+      setBackendUnavailable(backendMissing);
       const hasLiveData =
         metricsResult.status === 'fulfilled' ||
         tenantsResult.status === 'fulfilled' ||
         verifySucceeded;
-      const connectionHealthy = verifySucceeded || (hasLiveData && !bothMissing);
+      const connectionHealthy = verifySucceeded || (hasLiveData && !backendMissing);
       setSupabaseConnected(connectionHealthy);
       if (connectionHealthy) setLastRealtimeSyncAt(new Date());
 
