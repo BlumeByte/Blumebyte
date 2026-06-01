@@ -34,6 +34,8 @@ type ListControlsProps = {
   showPrint?: boolean;
   className?: string;
   placeholder?: string;
+  resultCount?: number;
+  totalCount?: number;
 };
 
 export function ListControls({
@@ -55,6 +57,8 @@ export function ListControls({
   showPrint = true,
   className = '',
   placeholder = 'Search...',
+  resultCount,
+  totalCount,
 }: ListControlsProps) {
   const hasActiveFilters = filters && Object.values(filterValues).some(v => v !== 'all' && v !== '');
 
@@ -124,6 +128,11 @@ export function ListControls({
 
       {/* Export/Print Actions */}
       <div className="flex gap-1 ml-auto">
+        {typeof resultCount === 'number' && typeof totalCount === 'number' && (
+          <div className="hidden sm:flex items-center px-2 text-xs text-muted-foreground">
+            {resultCount} of {totalCount}
+          </div>
+        )}
         {showExport && onExportCSV && (
           <Button variant="outline" size="sm" className="h-9" onClick={onExportCSV}>
             <FileSpreadsheet className="w-4 h-4 mr-1" />

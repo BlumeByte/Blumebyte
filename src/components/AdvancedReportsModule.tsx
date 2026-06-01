@@ -332,7 +332,7 @@ export function AdvancedReportsModule() {
                     <Calendar
                       mode="single"
                       selected={dateRange.from}
-                      onSelect={(date) => date && setDateRange({ ...dateRange, from: date })}
+                      onSelect={(date: Date | undefined) => date && setDateRange({ ...dateRange, from: date })}
                     />
                   </PopoverContent>
                 </Popover>
@@ -348,7 +348,7 @@ export function AdvancedReportsModule() {
                     <Calendar
                       mode="single"
                       selected={dateRange.to}
-                      onSelect={(date) => date && setDateRange({ ...dateRange, to: date })}
+                      onSelect={(date: Date | undefined) => date && setDateRange({ ...dateRange, to: date })}
                     />
                   </PopoverContent>
                 </Popover>

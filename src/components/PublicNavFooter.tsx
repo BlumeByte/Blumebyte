@@ -11,8 +11,18 @@ import {
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { PublicLanguageButton } from './PublicLanguageButton';
 
+type PublicMenuSection = {
+  title: string;
+  items: Array<{
+    name: string;
+    icon: React.ElementType;
+    description?: string;
+    path: string;
+  }>;
+};
+
 // ─── Desktop dropdown data ────────────────────────────────────────────────────
-const platformMenu = [
+const platformMenu: PublicMenuSection[] = [
   {
     title: 'Core Platform',
     items: [
@@ -39,7 +49,7 @@ const platformMenu = [
   },
 ];
 
-const solutionsMenu = [
+const solutionsMenu: PublicMenuSection[] = [
   {
     title: 'By Industry',
     items: [
@@ -71,7 +81,7 @@ const solutionsMenu = [
   },
 ];
 
-const resourcesMenu = [
+const resourcesMenu: PublicMenuSection[] = [
   {
     title: 'Learn',
     items: [
@@ -86,7 +96,7 @@ const resourcesMenu = [
 ];
 
 // ─── Desktop Dropdown ─────────────────────────────────────────────────────────
-function DesktopDropdown({ label, content }: { label: string; content: typeof platformMenu }) {
+function DesktopDropdown({ label, content }: { label: string; content: PublicMenuSection[] }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,8 +146,8 @@ function DesktopDropdown({ label, content }: { label: string; content: typeof pl
                           <item.icon className="h-5 w-5 text-mint-green/60 group-hover:text-mint-black mt-0.5 shrink-0" />
                           <div>
                             <div className="text-sm font-medium text-gray-900 group-hover:text-mint-black">{item.name}</div>
-                            {(item as any).description && (
-                              <div className="text-xs text-gray-500 mt-0.5">{(item as any).description}</div>
+                            {item.description && (
+                              <div className="text-xs text-gray-500 mt-0.5">{item.description}</div>
                             )}
                           </div>
                         </button>
@@ -161,7 +171,7 @@ function MobileSection({
   onNavigate,
 }: {
   label: string;
-  content: typeof platformMenu;
+  content: PublicMenuSection[];
   onNavigate: (path: string) => void;
 }) {
   const [open, setOpen] = useState(false);

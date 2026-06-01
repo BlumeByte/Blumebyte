@@ -1,3 +1,4 @@
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
 import { scrollToTop } from '../lib/navigation-utils';

@@ -74,6 +74,8 @@ export function PaymentVerification() {
     navigate(`/${user?.role}`, { replace: true });
   };
 
+  const tenantGradientStyle = brandGradientStyle(branding?.primaryColor || '#10b981');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
@@ -84,7 +86,7 @@ export function PaymentVerification() {
           <div className="text-center space-y-6">
             {status === 'verifying' && (
               <>
-                <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center" style={brandGradientStyle}>
+                <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center" style={tenantGradientStyle}>
                   <Loader2 className="w-8 h-8 animate-spin text-white" />
                 </div>
                 <div>
@@ -104,7 +106,7 @@ export function PaymentVerification() {
                   <p className="text-sm text-muted-foreground">{message}</p>
                   <p className="text-xs text-muted-foreground mt-2">Redirecting to your dashboard...</p>
                 </div>
-                <Button onClick={handleGoToDashboard} style={brandGradientStyle} className="text-white w-full">
+                <Button onClick={handleGoToDashboard} style={tenantGradientStyle} className="text-white w-full">
                   Go to Dashboard
                 </Button>
               </>

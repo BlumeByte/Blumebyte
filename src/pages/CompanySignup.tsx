@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Settings, Plus, Minus } from 'lucide-react';
+import { Building2, User, Loader2, CreditCard, Check, Users, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { publicAnonKey } from '../utils/supabase/info';
 import { fetchFunctionsUrl } from '../lib/functions-base';
@@ -17,6 +17,7 @@ export default function CompanySignup() {
   const [step, setStep] = useState(1); // 1 = Company Info, 2 = License Selection & Payment
   const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [paystackPublicKey, setPaystackPublicKey] = useState<string | null>(null);
+  const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [formData, setFormData] = useState({
     companyName: '',
     companySize: '',
@@ -35,18 +36,28 @@ export default function CompanySignup() {
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  const paymentWindowRef = useRef<Window | null>(null);
 
-  // Exchange rate: 1 USD = 15.5 GHS (Ghana Cedis)
-  const USD_TO_GHS = 15.5;
-
-  // Pricing calculation in USD first, then convert to GHS
-  // Monthly: $3.55/user/month  |  Yearly: $2.55/user/month billed as $30.60/year
-  const pricePerLicenseUSD = formData.billingCycle === 'monthly' ? 3.55 : 2.55;
-  const pricePerLicenseGHS = pricePerLicenseUSD * USD_TO_GHS;
+  const currencySymbols: Record<string, string> = {
+    GHS: '₵',
+    NGN: '₦',
+    USD: '$',
+  };
+  const minLicenses = Number(paymentConfig?.minLicenses || 2);
+  const currency = paymentConfig?.currency || 'GHS';
+  const currencySymbol = currencySymbols[currency] || `${currency} `;
+  const monthlyPricing = paymentConfig?.pricing?.monthly;
+  const yearlyPricing = paymentConfig?.pricing?.yearly;
+  const pricePerLicenseUSD = formData.billingCycle === 'monthly'
+    ? Number(monthlyPricing?.amountUsd || 3.55)
+    : Number(yearlyPricing?.monthlyEquivalentUsd || 2.55);
+  const pricePerLicenseDisplay = formData.billingCycle === 'monthly'
+    ? Number(monthlyPricing?.amountDisplay || 0)
+    : Number(yearlyPricing?.monthlyEquivalentDisplay || 0);
   const billingPeriod = formData.billingCycle === 'yearly' ? 12 : 1;
   const totalAmountUSD = formData.licenses * pricePerLicenseUSD * billingPeriod;
-  const totalAmountGHS = totalAmountUSD * USD_TO_GHS;
+  const totalAmountDisplay = formData.billingCycle === 'monthly'
+    ? formData.licenses * Number(monthlyPricing?.amountDisplay || 0)
+    : formData.licenses * Number(yearlyPricing?.amountDisplay || 0);
 
   // Check if Paystack script is loaded
   useEffect(() => {
@@ -107,59 +118,39 @@ export default function CompanySignup() {
     };
   }, []);
 
-  // Fetch Paystack public key
+  // Fetch Paystack payment configuration from the backend
   useEffect(() => {
     const fetchPublicKey = async () => {
       try {
         const response = await fetchFunctionsUrl('/paystack/public-key', {
           headers: { Authorization: `Bearer ${publicAnonKey}` },
         });
-        
-        
-        // If not successful, use fallback immediately
+
         if (!response.ok) {
-          handlePublicKeyFallback();
-          return;
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error || 'Payment system is not configured');
         }
-        
+
         const contentType = response.headers.get('content-type');
-        
-        // Check if response is JSON
         if (!contentType || !contentType.includes('application/json')) {
-          handlePublicKeyFallback();
-          return;
+          throw new Error('Payment system returned an invalid response');
         }
-        
+
         const data = await response.json();
-        
+
         if (data.publicKey) {
           setPaystackPublicKey(data.publicKey);
-          // Also store it for future use
-          localStorage.setItem('paystack_public_key', data.publicKey);
+          setPaymentConfig(data);
         } else {
-          console.error('Failed to load Paystack public key:', data.error);
-          handlePublicKeyFallback();
+          throw new Error(data.error || 'Payment public key is missing');
         }
       } catch (error: any) {
-        console.error('Error fetching Paystack public key:', error.message);
-        handlePublicKeyFallback();
+        console.warn('Paystack configuration unavailable:', error.message);
+        toast.error(
+          error.message || 'Payment system is unavailable. Please contact support.',
+          { duration: 8000 }
+        );
       }
-    };
-
-    const handlePublicKeyFallback = () => {
-      // Check localStorage first
-      const storedKey = localStorage.getItem('paystack_public_key');
-      if (storedKey && (storedKey.startsWith('pk_test_') || storedKey.startsWith('pk_live_'))) {
-        setPaystackPublicKey(storedKey);
-        return;
-      }
-
-      // If no key in localStorage, show message to configure it
-      console.warn('No Paystack public key found. Please configure it in Dev Settings.');
-      toast.error(
-        'Payment system needs configuration. Click the settings icon to configure.',
-        { duration: 8000 }
-      );
     };
 
     fetchPublicKey();
@@ -245,8 +236,8 @@ export default function CompanySignup() {
   };
 
   const handlePayment = async () => {
-    if (formData.licenses < 1) {
-      toast.error('Please select at least 1 license');
+    if (formData.licenses < minLicenses) {
+      toast.error(`Please select at least ${minLicenses} licenses`);
       return;
     }
 
@@ -267,15 +258,23 @@ export default function CompanySignup() {
         return;
       }
 
+      const quoteResponse = await fetchFunctionsUrl(
+        `/paystack/registration-quote?licenses=${encodeURIComponent(String(formData.licenses))}&plan=${encodeURIComponent(formData.billingCycle)}`,
+        {
+          headers: { Authorization: `Bearer ${publicAnonKey}` },
+        }
+      );
+      const quote = await quoteResponse.json().catch(() => null);
+      if (!quoteResponse.ok || !quote?.amountSmallestUnit || !quote?.currency) {
+        throw new Error(quote?.error || 'Failed to calculate payment amount');
+      }
+
       // Initialize Paystack payment directly (using inline popup)
-      const amountInKobo = Math.round(totalAmountGHS * 100);
-      
-      
       const paystackHandler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
         email: formData.adminEmail.toLowerCase(),
-        amount: amountInKobo,
-        currency: 'GHS',
+        amount: quote.amountSmallestUnit,
+        currency: quote.currency,
         ref: `blumebyte_${Date.now()}_${Math.random().toString(36).substring(7)}`,
         metadata: {
           companyName: formData.companyName,
@@ -283,6 +282,7 @@ export default function CompanySignup() {
           licenses: formData.licenses,
           plan: formData.billingCycle,
           email: formData.adminEmail.toLowerCase(),
+          amountUsd: quote.amountUsd,
         },
         callback: function(response: any) {
           // Use regular function (not async) as Paystack requires
@@ -381,17 +381,6 @@ export default function CompanySignup() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      {/* Floating Settings Button */}
-      {!paystackPublicKey && (
-        <button
-          onClick={() => navigate('/dev-settings')}
-          className="fixed bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-50"
-          title="Configure Paystack"
-        >
-          <Settings className="h-5 w-5" />
-        </button>
-      )}
-      
       <Card className="w-full max-w-2xl border-2">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -444,7 +433,7 @@ export default function CompanySignup() {
                     <Label htmlFor="companySize">Company Size</Label>
                     <Select
                       value={formData.companySize}
-                      onValueChange={(value) => setFormData({ ...formData, companySize: value })}
+                      onValueChange={(value: string) => setFormData({ ...formData, companySize: value })}
                       disabled={loading}
                     >
                       <SelectTrigger id="companySize">
@@ -464,7 +453,7 @@ export default function CompanySignup() {
                     <Label htmlFor="industry">Industry</Label>
                     <Select
                       value={formData.industry}
-                      onValueChange={(value) => {
+                      onValueChange={(value: string) => {
                         setFormData({ ...formData, industry: value });
                         if (value !== 'other') {
                           setCustomIndustry('');
@@ -541,6 +530,7 @@ export default function CompanySignup() {
                     <Input
                       id="password"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="Min. 8 characters"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -554,6 +544,7 @@ export default function CompanySignup() {
                     <Input
                       id="confirmPassword"
                       type="password"
+                      autoComplete="new-password"
                       placeholder="Confirm password"
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
@@ -609,7 +600,9 @@ export default function CompanySignup() {
                     <div className="font-semibold">Monthly</div>
                     <div className="text-2xl font-bold mt-1">$3.55<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
                     <div className="text-xs text-gray-600 mt-1">Billed monthly</div>
-                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(3.55 * USD_TO_GHS).toFixed(2)} GHS</div>
+                    <div className="text-xs text-blue-600 mt-1 font-medium">
+                      {pricePerLicenseDisplay ? `${currencySymbol}${pricePerLicenseDisplay.toFixed(2)} ${currency}` : 'Server pricing unavailable'}
+                    </div>
                   </button>
 
                   <button
@@ -625,7 +618,11 @@ export default function CompanySignup() {
                     <div className="font-semibold">Yearly</div>
                     <div className="text-2xl font-bold mt-1">$2.55<span className="text-sm font-normal text-gray-600">/user/mo</span></div>
                     <div className="text-xs text-gray-600 mt-1">Billed annually ($30.60/user/year)</div>
-                    <div className="text-xs text-blue-600 mt-1 font-medium">₵{(2.55 * USD_TO_GHS).toFixed(2)} GHS</div>
+                    <div className="text-xs text-blue-600 mt-1 font-medium">
+                      {yearlyPricing?.monthlyEquivalentDisplay
+                        ? `${currencySymbol}${Number(yearlyPricing.monthlyEquivalentDisplay).toFixed(2)} ${currency}/mo`
+                        : 'Server pricing unavailable'}
+                    </div>
                   </button>
                 </div>
               </div>
@@ -642,8 +639,8 @@ export default function CompanySignup() {
                     type="button"
                     variant="outline"
                     size="lg"
-                    onClick={() => setFormData({ ...formData, licenses: Math.max(2, formData.licenses - 1) })}
-                    disabled={loading || paymentWindowOpened || formData.licenses <= 2}
+                    onClick={() => setFormData({ ...formData, licenses: Math.max(minLicenses, formData.licenses - 1) })}
+                    disabled={loading || paymentWindowOpened || formData.licenses <= minLicenses}
                     className="w-14 h-14 rounded-full"
                   >
                     <Minus className="h-6 w-6" />
@@ -664,7 +661,7 @@ export default function CompanySignup() {
                   </Button>
                 </div>
                 <p className="text-sm text-gray-600 text-center">
-                  Each license allows one employee to access the platform. Minimum purchase: 2 licenses.
+                  Each license allows one employee to access the platform. Minimum purchase: {minLicenses} licenses.
                 </p>
               </div>
 
@@ -679,8 +676,10 @@ export default function CompanySignup() {
                   <span className="font-medium">${pricePerLicenseUSD}/{formData.billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Price per license (GHS):</span>
-                  <span className="font-medium">₵{pricePerLicenseGHS.toFixed(2)}/{formData.billingCycle === 'monthly' ? 'mo' : 'mo'}</span>
+                  <span className="text-gray-600">Price per license ({currency}):</span>
+                  <span className="font-medium">
+                    {pricePerLicenseDisplay ? `${currencySymbol}${pricePerLicenseDisplay.toFixed(2)}/mo` : 'Unavailable'}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Billing period:</span>
@@ -692,8 +691,10 @@ export default function CompanySignup() {
                     <span>${totalAmountUSD.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg mt-1">
-                    <span>Total (GHS):</span>
-                    <span className="text-blue-600">₵{totalAmountGHS.toFixed(2)}</span>
+                    <span>Total ({currency}):</span>
+                    <span className="text-blue-600">
+                      {totalAmountDisplay ? `${currencySymbol}${totalAmountDisplay.toFixed(2)}` : 'Calculated at checkout'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -715,17 +716,9 @@ export default function CompanySignup() {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-yellow-900">Payment Configuration Required</p>
                       <p className="text-xs text-yellow-700 mt-1">
-                        Paystack public key is not configured. Click below to set it up.
+                        Paystack keys must be configured on the server before company signup can accept payments.
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => navigate('/dev-settings')}
-                      className="bg-yellow-600 hover:bg-yellow-700"
-                    >
-                      <Settings className="h-3 w-3 mr-1" />
-                      Configure
-                    </Button>
                   </div>
                 </div>
               )}
@@ -747,7 +740,7 @@ export default function CompanySignup() {
                   onClick={handlePayment}
                   className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600"
                   size="lg"
-                  disabled={loading || paymentWindowOpened}
+                  disabled={loading || paymentWindowOpened || !paystackPublicKey || !paymentConfig}
                 >
                   {loading ? (
                     <>

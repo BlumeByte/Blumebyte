@@ -13,6 +13,105 @@ import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-s
 
 const app = new Hono();
 const PREFIX = "/make-server-a35148f0"; // v2.1 - Payment-first registration flow
+const REGISTRATION_MIN_LICENSES = 2;
+const MONTHLY_LICENSE_PRICE_USD = 3.55;
+const YEARLY_LICENSE_PRICE_USD = 30.60;
+
+function normalizeBillingPlan(plan: any): 'monthly' | 'yearly' {
+  return String(plan || '').toLowerCase() === 'yearly' ? 'yearly' : 'monthly';
+}
+
+function getLicensePriceUsd(plan: 'monthly' | 'yearly') {
+  return plan === 'yearly' ? YEARLY_LICENSE_PRICE_USD : MONTHLY_LICENSE_PRICE_USD;
+}
+
+function getSubscriptionEndDate(plan: 'monthly' | 'yearly', startDate = new Date()) {
+  const endDate = new Date(startDate);
+  if (plan === 'yearly') {
+    endDate.setDate(endDate.getDate() + 365);
+  } else {
+    endDate.setDate(endDate.getDate() + 30);
+  }
+  return endDate;
+}
+
+function isAcceptablePaystackAmount(paidAmount: number, expectedAmount: number) {
+  const tolerance = Math.max(100, Math.ceil(expectedAmount * 0.02));
+  return paidAmount + tolerance >= expectedAmount;
+}
+
+async function getRegistrationPaymentQuote(licensesInput: any, planInput: any) {
+  const licenses = Number(licensesInput);
+  if (!Number.isInteger(licenses) || licenses < REGISTRATION_MIN_LICENSES) {
+    throw new Error(`At least ${REGISTRATION_MIN_LICENSES} licenses are required`);
+  }
+
+  const plan = normalizeBillingPlan(planInput);
+  const amountUsd = licenses * getLicensePriceUsd(plan);
+  const quote = await usdToPaystackAmount(amountUsd);
+  return {
+    licenses,
+    plan,
+    amountUsd,
+    amountSmallestUnit: quote.amountSmallestUnit,
+    amountDisplay: quote.amountDisplay,
+    currency: quote.currency,
+  };
+}
+
+async function writeInitialSubscription(params: {
+  userId: string;
+  companyId: string;
+  plan: 'monthly' | 'yearly';
+  licenses: number;
+  paymentReference: string;
+  amountUsd: number;
+  amountDisplay: number;
+  currency: string;
+  paidAt?: string | null;
+}) {
+  const now = new Date();
+  const startDate = params.paidAt || now.toISOString();
+  const endDate = getSubscriptionEndDate(params.plan, new Date(startDate)).toISOString();
+  const subscription = {
+    userId: params.userId,
+    companyId: params.companyId,
+    plan: params.plan,
+    status: 'active',
+    userCount: params.licenses,
+    purchasedLicenses: params.licenses,
+    licenses: params.licenses,
+    usedLicenses: 1,
+    amount: params.amountUsd,
+    amountDisplay: params.amountDisplay,
+    currency: params.currency,
+    startDate,
+    endDate,
+    paymentReference: params.paymentReference,
+    lastPaymentDate: params.paidAt || now.toISOString(),
+    lastPaymentAmount: params.amountUsd,
+    lastPaymentReference: params.paymentReference,
+    billingHistory: [{
+      id: `tx_${Date.now()}`,
+      date: params.paidAt || now.toISOString(),
+      amount: params.amountUsd,
+      amountDisplay: params.amountDisplay,
+      currency: params.currency,
+      licenses: params.licenses,
+      plan: params.plan,
+      reference: params.paymentReference,
+      status: 'success',
+      type: 'registration',
+    }],
+    autoRenew: false,
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+  };
+
+  await kv.set(`subscription:${params.userId}`, subscription);
+  await syncCompanySubscriptionMirror(params.userId, subscription);
+  return subscription;
+}
 // Helpers that generate the full set of route paths for a given endpoint, covering:
 // 1) hardcoded deployment prefix, 2) bare path, 3) runtime function-name-prefixed path.
 // This prevents route mismatches across different Supabase function URL/path-forwarding modes.
@@ -1308,10 +1407,45 @@ app.get(`${PREFIX}/paystack/public-key`, async (c) => {
     if (!publicKey) {
       return c.json({ error: 'Paystack public key not configured' }, 500);
     }
-    return c.json({ publicKey });
+    const monthlyUnit = await usdToPaystackAmount(MONTHLY_LICENSE_PRICE_USD);
+    const yearlyUnit = await usdToPaystackAmount(YEARLY_LICENSE_PRICE_USD);
+    return c.json({
+      publicKey,
+      currency: monthlyUnit.currency,
+      minLicenses: REGISTRATION_MIN_LICENSES,
+      pricing: {
+        monthly: {
+          amountUsd: MONTHLY_LICENSE_PRICE_USD,
+          amountDisplay: monthlyUnit.amountDisplay,
+          amountSmallestUnit: monthlyUnit.amountSmallestUnit,
+        },
+        yearly: {
+          amountUsd: YEARLY_LICENSE_PRICE_USD,
+          monthlyEquivalentUsd: YEARLY_LICENSE_PRICE_USD / 12,
+          amountDisplay: yearlyUnit.amountDisplay,
+          monthlyEquivalentDisplay: Math.round((yearlyUnit.amountDisplay / 12) * 100) / 100,
+          amountSmallestUnit: yearlyUnit.amountSmallestUnit,
+        },
+      },
+    });
   } catch (error: any) {
     console.error('Error fetching Paystack public key:', error);
     return c.json({ error: error.message }, 500);
+  }
+});
+
+app.get(`${PREFIX}/paystack/registration-quote`, async (c) => {
+  try {
+    const quote = await getRegistrationPaymentQuote(
+      c.req.query('licenses'),
+      c.req.query('plan'),
+    );
+    return c.json({
+      ...quote,
+      minLicenses: REGISTRATION_MIN_LICENSES,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Failed to calculate payment quote' }, 400);
   }
 });
 
@@ -1328,6 +1462,10 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       return c.json({ error: "Password must be at least 8 characters" }, 400);
     }
 
+    if (!paymentReference) {
+      return c.json({ error: "Payment reference is required before company registration" }, 400);
+    }
+
     // Check if email already exists
     const sb = supabaseAdmin();
     const { data: existingUser } = await sb.auth.admin.listUsers();
@@ -1339,7 +1477,9 @@ app.post(`${PREFIX}/company/register`, async (c) => {
     let licensesToSet = 0;
     let subscriptionStatus = 'none';
     let subscriptionPlan = 'none';
-    let paymentData = null;
+    let paymentData: any = null;
+    let subscriptionStartDate: string | null = null;
+    let subscriptionEndDate: string | null = null;
 
     // If payment reference provided, verify payment first (pay-first flow)
     if (paymentReference) {
@@ -1387,18 +1527,38 @@ app.post(`${PREFIX}/company/register`, async (c) => {
           return c.json({ error: 'Payment verification failed. Please wait a moment and try again, or contact support with reference: ' + paymentReference }, 400);
         }
 
-        // Extract metadata from payment
+        // Extract metadata from payment and validate it against server-side pricing
         const metadata = verifyData.data.metadata || {};
-        const paidLicenses = metadata.licenses || selectedLicenses || 0;
-        const paidAmount = verifyData.data.amount / 100;
+        const paidLicenses = Number(metadata.licenses || selectedLicenses || 0);
+        const paidPlan = normalizeBillingPlan(metadata.plan || metadata.billingCycle);
+        const quote = await getRegistrationPaymentQuote(paidLicenses, paidPlan);
+        const paidAmountSmallestUnit = Number(verifyData.data.amount || 0);
+        const paidCurrency = String(verifyData.data.currency || '').toUpperCase();
+
+        if (paidCurrency && paidCurrency !== quote.currency) {
+          return c.json({
+            error: `Payment currency mismatch. Expected ${quote.currency}, received ${paidCurrency}.`,
+          }, 400);
+        }
+
+        if (!isAcceptablePaystackAmount(paidAmountSmallestUnit, quote.amountSmallestUnit)) {
+          return c.json({
+            error: `Payment amount mismatch. Expected at least ${quote.amountDisplay} ${quote.currency}.`,
+          }, 400);
+        }
         
-        licensesToSet = paidLicenses;
+        licensesToSet = quote.licenses;
         subscriptionStatus = 'active';
-        subscriptionPlan = metadata.plan || 'monthly';
+        subscriptionPlan = quote.plan;
+        subscriptionStartDate = verifyData.data.paid_at || new Date().toISOString();
+        subscriptionEndDate = getSubscriptionEndDate(quote.plan, new Date(subscriptionStartDate)).toISOString();
         paymentData = {
           reference: paymentReference,
-          amount: paidAmount,
-          paidAt: new Date().toISOString(),
+          amount: quote.amountDisplay,
+          amountUsd: quote.amountUsd,
+          amountSmallestUnit: quote.amountSmallestUnit,
+          currency: quote.currency,
+          paidAt: subscriptionStartDate,
         };
 
       } catch (paymentError: any) {
@@ -1420,7 +1580,8 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       usedLicenses: 1, // SuperAdmin counts as 1
       subscriptionStatus,
       subscriptionPlan,
-      subscriptionStartDate: subscriptionStatus === 'active' ? new Date().toISOString() : null,
+      subscriptionStartDate,
+      subscriptionEndDate,
       ...(paymentData && { lastPayment: paymentData }),
     };
     
@@ -1463,6 +1624,20 @@ app.post(`${PREFIX}/company/register`, async (c) => {
       assignedCompanies: [companyId],
       createdAt: new Date().toISOString(),
     });
+
+    if (paymentData && subscriptionStatus === 'active') {
+      await writeInitialSubscription({
+        userId,
+        companyId,
+        plan: subscriptionPlan as 'monthly' | 'yearly',
+        licenses: licensesToSet,
+        paymentReference,
+        amountUsd: paymentData.amountUsd,
+        amountDisplay: paymentData.amount,
+        currency: paymentData.currency,
+        paidAt: paymentData.paidAt,
+      });
+    }
 
 
     // CRITICAL FIX: Create default company-scoped settings for new tenant
@@ -1545,7 +1720,7 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
   try {
     const { 
       companyName, companySize, industry, adminName, adminEmail, password,
-      licenses, billingCycle, amount 
+      licenses, billingCycle
     } = await c.req.json();
     
     // Validation
@@ -1557,8 +1732,10 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
       return c.json({ error: "Password must be at least 8 characters" }, 400);
     }
 
-    if (!licenses || licenses < 1) {
-      return c.json({ error: "At least 1 license is required" }, 400);
+    const quote = await getRegistrationPaymentQuote(licenses, billingCycle);
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return c.json({ error: 'Payment system not configured' }, 500);
     }
 
     // Check if email already exists
@@ -1579,9 +1756,12 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
       adminName,
       adminEmail: adminEmail.toLowerCase(),
       password,
-      licenses,
-      billingCycle,
-      amount,
+      licenses: quote.licenses,
+      billingCycle: quote.plan,
+      amount: quote.amountUsd,
+      amountDisplay: quote.amountDisplay,
+      amountSmallestUnit: quote.amountSmallestUnit,
+      currency: quote.currency,
       reference,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -1591,23 +1771,25 @@ app.post(`${PREFIX}/company/init-payment`, async (c) => {
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('PAYSTACK_SECRET_KEY')}`,
+        'Authorization': `Bearer ${paystackSecretKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         email: adminEmail.toLowerCase(),
-        amount: Math.round(amount * 100), // Convert to kobo/cents
+        amount: quote.amountSmallestUnit,
+        currency: quote.currency,
         reference,
         metadata: {
           type: 'company_registration',
           companyName,
           adminName,
-          licenses,
-          billingCycle,
+          licenses: quote.licenses,
+          billingCycle: quote.plan,
+          amountUsd: quote.amountUsd,
           custom_fields: [
             { display_name: 'Company Name', variable_name: 'company_name', value: companyName },
-            { display_name: 'Licenses', variable_name: 'licenses', value: licenses.toString() },
-            { display_name: 'Billing Cycle', variable_name: 'billing_cycle', value: billingCycle },
+            { display_name: 'Licenses', variable_name: 'licenses', value: String(quote.licenses) },
+            { display_name: 'Billing Cycle', variable_name: 'billing_cycle', value: quote.plan },
           ],
         },
         callback_url: `${getFunctionsCallbackBaseUrl(c)}/company/payment-callback`,
@@ -1658,6 +1840,25 @@ app.get(`${PREFIX}/company/payment-status/:reference`, async (c) => {
     const paystackData = await paystackResponse.json();
 
     if (paystackData.status && paystackData.data.status === 'success') {
+      const expectedAmount = Number(pendingRegistration.amountSmallestUnit || 0);
+      const paidAmount = Number(paystackData.data?.amount || 0);
+      const expectedCurrency = String(pendingRegistration.currency || '').toUpperCase();
+      const paidCurrency = String(paystackData.data?.currency || '').toUpperCase();
+
+      if (expectedCurrency && paidCurrency && expectedCurrency !== paidCurrency) {
+        return c.json({
+          status: 'failed',
+          error: `Payment currency mismatch. Expected ${expectedCurrency}, received ${paidCurrency}.`,
+        }, 400);
+      }
+
+      if (expectedAmount > 0 && !isAcceptablePaystackAmount(paidAmount, expectedAmount)) {
+        return c.json({
+          status: 'failed',
+          error: `Payment amount mismatch. Expected at least ${pendingRegistration.amountDisplay} ${expectedCurrency}.`,
+        }, 400);
+      }
+
       // Payment successful - create the account now
       const result = await createCompanyAccount(pendingRegistration);
       
@@ -1686,9 +1887,13 @@ app.get(`${PREFIX}/company/payment-status/:reference`, async (c) => {
 // Helper function to create company account after payment
 async function createCompanyAccount(registrationData: any) {
   try {
-    const { companyName, companySize, industry, adminName, adminEmail, password, licenses, billingCycle } = registrationData;
+    const { companyName, companySize, industry, adminName, adminEmail, password } = registrationData;
+    const licenses = Number(registrationData.licenses || 0);
+    const billingCycle = normalizeBillingPlan(registrationData.billingCycle);
     
     const sb = supabaseAdmin();
+    const startDate = new Date().toISOString();
+    const endDate = getSubscriptionEndDate(billingCycle, new Date(startDate)).toISOString();
     
     // Create company record
     const companyId = crypto.randomUUID();
@@ -1704,7 +1909,8 @@ async function createCompanyAccount(registrationData: any) {
       usedLicenses: 1, // SuperAdmin counts as 1
       subscriptionStatus: 'active',
       subscriptionPlan: billingCycle,
-      subscriptionStartDate: new Date().toISOString(),
+      subscriptionStartDate: startDate,
+      subscriptionEndDate: endDate,
     };
     await kv.set(`company:${companyId}`, company);
 
@@ -1744,6 +1950,50 @@ async function createCompanyAccount(registrationData: any) {
       companyName: companyName,
       assignedCompanies: [companyId],
       createdAt: new Date().toISOString(),
+    });
+
+    await kv.set(`company-settings:${companyId}`, {
+      companyId,
+      companyName,
+      description: '',
+      primaryColor: '#10b981',
+      logoUrl: '',
+      logoPath: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await kv.set(`auto-clock-settings:${companyId}`, {
+      companyId,
+      enabled: false,
+      clockInTime: '08:00',
+      clockOutTime: '17:00',
+      mode: 'all',
+      specificUsers: [],
+      inactivityTimeout: 30,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await kv.set(`manual-clock-settings:${companyId}`, {
+      companyId,
+      enabled: true,
+      mode: 'all',
+      specificUsers: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await writeInitialSubscription({
+      userId,
+      companyId,
+      plan: billingCycle,
+      licenses,
+      paymentReference: registrationData.reference,
+      amountUsd: Number(registrationData.amount || 0),
+      amountDisplay: Number(registrationData.amountDisplay || 0),
+      currency: registrationData.currency || 'GHS',
+      paidAt: startDate,
     });
     
 
@@ -14388,6 +14638,50 @@ for (const route of compatibleRoutePaths('/developer/platform-users/:id')) app.d
 });
 
 // --- Catch-all 404 handler (returns JSON for better debugging) ---
+const functionPathPrefixes = new Set(
+  [
+    PREFIX.replace(/^\/+/, ''),
+    'make-server',
+    'server',
+    Deno.env.get('SUPABASE_FUNCTION_NAME') || '',
+    Deno.env.get('FUNCTION_NAME') || '',
+  ].filter(Boolean),
+);
+
+function buildLegacyRouteFallbackPath(pathname: string) {
+  if (!pathname || pathname === '/') return `${PREFIX}/health`;
+  if (pathname === PREFIX || pathname.startsWith(`${PREFIX}/`)) return null;
+
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length > 0 && functionPathPrefixes.has(segments[0])) {
+    const stripped = segments.slice(1).join('/');
+    return stripped ? `${PREFIX}/${stripped}` : `${PREFIX}/health`;
+  }
+
+  return `${PREFIX}${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
+}
+
+app.all('*', async (c) => {
+  const fallbackPath = buildLegacyRouteFallbackPath(new URL(c.req.url).pathname);
+  if (!fallbackPath) {
+    return c.json({ error: `Route not found: ${c.req.method} ${c.req.path}` }, 404);
+  }
+
+  const url = new URL(c.req.url);
+  url.pathname = fallbackPath;
+  const method = c.req.raw.method.toUpperCase();
+  const init: RequestInit = {
+    method,
+    headers: c.req.raw.headers,
+  };
+
+  if (method !== 'GET' && method !== 'HEAD') {
+    init.body = c.req.raw.body;
+  }
+
+  return app.fetch(new Request(url.toString(), init));
+});
+
 app.notFound((c) => {
   return c.json({ error: `Route not found: ${c.req.method} ${c.req.path}` }, 404);
 });

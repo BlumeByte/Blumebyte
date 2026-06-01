@@ -5,6 +5,11 @@ import { fetchFunctionsUrl } from './functions-base';
 const requestCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5000; // 5 seconds cache for GET requests
 
+type ApiOptions = Omit<RequestInit, 'body'> & {
+  token?: string | null;
+  body?: any;
+};
+
 export function authHeaders(userToken?: string | null, json = true): Record<string, string> {
   const h: Record<string, string> = {
     Authorization: `Bearer ${publicAnonKey}`,
@@ -14,7 +19,7 @@ export function authHeaders(userToken?: string | null, json = true): Record<stri
   return h;
 }
 
-export async function api(path: string, options: RequestInit & { token?: string | null } = {}) {
+export async function api(path: string, options: ApiOptions = {}) {
   const { token, ...fetchOpts } = options;
   const method = (fetchOpts.method || 'GET').toUpperCase();
   const needsJson = method !== 'GET' && fetchOpts.body;

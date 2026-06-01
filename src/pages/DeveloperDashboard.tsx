@@ -671,7 +671,7 @@ function TenantsPanel() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
           <Input className="pl-8" placeholder="Search tenants…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Button variant="outline" size="sm" onClick={() => load()}><RefreshCw className="h-3.5 w-3.5" /></Button>
         <Button size="sm" onClick={() => setCreateDialog(true)}>
           <Building2 className="h-3.5 w-3.5 mr-1" />New Tenant
         </Button>
@@ -975,7 +975,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
             {TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Button variant="outline" size="sm" onClick={() => load()}><RefreshCw className="h-3.5 w-3.5" /></Button>
         <Badge variant="secondary">{filtered.length} {filtered.length === 1 ? 'ticket' : 'tickets'}</Badge>
         <Button size="sm" onClick={() => setShowCreate(true)}><UserPlus className="h-3.5 w-3.5 mr-1" />New Ticket</Button>
       </div>
@@ -1769,7 +1769,7 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
             {allRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Button variant="outline" size="sm" onClick={() => load()}><RefreshCw className="h-3.5 w-3.5" /></Button>
         <Badge variant="secondary">{filtered.length} users</Badge>
       </div>
       {loading ? (
@@ -2136,7 +2136,7 @@ function AuditTrailPanel() {
             {allActionTypes.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        <Button variant="outline" size="sm" onClick={() => load()}><RefreshCw className="h-3.5 w-3.5" /></Button>
         <Badge variant="secondary">{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</Badge>
       </div>
       {loading ? (
@@ -2574,7 +2574,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
                         <p className="font-semibold text-red-800 text-sm">Failed to load platform metrics</p>
                         <p className="text-xs text-red-700 mt-0.5">Dashboard data could not be retrieved. Check your connection or server status.</p>
                       </div>
-                      <Button size="sm" variant="outline" onClick={loadData} className="shrink-0" aria-label="Retry loading metrics">
+                      <Button size="sm" variant="outline" onClick={() => loadData()} className="shrink-0" aria-label="Retry loading metrics">
                         <RefreshCw className="h-3.5 w-3.5 mr-1" />Retry
                       </Button>
                     </div>

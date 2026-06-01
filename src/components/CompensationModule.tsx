@@ -17,6 +17,8 @@ import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';
 import { useCurrency } from '../lib/currency-context';
 
+type ReferenceOption = string | { id?: string; name?: string };
+
 export function CompensationModule() {
   const { accessToken, user } = useAuth();
   const { branding } = useBranding();
@@ -32,8 +34,8 @@ export function CompensationModule() {
   const [editItem, setEditItem] = useState<any>(null);
   const [viewItem, setViewItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [departments, setDepartments] = useState<string[]>([]);
-  const [branches, setBranches] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<ReferenceOption[]>([]);
+  const [branches, setBranches] = useState<ReferenceOption[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
@@ -502,8 +504,9 @@ export function CompensationModule() {
                 <Label className="mb-2 block">Select Departments</Label>
                 <div className="space-y-2">
                   {departments.map(dept => {
-                    const deptId = typeof dept === 'string' ? dept : (dept?.id || dept?.name);
-                    const deptName = typeof dept === 'string' ? dept : (dept?.name || dept?.id);
+                    const deptId = String(typeof dept === 'string' ? dept : (dept?.id || dept?.name || ''));
+                    const deptName = String(typeof dept === 'string' ? dept : (dept?.name || dept?.id || ''));
+                    if (!deptId) return null;
                     return (
                       <div key={deptId} className="flex items-center space-x-2">
                         <Checkbox
@@ -532,8 +535,9 @@ export function CompensationModule() {
                 <Label className="mb-2 block">Select Branches</Label>
                 <div className="space-y-2">
                   {branches.map(branch => {
-                    const branchId = typeof branch === 'string' ? branch : (branch?.id || branch?.name);
-                    const branchName = typeof branch === 'string' ? branch : (branch?.name || branch?.id);
+                    const branchId = String(typeof branch === 'string' ? branch : (branch?.id || branch?.name || ''));
+                    const branchName = String(typeof branch === 'string' ? branch : (branch?.name || branch?.id || ''));
+                    if (!branchId) return null;
                     return (
                       <div key={branchId} className="flex items-center space-x-2">
                         <Checkbox

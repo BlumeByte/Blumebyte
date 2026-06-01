@@ -79,7 +79,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions<T>) {
 
       // Subscribe to broadcast events
       channel
-        .on('broadcast', { event: eventType === '*' ? undefined : eventType }, (payload) => {
+        .on('broadcast' as any, { event: eventType === '*' ? '*' : eventType } as any, (payload: any) => {
           const event: RealtimeEvent<T> = {
             type: payload.type || 'BROADCAST',
             key: payload.key || '',

@@ -6,6 +6,18 @@ import { CheckCircle2, Play, RotateCcw, Trophy, Zap } from 'lucide-react';
 import logoImage from 'figma:asset/fc8bfa36a5c8bac46710f5cb76c2233c090fc8f2.png';
 import { SharedNavigation } from '../components/SharedNavigation';
 
+type PricingPlan = {
+  name: string;
+  price: string;
+  period: string;
+  billingCycle: string;
+  description: string;
+  features: string[];
+  popular?: boolean;
+  savings?: string;
+  contactLink?: string;
+};
+
 // ─── Snake Mini-Game ──────────────────────────────────────────────────────────
 const GRID = 16;
 const CELL = 16;
@@ -206,7 +218,7 @@ function SnakeMiniGame() {
 export default function PricingPage() {
   const navigate = useNavigate();
 
-  const pricingPlans = [
+  const pricingPlans: PricingPlan[] = [
     {
       name: 'Monthly Plan',
       price: '$3.55',
