@@ -1,6 +1,22 @@
 // Company utility functions
 import * as kv from "./kv_store.tsx";
 
+function toValidDate(value: any): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isSubscriptionActive(subscription: any): boolean {
+  const status = String(subscription?.status || '').toLowerCase();
+  if (['expired', 'inactive', 'suspended', 'cancelled', 'canceled', 'disabled', 'past_due', 'payment_failed'].includes(status)) {
+    return false;
+  }
+  const endDate = toValidDate(subscription?.endDate) || toValidDate(subscription?.expiresAt);
+  if (endDate) return endDate > new Date();
+  return status === 'active';
+}
+
 /**
  * Get company record - handles both old and new storage formats
  * @param companyId - The company ID to look up
@@ -53,14 +69,15 @@ export async function validateCompanyLicenses(companyId: string) {
   
   const subscription = company.subscription;
   
-  if (!subscription || subscription.status !== 'active') {
+  if (!subscription || !isSubscriptionActive(subscription)) {
     return {
       valid: false,
       error: "No active subscription. Please purchase licenses first.",
       needsSubscription: true,
       debug: {
         hasSubscription: !!subscription,
-        subscriptionStatus: subscription?.status
+        subscriptionStatus: subscription?.status,
+        subscriptionEndDate: subscription?.endDate || subscription?.expiresAt
       }
     };
   }

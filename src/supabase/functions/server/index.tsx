@@ -384,6 +384,8 @@ function toValidDate(value: any): Date | null {
 function deriveSubscriptionLifecycle(subscription: any) {
   const now = new Date();
   const plan = String(subscription?.plan || '').toLowerCase();
+  const normalizedStatus = String(subscription?.status || '').toLowerCase();
+  const explicitlyInactive = ['expired', 'inactive', 'suspended', 'cancelled', 'canceled', 'disabled', 'past_due', 'payment_failed'].includes(normalizedStatus);
   let endDate = toValidDate(subscription?.endDate) || toValidDate(subscription?.expiresAt);
   if (!endDate) {
     const startDate = toValidDate(subscription?.startDate) || toValidDate(subscription?.createdAt);
@@ -394,8 +396,8 @@ function deriveSubscriptionLifecycle(subscription: any) {
     }
   }
 
-  const fallbackActive = String(subscription?.status || '').toLowerCase() === 'active';
-  const isActive = !!subscription && (endDate ? now < endDate : fallbackActive);
+  const fallbackActive = normalizedStatus === 'active';
+  const isActive = !!subscription && !explicitlyInactive && (endDate ? now < endDate : fallbackActive);
   const daysRemaining = endDate
     ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     : (isActive ? 0 : -1);
@@ -405,6 +407,19 @@ function deriveSubscriptionLifecycle(subscription: any) {
     endDateIso: endDate ? endDate.toISOString() : (subscription?.endDate || subscription?.expiresAt || null),
     daysRemaining: Math.max(0, daysRemaining),
   };
+}
+
+function isSubscriptionBypassPath(c: any): boolean {
+  const pathname = new URL(c.req.url).pathname.toLowerCase();
+  return [
+    '/profile',
+    '/company-settings',
+    '/subscription',
+    '/paystack',
+    '/company/init-payment',
+    '/company/payment-status',
+    '/company/test-payment',
+  ].some((segment) => pathname.includes(segment));
 }
 
 // Helper to verify subscription and license availability
@@ -468,8 +483,11 @@ async function requireAuth(c: any) {
   const rawRole = kvData?.role || user.user_metadata?.role || "employee";
   const role = normalizeCareRole(String(rawRole || ""));
 
-  // SuperAdmin is always allowed (they need to access payment pages)
-  if (role === 'superadmin' || role === 'developer' || role === 'customer_care') {
+  if (role === 'developer' || role === 'customer_care') {
+    return { user, role, kvData };
+  }
+
+  if (role === 'superadmin' && isSubscriptionBypassPath(c)) {
     return { user, role, kvData };
   }
   
@@ -601,6 +619,26 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
   }
   if (kvData?.companyId && !scope.includes(kvData.companyId)) {
     scope.push(kvData.companyId);
+  }
+
+  if (scope.length > 0) {
+    try {
+      const companies = await kv.getByPrefix('company:');
+      const lowerScope = new Set(scope.map((value) => String(value).toLowerCase()));
+      for (const company of companies) {
+        const ids = [company?.id, company?.companyId].filter(Boolean).map((value: any) => String(value));
+        const names = [company?.name, company?.companyName].filter(Boolean).map((value: any) => String(value));
+        const matches = [...ids, ...names].some((value) => lowerScope.has(value.toLowerCase()));
+        if (!matches) continue;
+        for (const value of [...ids, ...names]) {
+          if (value && !scope.some((existing) => existing.toLowerCase() === value.toLowerCase())) {
+            scope.push(value);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to expand company scope:', error);
+    }
   }
   
   if (scope.length > 0) {
@@ -753,7 +791,8 @@ async function ensureCompanyId(item: any, userId: string): Promise<any> {
 // FIX: Handles case mismatches like "BLUMEBYTE" vs "blumebyte" to ensure proper tenant isolation
 function companyMatches(scope: string[], company: string | undefined | null): boolean {
   if (!company || !scope?.length) return false;
-  return scope.some(s => s.toLowerCase() === company.toLowerCase());
+  const normalizedCompany = String(company).trim().toLowerCase();
+  return scope.some(s => String(s).trim().toLowerCase() === normalizedCompany);
 }
 
 // --- Normalize employment type to Title Case for consistent filtering ---
@@ -1172,9 +1211,19 @@ function handleError(e: any, c: any, context: string = '') {
   return c.json({ error: errorMsg }, 500);
 }
 
+async function resolveWritableCompanyId(userId: string, requestedCompanyId?: any): Promise<string | null> {
+  const scope = await resolveCompanyScope(userId);
+  if (!scope?.length) return null;
+
+  const requested = String(requestedCompanyId || '').trim();
+  if (!requested) return scope[0];
+  if (!companyMatches(scope, requested)) return null;
+  return requested;
+}
+
 // --- Check if an item belongs to a user's company ---
 async function isItemInUserCompany(userId: string, itemCompanyId: string | undefined): Promise<boolean> {
-  if (!itemCompanyId) return true; // No company constraint
+  if (!itemCompanyId) return false;
   const userScope = await resolveCompanyScope(userId);
   if (!userScope?.length) return false;
   return companyMatches(userScope, itemCompanyId);
@@ -1222,21 +1271,19 @@ async function triggerWorkflowNotifications(
 // --- Generic CRUD factory ---
 function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise<any>) {
   // List
-  app.get(`${PREFIX}/${prefix}`, async (c) => {
+  for (const route of compatibleRoutePaths(`/${prefix}`)) app.get(route, async (c) => {
     try {
       const { user, role } = await guardFn(c);
       let items = await kv.getByPrefix(`${kvPrefix}`);
       items = await applyCompanyFilter(items, user.id, role);
       return c.json(items || []);
     } catch (e: any) {
-      if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-      if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-      return c.json({ error: e.message }, 500);
+      return handleError(e, c, `${prefix}-list`);
     }
   });
 
   // Get one
-  app.get(`${PREFIX}/${prefix}/:id`, async (c) => {
+  for (const route of compatibleRoutePaths(`/${prefix}/:id`)) app.get(route, async (c) => {
     try {
       const { user, role } = await guardFn(c);
       const id = c.req.param("id");
@@ -1248,22 +1295,20 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
       }
       return c.json(item);
     } catch (e: any) {
-      if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-      if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-      return c.json({ error: e.message }, 500);
+      return handleError(e, c, `${prefix}-get`);
     }
   });
 
   // Create
-  app.post(`${PREFIX}/${prefix}`, async (c) => {
+  for (const route of compatibleRoutePaths(`/${prefix}`)) app.post(route, async (c) => {
     try {
       const { user } = await guardFn(c);
       const body = await c.req.json();
       const id = body.id || crypto.randomUUID();
-      const companyId = body.companyId || body.company || (await getCompanyId(user.id));
+      const companyId = await resolveWritableCompanyId(user.id, body.companyId || body.company);
       if (!companyId) {
         console.error(`⚠️  CRITICAL: User ${user.id} has no company scope - cannot create ${prefix}`);
-        return c.json({ error: 'User has no company assignment' }, 400);
+        return c.json({ error: 'Invalid company assignment' }, 403);
       }
       const item = { 
         ...body, 
@@ -1281,14 +1326,12 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
       
       return c.json(item, 201);
     } catch (e: any) {
-      if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-      if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-      return c.json({ error: e.message }, 500);
+      return handleError(e, c, `${prefix}-create`);
     }
   });
 
   // Update
-  app.put(`${PREFIX}/${prefix}/:id`, async (c) => {
+  for (const route of compatibleRoutePaths(`/${prefix}/:id`)) app.put(route, async (c) => {
     try {
       const { user } = await guardFn(c);
       const id = c.req.param("id");
@@ -1300,7 +1343,20 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
           return c.json({ error: "Not found" }, 404);
         }
       }
-      const item = { ...existing, ...body, id, updatedAt: new Date().toISOString() };
+      const requestedCompany = body.companyId || body.company;
+      if (requestedCompany && !(await isItemInUserCompany(user.id, requestedCompany))) {
+        return c.json({ error: "Invalid company assignment" }, 403);
+      }
+      const existingCompany = existing?.companyId || existing?.company;
+      const fallbackCompany = existingCompany || requestedCompany || (await getCompanyId(user.id));
+      const item = {
+        ...existing,
+        ...body,
+        id,
+        companyId: fallbackCompany,
+        company: fallbackCompany,
+        updatedAt: new Date().toISOString()
+      };
       await kv.set(`${kvPrefix}${id}`, item);
       
       // Broadcast real-time update
@@ -1309,14 +1365,12 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
       
       return c.json(item);
     } catch (e: any) {
-      if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-      if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-      return c.json({ error: e.message }, 500);
+      return handleError(e, c, `${prefix}-update`);
     }
   });
 
   // Delete
-  app.delete(`${PREFIX}/${prefix}/:id`, async (c) => {
+  for (const route of compatibleRoutePaths(`/${prefix}/:id`)) app.delete(route, async (c) => {
     try {
       const { user } = await guardFn(c);
       const id = c.req.param("id");
@@ -1335,9 +1389,7 @@ function makeCrud(prefix: string, kvPrefix: string, guardFn: (c: any) => Promise
       
       return c.json({ success: true });
     } catch (e: any) {
-      if (e.message === "Unauthorized") return c.json({ error: "Unauthorized" }, 401);
-      if (e.message === "Forbidden") return c.json({ error: "Forbidden" }, 403);
-      return c.json({ error: e.message }, 500);
+      return handleError(e, c, `${prefix}-delete`);
     }
   });
 }
@@ -12728,15 +12780,9 @@ const getDeveloperSupportMetrics = async (c: any) => {
         const entry = companyMap.get(cid)!;
         entry.purchasedLicenses = sub.purchasedLicenses || sub.userCount || sub.licenses || 0;
         if (!entry.plan) entry.plan = sub.plan || sub.planName || entry.plan;
-        const fallbackEndDate = sub.endDate || sub.expiresAt;
-        const parsedFallbackEndDate = fallbackEndDate ? new Date(fallbackEndDate) : null;
-        const hasValidFallbackEndDate = !!parsedFallbackEndDate && !Number.isNaN(parsedFallbackEndDate.getTime());
-        const inferredStatus = hasValidFallbackEndDate
-          ? (parsedFallbackEndDate! > new Date() ? 'active' : 'expired')
-          : 'unknown';
-        const normalizedStatus = sub.status || inferredStatus;
-        if (normalizedStatus !== 'active') entry.status = normalizedStatus;
-        if (normalizedStatus === 'active') entry.status = 'active';
+        const lifecycle = deriveSubscriptionLifecycle(sub);
+        const normalizedStatus = lifecycle.isActive ? 'active' : (String(sub.status || '').toLowerCase() || 'expired');
+        entry.status = normalizedStatus;
       }
     }
 
@@ -12953,11 +12999,9 @@ const listDeveloperSupportTenants = async (c: any) => {
       const sub = subMap.get(cid);
       const companyRecord = companyMap.get(cid);
       const inferredStatus = (() => {
-        const endDate = sub?.endDate || sub?.expiresAt;
-        if (!endDate) return 'unknown';
-        const d = new Date(endDate);
-        if (Number.isNaN(d.getTime())) return 'unknown';
-        return d > new Date() ? 'active' : 'expired';
+        if (!sub) return 'unknown';
+        const lifecycle = deriveSubscriptionLifecycle(sub);
+        return lifecycle.isActive ? 'active' : (String(sub.status || '').toLowerCase() || 'expired');
       })();
       const purchasedLicensesRaw =
         getCanonicalSubscriptionLicenses(sub) ||
@@ -12968,7 +13012,7 @@ const listDeveloperSupportTenants = async (c: any) => {
       const purchasedLicenses = Number.isFinite(purchasedLicensesNumber) ? purchasedLicensesNumber : 0;
       return {
         ...t,
-        licenseStatus: sub?.status || companyRecord?.subscriptionStatus || companyRecord?.status || inferredStatus,
+        licenseStatus: inferredStatus !== 'unknown' ? inferredStatus : (companyRecord?.subscriptionStatus || companyRecord?.status || 'unknown'),
         purchasedLicenses,
         plan: sub?.plan || sub?.planName || companyRecord?.subscriptionPlan || companyRecord?.plan || 'unknown',
         lastActivity: sub?.updatedAt || companyRecord?.updatedAt || t.createdAt || '',
@@ -13059,9 +13103,22 @@ const suspendDeveloperSupportTenant = async (c: any) => {
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = c.req.param('id');
     const body = await c.req.json().catch(() => ({}));
+    const nextStatus = body.restore ? 'active' : 'suspended';
     const sub = await kv.get(`subscription:${tenantId}`);
     if (sub) {
-      await kv.set(`subscription:${tenantId}`, { ...sub, status: body.restore ? 'active' : 'suspended', updatedAt: new Date().toISOString() });
+      await kv.set(`subscription:${tenantId}`, { ...sub, status: nextStatus, updatedAt: new Date().toISOString() });
+    }
+    const company = await kv.get(`company:${tenantId}`) || await kv.get(`company_by_id:${tenantId}`);
+    if (company) {
+      const updatedCompany = {
+        ...company,
+        status: nextStatus,
+        subscriptionStatus: nextStatus,
+        subscription: { ...(company.subscription || {}), status: nextStatus },
+        updatedAt: new Date().toISOString(),
+      };
+      await kv.set(`company:${tenantId}`, updatedCompany);
+      await kv.set(`company_by_id:${tenantId}`, updatedCompany);
     }
     // Log audit
     const auditId = crypto.randomUUID();
@@ -13115,15 +13172,21 @@ const updateDeveloperSupportTenantLicense = async (c: any) => {
     await kv.set(`subscription:${tenantId}`, updatedSub);
 
     // Also update company record if it exists
-    const company = await kv.get(`company:${tenantId}`);
+    const company = await kv.get(`company:${tenantId}`) || await kv.get(`company_by_id:${tenantId}`);
     if (company) {
-      await kv.set(`company:${tenantId}`, {
+      const updatedCompany = {
         ...company,
         licenses: updatedSub.purchasedLicenses,
+        subscriptionStatus: updatedSub.status,
+        subscriptionPlan: updatedSub.plan,
+        subscriptionEndDate: updatedSub.expiresAt,
         plan: updatedSub.plan,
-        status: updatedSub.status === 'active' ? 'active' : company.status,
+        status: updatedSub.status,
+        subscription: { ...(company.subscription || {}), ...updatedSub, licenses: updatedSub.purchasedLicenses },
         updatedAt: new Date().toISOString(),
-      });
+      };
+      await kv.set(`company:${tenantId}`, updatedCompany);
+      await kv.set(`company_by_id:${tenantId}`, updatedCompany);
     }
 
     const auditId = crypto.randomUUID();
