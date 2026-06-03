@@ -2,7 +2,6 @@
 # Project: ivohczdtuxasyfoiphqu
 # NOTE: Edge functions are deployed separately via Supabase CLI, NOT through Figma Make
 
-[project]
 project_id = "ivohczdtuxasyfoiphqu"
 
 [api]
@@ -26,8 +25,7 @@ max_client_conn = 100
 
 [realtime]
 enabled = true
-port = 54323
-ip_version = "ipv4"
+ip_version = "IPv4"
 
 [studio]
 enabled = true
@@ -42,7 +40,6 @@ pop3_port = 54327
 
 [storage]
 enabled = true
-port = 54328
 file_size_limit = "50MB"
 
 [auth]
@@ -55,7 +52,6 @@ additional_redirect_urls = [
 ]
 jwt_expiry = 3600
 enable_signup = true
-enable_confirmations = false
 
 [auth.email]
 enable_signup = true
@@ -63,12 +59,13 @@ double_confirm_changes = true
 enable_confirmations = false
 
 [auth.external.google]
-enabled = true
-redirect_uri = "https://blumebyte.vercel.app/auth/callback"
+enabled = false
 
-# Edge Functions - Enabled for automatic deployment
-[functions]
-enabled = true
+# Edge Functions
+[functions.make-server-a35148f0]
+verify_jwt = false
+
+[functions.server]
 verify_jwt = false
 
 # Analytics
