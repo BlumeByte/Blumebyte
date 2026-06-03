@@ -20,6 +20,22 @@ function normalizeSubscriptionRole(role: any): string {
   return String(role || '').trim().toLowerCase().replace(/[_-]/g, '');
 }
 
+function toValidDate(value: any): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isSubscriptionActive(subscription: any): boolean {
+  const status = String(subscription?.status || '').toLowerCase();
+  if (['expired', 'inactive', 'suspended', 'cancelled', 'canceled', 'disabled', 'past_due', 'payment_failed'].includes(status)) {
+    return false;
+  }
+  const endDate = toValidDate(subscription?.endDate) || toValidDate(subscription?.expiresAt);
+  if (endDate) return endDate > new Date();
+  return status === 'active';
+}
+
 async function resolveBillingSubscriptionContext(userId: string): Promise<{
   companyId: string | null;
   ownerUserId: string | null;
@@ -389,7 +405,9 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const purchasedLicensesNumber = Number(purchasedLicensesRaw);
       const purchasedLicenses = Number.isFinite(purchasedLicensesNumber) ? purchasedLicensesNumber : 0;
       const availableLicenses = Math.max(0, purchasedLicenses - usedLicenses);
-      const status = subscription?.status || company?.subscriptionStatus || 'none';
+      const status = subscription
+        ? (isSubscriptionActive(subscription) ? 'active' : (String(subscription.status || '').toLowerCase() || 'expired'))
+        : (company?.subscriptionStatus || 'none');
       const plan = subscription?.plan || company?.subscriptionPlan || 'none';
       
       return c.json({
@@ -431,7 +449,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       // Get subscription
       const { subscription } = await resolveBillingSubscriptionContext(user.id);
       
-      if (!subscription || subscription.status !== 'active') {
+      if (!subscription || !isSubscriptionActive(subscription)) {
         return c.json({ 
           canCreate: false, 
           reason: 'No active subscription. Please purchase licenses first.',
@@ -440,8 +458,13 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
       
       // Count used licenses
+      const employeeRecord = await kv.get(`employee:${user.id}`);
+      const companyId = employeeRecord?.companyId || employeeRecord?.company || null;
       const allUsers = await kv.getByPrefix('employee:');
-      const usedLicenses = allUsers.length;
+      const companyUsers = companyId
+        ? allUsers.filter((u: any) => u.companyId === companyId || u.company === companyId)
+        : [];
+      const usedLicenses = companyUsers.length;
       const purchasedLicenses = subscription.purchasedLicenses || 0;
       const availableLicenses = purchasedLicenses - usedLicenses;
       
@@ -535,10 +558,12 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const paystackData = paystackInit.paystackData;
       const finalAmountSmallestUnit = paystackInit.amountSmallestUnit;
       const finalCurrency = paystackInit.currency;
+      const { companyId } = await resolveBillingSubscriptionContext(user.id);
       
       // Store pending license purchase
       await kv.set(`pending-license:${reference}`, {
         userId: user.id,
+        companyId,
         plan,
         licenses,
         amount,
@@ -737,10 +762,13 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       if (pendingLicense.selectedUserIds && Array.isArray(pendingLicense.selectedUserIds)) {
         const allUsers = await kv.getByPrefix('employee:');
         const selectedIds = new Set(pendingLicense.selectedUserIds);
+        const companyUsers = pendingLicense.companyId
+          ? allUsers.filter((u: any) => u.companyId === pendingLicense.companyId || u.company === pendingLicense.companyId)
+          : [];
         
         
         // Deactivate users not in the selected list
-        for (const user of allUsers) {
+        for (const user of companyUsers) {
           const userId = user.id || user.userId;
           
           // Never deactivate SuperAdmin
@@ -1063,7 +1091,9 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           }
           
           const allEmps = await kv.getByPrefix('employee:');
-          const hrEmps = allEmps.filter((u: any) => u.companyId === pendingLicense.companyId || !pendingLicense.companyId);
+          const hrEmps = pendingLicense.companyId
+            ? allEmps.filter((u: any) => u.companyId === pendingLicense.companyId || u.company === pendingLicense.companyId)
+            : [];
           let assignedCount = 0;
           for (const emp of hrEmps) {
             if (emp.status === 'active' || emp.active) {
@@ -1164,10 +1194,12 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const paystackData = paystackInit.paystackData;
       const finalAmountSmallestUnit = paystackInit.amountSmallestUnit;
       const finalCurrency = paystackInit.currency;
+      const { companyId } = await resolveBillingSubscriptionContext(user.id);
       
       // Store pending license purchase with selected users
       await kv.set(`pending-license:${reference}`, {
         userId: user.id,
+        companyId,
         plan,
         licenses,
         amount,

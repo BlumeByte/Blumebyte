@@ -1126,6 +1126,50 @@ function calcBenefitPlanAllowance(basicSalary: number, plans: any[], userId?: st
   return allowance;
 }
 
+function calcTaxConfigurationDeduction(basicSalary: number, configs: any[]): number {
+  let taxDeduction = 0;
+  for (const tax of configs) {
+    if (tax.enabled === false || tax.active === false || tax.status === 'inactive') continue;
+    if (tax.applicableTo && tax.applicableTo !== 'all' && tax.applicableTo !== 'employees') continue;
+
+    const calculationType = String(tax.calculationType || tax.type || '').toLowerCase();
+    if (calculationType === 'percentage') {
+      taxDeduction += basicSalary * (parseFloat(tax.rate || 0) / 100);
+    } else if (['fixed', 'flat', 'amount'].includes(calculationType)) {
+      taxDeduction += parseFloat(tax.amount ?? tax.fixedAmount ?? tax.rate ?? 0);
+    } else if (['brackets', 'bracket', 'progressive'].includes(calculationType) && Array.isArray(tax.brackets)) {
+      const sorted = [...tax.brackets].sort((a, b) => parseFloat(a.min ?? a.minIncome ?? 0) - parseFloat(b.min ?? b.minIncome ?? 0));
+      for (const bracket of sorted) {
+        const min = parseFloat(bracket.min ?? bracket.minIncome ?? 0);
+        const max = parseFloat(bracket.max ?? bracket.maxIncome ?? 0) || Infinity;
+        const rate = parseFloat(bracket.rate || 0) / 100;
+        if (basicSalary > min) {
+          taxDeduction += (Math.min(basicSalary, max) - min) * rate;
+        }
+      }
+    }
+  }
+  return taxDeduction;
+}
+
+function calcAdminBenefitAllowance(basicSalary: number, benefits: any[], userId?: string): number {
+  let benefitAllowance = 0;
+  for (const benefit of benefits) {
+    if (benefit.enabled === false || benefit.active === false || benefit.status === 'inactive') continue;
+    const targetUsers = benefit.targetUsers || benefit.eligibleUsers || [];
+    if (userId && Array.isArray(targetUsers) && targetUsers.length && !targetUsers.includes(userId)) continue;
+
+    const contributionType = String(benefit.contributionType || benefit.calculationType || benefit.costType || '').toLowerCase();
+    const employerValue = parseFloat(benefit.employerContribution ?? benefit.employerCost ?? benefit.amount ?? 0);
+    if (contributionType === 'percentage') {
+      benefitAllowance += basicSalary * (employerValue / 100);
+    } else {
+      benefitAllowance += employerValue;
+    }
+  }
+  return benefitAllowance;
+}
+
 // --- Company-based filtering helper ---
 async function applyCompanyFilter(items: any[], userId: string, role: string): Promise<any[]> {
   // CRITICAL FIX: ALL roles including SuperAdmins are filtered by their company scope
@@ -2082,13 +2126,14 @@ app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
       return c.json({ error: 'No company scope found' }, 400);
     }
     
-    const subscription = await kv.get(`subscription:${authUser.id}`);
+    const { subscription } = await resolveBillingSubscriptionContext(authUser.id);
+    const lifecycle = deriveSubscriptionLifecycle(subscription);
     const allUsers = await kv.getByPrefix('employee:');
     // CRITICAL: Filter to only this company's users
     const companyUsers = allUsers.filter((u: any) => companyMatches(scope, u.companyId) || companyMatches(scope, u.company));
     
     // If no subscription or inactive, deactivate all non-superadmin users IN THIS COMPANY
-    if (!subscription || subscription.status !== 'active') {
+    if (!subscription || !lifecycle.isActive) {
       let deactivatedCount = 0;
       for (const user of companyUsers) {
         if (user.role !== 'superadmin' && user.status === 'active') {
@@ -2110,7 +2155,7 @@ app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
       });
     }
     
-    const purchasedLicenses = subscription.purchasedLicenses || 0;
+    const purchasedLicenses = getCanonicalSubscriptionLicenses(subscription);
     const superAdminCount = companyUsers.filter((u: any) => u.role === 'superadmin').length;
     const availableLicenses = purchasedLicenses - superAdminCount;
     
@@ -2160,7 +2205,7 @@ app.post(`${PREFIX}/sync-user-licenses`, async (c) => {
         availableLicenses,
         activatedCount,
         deactivatedCount,
-        totalUsers: allUsers.length
+        totalUsers: companyUsers.length
       }
     });
     
@@ -5043,44 +5088,13 @@ const adminPayrollCalculate = async (c: any) => {
     const benefits = allBenefits.filter(scopeFilter);
     const benefitPlans = allBenefitPlans.filter((b: any) => scopeFilter(b) && b.status !== 'inactive');
 
-    // Calculate tax deduction from admin-style tax-configuration records
-    let taxDeduction = 0;
-    for (const tax of taxConfigs) {
-      if (tax.enabled === false) continue;
-      if (tax.applicableTo && tax.applicableTo !== 'all' && tax.applicableTo !== 'employees') continue;
-      if (tax.type === 'percentage') {
-        taxDeduction += basicSalary * (parseFloat(tax.rate || 0) / 100);
-      } else if (tax.type === 'flat') {
-        taxDeduction += parseFloat(tax.amount || 0);
-      } else if (tax.type === 'bracket' && Array.isArray(tax.brackets)) {
-        let remaining = basicSalary;
-        for (const bracket of tax.brackets) {
-          if (remaining <= 0) break;
-          const min = parseFloat(bracket.min || 0);
-          const max = parseFloat(bracket.max || 0) || Infinity;
-          const rate = parseFloat(bracket.rate || 0) / 100;
-          const taxable = Math.min(remaining, max - min);
-          taxDeduction += taxable * rate;
-          remaining -= taxable;
-        }
-      }
-    }
-    // Add superadmin-style progressive bracket tax using shared helper
-    taxDeduction += calcProgressiveTax(basicSalary, taxBrackets);
+    const taxDeduction =
+      calcTaxConfigurationDeduction(basicSalary, taxConfigs) +
+      calcProgressiveTax(basicSalary, taxBrackets);
 
-    // Calculate benefit allowance (employer contribution)
-    let benefitAllowance = 0;
-    for (const benefit of benefits) {
-      if (benefit.enabled === false) continue;
-      if (userId && benefit.eligibleUsers?.length && !benefit.eligibleUsers.includes(userId)) continue;
-      if (benefit.contributionType === 'percentage') {
-        benefitAllowance += basicSalary * (parseFloat(benefit.employerContribution || 0) / 100);
-      } else {
-        benefitAllowance += parseFloat(benefit.employerContribution || 0);
-      }
-    }
-    // Add superadmin-style benefit-plan contributions using shared helper
-    benefitAllowance += calcBenefitPlanAllowance(basicSalary, benefitPlans, userId);
+    const benefitAllowance =
+      calcAdminBenefitAllowance(basicSalary, benefits, userId) +
+      calcBenefitPlanAllowance(basicSalary, benefitPlans, userId);
 
     // Calculate approved OT bonus
     let otBonus = 0;
@@ -5147,32 +5161,13 @@ const superadminPayrollCalculate = async (c: any) => {
     const benefits = allBenefits.filter(scopeFilter);
     const benefitPlans = allBenefitPlans.filter((b: any) => scopeFilter(b) && b.status !== 'inactive');
 
-    let taxDeduction = 0;
-    for (const tax of taxConfigs) {
-      if (tax.enabled === false) continue;
-      if (tax.applicableTo && tax.applicableTo !== 'all' && tax.applicableTo !== 'employees') continue;
-      if (tax.type === 'percentage') { taxDeduction += basicSalary * (parseFloat(tax.rate || 0) / 100); }
-      else if (tax.type === 'flat') { taxDeduction += parseFloat(tax.amount || 0); }
-      else if (tax.type === 'bracket' && Array.isArray(tax.brackets)) {
-        let remaining = basicSalary;
-        for (const bracket of tax.brackets) {
-          if (remaining <= 0) break;
-          const taxable = Math.min(remaining, (parseFloat(bracket.max || 0) || Infinity) - parseFloat(bracket.min || 0));
-          taxDeduction += taxable * (parseFloat(bracket.rate || 0) / 100);
-          remaining -= taxable;
-        }
-      }
-    }
-    taxDeduction += calcProgressiveTax(basicSalary, taxBrackets);
+    const taxDeduction =
+      calcTaxConfigurationDeduction(basicSalary, taxConfigs) +
+      calcProgressiveTax(basicSalary, taxBrackets);
 
-    let benefitAllowance = 0;
-    for (const benefit of benefits) {
-      if (benefit.enabled === false) continue;
-      if (userId && benefit.eligibleUsers?.length && !benefit.eligibleUsers.includes(userId)) continue;
-      if (benefit.contributionType === 'percentage') { benefitAllowance += basicSalary * (parseFloat(benefit.employerContribution || 0) / 100); }
-      else { benefitAllowance += parseFloat(benefit.employerContribution || 0); }
-    }
-    benefitAllowance += calcBenefitPlanAllowance(basicSalary, benefitPlans, userId);
+    const benefitAllowance =
+      calcAdminBenefitAllowance(basicSalary, benefits, userId) +
+      calcBenefitPlanAllowance(basicSalary, benefitPlans, userId);
 
     let otBonus = 0;
     if (userId) {
@@ -7678,13 +7673,7 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
     
     // Derive active status safely — mirrors the logic in deriveSubscriptionLifecycle
     // used by /subscription/status so the two endpoints agree.
-    const now = new Date();
-    const endDateRaw = resolvedSubscription.endDate;
-    const endDateParsed = endDateRaw ? new Date(endDateRaw) : null;
-    const validEndDate = endDateParsed && !Number.isNaN(endDateParsed.getTime()) ? endDateParsed : null;
-    const isActive = validEndDate
-      ? now < validEndDate
-      : String(resolvedSubscription.status || '').toLowerCase() === 'active';
+    const lifecycle = deriveSubscriptionLifecycle(resolvedSubscription);
     
     const cardAuth = resolvedSubscription.cardAuthorization;
     const cardSaved = !!(cardAuth?.authorizationCode);
@@ -7698,7 +7687,7 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
       purchasedLicenses: totalLicenses,
       usedLicenses,
       availableLicenses,
-      subscriptionStatus: isActive ? 'active' : 'expired',
+      subscriptionStatus: lifecycle.isActive ? 'active' : (String(resolvedSubscription.status || '').toLowerCase() || 'expired'),
       plan: resolvedSubscription.plan,
       endDate: resolvedSubscription.endDate,
       companyId,
@@ -10352,14 +10341,14 @@ Current user question: ${message}`;
 // ========================================
 
 // Workflows CRUD
-app.get(`${PREFIX}/automation/workflows`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/workflows')) app.get(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const scope = await resolveCompanyScope(authUser.user.id);
     
     const workflows = await kv.getByPrefix('automation_workflow:');
     const filtered = scope?.length
-      ? workflows.filter((w: any) => scope.includes(w.companyId) || !w.companyId)
+      ? workflows.filter((w: any) => companyMatches(scope, w.companyId || w.company))
       : [];
     
     return c.json({ data: filtered });
@@ -10368,7 +10357,7 @@ app.get(`${PREFIX}/automation/workflows`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/automation/workflows`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/workflows')) app.post(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
@@ -10397,10 +10386,11 @@ app.post(`${PREFIX}/automation/workflows`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/automation/workflows/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/workflows/:id')) app.put(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -10413,11 +10403,16 @@ app.put(`${PREFIX}/automation/workflows/:id`, async (c) => {
     if (!existing) {
       return c.json({ error: 'Workflow not found' }, 404);
     }
+    if (!scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Workflow not found' }, 404);
+    }
     
     const updated = {
       ...existing,
       ...data,
       id,
+      companyId: existing.companyId || existing.company,
+      company: existing.company || existing.companyId,
       updatedAt: new Date().toISOString(),
     };
     
@@ -10428,16 +10423,21 @@ app.put(`${PREFIX}/automation/workflows/:id`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/automation/workflows/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/workflows/:id')) app.delete(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
     
     const id = c.req.param('id');
+    const existing = await kv.get(`automation_workflow:${id}`);
+    if (!existing || !scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Workflow not found' }, 404);
+    }
     await kv.del(`automation_workflow:${id}`);
     
     return c.json({ success: true });
@@ -10447,13 +10447,13 @@ app.delete(`${PREFIX}/automation/workflows/:id`, async (c) => {
 });
 
 // Scheduled Tasks CRUD
-app.get(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/scheduled-tasks')) app.get(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const companyId = await getCompanyId(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     const tasks = await kv.getByPrefix('automation_task:');
-    const filtered = companyId ? tasks.filter((t: any) => t.companyId === companyId || !t.companyId) : tasks.filter((t: any) => !t.companyId);
+    const filtered = scope?.length ? tasks.filter((t: any) => companyMatches(scope, t.companyId || t.company)) : [];
     
     return c.json({ data: filtered });
   } catch (e: any) {
@@ -10461,7 +10461,7 @@ app.get(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/scheduled-tasks')) app.post(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
@@ -10490,10 +10490,11 @@ app.post(`${PREFIX}/automation/scheduled-tasks`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/scheduled-tasks/:id')) app.put(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -10506,11 +10507,16 @@ app.put(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
     if (!existing) {
       return c.json({ error: 'Task not found' }, 404);
     }
+    if (!scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Task not found' }, 404);
+    }
     
     const updated = {
       ...existing,
       ...data,
       id,
+      companyId: existing.companyId || existing.company,
+      company: existing.company || existing.companyId,
       updatedAt: new Date().toISOString(),
     };
     
@@ -10521,16 +10527,21 @@ app.put(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/scheduled-tasks/:id')) app.delete(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
     
     const id = c.req.param('id');
+    const existing = await kv.get(`automation_task:${id}`);
+    if (!existing || !scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Task not found' }, 404);
+    }
     await kv.del(`automation_task:${id}`);
     
     return c.json({ success: true });
@@ -10540,15 +10551,15 @@ app.delete(`${PREFIX}/automation/scheduled-tasks/:id`, async (c) => {
 });
 
 // Business Rules CRUD
-app.get(`${PREFIX}/automation/business-rules`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/business-rules')) app.get(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const scope = await resolveCompanyScope(authUser.user.id);
     
     const rules = await kv.getByPrefix('automation_rule:');
     const filtered = scope?.length
-      ? rules.filter((r: any) => scope.includes(r.companyId) || !r.companyId)
-      : rules.filter((r: any) => !r.companyId);
+      ? rules.filter((r: any) => companyMatches(scope, r.companyId || r.company))
+      : [];
     
     return c.json({ data: filtered });
   } catch (e: any) {
@@ -10556,7 +10567,7 @@ app.get(`${PREFIX}/automation/business-rules`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/automation/business-rules`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/business-rules')) app.post(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
@@ -10585,10 +10596,11 @@ app.post(`${PREFIX}/automation/business-rules`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/automation/business-rules/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/business-rules/:id')) app.put(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -10601,11 +10613,16 @@ app.put(`${PREFIX}/automation/business-rules/:id`, async (c) => {
     if (!existing) {
       return c.json({ error: 'Rule not found' }, 404);
     }
+    if (!scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Rule not found' }, 404);
+    }
     
     const updated = {
       ...existing,
       ...data,
       id,
+      companyId: existing.companyId || existing.company,
+      company: existing.company || existing.companyId,
       updatedAt: new Date().toISOString(),
     };
     
@@ -10648,16 +10665,21 @@ app.put(`${PREFIX}/automation/business-rules/:id`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/automation/business-rules/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/business-rules/:id')) app.delete(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
     
     const id = c.req.param('id');
+    const existing = await kv.get(`automation_rule:${id}`);
+    if (!existing || !scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Rule not found' }, 404);
+    }
     await kv.del(`automation_rule:${id}`);
     
     return c.json({ success: true });
@@ -10667,14 +10689,13 @@ app.delete(`${PREFIX}/automation/business-rules/:id`, async (c) => {
 });
 
 // Notification Templates CRUD
-app.get(`${PREFIX}/automation/notification-templates`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/notification-templates')) app.get(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
-    const profile = await getUserProfile(authUser.user.id);
-    const companyId = profile?.companyId;
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     const templates = await kv.getByPrefix('automation_template:');
-    const filtered = templates.filter((t: any) => t.companyId === companyId || !t.companyId);
+    const filtered = scope?.length ? templates.filter((t: any) => companyMatches(scope, t.companyId || t.company)) : [];
     
     return c.json({ data: filtered });
   } catch (e: any) {
@@ -10682,10 +10703,11 @@ app.get(`${PREFIX}/automation/notification-templates`, async (c) => {
   }
 });
 
-app.post(`${PREFIX}/automation/notification-templates`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/notification-templates')) app.post(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const companyId = await getCompanyId(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -10697,7 +10719,7 @@ app.post(`${PREFIX}/automation/notification-templates`, async (c) => {
     const template = {
       id,
       ...data,
-      companyId: profile?.companyId, // CRITICAL: Add companyId for multi-tenant isolation
+      companyId,
       createdBy: authUser.user.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -10710,10 +10732,11 @@ app.post(`${PREFIX}/automation/notification-templates`, async (c) => {
   }
 });
 
-app.put(`${PREFIX}/automation/notification-templates/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/notification-templates/:id')) app.put(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -10726,11 +10749,16 @@ app.put(`${PREFIX}/automation/notification-templates/:id`, async (c) => {
     if (!existing) {
       return c.json({ error: 'Template not found' }, 404);
     }
+    if (!scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Template not found' }, 404);
+    }
     
     const updated = {
       ...existing,
       ...data,
       id,
+      companyId: existing.companyId || existing.company,
+      company: existing.company || existing.companyId,
       updatedAt: new Date().toISOString(),
     };
     
@@ -10741,16 +10769,21 @@ app.put(`${PREFIX}/automation/notification-templates/:id`, async (c) => {
   }
 });
 
-app.delete(`${PREFIX}/automation/notification-templates/:id`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/notification-templates/:id')) app.delete(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
+    const scope = await resolveCompanyScope(authUser.user.id);
     
     if (!['superadmin', 'admin'].includes(profile?.role)) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
     
     const id = c.req.param('id');
+    const existing = await kv.get(`automation_template:${id}`);
+    if (!existing || !scope?.length || !companyMatches(scope, existing.companyId || existing.company)) {
+      return c.json({ error: 'Template not found' }, 404);
+    }
     await kv.del(`automation_template:${id}`);
     
     return c.json({ success: true });
@@ -10760,7 +10793,7 @@ app.delete(`${PREFIX}/automation/notification-templates/:id`, async (c) => {
 });
 
 // Execute workflow manually (for testing)
-app.post(`${PREFIX}/automation/workflows/:id/execute`, async (c) => {
+for (const route of compatibleRoutePaths('/automation/workflows/:id/execute')) app.post(route, async (c) => {
   try {
     const authUser = await requireAuth(c);
     const profile = await getUserProfile(authUser.user.id);
