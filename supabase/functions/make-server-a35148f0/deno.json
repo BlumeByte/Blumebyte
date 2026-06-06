@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["deno.window", "deno.unstable"],
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "imports": {
+    "hono": "npm:hono@4.7.7",
+    "hono/cors": "npm:hono@4.7.7/cors",
+    "hono/logger": "npm:hono@4.7.7/logger",
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2.49.8"
+  },
+  "tasks": {
+    "serve": "deno run --allow-net --allow-env --allow-read index.tsx"
+  }
+}

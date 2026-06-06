@@ -25,10 +25,12 @@ export function EmployeeChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showClearingAlert, setShowClearingAlert] = useState(true);
+  const [supportThreadId, setSupportThreadId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user, accessToken } = useAuth();
   const pollInterval = useRef<number>();
+  const isSuperAdmin = user?.role === 'superadmin';
 
   // Get user initials for avatar
   const getInitials = (name: string) => {
@@ -51,8 +53,11 @@ export function EmployeeChat() {
       const token = accessToken;
       if (!token) return;
 
+      const path = isSuperAdmin && supportThreadId
+        ? `/support-agent/threads/${supportThreadId}`
+        : '/chat/messages';
       const response = await fetchFunctionsUrl(
-        '/chat/messages',
+        path,
         {
           method: 'GET',
           headers: {
@@ -64,15 +69,18 @@ export function EmployeeChat() {
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.messages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
+        setMessages((data.messages || []).map((msg: any) => ({
+          id: msg.id,
+          userId: msg.senderId || msg.userId,
+          userName: msg.senderRole || msg.userName || msg.senderEmail || 'Support',
+          message: msg.message,
+          timestamp: new Date(msg.sentAt || msg.timestamp)
         })));
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
-  }, [accessToken]);
+  }, [accessToken, isSuperAdmin, supportThreadId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -119,8 +127,11 @@ export function EmployeeChat() {
         return;
       }
 
+      const path = isSuperAdmin
+        ? (supportThreadId ? `/support-agent/threads/${supportThreadId}/message` : '/support-agent/request')
+        : '/chat/send';
       const response = await fetchFunctionsUrl(
-        '/chat/send',
+        path,
         {
           method: 'POST',
           headers: {
@@ -135,13 +146,20 @@ export function EmployeeChat() {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to send message');
+      }
+      const data = await response.json().catch(() => ({}));
+      if (isSuperAdmin && data?.thread?.id) {
+        setSupportThreadId(data.thread.id);
+        if (data.queued) toast.info(data.message || 'No support agent is available. Your request has been queued.');
+        else toast.success(data.message || 'Connected to support.');
       }
 
       // Fetch updated messages
       await fetchMessages();
     } catch (error: any) {
-      toast.error('Failed to send message');
+      toast.error(error?.message || 'Failed to send message');
       console.error('Send message error:', error);
       // Restore input if failed
       setInput(messageText);
@@ -195,7 +213,7 @@ export function EmployeeChat() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
-                    <CardTitle className="text-lg">Blumebyte Chat</CardTitle>
+                    <CardTitle className="text-lg">{isSuperAdmin ? 'Talk to an Agent' : 'Blumebyte Chat'}</CardTitle>
                   </div>
                   <Button
                     variant="ghost"
@@ -207,13 +225,13 @@ export function EmployeeChat() {
                   </Button>
                 </div>
                 <p className="text-xs text-primary-foreground/90 mt-1">
-                  Chat with your colleagues
+                  {isSuperAdmin ? 'Send dashboard issues to an assigned support agent' : 'Chat with your colleagues'}
                 </p>
               </CardHeader>
 
               <CardContent className="p-0">
                 {/* Weekly Clearing Alert */}
-                {showClearingAlert && (
+                  {!isSuperAdmin && showClearingAlert && (
                   <Alert className="m-3 mb-0 border-amber-200 bg-amber-50">
                     <AlertCircle className="h-4 w-4 text-amber-600" />
                     <AlertDescription className="text-xs text-amber-800 flex items-start justify-between gap-2">
@@ -238,7 +256,7 @@ export function EmployeeChat() {
                       <MessageCircle className="h-12 w-12 mb-3 opacity-50" />
                       <p className="text-sm font-medium mb-1">No messages yet</p>
                       <p className="text-xs px-4">
-                        Start a conversation with your team
+                        {isSuperAdmin ? 'Send your issue to connect with an available agent' : 'Start a conversation with your team'}
                       </p>
                     </div>
                   ) : (

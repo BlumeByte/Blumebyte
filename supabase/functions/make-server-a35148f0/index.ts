@@ -4,12 +4,12 @@ import { Hono } from "npm:hono@4.7.7";
 import type { Context } from "npm:hono@4.7.7";
 import { cors } from "npm:hono@4.7.7/cors";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
-import * as kv from "./kv_store.tsx";
-import { addLicenseRoutes } from "./license-routes.tsx";
-import { usdToPaystackAmount } from "./currency-utils.tsx";
-import { performProductionCleanup } from "./production-cleanup.tsx";
-import { migrateCompanyKeys } from "./migration-company-keys.tsx";
-import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-stats.tsx";
+import * as kv from "./kv_store.ts";
+import { addLicenseRoutes } from "./license-routes.ts";
+import { usdToPaystackAmount } from "./currency-utils.ts";
+import { performProductionCleanup } from "./production-cleanup.ts";
+import { migrateCompanyKeys } from "./migration-company-keys.ts";
+import { recalculateCompanyStats, syncAllCompaniesStats } from "./sync-company-stats.ts";
 
 const app = new Hono();
 const PREFIX = "/make-server-a35148f0"; // v2.1 - Payment-first registration flow

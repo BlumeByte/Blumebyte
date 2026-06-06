@@ -129,17 +129,10 @@ export function LoginPage() {
     e.preventDefault();
     setResetLoading(true);
     try {
-      // Use Supabase Auth's built-in reset email (uses project's configured email provider)
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/password-reset`,
+      await api('/auth/forgot-password', {
+        method: 'POST',
+        body: { email: resetEmail },
       });
-      if (error) {
-        // Fall back to custom server endpoint if Supabase auth fails
-        await api('/auth/forgot-password', {
-          method: 'POST',
-          body: { email: resetEmail },
-        });
-      }
       setResetSuccess(true);
     } catch (error) {
       toast.error('Failed to send reset email. Please try again.');

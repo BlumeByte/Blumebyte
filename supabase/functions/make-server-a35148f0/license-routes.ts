@@ -1,7 +1,7 @@
 import { Hono } from 'npm:hono@4.7.7';
-import * as kv from './kv_store.tsx';
-import { usdToPaystackAmount } from './currency-utils.tsx';
-import { recalculateCompanyStats } from './sync-company-stats.tsx';
+import * as kv from './kv_store.ts';
+import { usdToPaystackAmount } from './currency-utils.ts';
+import { recalculateCompanyStats } from './sync-company-stats.ts';
 
 const PREFIX = '/make-server-a35148f0';
 const subscriptionRoutePaths = (path: string) =>

@@ -195,6 +195,7 @@
   .date-time-input {
     color-scheme: light;
     min-height: 2.25rem;
+    padding-right: 0.75rem;
   }
 
   /* Use high-specificity selectors instead of !important to ensure picker icons always show */
@@ -206,11 +207,14 @@
     opacity: 1;
     display: block;
     visibility: visible;
-    background: transparent;
-    position: static;
+    background-color: transparent;
+    background-size: 16px 16px;
+    position: relative;
+    z-index: 1;
     filter: brightness(0);
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
+    margin-left: 0.25rem;
   }
 
   /* Dark mode support for date/time inputs */

@@ -6,6 +6,10 @@ import { recalculateCompanyStats } from './sync-company-stats.tsx';
 const PREFIX = '/make-server-a35148f0';
 const subscriptionRoutePaths = (path: string) =>
   Array.from(new Set([`${PREFIX}${path}`, path, `/:functionName${path}`]));
+const BILLING_EMAIL_FROM = (Deno.env.get('EMAIL_FROM') || 'Blumebyte HR <noreply@blumebyte.com>').includes('@')
+  ? (Deno.env.get('EMAIL_FROM') || 'Blumebyte HR <noreply@blumebyte.com>')
+  : 'Blumebyte HR <noreply@blumebyte.com>';
+const OPERATIONS_COPY_EMAIL = 'info@blumebyte.com';
 
 function getCanonicalSubscriptionLicenses(subscription: any): number {
   return Number(
@@ -34,6 +38,51 @@ function isSubscriptionActive(subscription: any): boolean {
   const endDate = toValidDate(subscription?.endDate) || toValidDate(subscription?.expiresAt);
   if (endDate) return endDate > new Date();
   return status === 'active';
+}
+
+function calculateExtendedEndDate(subscription: any, plan: any): Date {
+  const now = new Date();
+  const currentEnd = toValidDate(subscription?.endDate) || toValidDate(subscription?.expiresAt);
+  const base = currentEnd && currentEnd > now ? currentEnd : now;
+  const endDate = new Date(base);
+  if (String(plan || subscription?.plan || '').toLowerCase() === 'monthly') {
+    endDate.setDate(endDate.getDate() + 30);
+  } else {
+    endDate.setDate(endDate.getDate() + 365);
+  }
+  return endDate;
+}
+
+async function sendBillingEmail(to: string, subject: string, html: string) {
+  if (!to) return;
+  const apiKey = Deno.env.get('RESEND_API_KEY');
+  if (!apiKey) {
+    console.warn(`sendBillingEmail skipped for ${to}: RESEND_API_KEY is not configured`);
+    return;
+  }
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: BILLING_EMAIL_FROM,
+      to,
+      cc: OPERATIONS_COPY_EMAIL,
+      subject,
+      html,
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    console.error(`sendBillingEmail failed ${response.status}:`, body.slice(0, 300));
+  }
+}
+
+async function getBillingRecipient(userId: string, fallbackEmail = '') {
+  const employee = await kv.get(`employee:${userId}`);
+  return employee?.email || fallbackEmail || '';
 }
 
 async function resolveBillingSubscriptionContext(userId: string): Promise<{
@@ -722,13 +771,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         status: 'active',
       };
       
-      // Calculate subscription end date
-      const endDate = new Date();
-      if (pendingLicense.plan === 'monthly') {
-        endDate.setDate(endDate.getDate() + 30);
-      } else {
-        endDate.setDate(endDate.getDate() + 365);
-      }
+      const endDate = calculateExtendedEndDate(subscription, pendingLicense.plan);
       
       // Update subscription
       subscription.purchasedLicenses = (subscription.purchasedLicenses || 0) + pendingLicense.licenses;
@@ -815,6 +858,15 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           usersDeactivated: deactivatedCount,
         },
       });
+      await sendBillingEmail(
+        user.email || await getBillingRecipient(pendingLicense.userId),
+        'Your Blumebyte subscription payment was successful',
+        `<p>Your Blumebyte subscription payment was successful.</p>
+         <p><strong>Licenses added:</strong> ${pendingLicense.licenses}</p>
+         <p><strong>Total licenses:</strong> ${subscription.purchasedLicenses}</p>
+         <p><strong>Plan:</strong> ${subscription.plan}</p>
+         <p><strong>Expires:</strong> ${subscription.endDate}</p>`
+      );
       
       return c.json({ 
         success: true, 
@@ -907,13 +959,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         });
       }
       
-      // Extend subscription
-      const endDate = new Date();
-      if (subscription.plan === 'monthly') {
-        endDate.setDate(endDate.getDate() + 30);
-      } else {
-        endDate.setDate(endDate.getDate() + 365);
-      }
+      const endDate = calculateExtendedEndDate(subscription, subscription.plan);
       
       subscription.endDate = endDate.toISOString();
       subscription.status = 'active';
@@ -938,6 +984,14 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           reference: paystackData.data.reference,
         },
       });
+      await sendBillingEmail(
+        user.email || await getBillingRecipient(writeUserId),
+        'Your Blumebyte subscription was renewed',
+        `<p>Your Blumebyte subscription renewal was successful.</p>
+         <p><strong>Licenses:</strong> ${subscription.purchasedLicenses}</p>
+         <p><strong>Plan:</strong> ${subscription.plan}</p>
+         <p><strong>New expiry:</strong> ${subscription.endDate}</p>`
+      );
       
       return c.json({ 
         success: true, 
@@ -1034,12 +1088,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
         };
 
         const now = new Date();
-        const endDate = new Date();
-        if (pendingLicense.plan === 'monthly') {
-          endDate.setDate(endDate.getDate() + 30);
-        } else {
-          endDate.setDate(endDate.getDate() + 365);
-        }
+        const endDate = calculateExtendedEndDate(subscription, pendingLicense.plan);
 
         subscription.plan = pendingLicense.plan;
         subscription.status = 'active';
@@ -1115,6 +1164,15 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
           resourceId: userId,
           details: { reference, amount: pendingLicense.amount, licenses: pendingLicense.licenses }
         });
+        await sendBillingEmail(
+          await getBillingRecipient(userId),
+          'Your Blumebyte subscription payment was processed',
+          `<p>Your Blumebyte subscription payment was processed successfully.</p>
+           <p><strong>Licenses added:</strong> ${pendingLicense.licenses}</p>
+           <p><strong>Total licenses:</strong> ${subscription.purchasedLicenses}</p>
+           <p><strong>Plan:</strong> ${subscription.plan}</p>
+           <p><strong>Expires:</strong> ${subscription.endDate}</p>`
+        );
         
       }
 
@@ -1317,6 +1375,11 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       await kv.set(`subscription:${writeUserId}`, updated);
       await syncCompanySubscriptionMirror(writeUserId, updated);
       await logAudit({ userId: user.id, userName: user.email || 'Unknown', action: 'UPDATE', resourceType: 'subscription-card', resourceId: user.id, details: { action: 'remove_card' } });
+      await sendBillingEmail(
+        user.email || await getBillingRecipient(writeUserId),
+        'Your Blumebyte saved card was removed',
+        `<p>Your saved payment card was removed and auto-renewal was disabled.</p>`
+      );
       return c.json({ success: true, message: 'Saved card removed. Auto-renewal disabled.' });
     } catch (e: any) {
       if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
@@ -1340,6 +1403,11 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       await kv.set(`subscription:${writeUserId}`, updated);
       await syncCompanySubscriptionMirror(writeUserId, updated);
       await logAudit({ userId: user.id, userName: user.email || 'Unknown', action: 'UPDATE', resourceType: 'subscription-auto-renew', resourceId: user.id, details: { autoRenew: !!enabled } });
+      await sendBillingEmail(
+        user.email || await getBillingRecipient(writeUserId),
+        `Blumebyte auto-renewal ${enabled ? 'enabled' : 'disabled'}`,
+        `<p>Auto-renewal has been <strong>${enabled ? 'enabled' : 'disabled'}</strong> for your Blumebyte subscription.</p>`
+      );
       return c.json({ success: true, autoRenew: !!enabled });
     } catch (e: any) {
       if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);

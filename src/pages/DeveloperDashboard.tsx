@@ -20,7 +20,7 @@ import {
   BarChart3, Briefcase, Ticket, Key, Activity, FileText, UserPlus,
   ChevronRight, ChevronLeft, Wrench, Bell, Lock, Unlock, PanelLeftClose,
   PanelLeftOpen, AlertTriangle, BookOpen, MessageSquare, Server, Zap,
-  TrendingUp, Menu, X as XIcon
+  TrendingUp, Menu, X as XIcon, Printer
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -407,6 +407,22 @@ interface Metrics {
 interface AuditLog {
   id: string; actorEmail: string; actionType: string; tenantId: string;
   timestamp: string; description: string;
+}
+
+function escapeHtml(value: any) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderReportList(items: any[], fields: string[]) {
+  if (!items?.length) return '<p class="muted">No records</p>';
+  return `<table><thead><tr>${fields.map(f => `<th>${escapeHtml(f)}</th>`).join('')}</tr></thead><tbody>${items.map(item => (
+    `<tr>${fields.map(f => `<td>${escapeHtml(item?.[f] ?? item?.details?.[f] ?? '')}</td>`).join('')}</tr>`
+  )).join('')}</tbody></table>`;
 }
 
 // ─── Root Component ────────────────────────────────────────────────────────────
@@ -1214,6 +1230,7 @@ function AgentsPanel() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', role: 'customer_care' });
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1287,6 +1304,65 @@ function AgentsPanel() {
     } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
   };
 
+  const printAgentActivity = async (agent: Agent) => {
+    setPrinting(agent.id);
+    try {
+      const token = await getToken();
+      const report = await api(`/developer/agents/${agent.id}/activity`, { token });
+      const win = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=800');
+      if (!win) {
+        toast.error('Popup blocked. Allow popups to print agent reports.');
+        return;
+      }
+      const html = `
+        <!doctype html>
+        <html>
+          <head>
+            <title>Agent Activity - ${escapeHtml(agent.name || agent.email)}</title>
+            <style>
+              body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+              h1 { font-size: 22px; margin: 0 0 4px; }
+              h2 { font-size: 16px; margin: 24px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+              .meta { color: #4b5563; font-size: 12px; margin-bottom: 16px; }
+              table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; }
+              th, td { text-align: left; border: 1px solid #e5e7eb; padding: 6px; vertical-align: top; }
+              th { background: #f9fafb; font-weight: 700; }
+              .muted { color: #6b7280; font-size: 12px; }
+              pre { white-space: pre-wrap; font-size: 11px; background: #f9fafb; border: 1px solid #e5e7eb; padding: 8px; }
+              @media print { button { display: none; } body { margin: 12mm; } }
+            </style>
+          </head>
+          <body>
+            <button onclick="window.print()">Print</button>
+            <h1>${escapeHtml(agent.name || agent.email)} activity report</h1>
+            <div class="meta">Generated ${escapeHtml(report.generatedAt || new Date().toISOString())}</div>
+            <h2>Assigned Tenants</h2>
+            ${renderReportList(report.assignedTenants || [], ['id', 'name', 'industry', 'status', 'subscriptionStatus'])}
+            <h2>Tickets</h2>
+            ${renderReportList(report.tickets || [], ['id', 'tenantName', 'subject', 'priority', 'status', 'createdAt', 'updatedAt'])}
+            <h2>Clock In / Clock Out</h2>
+            ${renderReportList(report.attendance || [], ['userId', 'employeeName', 'date', 'clockIn', 'clockOut', 'totalHours', 'status'])}
+            <h2>Performance Records</h2>
+            ${renderReportList(report.performance || [], ['id', 'employeeId', 'employeeName', 'rating', 'status', 'createdAt'])}
+            <h2>Conversations</h2>
+            ${renderReportList(report.chatMessages || [], ['threadId', 'tenantId', 'senderRole', 'senderEmail', 'message', 'createdAt'])}
+            <h2>Audit Logs</h2>
+            ${renderReportList(report.auditLogs || [], ['actorEmail', 'actionType', 'tenantId', 'timestamp', 'description'])}
+          </body>
+        </html>`;
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 300);
+      toast.success('Agent report opened for printing');
+    } catch (e: any) {
+      toast.error('Failed to prepare agent report: ' + (e.message || ''));
+    } finally {
+      setPrinting(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -1318,6 +1394,9 @@ function AgentsPanel() {
                     <div className="flex items-center gap-1">
                       <Button size="sm" variant="ghost" onClick={() => toggleStatus(a)} title={a.status === 'active' ? 'Deactivate' : 'Activate'}>
                         {a.status === 'active' ? <Lock className="h-3.5 w-3.5 text-orange-500" /> : <Unlock className="h-3.5 w-3.5 text-green-500" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => printAgentActivity(a)} title="Print activity report" disabled={printing === a.id}>
+                        {printing === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
                       </Button>
                       <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteAgent(a)} title="Delete">
                         <Trash2 className="h-3.5 w-3.5" />

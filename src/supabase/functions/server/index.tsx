@@ -145,6 +145,35 @@ const EMAIL_FROM = configuredEmailFrom.includes('@')
   ? configuredEmailFrom
   : 'Blumebyte HR <noreply@blumebyte.com>';
 const FRONTEND_FALLBACK_URL = 'http://localhost:3000';
+const OPERATIONS_COPY_EMAIL = 'info@blumebyte.com';
+
+const SENSITIVE_CHAT_TERMS = [
+  'idiot',
+  'stupid',
+  'dumb',
+  'fool',
+  'moron',
+  'bastard',
+  'asshole',
+  'fuck',
+  'shit',
+  'bitch',
+  'slut',
+  'whore',
+  'kill yourself',
+];
+
+function containsSensitiveChatLanguage(value: any) {
+  const normalized = String(value || '').toLowerCase();
+  return SENSITIVE_CHAT_TERMS.some((term) => normalized.includes(term));
+}
+
+function sensitiveLanguageResponse(c: any) {
+  return c.json({
+    error: 'Message blocked. Please remove insults or sensitive language and try again.',
+    code: 'sensitive_language',
+  }, 400);
+}
 
 // SECURITY: Restrict CORS to known frontend origins only.
 // Falls back to wildcard when no real origins are explicitly configured so the
@@ -419,6 +448,7 @@ function isSubscriptionBypassPath(c: any): boolean {
     '/company/init-payment',
     '/company/payment-status',
     '/company/test-payment',
+    '/support-agent',
   ].some((segment) => pathname.includes(segment));
 }
 
@@ -6319,6 +6349,7 @@ for (const route of compatibleRoutePaths('/auth/login-alert')) app.post(route, a
 });
 
 
+app.post(`${PREFIX}/attendance/activity`, async (c) => {
   try {
     const { user } = await requireAuth(c);
     const now = new Date();
@@ -8562,6 +8593,7 @@ const sendChatMessage = async (c: any) => {
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return c.json({ error: 'Message is required' }, 400);
     }
+    if (containsSensitiveChatLanguage(message)) return sensitiveLanguageResponse(c);
 
     // Get user profile for name and company - use employee: key for consistency
     const userProfile = await kv.get(`employee:${authUser.user.id}`);
@@ -11532,14 +11564,23 @@ app.post(`${PREFIX}/admin/migrate-company-keys`, async (c) => {
 // Request password reset (forgot password) - Custom token-based system
 app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
   try {
-    const { email } = await c.req.json();
+    const rawBody = await c.req.text().catch(() => '');
+    let body: any = {};
+    if (rawBody) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        body = Object.fromEntries(new URLSearchParams(rawBody));
+      }
+    }
+    const email = String(body?.email || '').trim().toLowerCase();
     
     if (!email) {
       return c.json({ error: 'Email is required' }, 400);
     }
 
     // Rate-limit: max 3 password reset requests per email per hour
-    const fpRateLimitKey = `fp-ratelimit:${email.toLowerCase()}`;
+    const fpRateLimitKey = `fp-ratelimit:${email}`;
     const fpRateData = await kv.get(fpRateLimitKey).catch(() => null) as any;
     const fpNow = Date.now();
     const fpWindowMs = 60 * 60 * 1000; // 1 hour
@@ -11554,7 +11595,7 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
     
     // Find user by email
     const allEmployees = await kv.getByPrefix('employee:');
-    const employee = allEmployees.find((e: any) => e.email?.toLowerCase() === email.toLowerCase());
+    const employee = allEmployees.find((e: any) => String(e.email || '').toLowerCase() === email);
     
     if (!employee) {
       // Don't reveal if email exists or not for security
@@ -11593,6 +11634,7 @@ app.post(`${PREFIX}/auth/forgot-password`, async (c) => {
           body: JSON.stringify({
             from: EMAIL_FROM,
             to: employee.email,
+            cc: OPERATIONS_COPY_EMAIL,
             subject: 'Reset Your Blumebyte Password',
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -11872,14 +11914,31 @@ async function sendEmailNotification(
       body: JSON.stringify({
         from: EMAIL_FROM,
         to: recipientEmail,
-        bcc: 'info@blumebyte.com',
+        cc: OPERATIONS_COPY_EMAIL,
         subject,
         html: emailHtml,
       }),
     });
+    let deliveryStatus = 'queued';
+    let deliveryError = '';
     if (!res.ok) {
       const body = await res.text().catch(() => '');
+      deliveryStatus = 'failed';
+      deliveryError = body.slice(0, 500);
       console.error(`sendEmailNotification: Resend error ${res.status} for subject="${subject}"`, body.slice(0, 200));
+    } else {
+      const body = await res.text().catch(() => '');
+      try {
+        const parsed = body ? JSON.parse(body) : {};
+        if (!parsed?.id) {
+          deliveryStatus = 'unknown';
+          deliveryError = body.slice(0, 500);
+          console.warn(`sendEmailNotification: Resend returned success without id for subject="${subject}"`);
+        }
+      } catch {
+        deliveryStatus = 'unknown';
+        deliveryError = body.slice(0, 500);
+      }
     }
 
     // Mirror every user-facing notification to the developer dashboard via KV so
@@ -11893,6 +11952,9 @@ async function sendEmailNotification(
         recipientEmail,
         subject,
         prefKey: prefKey || '',
+        deliveryStatus,
+        deliveryError,
+        copiedTo: OPERATIONS_COPY_EMAIL,
         sentAt: new Date().toISOString(),
         read: false,
       });
@@ -13720,6 +13782,7 @@ const sendDeveloperChatMessage = async (c: any) => {
     const body = await c.req.json();
     const { recipientId, recipientEmail, recipientName, tenantId, message, threadId: existingThreadId } = body;
     if (!message?.trim()) return c.json({ error: 'message is required' }, 400);
+    if (containsSensitiveChatLanguage(message)) return sensitiveLanguageResponse(c);
     if (!recipientId && !recipientEmail) return c.json({ error: 'recipientId or recipientEmail is required' }, 400);
     const now = new Date().toISOString();
 
@@ -13762,8 +13825,288 @@ const sendDeveloperChatMessage = async (c: any) => {
 };
 for (const route of compatibleRoutePathsForAliases('/developer/chat/send', '/support/chat/send')) app.post(route, sendDeveloperChatMessage);
 
+async function findAvailableSupportAgent(tenantId: string) {
+  const agents = (await getDynamicPlatformAgents())
+    .filter((agent: any) => normalizeCareRole(agent?.role) === 'customer_care' && String(agent?.status || 'active').toLowerCase() === 'active');
+  const threads = await kv.getByPrefix('support_agent_thread:');
+  const busyAgentIds = new Set(
+    threads
+      .filter((thread: any) => !['resolved', 'closed'].includes(String(thread?.status || '').toLowerCase()))
+      .map((thread: any) => thread.assignedAgentId)
+      .filter(Boolean)
+  );
+  for (const agent of agents) {
+    const agentId = agent.userId || agent.id;
+    const assigned = await getCareAssignmentsForAgent(agentId);
+    if (assigned.includes(tenantId) && !busyAgentIds.has(agentId)) return { ...agent, id: agentId, assignedTenants: assigned };
+  }
+  return null;
+}
+
+async function getSupportAgentThreadForUser(c: any, threadId: string) {
+  const auth = await requireAuth(c);
+  const role = normalizeCareRole(auth.role || auth.kvData?.role || auth.user?.user_metadata?.role);
+  const thread = await kv.get(`support_agent_thread:${threadId}`);
+  if (!thread) throw new Error('ThreadNotFound');
+  if (role === 'developer') return { auth, role, thread };
+  if (role === 'superadmin' && thread.requesterId === auth.user.id) return { auth, role, thread };
+  if (role === 'customer_care' && thread.assignedAgentId === auth.user.id) return { auth, role, thread };
+  throw new Error('Forbidden');
+}
+
+for (const route of compatibleRoutePaths('/support-agent/request')) app.post(route, async (c) => {
+  try {
+    const { user, kvData } = await requireSuperAdmin(c);
+    const body = await c.req.json();
+    const message = String(body?.message || '').trim();
+    if (!message) return c.json({ error: 'message is required' }, 400);
+    if (containsSensitiveChatLanguage(message)) return sensitiveLanguageResponse(c);
+    const tenantId = body?.tenantId || kvData?.companyId || kvData?.company;
+    if (!tenantId) return c.json({ error: 'Tenant context is required' }, 400);
+    const now = new Date().toISOString();
+    const agent = await findAvailableSupportAgent(tenantId);
+    const ticketId = crypto.randomUUID();
+    const ticket = {
+      id: ticketId,
+      tenantId,
+      tenantName: body?.tenantName || kvData?.companyName || '',
+      subject: body?.subject || 'Super admin support chat',
+      description: message,
+      issueType: body?.issueType || 'chat_support',
+      priority: body?.priority || 'medium',
+      status: agent ? 'open' : 'queued',
+      escalated: false,
+      assignedAgentId: agent?.id || '',
+      createdBy: user.id,
+      createdByEmail: user.email,
+      createdAt: now,
+      updatedAt: now,
+      source: 'support_agent_chat',
+    };
+    await saveSupportTicket(ticket);
+    const threadId = crypto.randomUUID();
+    const thread = {
+      id: threadId,
+      ticketId,
+      tenantId,
+      requesterId: user.id,
+      requesterEmail: user.email,
+      requesterName: kvData?.name || user.email,
+      assignedAgentId: agent?.id || '',
+      assignedAgentEmail: agent?.email || '',
+      status: agent ? 'open' : 'queued',
+      createdAt: now,
+      updatedAt: now,
+      lastMessage: message,
+    };
+    await kv.set(`support_agent_thread:${threadId}`, thread);
+    await kv.set(`developer_chat_thread:${threadId}`, {
+      ...thread,
+      recipientId: user.id,
+      recipientEmail: user.email,
+      recipientName: kvData?.name || user.email,
+      agentId: agent?.id || '',
+      source: 'support_agent_chat',
+    });
+    const msgId = crypto.randomUUID();
+    const msg = {
+      id: msgId,
+      threadId,
+      ticketId,
+      senderRole: 'superadmin',
+      senderEmail: user.email,
+      senderId: user.id,
+      message,
+      sentAt: now,
+    };
+    await kv.set(`support_agent_msg:${threadId}:${msgId}`, msg);
+    await kv.set(`developer_chat_msg:${threadId}:${msgId}`, msg);
+    if (!agent) {
+      const noteId = crypto.randomUUID();
+      await kv.set(`developer_notification:${noteId}`, {
+        id: noteId,
+        type: 'support_agent_unavailable',
+        subject: 'Support request queued because no assigned agent is available',
+        message: `Tenant ${tenantId} requested support but no assigned customer care agent is currently available.`,
+        tenantId,
+        ticketId,
+        threadId,
+        createdAt: now,
+        read: false,
+      });
+    }
+    await writeDeveloperAudit(user, 'support_agent_chat_requested', { tenantId, ticketId, threadId, assignedAgentId: agent?.id || '' });
+    return c.json({
+      success: true,
+      queued: !agent,
+      message: agent ? 'Connected to an available support agent.' : 'No assigned support agent is currently available. Your request has been queued and developers have been notified.',
+      thread,
+      ticket,
+      agent,
+    }, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/support-agent/threads/:threadId')) app.get(route, async (c) => {
+  try {
+    const { thread } = await getSupportAgentThreadForUser(c, c.req.param('threadId'));
+    const messages = await kv.getByPrefix(`support_agent_msg:${thread.id}:`);
+    messages.sort((a: any, b: any) => new Date(a.sentAt || 0).getTime() - new Date(b.sentAt || 0).getTime());
+    return c.json({ thread, messages });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    if (e.message === 'ThreadNotFound') return c.json({ error: 'Thread not found' }, 404);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/support-agent/threads/:threadId/message')) app.post(route, async (c) => {
+  try {
+    const { auth, role, thread } = await getSupportAgentThreadForUser(c, c.req.param('threadId'));
+    if (['resolved', 'closed'].includes(String(thread.status || '').toLowerCase())) {
+      return c.json({ error: 'This support chat is closed. Start a new request to chat again.' }, 400);
+    }
+    const body = await c.req.json();
+    const message = String(body?.message || '').trim();
+    if (!message) return c.json({ error: 'message is required' }, 400);
+    if (containsSensitiveChatLanguage(message)) return sensitiveLanguageResponse(c);
+    const now = new Date().toISOString();
+    const msgId = crypto.randomUUID();
+    const msg = {
+      id: msgId,
+      threadId: thread.id,
+      ticketId: thread.ticketId,
+      senderRole: role,
+      senderEmail: auth.user.email,
+      senderId: auth.user.id,
+      message,
+      sentAt: now,
+    };
+    const updatedThread = { ...thread, lastMessage: message, updatedAt: now, status: thread.status === 'queued' ? 'open' : thread.status };
+    await kv.set(`support_agent_thread:${thread.id}`, updatedThread);
+    await kv.set(`developer_chat_thread:${thread.id}`, { ...(await kv.get(`developer_chat_thread:${thread.id}`) || {}), ...updatedThread, source: 'support_agent_chat' });
+    await kv.set(`support_agent_msg:${thread.id}:${msgId}`, msg);
+    await kv.set(`developer_chat_msg:${thread.id}:${msgId}`, msg);
+    await writeDeveloperAudit(auth.user, 'support_agent_chat_message', { threadId: thread.id, ticketId: thread.ticketId, role });
+    return c.json({ success: true, thread: updatedThread, message: msg });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    if (e.message === 'ThreadNotFound') return c.json({ error: 'Thread not found' }, 404);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/support-agent/threads/:threadId/resolve')) app.post(route, async (c) => {
+  try {
+    const { auth, role, thread } = await getSupportAgentThreadForUser(c, c.req.param('threadId'));
+    if (!['customer_care', 'developer', 'superadmin'].includes(role)) return c.json({ error: 'Forbidden' }, 403);
+    const now = new Date().toISOString();
+    const updatedThread = { ...thread, status: 'resolved', resolvedAt: now, resolvedBy: auth.user.id, updatedAt: now };
+    await kv.set(`support_agent_thread:${thread.id}`, updatedThread);
+    await kv.set(`developer_chat_thread:${thread.id}`, { ...(await kv.get(`developer_chat_thread:${thread.id}`) || {}), ...updatedThread, status: 'resolved', chatClosed: true });
+    const ticket = await getSupportTicketById(thread.ticketId);
+    if (ticket) await saveSupportTicket({ ...ticket, status: 'resolved', chatClosed: true, resolvedAt: now, updatedAt: now });
+    await writeDeveloperAudit(auth.user, 'support_agent_chat_resolved', { threadId: thread.id, ticketId: thread.ticketId });
+    return c.json({ success: true, thread: updatedThread });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    if (e.message === 'ThreadNotFound') return c.json({ error: 'Thread not found' }, 404);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/support-agent/threads/:threadId/transfer')) app.post(route, async (c) => {
+  try {
+    const { auth, role, thread } = await getSupportAgentThreadForUser(c, c.req.param('threadId'));
+    if (!['customer_care', 'developer'].includes(role)) return c.json({ error: 'Forbidden' }, 403);
+    const body = await c.req.json();
+    const newAgentId = String(body?.agentId || '').trim();
+    if (!newAgentId) return c.json({ error: 'agentId is required' }, 400);
+    const assigned = await getCareAssignmentsForAgent(newAgentId);
+    if (!assigned.includes(thread.tenantId)) return c.json({ error: 'Agent is not assigned to this tenant' }, 400);
+    const now = new Date().toISOString();
+    const agent = await kv.get(`customer_care_users:${newAgentId}`) || await kv.get(`employee:${newAgentId}`);
+    const updatedThread = { ...thread, assignedAgentId: newAgentId, assignedAgentEmail: agent?.email || '', updatedAt: now };
+    await kv.set(`support_agent_thread:${thread.id}`, updatedThread);
+    await kv.set(`developer_chat_thread:${thread.id}`, { ...(await kv.get(`developer_chat_thread:${thread.id}`) || {}), ...updatedThread, agentId: newAgentId, source: 'support_agent_chat' });
+    const ticket = await getSupportTicketById(thread.ticketId);
+    if (ticket) await saveSupportTicket({ ...ticket, assignedAgentId: newAgentId, updatedAt: now });
+    await writeDeveloperAudit(auth.user, 'support_agent_chat_transfer', { threadId: thread.id, fromAgentId: thread.assignedAgentId, toAgentId: newAgentId });
+    return c.json({ success: true, thread: updatedThread });
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    if (e.message === 'ThreadNotFound') return c.json({ error: 'Thread not found' }, 404);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // ── Developer platform-users and assignments aliases ─────────────────
 // Mirrors /platform-users and /assignments under /developer/*
+
+async function findAuthUserByEmail(email: string) {
+  const normalized = String(email || '').toLowerCase().trim();
+  if (!normalized) return null;
+  const sb = supabaseAdmin();
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) break;
+    const found = data?.users?.find((u: any) => String(u.email || '').toLowerCase() === normalized);
+    if (found) return found;
+    if (!data?.users || data.users.length < 1000) break;
+  }
+  return null;
+}
+
+async function sendPlatformAccessEmail(record: any, password: string | null, resetLink: string | null, action: string) {
+  const loginUrl = `${Deno.env.get('FRONTEND_URL') || FRONTEND_FALLBACK_URL}/login`;
+  await sendEmailNotification(
+    record.userId || record.id || '',
+    record.email,
+    record.name || record.email,
+    action === 'created' ? 'Your Blumebyte platform access is ready' : 'Your Blumebyte platform password was updated',
+    `
+      <p>Your Blumebyte ${record.role === 'developer' ? 'Developer' : 'Customer Care'} access has been ${action}.</p>
+      <p><strong>Login email:</strong> ${record.email}</p>
+      ${password ? `<p><strong>Temporary password:</strong> ${password}</p><p>Please change this password after login.</p>` : ''}
+      ${resetLink ? `<p>Use this secure link to set your password:</p><p><a href="${resetLink}" style="background-color:#7C5A1A;color:#fff;padding:12px 20px;text-decoration:none;border-radius:6px;display:inline-block;">Set Password</a></p>` : ''}
+      <p><a href="${loginUrl}">Open Blumebyte HR</a></p>
+    `,
+    'emailOnPlatformAccess'
+  );
+}
+
+async function ensurePlatformAuthUser(body: any, role: string) {
+  const sb = supabaseAdmin();
+  const email = String(body.email || '').toLowerCase().trim();
+  const password = body.password || generateTempPassword();
+  let authUser = await findAuthUserByEmail(email);
+  if (!authUser) {
+    const { data, error } = await sb.auth.admin.createUser({
+      email,
+      password,
+      user_metadata: { role, name: body.name },
+      email_confirm: true,
+    });
+    if (error) throw new Error(error.message);
+    authUser = data.user;
+    return { authUser, password, created: true };
+  }
+  const updatePayload: any = {
+    user_metadata: { ...(authUser.user_metadata || {}), role, name: body.name || authUser.user_metadata?.name || email },
+  };
+  if (body.password) updatePayload.password = body.password;
+  const { data, error } = await sb.auth.admin.updateUserById(authUser.id, updatePayload);
+  if (error) throw new Error(error.message);
+  return { authUser: data.user || authUser, password: body.password || null, created: false };
+}
 
 for (const route of compatibleRoutePathsForAliases('/developer/platform-users', '/platform-users')) app.get(route, async (c) => {
   // Return platform user records for canonical and legacy-compatible paths
@@ -13785,25 +14128,21 @@ for (const route of compatibleRoutePathsForAliases('/developer/platform-users', 
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const body = await c.req.json();
     if (!body?.email || !body?.name) return c.json({ error: 'email and name are required' }, 400);
-    const sb = supabaseAdmin();
-    const password = body.password || generateTempPassword();
     const role = normalizeCareRole(body.role || 'customer_care');
     const allowedRoles = ['developer', 'customer_care'];
     if (!allowedRoles.includes(role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
-    const { data: authData, error: authErr } = await sb.auth.admin.createUser({
-      email: body.email.toLowerCase().trim(), password,
-      user_metadata: { role, name: body.name },
-      email_confirm: true,
-    });
-    if (authErr) return c.json({ error: authErr.message }, 400);
-    const userId = authData.user.id;
+    const { authUser, password, created } = await ensurePlatformAuthUser(body, role);
+    const userId = authUser.id;
     const now = new Date().toISOString();
     const record = {
-      id: userId, userId, email: body.email.toLowerCase().trim(),
+      id: userId, userId, email: String(body.email).toLowerCase().trim(),
       name: body.name, role, status: 'active', createdAt: now,
       createdBy: access.user.id, noLicenseRequired: true,
     };
     await kv.set(`platform_user:${userId}`, record);
+    await kv.set(`customer_care_users:${userId}`, record);
+    await kv.set(`employee:${userId}`, { ...record, updatedAt: now });
+    await sendPlatformAccessEmail(record, password, null, created ? 'created' : 'updated');
     const auditId = crypto.randomUUID();
     await kv.set(`support-audit:${auditId}`, {
       id: auditId, actorId: access.user.id, actorEmail: access.user.email,
@@ -13823,21 +14162,61 @@ for (const route of compatibleRoutePathsForAliases('/developer/platform-users/:i
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const userId = c.req.param('id');
     const body = await c.req.json();
-    const existing = await kv.get(`platform_user:${userId}`);
-    if (!existing) return c.json({ error: 'User not found' }, 404);
-    if (body.role) {
-      body.role = normalizeCareRole(body.role);
-      const allowedRoles = ['developer', 'customer_care'];
-      if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    const existing =
+      await kv.get(`platform_user:${userId}`) ||
+      await kv.get(`customer_care_users:${userId}`) ||
+      await kv.get(`employee:${userId}`);
+    const email = String(body.email || existing?.email || '').toLowerCase().trim();
+    if (!email) return c.json({ error: 'email is required to repair or update this platform user' }, 400);
+    const role = normalizeCareRole(body.role || existing?.role || 'customer_care');
+    const allowedRoles = ['developer', 'customer_care'];
+    if (!allowedRoles.includes(role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
+    const authPayload = {
+      ...existing,
+      ...body,
+      email,
+      name: body.name || existing?.name || email,
+      role,
+    };
+    const { authUser, password, created } = await ensurePlatformAuthUser(authPayload, role);
+    const resolvedId = authUser?.id || userId;
+    const now = new Date().toISOString();
+    const updated = {
+      ...(existing || {}),
+      ...body,
+      id: resolvedId,
+      userId: resolvedId,
+      email,
+      name: authPayload.name,
+      role,
+      status: body.status || existing?.status || 'active',
+      noLicenseRequired: true,
+      updatedAt: now,
+      createdAt: existing?.createdAt || now,
+    };
+    await kv.set(`platform_user:${resolvedId}`, updated);
+    await kv.set(`customer_care_users:${resolvedId}`, updated);
+    await kv.set(`employee:${resolvedId}`, updated);
+    await appendUniqueListValue('customer_care_users', resolvedId);
+    if (resolvedId !== userId) {
+      await kv.del(`platform_user:${userId}`);
+      await kv.del(`customer_care_users:${userId}`);
+      await kv.del(`employee:${userId}`);
+      await kv.del(`care_assignments:${userId}`);
     }
-    const updated = { ...existing, ...body, id: userId, updatedAt: new Date().toISOString() };
-    await kv.set(`platform_user:${userId}`, updated);
-    // Update Supabase user_metadata role if role changed
-    if (body.role && body.role !== existing.role) {
-      const sb = supabaseAdmin();
-      await sb.auth.admin.updateUserById(userId, { user_metadata: { role: body.role, name: updated.name } });
-    }
-    return c.json(updated);
+    if (password) await sendPlatformAccessEmail(updated, password, null, created ? 'created' : 'updated');
+    const auditId = crypto.randomUUID();
+    await kv.set(`support-audit:${auditId}`, {
+      id: auditId,
+      actorId: access.user.id,
+      actorEmail: access.user.email,
+      actionType: 'platform_user_update',
+      targetId: resolvedId,
+      timestamp: now,
+      description: `Platform user "${email}" (${role}) updated by ${access.user.email}`,
+      details: { changedPassword: !!password, repairedAuthUser: resolvedId !== userId || created },
+    });
+    return c.json({ ...updated, tempPassword: body.password ? undefined : password || undefined });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
@@ -13849,7 +14228,20 @@ for (const route of compatibleRoutePathsForAliases('/developer/platform-users/:i
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
     const userId = c.req.param('id');
+    const existing = await kv.get(`platform_user:${userId}`) || await kv.get(`customer_care_users:${userId}`) || await kv.get(`employee:${userId}`);
+    if (existing?.email) {
+      await sendEmailNotification(
+        userId,
+        existing.email,
+        existing.name || existing.email,
+        'Your Blumebyte platform access was removed',
+        `<p>Your Blumebyte platform access has been removed by a platform administrator.</p>`,
+        'emailOnPlatformAccessRemoved'
+      );
+    }
     await kv.del(`platform_user:${userId}`);
+    await kv.del(`customer_care_users:${userId}`);
+    await kv.del(`employee:${userId}`);
     await kv.del(`care_assignments:${userId}`);
     const sb = supabaseAdmin();
     await sb.auth.admin.deleteUser(userId).catch(() => null);
@@ -14408,10 +14800,250 @@ for (const route of compatibleRoutePaths('/developer/system-health')) app.get(ro
 
 for (const route of compatibleRoutePaths('/developer/audit-log')) app.get(route, async (c) => {
   try {
-    await requireDeveloper(c);
-    const logs = await kv.getByPrefix('developer_audit_log:');
+    const { user } = await requireDeveloper(c);
+    const [developerLogs, supportLogs, tenantLogs, healthLogs, loginLogs] = await Promise.all([
+      kv.getByPrefix('developer_audit_log:'),
+      kv.getByPrefix('support-audit:'),
+      kv.getByPrefix('audit:'),
+      kv.getByPrefix('system_health_log:'),
+      kv.getByPrefix('developer_notification:'),
+    ]);
+    const normalizeLog = (entry: any, source: string) => ({
+      id: entry?.id || crypto.randomUUID(),
+      actorId: entry?.actorId || entry?.userId || entry?.recipientId || '',
+      actorEmail: entry?.actorEmail || entry?.userEmail || entry?.recipientEmail || entry?.email || 'system',
+      actionType: entry?.actionType || entry?.action || entry?.type || source,
+      tenantId: entry?.tenantId || entry?.companyId || entry?.details?.tenantId || entry?.details?.companyId || '',
+      timestamp: entry?.timestamp || entry?.createdAt || entry?.sentAt || new Date().toISOString(),
+      description: entry?.description || entry?.message || entry?.subject || JSON.stringify(entry?.details || entry || {}),
+      source,
+      details: entry?.details || entry,
+    });
+    const logs = [
+      ...developerLogs.map((entry: any) => normalizeLog(entry, 'developer')),
+      ...supportLogs.map((entry: any) => normalizeLog(entry, 'support')),
+      ...tenantLogs.map((entry: any) => normalizeLog(entry, 'tenant')),
+      ...healthLogs.map((entry: any) => normalizeLog(entry, 'system_health')),
+      ...loginLogs.map((entry: any) => normalizeLog(entry, 'login_notification')),
+    ];
     logs.sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+    await writeDeveloperAudit(user, 'developer_audit_log_read', { count: logs.length });
     return c.json(logs);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+const tenantModulePrefixes: Record<string, string> = {
+  branches: 'branch:',
+  departments: 'department:',
+  assets: 'asset:',
+  assetCategories: 'asset-category:',
+  paygrades: 'paygrade:',
+  financialYears: 'financial-year:',
+  leaveTypes: 'leave-type:',
+  leaves: 'leave:',
+  attendance: 'attendance:',
+  announcements: 'announcement:',
+  messages: 'message:',
+  notifications: 'notification:',
+  jobPostings: 'job-posting:',
+  jobApplications: 'job-application:',
+  performanceReviews: 'perf-review:',
+  goals: 'goal:',
+  feedback: 'feedback:',
+  meetings: 'meeting:',
+  workflows: 'workflow:',
+  disciplinaryCases: 'disciplinary:',
+  complianceItems: 'compliance:',
+  trainingPrograms: 'training:',
+  tasks: 'task:',
+  onboarding: 'onboard-checklist:',
+  payrollRuns: 'payroll-run:',
+  taxConfigurations: 'tax-configuration:',
+  benefits: 'benefit:',
+  benefitPlans: 'benefit-plan:',
+};
+
+function getTenantModulePrefix(resource: string) {
+  const normalized = String(resource || '').replace(/[-_ ]+([a-z])/g, (_m, c) => c.toUpperCase());
+  return tenantModulePrefixes[normalized] || tenantModulePrefixes[String(resource || '')];
+}
+
+function recordBelongsToTenant(record: any, tenantId: string) {
+  return (
+    record?.companyId === tenantId ||
+    record?.company === tenantId ||
+    record?.tenantId === tenantId ||
+    record?.organizationId === tenantId
+  );
+}
+
+async function listTenantModuleRecords(tenantId: string, resource: string) {
+  const prefix = getTenantModulePrefix(resource);
+  if (!prefix) return null;
+  const records = await kv.getByPrefix(prefix);
+  return records.filter((record: any) => recordBelongsToTenant(record, tenantId));
+}
+
+async function saveTenantModuleRecord(tenantId: string, resource: string, recordId: string | undefined, body: any) {
+  const prefix = getTenantModulePrefix(resource);
+  if (!prefix) return null;
+  const id = recordId || body?.id || crypto.randomUUID();
+  const existing = await kv.get(`${prefix}${id}`);
+  if (existing && !recordBelongsToTenant(existing, tenantId)) {
+    throw new Error('Forbidden');
+  }
+  const now = new Date().toISOString();
+  const record = {
+    ...(existing || {}),
+    ...(body || {}),
+    id,
+    companyId: tenantId,
+    tenantId: body?.tenantId || tenantId,
+    updatedAt: now,
+    createdAt: existing?.createdAt || body?.createdAt || now,
+  };
+  await kv.set(`${prefix}${id}`, record);
+  await appendUniqueListValue(prefix.replace(/:$/, ''), id);
+  return record;
+}
+
+async function deleteTenantModuleRecord(tenantId: string, resource: string, recordId: string) {
+  const prefix = getTenantModulePrefix(resource);
+  if (!prefix) return null;
+  const existing = await kv.get(`${prefix}${recordId}`);
+  if (!existing) return { success: true, deleted: false };
+  if (!recordBelongsToTenant(existing, tenantId)) throw new Error('Forbidden');
+  await kv.del(`${prefix}${recordId}`);
+  await removeListValue(prefix.replace(/:$/, ''), recordId);
+  return { success: true, deleted: true };
+}
+
+for (const route of compatibleRoutePaths('/developer/tenants/:id/data/:resource')) app.get(route, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const resource = c.req.param('resource');
+    const records = await listTenantModuleRecords(tenantId, resource);
+    if (!records) return c.json({ error: 'Unsupported tenant module' }, 400);
+    await writeDeveloperAudit(user, 'developer_tenant_module_read', { tenantId, resource, count: records.length });
+    return c.json(records);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/developer/tenants/:id/data/:resource')) app.post(route, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const resource = c.req.param('resource');
+    const record = await saveTenantModuleRecord(tenantId, resource, undefined, await c.req.json());
+    if (!record) return c.json({ error: 'Unsupported tenant module' }, 400);
+    await writeDeveloperAudit(user, 'developer_tenant_module_create', { tenantId, resource, recordId: record.id });
+    return c.json(record, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/developer/tenants/:id/data/:resource/:recordId')) app.put(route, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const resource = c.req.param('resource');
+    const recordId = c.req.param('recordId');
+    const record = await saveTenantModuleRecord(tenantId, resource, recordId, await c.req.json());
+    if (!record) return c.json({ error: 'Unsupported tenant module' }, 400);
+    await writeDeveloperAudit(user, 'developer_tenant_module_update', { tenantId, resource, recordId });
+    return c.json(record);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/developer/tenants/:id/data/:resource/:recordId')) app.delete(route, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const tenantId = c.req.param('id');
+    const resource = c.req.param('resource');
+    const recordId = c.req.param('recordId');
+    const result = await deleteTenantModuleRecord(tenantId, resource, recordId);
+    if (!result) return c.json({ error: 'Unsupported tenant module' }, 400);
+    await writeDeveloperAudit(user, 'developer_tenant_module_delete', { tenantId, resource, recordId });
+    return c.json(result);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/developer/agents/:id/activity')) app.get(route, async (c) => {
+  try {
+    const { user } = await requireDeveloper(c);
+    const agentId = c.req.param('id');
+    const [agent, assignments, allCompanies, tickets, threads, attendance, performance, supportAudit, developerAudit] = await Promise.all([
+      kv.get(`customer_care_users:${agentId}`) || kv.get(`employee:${agentId}`),
+      getCareAssignmentsForAgent(agentId),
+      kv.getByPrefix('company:'),
+      getAllSupportTickets(),
+      kv.getByPrefix('developer_chat_thread:'),
+      kv.getByPrefix('attendance:'),
+      kv.getByPrefix('perf-review:'),
+      kv.getByPrefix('support-audit:'),
+      kv.getByPrefix('developer_audit_log:'),
+    ]);
+    const assignedSet = new Set(assignments);
+    const assignedTenants = allCompanies.filter((company: any) => assignedSet.has(company?.id || company?.companyId));
+    const scopedTickets = tickets.filter((ticket: any) => assignedSet.has(ticket.tenantId) || ticket.assignedAgentId === agentId || ticket.createdBy === agentId);
+    const scopedThreads = threads.filter((thread: any) => assignedSet.has(thread.tenantId) || thread.agentId === agentId || thread.assignedAgentId === agentId);
+    const scopedMessages: any[] = [];
+    for (const thread of scopedThreads) {
+      const messages = await kv.getByPrefix(`developer_chat_msg:${thread.id}:`);
+      scopedMessages.push(...messages.map((message: any) => ({ ...message, threadId: thread.id, tenantId: thread.tenantId })));
+    }
+    const tenantUsers = (await kv.getByPrefix('employee:')).filter((employee: any) => assignedSet.has(employee.companyId || employee.company || employee.tenantId));
+    const tenantUserIds = new Set(tenantUsers.map((employee: any) => employee.userId || employee.id));
+    const scopedAttendance = attendance.filter((record: any) =>
+      record?.userId === agentId ||
+      tenantUserIds.has(record?.userId) ||
+      assignedSet.has(record?.companyId || record?.company || record?.tenantId)
+    );
+    const scopedPerformance = performance.filter((record: any) =>
+      record?.employeeId === agentId ||
+      record?.userId === agentId ||
+      tenantUserIds.has(record?.employeeId || record?.userId) ||
+      assignedSet.has(record?.companyId || record?.company || record?.tenantId)
+    );
+    const logs = [...supportAudit, ...developerAudit].filter((entry: any) =>
+      entry?.actorId === agentId ||
+      entry?.targetId === agentId ||
+      entry?.details?.careAgentId === agentId ||
+      assignedSet.has(entry?.tenantId || entry?.details?.tenantId)
+    );
+    await writeDeveloperAudit(user, 'developer_agent_activity_export', { agentId, tenantCount: assignments.length });
+    return c.json({
+      agent,
+      assignedTenantIds: assignments,
+      assignedTenants,
+      tickets: scopedTickets,
+      chatThreads: scopedThreads,
+      chatMessages: scopedMessages,
+      attendance: scopedAttendance,
+      performance: scopedPerformance,
+      auditLogs: logs,
+      generatedAt: new Date().toISOString(),
+    });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
@@ -14467,6 +15099,73 @@ const listCareTenantUsersV2 = async (c: any) => {
 };
 for (const route of compatibleRoutePaths('/care/tenant/:id/users')) app.get(route, listCareTenantUsersV2);
 
+for (const route of compatibleRoutePaths('/care/tenant/:id/data/:resource')) app.get(route, async (c) => {
+  try {
+    const tenantId = c.req.param('id');
+    await requireCareTenantAccess(c, tenantId);
+    const records = await listTenantModuleRecords(tenantId, c.req.param('resource'));
+    if (!records) return c.json({ error: 'Unsupported tenant module' }, 400);
+    return c.json(records);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/care/tenant/:id/data/:resource')) app.post(route, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const tenantId = c.req.param('id');
+    await requireCareTenantAccess(c, tenantId);
+    const resource = c.req.param('resource');
+    const record = await saveTenantModuleRecord(tenantId, resource, undefined, await c.req.json());
+    if (!record) return c.json({ error: 'Unsupported tenant module' }, 400);
+    await writeDeveloperAudit(auth.user, 'care_tenant_module_create', { tenantId, resource, recordId: record.id });
+    return c.json(record, 201);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/care/tenant/:id/data/:resource/:recordId')) app.put(route, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const tenantId = c.req.param('id');
+    await requireCareTenantAccess(c, tenantId);
+    const resource = c.req.param('resource');
+    const recordId = c.req.param('recordId');
+    const record = await saveTenantModuleRecord(tenantId, resource, recordId, await c.req.json());
+    if (!record) return c.json({ error: 'Unsupported tenant module' }, 400);
+    await writeDeveloperAudit(auth.user, 'care_tenant_module_update', { tenantId, resource, recordId });
+    return c.json(record);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+for (const route of compatibleRoutePaths('/care/tenant/:id/data/:resource/:recordId')) app.delete(route, async (c) => {
+  try {
+    const auth = await requireCustomerCare(c);
+    const tenantId = c.req.param('id');
+    await requireCareTenantAccess(c, tenantId);
+    const resource = c.req.param('resource');
+    const recordId = c.req.param('recordId');
+    const result = await deleteTenantModuleRecord(tenantId, resource, recordId);
+    if (!result) return c.json({ error: 'Unsupported tenant module' }, 400);
+    await writeDeveloperAudit(auth.user, 'care_tenant_module_delete', { tenantId, resource, recordId });
+    return c.json(result);
+  } catch (e: any) {
+    if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
+    if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 const listCareTenantTicketsV2 = async (c: any) => {
   try {
     const tenantId = c.req.param('id');
@@ -14487,6 +15186,7 @@ const createCareTicket = async (c: any) => {
     const body = await c.req.json();
     const tenantId = body?.tenantId;
     if (!tenantId) return c.json({ error: 'tenantId is required' }, 400);
+    if (containsSensitiveChatLanguage(`${body?.subject || ''} ${body?.description || ''}`)) return sensitiveLanguageResponse(c);
     const assigned = await isTenantAssignedToCareAgent(auth.user.id, tenantId);
     if (!assigned) return c.json({ error: 'Forbidden' }, 403);
     const ticketId = crypto.randomUUID();
@@ -14539,6 +15239,7 @@ const commentOnCareTicket = async (c: any) => {
     const ticketId = c.req.param('id');
     const body = await c.req.json();
     if (!body?.comment) return c.json({ error: 'comment is required' }, 400);
+    if (containsSensitiveChatLanguage(body.comment)) return sensitiveLanguageResponse(c);
     const ticket = await getSupportTicketById(ticketId);
     if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
     const assigned = await isTenantAssignedToCareAgent(auth.user.id, ticket.tenantId);
@@ -14660,23 +15361,28 @@ for (const route of compatibleRoutePaths('/developer/platform-users')) app.post(
     const allowedRoles = ['developer', 'customer_care'];
     const normalizedRole = normalizeCareRole(body.role);
     if (!allowedRoles.includes(normalizedRole)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
-    const id = body.id || body.userId || crypto.randomUUID();
+    const { authUser, password, created } = await ensurePlatformAuthUser(body, normalizedRole);
+    const id = authUser.id;
+    const now = new Date().toISOString();
     const record = {
       id,
-      userId: body.userId || id,
+      userId: id,
       name: body.name,
       email: String(body.email).toLowerCase(),
       role: normalizedRole,
       status: body.status || 'active',
       assignedTenants: [],
-      createdAt: new Date().toISOString(),
+      createdAt: now,
       createdBy: user.id,
+      noLicenseRequired: true,
     };
+    await kv.set(`platform_user:${id}`, record);
     await kv.set(`customer_care_users:${id}`, record);
-    await kv.set(`employee:${id}`, { ...record, updatedAt: new Date().toISOString() });
+    await kv.set(`employee:${id}`, { ...record, updatedAt: now });
     await appendUniqueListValue('customer_care_users', id);
+    await sendPlatformAccessEmail(record, password, null, created ? 'created' : 'updated');
     await writeDeveloperAudit(user, 'developer_platform_user_create', { userId: id, role: normalizedRole, email: body.email });
-    return c.json(record, 201);
+    return c.json({ ...record, tempPassword: body.password ? undefined : password }, 201);
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
@@ -14695,20 +15401,45 @@ for (const route of compatibleRoutePaths('/developer/platform-users/:id')) app.p
       body.role = normalizeCareRole(body.role);
       if (!allowedRoles.includes(body.role)) return c.json({ error: `Invalid role. Allowed: ${allowedRoles.join(', ')}` }, 400);
     }
-    // Update in both KV stores
-    const existing = await kv.get(`customer_care_users:${id}`) || await kv.get(`employee:${id}`) || { id };
-    const updated = { ...existing, ...body, id, updatedAt: new Date().toISOString() };
-    await kv.set(`customer_care_users:${id}`, updated);
-    await kv.set(`employee:${id}`, updated);
-    // Also update Supabase auth metadata if userId provided
-    if (body.role && (existing.userId || id)) {
-      const sb = supabaseAdmin();
-      await sb.auth.admin.updateUserById(existing.userId || id, {
-        user_metadata: { role: body.role, name: updated.name },
-      }).catch(() => {});
+    const existing = await kv.get(`platform_user:${id}`) || await kv.get(`customer_care_users:${id}`) || await kv.get(`employee:${id}`);
+    const email = String(body.email || existing?.email || '').toLowerCase().trim();
+    if (!email) return c.json({ error: 'email is required to repair or update this platform user' }, 400);
+    const role = normalizeCareRole(body.role || existing?.role || 'customer_care');
+    const { authUser, password, created } = await ensurePlatformAuthUser({
+      ...existing,
+      ...body,
+      email,
+      name: body.name || existing?.name || email,
+      role,
+    }, role);
+    const resolvedId = authUser.id || id;
+    const now = new Date().toISOString();
+    const updated = {
+      ...(existing || {}),
+      ...body,
+      id: resolvedId,
+      userId: resolvedId,
+      email,
+      name: body.name || existing?.name || email,
+      role,
+      status: body.status || existing?.status || 'active',
+      noLicenseRequired: true,
+      updatedAt: now,
+      createdAt: existing?.createdAt || now,
+    };
+    await kv.set(`platform_user:${resolvedId}`, updated);
+    await kv.set(`customer_care_users:${resolvedId}`, updated);
+    await kv.set(`employee:${resolvedId}`, updated);
+    await appendUniqueListValue('customer_care_users', resolvedId);
+    if (resolvedId !== id) {
+      await kv.del(`platform_user:${id}`);
+      await kv.del(`customer_care_users:${id}`);
+      await kv.del(`employee:${id}`);
+      await kv.del(`care_assignments:${id}`);
     }
-    await writeDeveloperAudit(user, 'developer_platform_user_update', { targetId: id, changes: body });
-    return c.json(updated);
+    if (password) await sendPlatformAccessEmail(updated, password, null, created ? 'created' : 'updated');
+    await writeDeveloperAudit(user, 'developer_platform_user_update', { targetId: resolvedId, changes: body, changedPassword: !!password });
+    return c.json({ ...updated, tempPassword: body.password ? undefined : password || undefined });
   } catch (e: any) {
     if (e.message === 'Unauthorized') return c.json({ error: 'Unauthorized' }, 401);
     if (e.message === 'Forbidden') return c.json({ error: 'Forbidden' }, 403);
@@ -14721,9 +15452,23 @@ for (const route of compatibleRoutePaths('/developer/platform-users/:id')) app.d
   try {
     const { user } = await requireDeveloper(c);
     const id = c.req.param('id');
+    const existing = await kv.get(`platform_user:${id}`) || await kv.get(`customer_care_users:${id}`) || await kv.get(`employee:${id}`);
+    if (existing?.email) {
+      await sendEmailNotification(
+        id,
+        existing.email,
+        existing.name || existing.email,
+        'Your Blumebyte platform access was removed',
+        `<p>Your Blumebyte platform access has been removed by a platform administrator.</p>`,
+        'emailOnPlatformAccessRemoved'
+      );
+    }
+    await kv.del(`platform_user:${id}`);
     await kv.del(`customer_care_users:${id}`);
+    await kv.del(`employee:${id}`);
     await removeListValue('customer_care_users', id);
     await kv.del(`care_assignments:${id}`);
+    await supabaseAdmin().auth.admin.deleteUser(id).catch(() => null);
     await writeDeveloperAudit(user, 'developer_platform_user_delete', { targetId: id });
     return c.json({ success: true });
   } catch (e: any) {

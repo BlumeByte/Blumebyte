@@ -910,7 +910,7 @@ export function LicenseManagement({ onClose, requiredLicenses }: LicenseManageme
   const purchasedRenewLicenses = Math.max(MIN_LICENSES, licenseInfo?.purchasedLicenses || MIN_LICENSES);
   const renewalExceedsPurchased = effectiveRenewLicenses > purchasedRenewLicenses;
 
-  const EXPIRY_WARNING_DAYS = 14; // Show renewal section this many days before expiry
+  const EXPIRY_WARNING_DAYS = 30; // Allow and prompt renewal during the final month
 
   const licenseExpiryDate = licenseInfo?.endDate || null;
 
