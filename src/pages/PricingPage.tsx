@@ -334,26 +334,6 @@ export default function PricingPage() {
             No hidden fees. No surprises. Just powerful HR management at an affordable price.
           </p>
         </div>
-
-        {/* Mini Game */}
-        <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 justify-center">
-          <div className="flex-1 text-center md:text-left space-y-4 max-w-sm">
-            <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-semibold text-gray-600 shadow-sm">
-              <span className="text-base">🎮</span> Take a break
-            </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-mint-black">Catch the Payslip!</h2>
-            <p className="text-gray-500 text-sm">
-              Guide your HR agent to collect payslips before your team notices. Use arrow keys, WASD, or swipe on mobile.
-            </p>
-            <div className="flex flex-wrap gap-3 justify-center md:justify-start text-xs text-gray-400">
-              <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5 text-amber-500" /> Beat your high score</span>
-              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 text-primary" /> Instant play, no download</span>
-            </div>
-          </div>
-          <div className="flex-shrink-0">
-            <SnakeMiniGame />
-          </div>
-        </div>
       </section>
 
       {/* Pricing Cards */}
@@ -413,6 +393,34 @@ export default function PricingPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* Mini Game */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="mx-auto max-w-3xl">
+          <div className="glass-public border border-mint-green/20 rounded-2xl px-4 py-8 sm:px-8">
+            <div className="flex justify-center">
+              <div className="w-full max-w-sm sm:max-w-md">
+                <div className="[&_canvas]:w-full [&_canvas]:h-auto [&_canvas]:aspect-square">
+                  <SnakeMiniGame />
+                </div>
+              </div>
+            </div>
+            <div className="mt-8 text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1 text-xs font-semibold text-gray-600 shadow-sm">
+                Take a break
+              </div>
+              <h2 className="mt-4 text-2xl md:text-3xl font-bold text-mint-black">Catch the Payslip!</h2>
+              <p className="mt-3 text-gray-500 text-sm max-w-xl mx-auto">
+                Guide your HR agent to collect payslips before your team notices. Use arrow keys, WASD, or swipe on mobile.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs text-gray-400">
+                <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5 text-amber-500" /> Beat your high score</span>
+                <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 text-primary" /> Instant play, no download</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
