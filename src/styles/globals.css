@@ -370,6 +370,11 @@ html {
   background: linear-gradient(160deg, #ffffff 0%, #f9fafb 50%, #ffffff 100%);
 }
 
+.dark .public-page-bg {
+  background: linear-gradient(160deg, #080b12 0%, #111827 52%, #05070d 100%);
+  color: #f8fafc;
+}
+
 /* Frosted-glass card for public sections */
 .glass-public {
   background: rgba(255, 255, 255, 0.80);
@@ -384,6 +389,13 @@ html {
   background: rgba(255, 255, 255, 0.80) !important;
 }
 
+.dark .glass-public[class*="bg-"],
+.dark .glass-public {
+  background: rgba(17, 24, 39, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.32), 0 1px 4px rgba(0, 0, 0, 0.22);
+}
+
 /* Glass sticky navbar for public pages */
 .glass-nav {
   background: rgba(255, 255, 255, 0.92);
@@ -391,6 +403,12 @@ html {
   -webkit-backdrop-filter: blur(18px) saturate(170%);
   border-bottom: 1px solid rgba(0, 0, 0, 0.10);
   box-shadow: 0 1px 16px rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-nav {
+  background: rgba(8, 11, 18, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 1px 16px rgba(0, 0, 0, 0.30);
 }
 
 /* Glass dropdown panel */
@@ -402,11 +420,21 @@ html {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+.dark .glass-dropdown {
+  background: rgba(17, 24, 39, 0.97);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.38), 0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
 /* Subtle tint for alternating sections on public pages */
 .section-mint {
   background: rgba(0, 0, 0, 0.03);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
+}
+
+.dark .section-mint {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 /* ============================================================
@@ -575,4 +603,91 @@ html.dark [class*="card"],
 html.dark [class*="Card"] {
   background-color: var(--card);
   color: var(--card-foreground);
+}
+
+/* Public website dark mode refinements.
+   These must come after the dashboard backstop rules above because public pages
+   also receive html.dark when the browser prefers a dark color scheme. */
+html.dark .public-page-bg {
+  color-scheme: dark;
+}
+
+html.dark .public-page-bg .text-mint-black,
+html.dark .public-page-bg h1.text-black,
+html.dark .public-page-bg h2.text-black,
+html.dark .public-page-bg h3.text-black,
+html.dark .public-page-bg h4.text-black,
+html.dark .public-page-bg .glass-public .text-black,
+html.dark .public-page-bg .glass-public .text-gray-900,
+html.dark .public-page-bg .glass-public .text-gray-800,
+html.dark .public-page-bg .glass-public .text-gray-700,
+html.dark .public-page-bg .public-footer .text-mint-black {
+  color: #f8fafc !important;
+}
+
+html.dark .public-page-bg .text-gray-700,
+html.dark .public-page-bg .text-gray-600,
+html.dark .public-page-bg .public-footer .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .public-page-bg .text-gray-500,
+html.dark .public-page-bg .text-gray-400,
+html.dark .public-page-bg .text-gray-300,
+html.dark .public-page-bg .public-footer .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .public-page-bg .glass-public {
+  color: #e5e7eb;
+}
+
+html.dark .public-page-bg .glass-public .border-black\/8,
+html.dark .public-page-bg .glass-public.border-gray-200,
+html.dark .public-page-bg .border-gray-200,
+html.dark .public-page-bg .border-black\/10,
+html.dark .public-page-bg .border-black\/15,
+html.dark .public-page-bg .border-black\/20 {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html.dark .public-page-bg section.bg-gray-50,
+html.dark .public-page-bg .bg-gray-50:not(button):not([role="button"]) {
+  background-color: rgba(15, 23, 42, 0.74) !important;
+}
+
+html.dark .public-page-bg .bg-white\/80,
+html.dark .public-page-bg .bg-white\/85,
+html.dark .public-page-bg .bg-white\/90 {
+  background-color: rgba(15, 23, 42, 0.82) !important;
+}
+
+html.dark .public-page-bg .glass-nav img,
+html.dark .public-page-bg .public-footer img {
+  filter: invert(1) brightness(1.8);
+}
+
+html.dark .public-page-bg .glass-nav button,
+html.dark .public-page-bg .public-mobile-menu button,
+html.dark .public-page-bg .public-footer button {
+  color: inherit;
+}
+
+html.dark .public-page-bg .glass-nav .bg-mint-black,
+html.dark .public-page-bg .public-mobile-menu .bg-mint-black {
+  background-color: #ffffff !important;
+  color: #0b1220 !important;
+}
+
+html.dark .public-page-bg .public-footer {
+  color: #cbd5e1;
+}
+
+html.dark .public-page-bg .public-footer h3 {
+  color: #f8fafc !important;
+}
+
+html.dark .public-page-bg .public-footer button:hover,
+html.dark .public-page-bg .glass-nav button:hover {
+  color: #ffffff !important;
 }

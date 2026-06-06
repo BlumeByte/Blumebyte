@@ -27,9 +27,14 @@ function isDashboardPath(pathname: string): boolean {
   return DASHBOARD_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
 }
 
+function prefersSystemDarkMode(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+}
+
 function applyDarkMode(isDark: boolean, pathname: string) {
-  // Dark mode must ONLY affect dashboard routes. On public pages it must be off.
-  if (isDark && isDashboardPath(pathname)) {
+  // Dashboards use tenant/user settings. Public pages follow the browser theme.
+  const shouldUseDark = isDashboardPath(pathname) ? isDark : prefersSystemDarkMode();
+  if (shouldUseDark) {
     document.documentElement.classList.add('dark');
   } else {
     document.documentElement.classList.remove('dark');
@@ -60,12 +65,22 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
     applyDarkMode(darkMode, location.pathname);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally runs once on mount
 
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!query) return;
+    const handleSystemThemeChange = () => {
+      if (!isDashboardPath(location.pathname)) applyDarkMode(darkMode, location.pathname);
+    };
+    query.addEventListener?.('change', handleSystemThemeChange);
+    return () => query.removeEventListener?.('change', handleSystemThemeChange);
+  }, [darkMode, location.pathname]);
+
   // When route changes: reapply dark-mode scoping and handle dashboard→public logout.
   useEffect(() => {
     const prev = prevPathRef.current;
     const curr = location.pathname;
 
-    // Re-evaluate dark mode whenever the URL changes so public pages stay light.
+    // Re-evaluate dark mode whenever the URL changes so public pages follow the browser theme.
     applyDarkMode(darkMode, curr);
 
     // Auto-logout when navigating FROM a dashboard route TO a public route.

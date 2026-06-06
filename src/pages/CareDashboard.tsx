@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import {
   Building2, Users, KeyRound, Shield, Search, Loader2, RefreshCw,
   LogOut, Copy, CheckCircle, Briefcase,
-  Ticket, MessageSquare, Send
+  Ticket, MessageSquare, Send, Database, Edit3, Plus, Save, Trash2
 } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { isCustomerCareRole, normalizeRole } from '../lib/role-utils';
@@ -40,6 +40,23 @@ interface TenantUser {
   status: string;
   companyId?: string;
 }
+
+const TENANT_MODULES = [
+  { value: 'users', label: 'Users' },
+  { value: 'tasks', label: 'Tasks' },
+  { value: 'attendance', label: 'Attendance' },
+  { value: 'leaves', label: 'Leave Requests' },
+  { value: 'benefits', label: 'Benefits' },
+  { value: 'departments', label: 'Departments' },
+  { value: 'branches', label: 'Branches' },
+  { value: 'assets', label: 'Assets' },
+  { value: 'announcements', label: 'Announcements' },
+  { value: 'performanceReviews', label: 'Performance' },
+  { value: 'goals', label: 'Goals' },
+  { value: 'meetings', label: 'Meetings' },
+  { value: 'workflows', label: 'Workflows' },
+  { value: 'payrollRuns', label: 'Payroll Runs' },
+];
 
 function isRouteNotFoundError(error: any): boolean {
   const status = Number(error?.status || 0);
@@ -149,6 +166,16 @@ export default function CareDashboard() {
   const [newComment, setNewComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [ticketStatusFilter, setTicketStatusFilter] = useState('all');
+  const [history, setHistory] = useState<{ tickets: any[]; logs: any[] }>({ tickets: [], logs: [] });
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [tenantDataOpen, setTenantDataOpen] = useState(false);
+  const [tenantDataTenant, setTenantDataTenant] = useState<{ id: string; name?: string } | null>(null);
+  const [tenantDataModule, setTenantDataModule] = useState('users');
+  const [tenantDataRecords, setTenantDataRecords] = useState<any[]>([]);
+  const [tenantDataLoading, setTenantDataLoading] = useState(false);
+  const [editingTenantRecord, setEditingTenantRecord] = useState<any | null>(null);
+  const [tenantRecordJson, setTenantRecordJson] = useState('');
+  const [tenantRecordSaving, setTenantRecordSaving] = useState(false);
 
   // Care agents are NOT developers — developers have their own dashboard at /developer.
   // The delete and license-edit actions are developer-only and not shown here.
@@ -241,6 +268,23 @@ export default function CareDashboard() {
     }
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    const token = await getCareToken();
+    if (!token) return;
+    setHistoryLoading(true);
+    try {
+      const data = await api('/care/history', { token });
+      setHistory({
+        tickets: Array.isArray(data?.tickets) ? data.tickets : [],
+        logs: Array.isArray(data?.logs) ? data.logs : [],
+      });
+    } catch {
+      setHistory({ tickets: [], logs: [] });
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
   const handleViewTicket = async (ticket: any) => {
     setSelectedTicket(ticket);
     setTicketDetailOpen(true);
@@ -329,6 +373,91 @@ export default function CareDashboard() {
     }
   };
 
+  const loadTenantDataModule = async (tenantId: string, module = tenantDataModule) => {
+    const token = await getCareToken();
+    if (!token) return;
+    setTenantDataLoading(true);
+    try {
+      const path = module === 'users'
+        ? `/care/tenant/${tenantId}/users`
+        : `/care/tenant/${tenantId}/data/${module}`;
+      const fallbackPaths = module === 'users' ? [`/care/tenants/${tenantId}/users`] : [];
+      const data = await apiWithRouteFallback(path, { token }, fallbackPaths);
+      setTenantDataRecords(Array.isArray(data) ? data : []);
+      setTenantDataModule(module);
+    } catch (e: any) {
+      setTenantDataRecords([]);
+      toast.error(e.message || 'Failed to load tenant data');
+    } finally {
+      setTenantDataLoading(false);
+    }
+  };
+
+  const openTenantData = async (tenant: { id: string; name?: string }) => {
+    setTenantDataTenant(tenant);
+    setTenantDataOpen(true);
+    setEditingTenantRecord(null);
+    setTenantRecordJson('');
+    await loadTenantDataModule(tenant.id, 'users');
+  };
+
+  const openTenantDataFromTicket = async (ticket: any) => {
+    const tenantId = ticket?.tenantId || ticket?.companyId;
+    if (!tenantId) {
+      toast.error('Ticket is missing tenant details');
+      return;
+    }
+    await openTenantData({ id: tenantId, name: ticket?.tenantName || tenantId });
+  };
+
+  const startEditingTenantRecord = (record: any | null) => {
+    const initial = record || { name: '', status: 'active' };
+    setEditingTenantRecord(record);
+    setTenantRecordJson(JSON.stringify(initial, null, 2));
+  };
+
+  const saveTenantRecord = async () => {
+    if (!tenantDataTenant) return;
+    setTenantRecordSaving(true);
+    try {
+      const token = await getCareToken();
+      const body = JSON.parse(tenantRecordJson);
+      const isUpdate = Boolean(editingTenantRecord?.id);
+      const path = tenantDataModule === 'users'
+        ? `/care/tenant/${tenantDataTenant.id}/users/${editingTenantRecord?.id}`
+        : isUpdate
+          ? `/care/tenant/${tenantDataTenant.id}/data/${tenantDataModule}/${editingTenantRecord.id}`
+          : `/care/tenant/${tenantDataTenant.id}/data/${tenantDataModule}`;
+      if (tenantDataModule === 'users' && !editingTenantRecord?.id) {
+        toast.error('User creation is handled from the tenant dashboard. Existing users can be edited here.');
+        return;
+      }
+      await api(path, { method: isUpdate || tenantDataModule === 'users' ? 'PUT' : 'POST', token, body });
+      toast.success('Tenant data updated');
+      setEditingTenantRecord(null);
+      setTenantRecordJson('');
+      await loadTenantDataModule(tenantDataTenant.id, tenantDataModule);
+      await loadHistory();
+    } catch (e: any) {
+      toast.error(e instanceof SyntaxError ? 'Invalid JSON' : (e.message || 'Failed to save tenant data'));
+    } finally {
+      setTenantRecordSaving(false);
+    }
+  };
+
+  const deleteTenantRecord = async (record: any) => {
+    if (!tenantDataTenant || !record?.id || tenantDataModule === 'users') return;
+    try {
+      const token = await getCareToken();
+      await api(`/care/tenant/${tenantDataTenant.id}/data/${tenantDataModule}/${record.id}`, { method: 'DELETE', token });
+      toast.success('Record deleted');
+      await loadTenantDataModule(tenantDataTenant.id, tenantDataModule);
+      await loadHistory();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to delete record');
+    }
+  };
+
   useEffect(() => {
     if (sessionLoading) return;
     if (!user) {
@@ -351,6 +480,10 @@ export default function CareDashboard() {
   useEffect(() => {
     if (activeTab === 'tickets') loadTickets();
   }, [activeTab, loadTickets]);
+
+  useEffect(() => {
+    if (activeTab === 'history') loadHistory();
+  }, [activeTab, loadHistory]);
 
   const handleViewUsers = async (tenant: Tenant) => {
     setSelectedTenant(tenant);
@@ -473,6 +606,7 @@ export default function CareDashboard() {
           <TabsList className="mb-6 w-full sm:w-auto">
             <TabsTrigger value="tenants"><Building2 className="h-4 w-4 mr-1" />Tenants</TabsTrigger>
             <TabsTrigger value="tickets"><Ticket className="h-4 w-4 mr-1" />Tickets</TabsTrigger>
+            <TabsTrigger value="history"><MessageSquare className="h-4 w-4 mr-1" />History</TabsTrigger>
             <TabsTrigger value="applications"><Briefcase className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Global Hiring </span>Apps</TabsTrigger>
           </TabsList>
 
@@ -530,6 +664,73 @@ export default function CareDashboard() {
                         )}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <Card>
+              <CardHeader>
+                <CardTitle>Closed Ticket History</CardTitle>
+                <p className="text-xs text-gray-500">Resolved chats, escalations, transfers, and tenant data changes remain here after the active ticket is closed.</p>
+              </CardHeader>
+              <CardContent>
+                {historyLoading ? (
+                  <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-gray-300" /></div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="border rounded-lg overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tenant</TableHead>
+                            <TableHead>Subject</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Rating</TableHead>
+                            <TableHead>Updated</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {history.tickets.length === 0 ? (
+                            <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">No history yet</TableCell></TableRow>
+                          ) : history.tickets.map((t: any) => (
+                            <TableRow key={t.id}>
+                              <TableCell>{t.tenantName || t.tenantId}</TableCell>
+                              <TableCell>{t.subject || t.id}</TableCell>
+                              <TableCell><Badge variant="outline">{t.status}</Badge></TableCell>
+                              <TableCell className="text-sm">
+                                {t.rating ? `${t.rating}/5` : 'n/a'}
+                                {t.feedback && <span className="block text-xs text-gray-500 max-w-xs truncate">{t.feedback}</span>}
+                              </TableCell>
+                              <TableCell className="text-sm text-gray-500">{t.updatedAt ? new Date(t.updatedAt).toLocaleString() : '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="border rounded-lg overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Action</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>When</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {history.logs.slice(0, 100).map((log: any) => (
+                            <TableRow key={log.id}>
+                              <TableCell><Badge variant="secondary">{log.actionType || log.action}</Badge></TableCell>
+                              <TableCell className="text-sm">{log.description || JSON.stringify(log.details || {})}</TableCell>
+                              <TableCell className="text-sm text-gray-500">{log.timestamp ? new Date(log.timestamp).toLocaleString() : '—'}</TableCell>
+                            </TableRow>
+                          ))}
+                          {history.logs.length === 0 && <TableRow><TableCell colSpan={3} className="text-center py-8 text-gray-400">No logs yet</TableCell></TableRow>}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -675,6 +876,9 @@ export default function CareDashboard() {
                                     <Button size="sm" variant="outline" onClick={() => handleViewTicket(t)}>
                                       <MessageSquare className="h-3.5 w-3.5 mr-1" />Chat
                                     </Button>
+                                    <Button size="sm" variant="outline" onClick={() => openTenantDataFromTicket(t)}>
+                                      <Database className="h-3.5 w-3.5 mr-1" />Tenant
+                                    </Button>
                                     {t.status !== 'escalated' && t.status !== 'resolved' && (
                                       <Button
                                         size="sm"
@@ -718,7 +922,7 @@ export default function CareDashboard() {
               <span className="text-gray-500 text-xs font-normal block mb-0.5">{selectedTicket?.tenantName}</span>
               {selectedTicket?.subject}
             </DialogTitle>
-            <div className="flex gap-2 mt-1">
+            <div className="flex flex-wrap gap-2 mt-1">
               <Badge variant="outline">{selectedTicket?.issueType}</Badge>
               <Badge variant={selectedTicket?.priority === 'critical' || selectedTicket?.priority === 'high' ? 'destructive' : 'secondary'}>
                 {selectedTicket?.priority}
@@ -726,6 +930,11 @@ export default function CareDashboard() {
               <Badge variant={selectedTicket?.status === 'resolved' ? 'default' : 'secondary'}>
                 {selectedTicket?.status}
               </Badge>
+              {selectedTicket?.tenantId && (
+                <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openTenantDataFromTicket(selectedTicket)}>
+                  <Database className="h-3.5 w-3.5 mr-1" />Tenant Data
+                </Button>
+              )}
             </div>
           </DialogHeader>
           {/* Description */}
@@ -824,6 +1033,117 @@ export default function CareDashboard() {
               </TableBody>
             </Table>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={tenantDataOpen} onOpenChange={(v) => { if (!v) { setTenantDataOpen(false); setEditingTenantRecord(null); setTenantRecordJson(''); } }}>
+        <DialogContent className="max-w-5xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Tenant Data - {tenantDataTenant?.name || tenantDataTenant?.id}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="lg:w-64 space-y-3">
+              <Label>Module</Label>
+              <Select
+                value={tenantDataModule}
+                onValueChange={(value) => tenantDataTenant && loadTenantDataModule(tenantDataTenant.id, value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TENANT_MODULES.map((module) => (
+                    <SelectItem key={module.value} value={module.value}>{module.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => tenantDataTenant && loadTenantDataModule(tenantDataTenant.id, tenantDataModule)}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+              </Button>
+              {tenantDataModule !== 'users' && (
+                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => startEditingTenantRecord(null)}>
+                  <Plus className="h-4 w-4 mr-2" /> New Record
+                </Button>
+              )}
+              <p className="text-xs text-gray-500">
+                Changes apply immediately and are logged for developer and customer-care history.
+              </p>
+            </div>
+
+            <div className="flex-1 space-y-4">
+              <div className="border rounded-lg overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Record</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Updated</TableHead>
+                      <TableHead className="w-36">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tenantDataLoading ? (
+                      <TableRow><TableCell colSpan={4} className="text-center py-10"><Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-300" /></TableCell></TableRow>
+                    ) : tenantDataRecords.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-gray-400">No records found</TableCell></TableRow>
+                    ) : tenantDataRecords.map((record) => (
+                      <TableRow key={record.id || record.email || JSON.stringify(record).slice(0, 32)}>
+                        <TableCell>
+                          <div className="font-medium">{record.name || record.fullName || record.title || record.subject || record.email || record.id}</div>
+                          <div className="text-xs text-gray-500 truncate max-w-xl">{record.email || record.role || record.department || record.id}</div>
+                        </TableCell>
+                        <TableCell><Badge variant="outline">{record.status || record.state || 'record'}</Badge></TableCell>
+                        <TableCell className="text-xs text-gray-500">
+                          {record.updatedAt || record.createdAt ? new Date(record.updatedAt || record.createdAt).toLocaleString() : 'n/a'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => startEditingTenantRecord(record)}>
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </Button>
+                            {tenantDataModule !== 'users' && (
+                              <Button size="sm" variant="outline" className="text-red-600 hover:border-red-300" onClick={() => deleteTenantRecord(record)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {tenantRecordJson && (
+                <div className="border rounded-lg p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>{editingTenantRecord?.id ? 'Edit Record' : 'New Record'}</Label>
+                    <Badge variant="secondary">{tenantDataModule}</Badge>
+                  </div>
+                  <Textarea
+                    value={tenantRecordJson}
+                    onChange={(e) => setTenantRecordJson(e.target.value)}
+                    rows={12}
+                    className="font-mono text-xs"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" onClick={() => { setEditingTenantRecord(null); setTenantRecordJson(''); }}>Cancel</Button>
+                    <Button onClick={saveTenantRecord} disabled={tenantRecordSaving} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                      {tenantRecordSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

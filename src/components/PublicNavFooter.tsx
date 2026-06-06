@@ -116,7 +116,7 @@ function DesktopDropdown({ label, content }: { label: string; content: PublicMen
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
     >
-      <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-mint-black transition-colors">
+      <button className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 hover:text-mint-black dark:hover:text-white transition-colors">
         {label}
         <ChevronDown className="h-4 w-4" />
       </button>
@@ -141,13 +141,13 @@ function DesktopDropdown({ label, content }: { label: string; content: PublicMen
                       <li key={j}>
                         <button
                           onClick={() => { setOpen(false); navigate(item.path); }}
-                          className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-mint-green-light/40 transition-colors group"
+                          className="flex items-start gap-3 w-full text-left p-2 rounded-md hover:bg-mint-green-light/40 dark:hover:bg-white/10 transition-colors group"
                         >
-                          <item.icon className="h-5 w-5 text-mint-green/60 group-hover:text-mint-black mt-0.5 shrink-0" />
+                          <item.icon className="h-5 w-5 text-mint-green/70 dark:text-emerald-300 group-hover:text-mint-black dark:group-hover:text-white mt-0.5 shrink-0" />
                           <div>
-                            <div className="text-sm font-medium text-gray-900 group-hover:text-mint-black">{item.name}</div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-slate-100 group-hover:text-mint-black dark:group-hover:text-white">{item.name}</div>
                             {item.description && (
-                              <div className="text-xs text-gray-500 mt-0.5">{item.description}</div>
+                              <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{item.description}</div>
                             )}
                           </div>
                         </button>
@@ -179,7 +179,7 @@ function MobileSection({
   return (
     <div>
       <button
-        className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-100 hover:text-mint-black dark:hover:text-white hover:bg-mint-green-light/30 dark:hover:bg-white/10 rounded-md transition-colors"
         onClick={() => setOpen((v) => !v)}
       >
         {label}
@@ -189,14 +189,14 @@ function MobileSection({
         <div className="pl-4 pb-1 space-y-0.5">
           {content.map((section, i) => (
             <div key={i} className="mt-2">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-1">
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider px-3 mb-1">
                 {section.title}
               </p>
               {section.items.map((item, j) => (
                 <button
                   key={j}
                   onClick={() => onNavigate(item.path)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-slate-300 hover:text-mint-black dark:hover:text-white hover:bg-mint-green-light/30 dark:hover:bg-white/10 rounded-md transition-colors"
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   {item.name}
@@ -258,7 +258,7 @@ export function PublicNavbar() {
               </Button>
             </div>
             <button
-              className="md:hidden p-2 rounded-md text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 transition-colors"
+              className="md:hidden p-2 rounded-md text-gray-700 dark:text-slate-100 hover:text-mint-black dark:hover:text-white hover:bg-mint-green-light/30 dark:hover:bg-white/10 transition-colors"
               onClick={() => setMobileOpen((v) => !v)}
               aria-label="Toggle menu"
             >
@@ -270,20 +270,20 @@ export function PublicNavbar() {
 
       {/* Mobile menu drawer – full-width below the nav bar */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-mint-green/20 bg-mint-white/90 backdrop-blur-xl shadow-lg w-full">
+        <div className="public-mobile-menu md:hidden border-t border-mint-green/20 dark:border-white/10 bg-mint-white/90 dark:bg-slate-950/96 backdrop-blur-xl shadow-lg w-full">
           <div className="px-4 py-3 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <MobileSection label="Our Platform" content={platformMenu} onNavigate={go} />
             <MobileSection label="Solutions" content={solutionsMenu} onNavigate={go} />
             <MobileSection label="Resources" content={resourcesMenu} onNavigate={go} />
             <button
               onClick={() => go('/pricing')}
-              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors"
+              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-100 hover:text-mint-black dark:hover:text-white hover:bg-mint-green-light/30 dark:hover:bg-white/10 rounded-md transition-colors"
             >
               Pricing
             </button>
             <button
               onClick={() => go('/hirings')}
-              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-mint-black hover:bg-mint-green-light/30 rounded-md transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-100 hover:text-mint-black dark:hover:text-white hover:bg-mint-green-light/30 dark:hover:bg-white/10 rounded-md transition-colors flex items-center gap-2"
             >
               <Briefcase className="h-4 w-4" />
               Hirings
@@ -316,7 +316,7 @@ export function PublicFooter() {
 
   return (
     <>
-      <footer className="border-t border-mint-green/20 bg-mint-white/80 backdrop-blur-sm">
+      <footer className="public-footer border-t border-mint-green/20 dark:border-white/10 bg-mint-white/80 dark:bg-slate-950/90 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div className="md:col-span-1">

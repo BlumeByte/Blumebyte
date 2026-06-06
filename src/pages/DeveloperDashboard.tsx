@@ -1787,8 +1787,10 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [resetTarget, setResetTarget] = useState<{ email: string } | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ id?: string; email: string } | null>(null);
   const [resetLink, setResetLink] = useState<string | null>(null);
+  const [overridePassword, setOverridePassword] = useState('');
+  const [overrideResult, setOverrideResult] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const normalizedSupportRole = canonicalPlatformRole(authUser?.role);
   const isDeveloperAdmin = normalizedSupportRole === 'developer';
@@ -1821,6 +1823,24 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
       setResetLink(res.resetLink || '(link generated — check Supabase logs)');
       toast.success('Reset link generated');
     } catch (e: any) { toast.error('Failed to generate reset link: ' + (e.message || '')); }
+    finally { setResetting(false); }
+  };
+
+  const overrideUserPassword = async () => {
+    if (!resetTarget) return;
+    setResetting(true);
+    setOverrideResult(null);
+    try {
+      const token = await getToken();
+      const res = await apiWithRouteFallback(`/developer/users/${resetTarget.id || resetTarget.email}/password`, {
+        method: 'PUT',
+        token,
+        body: { email: resetTarget.email, password: overridePassword || undefined },
+      }, [`/support/users/${resetTarget.id || resetTarget.email}/password`]);
+      setOverrideResult(res.tempPassword || (overridePassword ? 'Password updated.' : 'Temporary password generated and emailed.'));
+      toast.success('Password updated');
+      setOverridePassword('');
+    } catch (e: any) { toast.error('Failed to update password: ' + (e.message || '')); }
     finally { setResetting(false); }
   };
 
@@ -1878,7 +1898,7 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                   {isDeveloperAdmin && (
                     <TableCell>
                       <Button size="sm" variant="ghost" title="Generate Password Reset Link"
-                        onClick={() => { setResetTarget({ email: u.email }); setResetLink(null); }}>
+                        onClick={() => { setResetTarget({ id: u.id || u.userId, email: u.email }); setResetLink(null); setOverridePassword(''); setOverrideResult(null); }}>
                         <Key className="h-3.5 w-3.5 text-blue-500" />
                       </Button>
                     </TableCell>
@@ -1891,11 +1911,26 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
       )}
 
       {/* Reset password dialog */}
-      <Dialog open={!!resetTarget} onOpenChange={open => { if (!open) { setResetTarget(null); setResetLink(null); } }}>
+      <Dialog open={!!resetTarget} onOpenChange={open => { if (!open) { setResetTarget(null); setResetLink(null); setOverridePassword(''); setOverrideResult(null); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Generate Password Reset Link</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Password Access</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-gray-600">Send a password reset link for <strong>{resetTarget?.email}</strong>.</p>
+            <p className="text-sm text-gray-600">Reset or override password for <strong>{resetTarget?.email}</strong>.</p>
+            <div>
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                value={overridePassword}
+                onChange={e => setOverridePassword(e.target.value)}
+                placeholder="Leave blank to auto-generate"
+              />
+              <p className="text-xs text-gray-400 mt-1">A no-reply email is sent to the user and copied to operations.</p>
+            </div>
+            {overrideResult && (
+              <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-800">
+                {overrideResult}
+              </div>
+            )}
             {resetLink && (
               <div className="space-y-1">
                 <Label>Reset Link</Label>
@@ -1910,7 +1945,11 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setResetTarget(null); setResetLink(null); }}>Close</Button>
+            <Button variant="outline" onClick={() => { setResetTarget(null); setResetLink(null); setOverridePassword(''); setOverrideResult(null); }}>Close</Button>
+            <Button variant="outline" onClick={overrideUserPassword} disabled={resetting}>
+              {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Key className="h-4 w-4 mr-2" />}
+              Override Password
+            </Button>
             <Button onClick={generateReset} disabled={resetting}>
               {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Key className="h-4 w-4 mr-2" />}
               Generate Link

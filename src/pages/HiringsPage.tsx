@@ -92,55 +92,55 @@ function JobCard({
 }) {
   const status = job.status || 'open';
   const applyButtonClass = applied
-    ? 'flex-1 bg-slate-200 text-blue-700 hover:bg-slate-300'
+    ? 'flex-1 bg-gray-100 text-blue-700 hover:bg-gray-200 dark:bg-slate-800 dark:text-blue-200 dark:hover:bg-slate-700'
     : 'flex-1 bg-primary text-primary-foreground hover:bg-primary/90';
 
   return (
-    <div className="bg-slate-950 text-slate-200 rounded-2xl border border-slate-700/70 shadow-lg hover:shadow-xl transition-all duration-200 p-5 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
+    <div className="glass-public text-gray-900 dark:text-slate-100 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-lg hover:shadow-xl transition-all duration-200 p-5 flex flex-col gap-4 cursor-pointer" onClick={onDetails}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-semibold text-slate-100 text-base truncate" title={job.roleTitle || 'Untitled Role'}>
+          <h3 className="font-semibold text-gray-950 dark:text-slate-50 text-base truncate" title={job.roleTitle || 'Untitled Role'}>
             {job.roleTitle || 'Untitled Role'}
           </h3>
-          <p className="text-sm text-slate-400 truncate mt-1" title={job.companyName || 'Hiring Organization'}>
+          <p className="text-sm text-gray-600 dark:text-slate-400 truncate mt-1" title={job.companyName || 'Hiring Organization'}>
             {job.companyName || 'Hiring Organization'}
           </p>
         </div>
         <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-1 capitalize">{status}</span>
       </div>
 
-      <div className="space-y-1 text-sm text-slate-300">
+      <div className="space-y-1 text-sm text-gray-700 dark:text-slate-300">
         <p className="flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5 text-slate-400" />
+          <MapPin className="h-3.5 w-3.5 text-gray-500 dark:text-slate-400" />
           <span>{job.location || 'Location not specified'}</span>
           {job.employmentType && (
             <>
-              <Clock3 className="h-3.5 w-3.5 text-slate-400 ml-2" />
+              <Clock3 className="h-3.5 w-3.5 text-gray-500 dark:text-slate-400 ml-2" />
               <span>{job.employmentType}</span>
             </>
           )}
         </p>
         {job.deadline && (
           <p className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            <Calendar className="h-3.5 w-3.5 text-gray-500 dark:text-slate-400" />
             <span>Deadline: {new Date(job.deadline).toLocaleDateString()}</span>
           </p>
         )}
         {!!job.salaryRange && (
-          <p className="flex items-center gap-1.5 text-emerald-400 font-medium">
+          <p className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
             <DollarSign className="h-3.5 w-3.5" />
             <span>{job.salaryRange}</span>
           </p>
         )}
       </div>
 
-      <p className="text-sm text-slate-300 line-clamp-2">{job.description || ''}</p>
-      <div className="text-xs text-slate-400 pt-2 border-t border-slate-700/60">
+      <p className="text-sm text-gray-700 dark:text-slate-300 line-clamp-2">{job.description || ''}</p>
+      <div className="text-xs text-gray-500 dark:text-slate-400 pt-2 border-t border-gray-200 dark:border-slate-700/60">
         Posted {new Date(job.createdAt).toLocaleDateString()}
       </div>
 
       <div className="flex gap-2 mt-auto" onClick={(event) => event.stopPropagation()}>
-        <Button variant="outline" size="sm" className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700" onClick={onDetails}>
+        <Button variant="outline" size="sm" className="flex-1 border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onDetails}>
           <Eye className="h-4 w-4 mr-1" />
           Details
         </Button>
