@@ -679,6 +679,19 @@ html.dark .public-page-bg .public-mobile-menu .bg-mint-black {
   color: #0b1220 !important;
 }
 
+html.dark .public-page-bg button.bg-white,
+html.dark .public-page-bg .bg-white.text-black,
+html.dark .public-page-bg .bg-white.text-mint-black {
+  background-color: #ffffff !important;
+  color: #0b1220 !important;
+}
+
+html.dark .public-page-bg button.bg-white:hover,
+html.dark .public-page-bg .hover\:bg-gray-100:hover {
+  background-color: #f1f5f9 !important;
+  color: #020617 !important;
+}
+
 html.dark .public-page-bg .public-footer {
   color: #cbd5e1;
 }
@@ -690,4 +703,52 @@ html.dark .public-page-bg .public-footer h3 {
 html.dark .public-page-bg .public-footer button:hover,
 html.dark .public-page-bg .glass-nav button:hover {
   color: #ffffff !important;
+}
+
+html.dark .legal-public-page header {
+  background-color: rgba(8, 11, 18, 0.92) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+html.dark .legal-public-page header img {
+  filter: invert(1) brightness(1.8);
+}
+
+html.dark .legal-public-page header button {
+  color: #e5e7eb !important;
+}
+
+html.dark .legal-public-page header button:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .legal-public-page .bg-blue-50 {
+  background-color: rgba(30, 64, 175, 0.18) !important;
+  border-color: rgba(96, 165, 250, 0.30) !important;
+}
+
+html.dark .legal-public-page .bg-green-50 {
+  background-color: rgba(22, 101, 52, 0.18) !important;
+  border-color: rgba(74, 222, 128, 0.30) !important;
+}
+
+html.dark .legal-public-page .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.18) !important;
+  border-color: rgba(248, 113, 113, 0.30) !important;
+}
+
+html.dark .legal-public-page .bg-amber-50 {
+  background-color: rgba(146, 64, 14, 0.18) !important;
+  border-color: rgba(251, 191, 36, 0.30) !important;
+}
+
+html.dark .legal-public-page .text-blue-900,
+html.dark .legal-public-page .text-blue-800,
+html.dark .legal-public-page .text-green-900,
+html.dark .legal-public-page .text-green-800,
+html.dark .legal-public-page .text-red-900,
+html.dark .legal-public-page .text-red-800,
+html.dark .legal-public-page .text-amber-900 {
+  color: #dbeafe !important;
 }

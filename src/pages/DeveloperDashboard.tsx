@@ -1464,6 +1464,7 @@ function PlatformUsersPanel() {
   const saveUser = async () => {
     if (!form.name.trim() || !form.email.trim()) return toast.error('Name and email required');
     setSaving(true);
+    let passwordToShow: string | null = null;
     try {
       const token = await getToken();
       if (editUser) {
@@ -1474,6 +1475,13 @@ function PlatformUsersPanel() {
         } catch (error: any) {
           if (!isRouteNotFoundError(error)) throw error;
           await api(`/platform-users/${editUser.id}`, { method: 'PUT', token, body });
+        }
+        if (form.password) {
+          await apiWithRouteFallback(`/developer/users/${editUser.id}/password`, {
+            method: 'PUT',
+            token,
+            body: { email: form.email, password: form.password, role: form.role, name: form.name },
+          }, [`/support/users/${editUser.id}/password`]);
         }
         toast.success('User updated');
         setTempPassword(null);
@@ -1488,13 +1496,14 @@ function PlatformUsersPanel() {
           result = await api('/platform-users', { method: 'POST', token, body });
         }
         if (result?.tempPassword) {
+          passwordToShow = result.tempPassword;
           setTempPassword(result.tempPassword);
           toast.success(`Platform user created — temp password shown below`);
         } else {
           toast.success('Platform user created');
         }
       }
-      if (!tempPassword) {
+      if (!passwordToShow) {
         setShowCreate(false);
         setEditUser(null);
         setForm({ name: '', email: '', role: 'customer_care', password: '' });
