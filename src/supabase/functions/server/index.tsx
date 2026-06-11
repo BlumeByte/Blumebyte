@@ -684,7 +684,26 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
 // Helper to get the first company ID from scope (reduces repeated const scope patterns)
 async function getCompanyId(userId: string): Promise<string | null> {
   const companies = await resolveCompanyScope(userId);
-  return companies?.[0] || null;
+  if (!companies?.length) return null;
+  const scopeAliases = new Set(companies.map((value) => normalizeTenantIdentifier(value)));
+
+  try {
+    const allCompanies = await kv.getByPrefix('company:');
+    const matchedCompany = allCompanies.find((company: any) => [
+      company?.id,
+      company?.companyId,
+      company?.name,
+      company?.companyName,
+      company?.slug,
+      company?.tenantSlug,
+    ].some((value) => scopeAliases.has(normalizeTenantIdentifier(value))));
+    const canonicalId = matchedCompany?.id || matchedCompany?.companyId;
+    if (canonicalId) return String(canonicalId);
+  } catch (error) {
+    console.error('Failed to canonicalize company scope:', error);
+  }
+
+  return companies[0] || null;
 }
 
 function getCanonicalSubscriptionLicenses(subscription: any): number {
@@ -694,6 +713,80 @@ function getCanonicalSubscriptionLicenses(subscription: any): number {
     subscription?.licenses ??
     0
   ) || 0;
+}
+
+function normalizeTenantIdentifier(value: any): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+async function getCompanyAliasSet(companyId: string | null): Promise<Set<string>> {
+  const aliases = new Set<string>();
+  const add = (value: any) => {
+    const normalized = normalizeTenantIdentifier(value);
+    if (normalized) aliases.add(normalized);
+  };
+
+  add(companyId);
+  if (companyId) {
+    try {
+      const company = await kv.get(`company:${companyId}`) || await kv.get(`company_by_id:${companyId}`);
+      [
+        company?.id,
+        company?.companyId,
+        company?.name,
+        company?.companyName,
+        company?.slug,
+        company?.tenantSlug,
+      ].forEach(add);
+    } catch (error) {
+      console.error('Failed to resolve company aliases:', error);
+    }
+  }
+
+  return aliases;
+}
+
+function employeeMatchesCompanyAliases(employee: any, aliases: Set<string>): boolean {
+  if (!employee || aliases.size === 0) return false;
+  return [
+    employee.companyId,
+    employee.company,
+    employee.companyName,
+    employee.companySlug,
+    employee.tenantId,
+    employee.tenantSlug,
+  ].some((value) => aliases.has(normalizeTenantIdentifier(value)));
+}
+
+function getSubscriptionSortTime(subscription: any): number {
+  const dates = [
+    toValidDate(subscription?.updatedAt),
+    toValidDate(subscription?.endDate),
+    toValidDate(subscription?.expiresAt),
+    toValidDate(subscription?.createdAt),
+    toValidDate(subscription?.startDate),
+  ].filter(Boolean) as Date[];
+  return dates.reduce((latest, date) => Math.max(latest, date.getTime()), 0);
+}
+
+function chooseBestSubscriptionRecord<T extends { subscription: any | null }>(records: T[]): T | null {
+  const available = records.filter((record) => !!record.subscription);
+  if (available.length === 0) return null;
+  return available.sort((a, b) => {
+    const aLifecycle = deriveSubscriptionLifecycle(a.subscription);
+    const bLifecycle = deriveSubscriptionLifecycle(b.subscription);
+    if (aLifecycle.isActive !== bLifecycle.isActive) return aLifecycle.isActive ? -1 : 1;
+    return getSubscriptionSortTime(b.subscription) - getSubscriptionSortTime(a.subscription);
+  })[0];
+}
+
+function ensureActiveSubscriptionExpiry(expiresAt: any, fallbackDays = 30): string {
+  const parsed = toValidDate(expiresAt);
+  const now = new Date();
+  if (parsed && parsed > now) return parsed.toISOString();
+  const nextExpiry = new Date(now);
+  nextExpiry.setDate(nextExpiry.getDate() + fallbackDays);
+  return nextExpiry.toISOString();
 }
 
 async function resolveBillingSubscriptionContext(userId: string): Promise<{
@@ -707,9 +800,10 @@ async function resolveBillingSubscriptionContext(userId: string): Promise<{
 
   if (companyId) {
     const allEmployees = await kv.getByPrefix('employee:');
+    const aliases = await getCompanyAliasSet(companyId);
     const companySuperAdmin = allEmployees.find((emp: any) =>
       normalizeCareRole(String(emp?.role || '')) === 'superadmin' &&
-      (emp?.companyId === companyId || emp?.company === companyId)
+      employeeMatchesCompanyAliases(emp, aliases)
     );
     ownerUserId = String(companySuperAdmin?.userId || companySuperAdmin?.id || userId || '').trim() || null;
   }
@@ -727,16 +821,19 @@ async function resolveBillingSubscriptionContext(userId: string): Promise<{
     candidates.push({ id: normalizedId, source });
   }
 
+  const records = [];
   for (const candidate of candidates) {
-    const subscription = await kv.get(`subscription:${candidate.id}`);
-    if (subscription) {
-      return {
-        companyId,
-        ownerUserId,
-        subscription,
-        source: candidate.source,
-      };
-    }
+    records.push({ ...candidate, subscription: await kv.get(`subscription:${candidate.id}`) });
+  }
+
+  const selected = chooseBestSubscriptionRecord(records);
+  if (selected?.subscription) {
+    return {
+      companyId,
+      ownerUserId,
+      subscription: selected.subscription,
+      source: selected.source,
+    };
   }
 
   return {
@@ -794,9 +891,10 @@ async function syncCompanySubscriptionMirror(userId: string, subscription: any) 
 async function findCompanySuperAdminUserId(companyId: string) {
   if (!companyId) return null;
   const employees = await kv.getByPrefix('employee:');
+  const aliases = await getCompanyAliasSet(companyId);
   const owner = employees.find((employee: any) =>
     normalizeCareRole(employee?.role || '') === 'superadmin' &&
-    (employee?.companyId === companyId || employee?.company === companyId)
+    employeeMatchesCompanyAliases(employee, aliases)
   );
   return owner?.userId || owner?.id || null;
 }
@@ -7598,17 +7696,21 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     // For non-superadmins, they're covered under the superadmin's subscription
     if (role !== 'superadmin') {
       // CRITICAL: Find the superadmin from the SAME company only
-      const scope = await resolveCompanyScope(user.id);
-      const companyId = scope?.[0];
+      const companyId = await getCompanyId(user.id);
       const allEmployees = await kv.getByPrefix('employee:');
+      const aliases = await getCompanyAliasSet(companyId || null);
       const superadmin = companyId 
-        ? allEmployees.find((emp: any) => emp.role === 'superadmin' && (emp.companyId === companyId || emp.company === companyId))
+        ? allEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin' && employeeMatchesCompanyAliases(emp, aliases))
         : null;
 
       const superadminId = superadmin?.userId || superadmin?.id || null;
       const ownerSubscription = superadminId ? await kv.get(`subscription:${superadminId}`) : null;
       const mirrorSubscription = companyId ? await kv.get(`subscription:${companyId}`) : null;
-      const subscription = ownerSubscription || mirrorSubscription;
+      const selected = chooseBestSubscriptionRecord([
+        { source: 'owner', subscription: ownerSubscription },
+        { source: 'company', subscription: mirrorSubscription },
+      ]);
+      const subscription = selected?.subscription || null;
       
       if (!subscription) {
         return c.json({ status: 'expired', message: 'No subscription found' }, 200);
@@ -7635,7 +7737,7 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     }
     
     // For superadmins, check their own subscription
-    const { subscription } = await resolveBillingSubscriptionContext(user.id);
+    const { subscription, source } = await resolveBillingSubscriptionContext(user.id);
     
     if (!subscription) {
       return c.json({ status: 'none', message: 'No subscription found' }, 200);
@@ -7653,10 +7755,20 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
         ...subscription,
         status: normalizedStatus,
         endDate: lifecycle.endDateIso || subscription?.endDate || null,
+        expiresAt: lifecycle.endDateIso || subscription?.expiresAt || subscription?.endDate || null,
         updatedAt: new Date().toISOString(),
       };
       await kv.set(`subscription:${user.id}`, normalizedSubscription);
       await syncCompanySubscriptionMirror(user.id, normalizedSubscription);
+    } else if (source !== 'user') {
+      await kv.set(`subscription:${user.id}`, {
+        ...subscription,
+        userId: user.id,
+        status: normalizedStatus,
+        endDate: lifecycle.endDateIso || subscription?.endDate || subscription?.expiresAt || null,
+        expiresAt: lifecycle.endDateIso || subscription?.expiresAt || subscription?.endDate || null,
+        updatedAt: new Date().toISOString(),
+      });
     }
     
     await logAudit({
@@ -7694,8 +7806,7 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
     const { user, role } = await requireAuth(c);
     
     // Get company scope
-    const scope = await resolveCompanyScope(user.id);
-    const companyId = scope?.[0];
+    const companyId = await getCompanyId(user.id);
     
     if (!companyId) {
       return c.json({ 
@@ -7708,9 +7819,8 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
     
     // Get all employees in the same company
     const allEmployees = await kv.getByPrefix('employee:');
-    const companyEmployees = allEmployees.filter((emp: any) => 
-      (emp.company === companyId || emp.companyId === companyId)
-    );
+    const aliases = await getCompanyAliasSet(companyId);
+    const companyEmployees = allEmployees.filter((emp: any) => employeeMatchesCompanyAliases(emp, aliases));
     
     // Find superadmin in this company
     const superadmin = companyEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin');
@@ -7730,9 +7840,13 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
     // the two differ.
     const superadminAuthId = superadmin.userId || superadmin.id;
     const subscription = superadminAuthId ? await kv.get(`subscription:${superadminAuthId}`) : null;
-    // Also try the company mirror if the owner record is missing
-    const mirrorSubscription = !subscription && companyId ? await kv.get(`subscription:${companyId}`) : null;
-    const resolvedSubscription = subscription || mirrorSubscription;
+    // Also try the company mirror, and prefer whichever record is actually active.
+    const mirrorSubscription = companyId ? await kv.get(`subscription:${companyId}`) : null;
+    const selected = chooseBestSubscriptionRecord([
+      { source: 'owner', subscription },
+      { source: 'company', subscription: mirrorSubscription },
+    ]);
+    const resolvedSubscription = selected?.subscription || null;
     
     if (!resolvedSubscription) {
       return c.json({ 
@@ -13299,6 +13413,10 @@ const updateDeveloperSupportTenantLicense = async (c: any) => {
       else if (body.durationUnit === 'years') now.setFullYear(now.getFullYear() + amount);
       expiresAt = now.toISOString();
     }
+    const nextStatus = body.status ?? 'active';
+    if (String(nextStatus).toLowerCase() === 'active') {
+      expiresAt = ensureActiveSubscriptionExpiry(expiresAt);
+    }
 
     // Upsert subscription (create if doesn't exist)
     const sub = (await kv.get(`subscription:${tenantId}`)) || {
@@ -13307,8 +13425,8 @@ const updateDeveloperSupportTenantLicense = async (c: any) => {
     };
     const updatedSub = {
       ...sub,
-      purchasedLicenses: body.purchasedLicenses ?? sub.purchasedLicenses,
-      status: body.status ?? sub.status,
+      purchasedLicenses: body.purchasedLicenses ?? body.licenses ?? body.userCount ?? sub.purchasedLicenses ?? sub.licenses ?? 0,
+      status: nextStatus,
       expiresAt: expiresAt ?? sub.expiresAt,
       endDate: expiresAt ?? body.endDate ?? sub.endDate ?? sub.expiresAt,
       plan: body.plan ?? sub.plan,
@@ -14891,10 +15009,13 @@ for (const route of compatibleRoutePaths('/developer/tenants/:id/license')) app.
     }
     const sub = await kv.get(`subscription:${tenantId}`) || company.subscription || {};
     const status = body.status || 'active';
+    if (String(status).toLowerCase() === 'active') {
+      expiresAt = ensureActiveSubscriptionExpiry(expiresAt);
+    }
     const synced = await syncTenantSubscriptionEverywhere(tenantId, {
       ...sub,
       companyId: tenantId,
-      purchasedLicenses: body.purchasedLicenses ?? body.licenses ?? sub.purchasedLicenses ?? company.licenses ?? 0,
+      purchasedLicenses: body.purchasedLicenses ?? body.licenses ?? body.userCount ?? sub.purchasedLicenses ?? sub.licenses ?? company.purchasedLicenses ?? company.licenses ?? 0,
       plan: body.plan ?? sub.plan ?? company.plan ?? 'custom',
       status,
       expiresAt,
