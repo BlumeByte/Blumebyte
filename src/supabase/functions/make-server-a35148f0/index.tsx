@@ -656,14 +656,13 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
 
   if (scope.length > 0) {
     try {
-      const companies = await kv.getByPrefix('company:');
+      const companies = await getAllCompanyRecords();
       const lowerScope = new Set(scope.map((value) => String(value).toLowerCase()));
       for (const company of companies) {
-        const ids = [company?.id, company?.companyId].filter(Boolean).map((value: any) => String(value));
-        const names = [company?.name, company?.companyName].filter(Boolean).map((value: any) => String(value));
-        const matches = [...ids, ...names].some((value) => lowerScope.has(value.toLowerCase()));
+        const aliases = getCompanyRecordAliases(company);
+        const matches = aliases.some((value) => lowerScope.has(value.toLowerCase()));
         if (!matches) continue;
-        for (const value of [...ids, ...names]) {
+        for (const value of aliases) {
           if (value && !scope.some((existing) => existing.toLowerCase() === value.toLowerCase())) {
             scope.push(value);
           }
@@ -688,16 +687,11 @@ async function getCompanyId(userId: string): Promise<string | null> {
   const scopeAliases = new Set(companies.map((value) => normalizeTenantIdentifier(value)));
 
   try {
-    const allCompanies = await kv.getByPrefix('company:');
-    const matchedCompany = allCompanies.find((company: any) => [
-      company?.id,
-      company?.companyId,
-      company?.name,
-      company?.companyName,
-      company?.slug,
-      company?.tenantSlug,
-    ].some((value) => scopeAliases.has(normalizeTenantIdentifier(value))));
-    const canonicalId = matchedCompany?.id || matchedCompany?.companyId;
+    const allCompanies = await getAllCompanyRecords();
+    const matchedCompany = allCompanies.find((company: any) =>
+      getCompanyRecordAliases(company).some((value) => scopeAliases.has(normalizeTenantIdentifier(value)))
+    );
+    const canonicalId = matchedCompany?.id || matchedCompany?.companyId || matchedCompany?.tenantId;
     if (canonicalId) return String(canonicalId);
   } catch (error) {
     console.error('Failed to canonicalize company scope:', error);
@@ -719,6 +713,40 @@ function normalizeTenantIdentifier(value: any): string {
   return String(value || '').trim().toLowerCase();
 }
 
+async function getAllCompanyRecords(): Promise<any[]> {
+  const [companyRecords, companyByIdRecords] = await Promise.all([
+    kv.getByPrefix('company:').catch((error: any) => {
+      console.error('Failed to load company records:', error);
+      return [];
+    }),
+    kv.getByPrefix('company_by_id:').catch((error: any) => {
+      console.error('Failed to load company_by_id records:', error);
+      return [];
+    }),
+  ]);
+  const seen = new Set<string>();
+  const combined: any[] = [];
+  for (const company of [...companyRecords, ...companyByIdRecords]) {
+    const key = String(company?.id || company?.companyId || company?.tenantId || company?.name || company?.companyName || crypto.randomUUID());
+    if (seen.has(key)) continue;
+    seen.add(key);
+    combined.push(company);
+  }
+  return combined;
+}
+
+function getCompanyRecordAliases(company: any): string[] {
+  return [
+    company?.id,
+    company?.companyId,
+    company?.tenantId,
+    company?.name,
+    company?.companyName,
+    company?.slug,
+    company?.tenantSlug,
+  ].filter(Boolean).map((value) => String(value));
+}
+
 async function getCompanyAliasSet(companyId: string | null): Promise<Set<string>> {
   const aliases = new Set<string>();
   const add = (value: any) => {
@@ -730,14 +758,15 @@ async function getCompanyAliasSet(companyId: string | null): Promise<Set<string>
   if (companyId) {
     try {
       const company = await kv.get(`company:${companyId}`) || await kv.get(`company_by_id:${companyId}`);
-      [
-        company?.id,
-        company?.companyId,
-        company?.name,
-        company?.companyName,
-        company?.slug,
-        company?.tenantSlug,
-      ].forEach(add);
+      if (company) getCompanyRecordAliases(company).forEach(add);
+
+      const allCompanies = await getAllCompanyRecords();
+      const seedAliases = new Set(aliases);
+      for (const record of allCompanies) {
+        const recordAliases = getCompanyRecordAliases(record);
+        const matches = recordAliases.some((value) => seedAliases.has(normalizeTenantIdentifier(value)));
+        if (matches) recordAliases.forEach(add);
+      }
     } catch (error) {
       console.error('Failed to resolve company aliases:', error);
     }
@@ -7870,7 +7899,20 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
     // Derive active status safely — mirrors the logic in deriveSubscriptionLifecycle
     // used by /subscription/status so the two endpoints agree.
     const lifecycle = deriveSubscriptionLifecycle(resolvedSubscription);
-    
+    if (lifecycle.isActive && superadminAuthId && selected?.source !== 'owner') {
+      const repairedSubscription = {
+        ...resolvedSubscription,
+        userId: superadminAuthId,
+        companyId,
+        status: 'active',
+        endDate: lifecycle.endDateIso || resolvedSubscription?.endDate || resolvedSubscription?.expiresAt || null,
+        expiresAt: lifecycle.endDateIso || resolvedSubscription?.expiresAt || resolvedSubscription?.endDate || null,
+        updatedAt: new Date().toISOString(),
+      };
+      await kv.set(`subscription:${superadminAuthId}`, repairedSubscription);
+      await syncCompanySubscriptionMirror(superadminAuthId, repairedSubscription);
+    }
+
     const cardAuth = resolvedSubscription.cardAuthorization;
     const cardSaved = !!(cardAuth?.authorizationCode);
     const cardLast4 = cardAuth?.last4 || '';
@@ -7885,7 +7927,7 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
       availableLicenses,
       subscriptionStatus: lifecycle.isActive ? 'active' : (String(resolvedSubscription.status || '').toLowerCase() || 'expired'),
       plan: resolvedSubscription.plan,
-      endDate: resolvedSubscription.endDate,
+      endDate: lifecycle.endDateIso || resolvedSubscription.endDate || resolvedSubscription.expiresAt || null,
       companyId,
       // Saved card for auto-renewal display
       cardSaved,
