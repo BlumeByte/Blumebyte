@@ -747,32 +747,60 @@ function getCompanyRecordAliases(company: any): string[] {
   ].filter(Boolean).map((value) => String(value));
 }
 
-async function getCompanyAliasSet(companyId: string | null): Promise<Set<string>> {
-  const aliases = new Set<string>();
+async function getCompanyAliasValues(companyId: string | null): Promise<string[]> {
+  const values: string[] = [];
+  const normalized = new Set<string>();
   const add = (value: any) => {
-    const normalized = normalizeTenantIdentifier(value);
-    if (normalized) aliases.add(normalized);
+    const raw = String(value || '').trim();
+    const key = normalizeTenantIdentifier(raw);
+    if (!raw || normalized.has(key)) return;
+    normalized.add(key);
+    values.push(raw);
   };
 
   add(companyId);
-  if (companyId) {
-    try {
-      const company = await kv.get(`company:${companyId}`) || await kv.get(`company_by_id:${companyId}`);
-      if (company) getCompanyRecordAliases(company).forEach(add);
+  if (!companyId) return values;
 
-      const allCompanies = await getAllCompanyRecords();
-      const seedAliases = new Set(aliases);
-      for (const record of allCompanies) {
-        const recordAliases = getCompanyRecordAliases(record);
-        const matches = recordAliases.some((value) => seedAliases.has(normalizeTenantIdentifier(value)));
-        if (matches) recordAliases.forEach(add);
-      }
-    } catch (error) {
-      console.error('Failed to resolve company aliases:', error);
+  try {
+    const directCompany = await kv.get(`company:${companyId}`) || await kv.get(`company_by_id:${companyId}`);
+    if (directCompany) getCompanyRecordAliases(directCompany).forEach(add);
+
+    const seedAliases = new Set(normalized);
+    const allCompanies = await getAllCompanyRecords();
+    for (const company of allCompanies) {
+      const aliases = getCompanyRecordAliases(company);
+      const matches = aliases.some((value) => seedAliases.has(normalizeTenantIdentifier(value)));
+      if (matches) aliases.forEach(add);
     }
+  } catch (error) {
+    console.error('Failed to resolve company alias values:', error);
   }
 
+  return values;
+}
+
+async function getCompanyAliasSet(companyId: string | null): Promise<Set<string>> {
+  const aliases = new Set<string>();
+  for (const value of await getCompanyAliasValues(companyId)) {
+    aliases.add(normalizeTenantIdentifier(value));
+  }
   return aliases;
+}
+
+async function canonicalizeTenantId(value: any): Promise<string> {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const target = normalizeTenantIdentifier(raw);
+  try {
+    const allCompanies = await getAllCompanyRecords();
+    const match = allCompanies.find((company) =>
+      getCompanyRecordAliases(company).some((alias) => normalizeTenantIdentifier(alias) === target)
+    );
+    return String(match?.id || match?.companyId || match?.tenantId || raw).trim();
+  } catch (error) {
+    console.error('Failed to canonicalize tenant id:', error);
+    return raw;
+  }
 }
 
 function employeeMatchesCompanyAliases(employee: any, aliases: Set<string>): boolean {
@@ -848,6 +876,12 @@ async function resolveBillingSubscriptionContext(userId: string): Promise<{
     if (!normalizedId || seen.has(normalizedId)) continue;
     seen.add(normalizedId);
     candidates.push({ id: normalizedId, source });
+  }
+  for (const alias of await getCompanyAliasValues(companyId)) {
+    const normalizedId = String(alias || '').trim();
+    if (!normalizedId || seen.has(normalizedId)) continue;
+    seen.add(normalizedId);
+    candidates.push({ id: normalizedId, source: 'company' });
   }
 
   const records = [];
@@ -7734,10 +7768,15 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
 
       const superadminId = superadmin?.userId || superadmin?.id || null;
       const ownerSubscription = superadminId ? await kv.get(`subscription:${superadminId}`) : null;
-      const mirrorSubscription = companyId ? await kv.get(`subscription:${companyId}`) : null;
+      const aliasSubscriptions = await Promise.all(
+        (await getCompanyAliasValues(companyId || null)).map(async (alias) => ({
+          source: 'company',
+          subscription: await kv.get(`subscription:${alias}`),
+        }))
+      );
       const selected = chooseBestSubscriptionRecord([
         { source: 'owner', subscription: ownerSubscription },
-        { source: 'company', subscription: mirrorSubscription },
+        ...aliasSubscriptions,
       ]);
       const subscription = selected?.subscription || null;
       
@@ -7870,10 +7909,15 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
     const superadminAuthId = superadmin.userId || superadmin.id;
     const subscription = superadminAuthId ? await kv.get(`subscription:${superadminAuthId}`) : null;
     // Also try the company mirror, and prefer whichever record is actually active.
-    const mirrorSubscription = companyId ? await kv.get(`subscription:${companyId}`) : null;
+    const aliasSubscriptions = await Promise.all(
+      (await getCompanyAliasValues(companyId)).map(async (alias) => ({
+        source: 'company',
+        subscription: await kv.get(`subscription:${alias}`),
+      }))
+    );
     const selected = chooseBestSubscriptionRecord([
       { source: 'owner', subscription },
-      { source: 'company', subscription: mirrorSubscription },
+      ...aliasSubscriptions,
     ]);
     const resolvedSubscription = selected?.subscription || null;
     
@@ -12966,17 +13010,29 @@ const getDeveloperSupportMetrics = async (c: any) => {
     const [allEmployees, allSubscriptions, allCompanies, allAgents, allTickets, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
-      kv.getByPrefix('company:'),
+      getAllCompanyRecords(),
       getDynamicPlatformAgents(),
       getAllSupportTickets(),
       listSupabasePlatformUsers(),
     ]);
 
+    const aliasToCompanyId = new Map<string, string>();
     const companyRecordMap = new Map<string, any>();
     for (const company of allCompanies) {
-      const cid = company?.id || company?.companyId;
+      const cid = String(company?.id || company?.companyId || company?.tenantId || '').trim();
       if (cid) companyRecordMap.set(cid, company);
+      const canonicalId = cid || String(company?.name || company?.companyName || '').trim();
+      if (!canonicalId) continue;
+      for (const alias of getCompanyRecordAliases(company)) {
+        aliasToCompanyId.set(normalizeTenantIdentifier(alias), canonicalId);
+      }
     }
+
+    const resolveTenantId = (value: any) => {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      return aliasToCompanyId.get(normalizeTenantIdentifier(raw)) || raw;
+    };
 
     const companyMap = new Map<string, { id: string; name: string; usedLicenses: number; purchasedLicenses: number; status: string; createdAt?: string; plan?: string }>();
     const tenantUserKeys = new Set<string>();
@@ -13011,7 +13067,7 @@ const getDeveloperSupportMetrics = async (c: any) => {
     };
 
     for (const emp of allEmployees) {
-      const cid = emp.companyId || emp.company;
+      const cid = resolveTenantId(emp.companyId || emp.company || emp.tenantId);
       if (!cid) continue;
       if (!companyMap.has(cid)) {
         companyMap.set(cid, { id: cid, name: emp.companyName || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'active' });
@@ -13026,7 +13082,7 @@ const getDeveloperSupportMetrics = async (c: any) => {
       });
     }
     for (const c of allCompanies) {
-      const cid = c.id || c.companyId;
+      const cid = resolveTenantId(c.id || c.companyId || c.tenantId || c.name || c.companyName);
       if (!cid) continue;
       if (!companyMap.has(cid)) {
         companyMap.set(cid, { id: cid, name: c.name || cid, usedLicenses: 0, purchasedLicenses: 0, status: 'unknown', createdAt: c.createdAt, plan: c.plan });
@@ -13039,7 +13095,7 @@ const getDeveloperSupportMetrics = async (c: any) => {
     }
     for (const authUser of supabaseUsers) {
       const meta = authUser?.user_metadata || {};
-      const cid = meta.companyId || meta.company;
+      const cid = resolveTenantId(meta.companyId || meta.company || meta.tenantId);
       if (cid && !companyMap.has(cid)) {
         const companyRecord = companyRecordMap.get(cid);
         companyMap.set(cid, {
@@ -13063,9 +13119,18 @@ const getDeveloperSupportMetrics = async (c: any) => {
         createdAt: authUser?.created_at,
       });
     }
+    const subscriptionByTenant = new Map<string, any>();
     for (const sub of allSubscriptions) {
-      const cid = sub.companyId || sub.company;
+      const cid = resolveTenantId(sub.companyId || sub.company || sub.tenantId);
       if (!cid) continue;
+      const selected = chooseBestSubscriptionRecord([
+        { subscription: sub },
+        { subscription: subscriptionByTenant.get(cid) || null },
+      ]);
+      if (selected?.subscription) subscriptionByTenant.set(cid, selected.subscription);
+    }
+
+    for (const [cid, sub] of subscriptionByTenant.entries()) {
       if (!companyMap.has(cid)) {
         const companyRecord = companyRecordMap.get(cid);
         companyMap.set(cid, {
@@ -13188,27 +13253,44 @@ const listDeveloperSupportTenants = async (c: any) => {
     const [allEmployees, allSubscriptions, allCompanies, supabaseUsers] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
-      kv.getByPrefix('company:'),
+      getAllCompanyRecords(),
       listSupabasePlatformUsers(),
     ]);
 
-    const subMap = new Map<string, any>();
-    for (const sub of allSubscriptions) {
-      const cid = sub.companyId || sub.company;
-      if (cid) subMap.set(cid, sub);
-    }
-
+    const aliasToCompanyId = new Map<string, string>();
     const companyMap = new Map<string, any>();
     for (const c of allCompanies) {
-      const cid = c.id || c.companyId;
+      const cid = String(c.id || c.companyId || c.tenantId || '').trim();
       if (cid) companyMap.set(cid, c);
+      const canonicalId = cid || String(c.name || c.companyName || '').trim();
+      if (!canonicalId) continue;
+      for (const alias of getCompanyRecordAliases(c)) {
+        aliasToCompanyId.set(normalizeTenantIdentifier(alias), canonicalId);
+      }
+    }
+
+    const resolveTenantId = (value: any) => {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      return aliasToCompanyId.get(normalizeTenantIdentifier(raw)) || raw;
+    };
+
+    const subMap = new Map<string, any>();
+    for (const sub of allSubscriptions) {
+      const cid = resolveTenantId(sub.companyId || sub.company || sub.tenantId);
+      if (!cid) continue;
+      const selected = chooseBestSubscriptionRecord([
+        { subscription: sub },
+        { subscription: subMap.get(cid) || null },
+      ]);
+      if (selected?.subscription) subMap.set(cid, selected.subscription);
     }
 
     // Build tenant list from employee records (superadmin entries carry company metadata)
     const tenantMap = new Map<string, any>();
     const tenantUserMap = new Map<string, Set<string>>();
     for (const emp of allEmployees) {
-      const cid = emp.companyId || emp.company;
+      const cid = resolveTenantId(emp.companyId || emp.company || emp.tenantId);
       if (!cid) continue;
       if (!tenantMap.has(cid)) {
         const companyRecord = companyMap.get(cid);
@@ -13238,7 +13320,7 @@ const listDeveloperSupportTenants = async (c: any) => {
     // before KV profile sync runs).
     for (const authUser of supabaseUsers) {
       const meta = authUser?.user_metadata || {};
-      const cid = meta.companyId || meta.company;
+      const cid = resolveTenantId(meta.companyId || meta.company || meta.tenantId);
       if (!cid) continue;
       if (!tenantMap.has(cid)) {
         const companyRecord = companyMap.get(cid);
@@ -13267,7 +13349,7 @@ const listDeveloperSupportTenants = async (c: any) => {
     // Include subscription-only tenants (e.g. billing records created before
     // company/employee mirrors are fully synced).
     for (const sub of allSubscriptions) {
-      const cid = sub.companyId || sub.company;
+      const cid = resolveTenantId(sub.companyId || sub.company || sub.tenantId);
       if (!cid) continue;
       if (!tenantMap.has(cid)) {
         const companyRecord = companyMap.get(cid);
@@ -13442,7 +13524,7 @@ const updateDeveloperSupportTenantLicense = async (c: any) => {
   try {
     const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
-    const tenantId = c.req.param('id');
+    const tenantId = await canonicalizeTenantId(c.req.param('id'));
     const body = await c.req.json();
 
     // Duration-based expiry: calculate expiresAt from durationAmount + durationUnit
@@ -15036,7 +15118,7 @@ for (const route of compatibleRoutePaths('/developer/tenants/:id/reinstate')) ap
 for (const route of compatibleRoutePaths('/developer/tenants/:id/license')) app.put(route, async (c) => {
   try {
     const { user } = await requireDeveloper(c);
-    const tenantId = c.req.param('id');
+    const tenantId = await canonicalizeTenantId(c.req.param('id'));
     const body = await c.req.json().catch(() => ({}));
     const company = await kv.get(`company:${tenantId}`) || await kv.get(`company_by_id:${tenantId}`);
     if (!company) return c.json({ error: 'Tenant not found' }, 404);
