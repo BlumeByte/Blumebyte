@@ -7687,7 +7687,7 @@ app.get(`${PREFIX}/subscription/user-count`, async (c) => {
   }
 });
 
-const SUBSCRIPTION_EXPIRY_ALERT_DAYS = new Set([0, 1, 3, 7]);
+const SUBSCRIPTION_EXPIRY_ALERT_DAYS = new Set([0, 1, 3, 7, 15]);
 
 async function triggerSuperadminSubscriptionExpiryAlert(
   superadminUser: any,

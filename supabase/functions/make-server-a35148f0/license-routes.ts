@@ -909,6 +909,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       // Calculate renewal amount: Monthly $3.55/user/month | Yearly $2.55/user/month = $30.60/year
       const pricePerLicense = subscription.plan === 'monthly' ? 3.55 : 30.60;
       const amount = subscription.purchasedLicenses * pricePerLicense;
+      const writeUserId = ownerUserId || user.id;
       
       // Convert USD to GHS for Paystack
       const { amountSmallestUnit: renewAmountSmallestUnit, currency: renewCurrency } = await usdToPaystackAmount(amount);
@@ -939,22 +940,49 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       const paystackData = await paystackResponse.json();
       
       if (!paystackData.status || paystackData.data.status !== 'success') {
+        const failureMessage = paystackData.message || 'Auto-renewal failed. Please update your payment method.';
         await logAudit({
           userId: user.id,
           userName: user.email || 'Unknown',
           action: 'UPDATE',
           resourceType: 'subscription-renewal',
           resourceId: user.id,
-          details: { 
+          details: {
             success: false,
-            error: paystackData.message || 'Auto-renewal failed',
+            error: failureMessage,
             amount,
           },
         });
-        
+
+        const notifId = crypto.randomUUID();
+        await kv.set(`notification:${notifId}`, {
+          id: notifId,
+          userId: user.id,
+          type: 'subscription-renewal-failed',
+          title: 'Subscription Auto‑Renewal Failed',
+          message: failureMessage,
+          read: false,
+          createdAt: new Date().toISOString(),
+          metadata: {
+            plan: subscription.plan,
+            amountUsd: amount,
+            endDate: subscription.endDate,
+          },
+        });
+
+        await sendBillingEmail(
+          user.email || await getBillingRecipient(writeUserId),
+          'Blumebyte subscription renewal failed',
+          `<p>We attempted to renew your Blumebyte subscription using your saved card, but the payment did not go through.</p>
+           <p><strong>Amount:</strong> $${amount.toFixed(2)}</p>
+           <p><strong>Plan:</strong> ${subscription.plan}</p>
+           <p><strong>Expiry date:</strong> ${subscription.endDate || 'Unknown'}</p>
+           <p>Please sign in and update your payment method or renew manually at <a href="/subscription">Billing & Subscription</a>.</p>`
+        );
+
         return c.json({ 
           success: false, 
-          message: paystackData.message || 'Auto-renewal failed. Please update your payment method.',
+          message: failureMessage,
           needsCardUpdate: true,
         });
       }

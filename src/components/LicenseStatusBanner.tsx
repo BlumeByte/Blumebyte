@@ -61,7 +61,7 @@ export function LicenseStatusBanner() {
     'none'
   ).toLowerCase();
   const daysLeft = useMemo(() => daysUntil(licenseInfo?.endDate), [licenseInfo?.endDate]);
-  const shouldShowExpiry = licenseInfo && (status !== 'active' || (daysLeft != null && daysLeft <= 30));
+  const shouldShowExpiry = licenseInfo && (status !== 'active' || (daysLeft != null && daysLeft <= 15));
 
   useEffect(() => {
     if (!user || user.role !== 'superadmin' || !licenseInfo || !shouldShowExpiry) return;
@@ -74,11 +74,11 @@ export function LicenseStatusBanner() {
       ? 'Your subscription is expired. Renew now to restore access automatically after payment.'
       : daysLeft != null && daysLeft <= 7
       ? `Your subscription expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew now to extend your current expiry.`
-      : `Your subscription expires in ${daysLeft} days. Weekly renewal reminders are enabled for the final month.`;
+      : `Your subscription expires in ${daysLeft} days. Weekly renewal reminders are enabled for the final two weeks.`;
 
     toast.warning(message, {
       duration: 10000,
-      action: { label: 'Renew', onClick: () => navigate('/superadmin/settings') },
+      action: { label: 'Renew', onClick: () => navigate('/subscription') },
     });
   }, [daysLeft, licenseInfo, navigate, shouldShowExpiry, status, user]);
 
@@ -99,7 +99,7 @@ export function LicenseStatusBanner() {
                 Renew now. Once payment is verified, the dashboard unlocks automatically.
               </p>
             </div>
-            <Button onClick={() => navigate('/superadmin/settings')} className="bg-red-600 hover:bg-red-700 text-white">
+            <Button onClick={() => navigate('/subscription')} className="bg-red-600 hover:bg-red-700 text-white">
               <ShoppingCart className="w-4 h-4 mr-2" />
               Renew Subscription
             </Button>
@@ -109,7 +109,7 @@ export function LicenseStatusBanner() {
     );
   }
 
-  if (daysLeft != null && daysLeft <= 30) {
+  if (daysLeft != null && daysLeft <= 15) {
     const urgent = daysLeft <= 7;
     return (
       <Alert className={`mb-6 border-2 ${urgent ? 'border-orange-300 bg-orange-50' : 'border-yellow-300 bg-yellow-50'}`}>
@@ -122,7 +122,7 @@ export function LicenseStatusBanner() {
             <p className={urgent ? 'text-orange-900' : 'text-yellow-900'}>
               You can renew now. Early renewal extends from the current expiry date, so remaining time is not lost.
             </p>
-            <Button onClick={() => navigate('/superadmin/settings')} variant={urgent ? 'default' : 'outline'}>
+            <Button onClick={() => navigate('/subscription')} variant={urgent ? 'default' : 'outline'}>
               <ShoppingCart className="w-4 h-4 mr-2" />
               Renew Subscription
             </Button>
@@ -142,7 +142,7 @@ export function LicenseStatusBanner() {
             <p>
               You have <strong className="text-red-700">{licenseInfo.usedLicenses || 0} of {licenseInfo.purchasedLicenses || 0}</strong> licenses in use.
             </p>
-            <Button onClick={() => navigate('/superadmin/settings')} variant="destructive">
+            <Button onClick={() => navigate('/subscription')} variant="destructive">
               <ShoppingCart className="w-4 h-4 mr-2" />
               Buy More Licenses
             </Button>
@@ -162,7 +162,7 @@ export function LicenseStatusBanner() {
             <p className="text-yellow-900">
               Only <strong className="text-yellow-700">{licenseInfo.availableLicenses} license(s)</strong> remaining out of {licenseInfo.purchasedLicenses} purchased.
             </p>
-            <Button onClick={() => navigate('/superadmin/settings')} variant="outline" className="border-yellow-600 text-yellow-700 hover:bg-yellow-100">
+            <Button onClick={() => navigate('/subscription')} variant="outline" className="border-yellow-600 text-yellow-700 hover:bg-yellow-100">
               <ShoppingCart className="w-4 h-4 mr-2" />
               Purchase More Licenses
             </Button>
@@ -225,7 +225,7 @@ export function NoLicenseCreateAlert({ onContactSuperAdmin }: { onContactSuperAd
 export function SubscriptionExpiryAlert({ daysRemaining }: { daysRemaining: number }) {
   const navigate = useNavigate();
 
-  if (daysRemaining > 30) return null;
+  if (daysRemaining > 15) return null;
 
   return (
     <Alert className="mb-6 border-orange-300 bg-orange-50">
@@ -236,7 +236,7 @@ export function SubscriptionExpiryAlert({ daysRemaining }: { daysRemaining: numb
           <p className="text-orange-900">
             Your subscription will expire in <strong className="text-orange-700">{daysRemaining} day(s)</strong>.
           </p>
-          <Button onClick={() => navigate('/superadmin/settings')} className="bg-orange-600 hover:bg-orange-700 text-white">
+          <Button onClick={() => navigate('/subscription')} className="bg-orange-600 hover:bg-orange-700 text-white">
             <CreditCard className="w-4 h-4 mr-2" />
             Renew Subscription Now
           </Button>
