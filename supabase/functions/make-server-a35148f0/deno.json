@@ -13,6 +13,6 @@
     "@supabase/supabase-js": "jsr:@supabase/supabase-js@2.49.8"
   },
   "tasks": {
-    "serve": "deno run --allow-net --allow-env --allow-read index.tsx"
+    "serve": "deno run --allow-net --allow-env --allow-read index.ts"
   }
 }

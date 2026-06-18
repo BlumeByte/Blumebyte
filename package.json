@@ -73,6 +73,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "vercel-build": "vite build"
+    "vercel-build": "vite build",
+    "deploy:functions": "npx supabase functions deploy make-server-a35148f0 --project-ref ivohczdtuxasyfoiphqu --no-verify-jwt --use-api"
   }
 }
