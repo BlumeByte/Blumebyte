@@ -294,10 +294,6 @@ export default function PricingPage() {
 
   const faqs = [
     {
-      question: 'What is included in the free trial?',
-      answer: 'The free trial includes full access to all features for 14 days. No credit card required.'
-    },
-    {
       question: 'How is pricing calculated?',
       answer: 'Pricing is per employee per month. Monthly plan is $3.55/employee/month. Annual plan is $2.55/employee/month ($30.60/employee/year). Minimum purchase is 2 licenses.'
     },

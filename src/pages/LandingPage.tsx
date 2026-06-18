@@ -648,7 +648,6 @@ export default function LandingPage() {
 
   const faqs = [
     { q: 'How is pricing calculated?', a: 'Pricing is per active employee per month. The minimum purchase is 2 licenses.' },
-    { q: 'Is there a free trial?', a: 'Yes — get full access to all features for 14 days with no credit card required.' },
     { q: 'Can I upgrade or downgrade my plan?', a: 'Absolutely. You can change plans at any time; adjustments take effect at the next billing cycle.' },
     { q: 'What payment methods are accepted?', a: 'We accept all major credit cards and bank transfers via Paystack.' },
     { q: 'How quickly can we get started?', a: 'Most companies are live within a day. Our guided onboarding walks you through every step.' },
@@ -748,8 +747,6 @@ export default function LandingPage() {
 
               {/* Trust row */}
               <div className="flex flex-wrap items-center gap-5 pt-2 text-xs text-gray-500 font-medium">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> No credit card needed</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> 14-day free trial</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> 99.9% uptime SLA</span>
               </div>
             </motion.div>
@@ -1059,7 +1056,6 @@ export default function LandingPage() {
                   Contact Sales
                 </Button>
               </div>
-              <p className="text-xs text-white/40 pt-1">No credit card required · 14-day free trial · Cancel anytime</p>
             </div>
           </div>
         </FadeSection>

@@ -213,7 +213,16 @@ app.use(
       }
       return null;
     },
-    allowHeaders: ["Content-Type", "Authorization", "X-User-Token"],
+    allowHeaders: [
+      "authorization",
+      "x-client-info",
+      "apikey",
+      "content-type",
+      "x-user-token",
+      "Content-Type",
+      "Authorization",
+      "X-User-Token",
+    ],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
     maxAge: 600,
@@ -1739,7 +1748,7 @@ app.post(`${PREFIX}/setup-superadmin`, async (c) => {
 });
 
 // --- Get Paystack Public Key ---
-app.get(`${PREFIX}/paystack/public-key`, async (c) => {
+const handlePaystackPublicKey = async (c: any) => {
   try {
     const publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY');
     if (!publicKey) {
@@ -1770,7 +1779,10 @@ app.get(`${PREFIX}/paystack/public-key`, async (c) => {
     console.error('Error fetching Paystack public key:', error);
     return c.json({ error: error.message }, 500);
   }
-});
+};
+
+app.get('/paystack/public-key', handlePaystackPublicKey);
+app.get(`${PREFIX}/paystack/public-key`, handlePaystackPublicKey);
 
 app.get(`${PREFIX}/paystack/registration-quote`, async (c) => {
   try {

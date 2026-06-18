@@ -65,6 +65,9 @@ enabled = false
 [functions.make-server-a35148f0]
 verify_jwt = false
 
+[functions.make-server]
+verify_jwt = false
+
 [functions.server]
 verify_jwt = false
 

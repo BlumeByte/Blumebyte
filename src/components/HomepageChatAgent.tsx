@@ -81,7 +81,7 @@ const QUICK_QUESTIONS = [
   "What are your pricing plans?",
   "What features do you offer?",
   "How do I sign up?",
-  "Do you offer a free trial?",
+  "How does onboarding work?",
   "Tell me about security"
 ];
 

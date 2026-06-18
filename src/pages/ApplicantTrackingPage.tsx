@@ -111,9 +111,6 @@ export default function ApplicantTrackingPage() {
                 </Button>
               </div>
               <div className="flex flex-wrap items-center gap-5 pt-2 text-xs text-gray-500 font-medium">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> No credit card needed</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> 14-day free trial</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500" /> Cancel anytime</span>
               </div>
             </motion.div>
 
@@ -235,7 +232,6 @@ export default function ApplicantTrackingPage() {
                 <Button size="lg" onClick={() => navigate('/company-signup')} className="bg-white text-black hover:bg-gray-100 text-base px-8 shadow-lg font-bold">Start Now</Button>
                 <Button size="lg" variant="outline" onClick={() => window.open('https://blumebyte.com/contact/', '_blank')} className="border-white/30 bg-transparent text-white hover:bg-white/10 text-base px-8 font-semibold">Contact Sales</Button>
               </div>
-              <p className="text-xs text-white/40 pt-1">No credit card required · 14-day free trial · Cancel anytime</p>
             </div>
           </div>
         </FadeSection>
