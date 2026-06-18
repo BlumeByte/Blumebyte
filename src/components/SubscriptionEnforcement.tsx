@@ -88,6 +88,23 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
         });
       } catch (error: any) {
         console.error('Subscription check failed:', error);
+
+        const isSuperAdmin =
+          normalizeRole(user?.role) === 'superadmin' ||
+          sessionRole === 'superadmin';
+        if (isSuperAdmin) {
+          setSubscriptionStatus({
+            isActive: true,
+            checking: false,
+            error: null,
+            accountInactive: false,
+            subscriptionInactive: false,
+            canManageSubscription: true,
+            autoRenewEligible: false,
+            sessionRole,
+          });
+          return;
+        }
         
         setSubscriptionStatus({
           isActive: false,

@@ -2,7 +2,7 @@ import { projectId } from '../utils/supabase/info';
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const trimSlashes = (value: string) => value.replace(/^\/+|\/+$/g, '');
-const RETRYABLE_FUNCTION_STATUSES = new Set([404, 405, 501]);
+const RETRYABLE_FUNCTION_STATUSES = new Set([404, 405, 501, 503]);
 
 const SUPABASE_BASE_URL = trimTrailingSlash(
   import.meta.env.VITE_SUPABASE_URL ?? `https://${projectId}.supabase.co`,
