@@ -53,6 +53,22 @@ function calculateExtendedEndDate(subscription: any, plan: any): Date {
   return endDate;
 }
 
+async function verifyPaystackSignature(body: string, secret: string, signature: string | null) {
+  if (!secret || !signature) return false;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-512' },
+    false,
+    ['sign'],
+  );
+  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
+  const expected = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  return expected === signature;
+}
+
 async function sendBillingEmail(to: string, subject: string, html: string) {
   if (!to) return;
   const apiKey = Deno.env.get('RESEND_API_KEY');
@@ -1046,10 +1062,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       }
 
       // Verify Paystack HMAC signature
-      const { createHmac } = await import('node:crypto');
-      const hash = createHmac('sha512', paystackSecretKey).update(bodyText).digest('hex');
-      
-      if (hash !== signature) {
+      if (!(await verifyPaystackSignature(bodyText, paystackSecretKey, signature))) {
         console.error('Invalid Paystack signature');
         return c.text('Invalid Signature', 400);
       }

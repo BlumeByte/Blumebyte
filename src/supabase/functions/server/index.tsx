@@ -40,6 +40,22 @@ function isAcceptablePaystackAmount(paidAmount: number, expectedAmount: number) 
   return paidAmount + tolerance >= expectedAmount;
 }
 
+async function verifyPaystackSignature(body: string, secret: string, signature: string | null) {
+  if (!secret || !signature) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-512" },
+    false,
+    ["sign"],
+  );
+  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  const expected = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return expected === signature;
+}
+
 async function getRegistrationPaymentQuote(licensesInput: any, planInput: any) {
   const licenses = Number(licensesInput);
   if (!Number.isInteger(licenses) || licenses < REGISTRATION_MIN_LICENSES) {
@@ -7397,12 +7413,14 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
       
       // SuperAdmin approval - proceed with hiring
       const empData = await kv.get(`employee:${existing.applicantId}`);
+      let hiredCompany = existing.jobCompany || "";
       if (empData) {
         const jobPosting = existing.jobPostingId ? await kv.get(`job-posting:${existing.jobPostingId}`) : null;
         const newPosition = jobPosting?.title || existing.jobTitle || empData.position;
         const newDepartment = jobPosting?.department || existing.jobDepartment || empData.department;
         const newSalary = jobPosting?.salary || existing.jobSalaryRange || empData.salary || "";
         const newCompany = jobPosting?.company || existing.jobCompany || empData.company || "";
+        hiredCompany = newCompany;
         const updatedEmp = { ...empData, position: newPosition, department: newDepartment, salary: newSalary, company: newCompany, updatedAt: new Date().toISOString() };
         await kv.set(`employee:${existing.applicantId}`, updatedEmp);
         const sb = supabaseAdmin();
@@ -7412,7 +7430,7 @@ app.put(`${PREFIX}/job-applications/:id`, async (c) => {
       await kv.set(`notification:${nid1}`, { id: nid1, userId: existing.applicantId, type: "hire-approved", title: "Congratulations! You've Been Hired!", message: `Your application for ${existing.jobTitle} has been approved. Your profile has been updated.`, read: false, createdAt: new Date().toISOString() });
       // CRITICAL: Only notify same-company employees
       const allEmp3 = await kv.getByPrefix("employee:");
-      const hireComp3 = existing.jobCompany || newCompany;
+      const hireComp3 = existing.jobCompany || hiredCompany;
       const compEmp3 = hireComp3 ? allEmp3.filter((e: any) => e.companyId === hireComp3 || e.company === hireComp3) : [];
       for (const emp of compEmp3) {
         if (emp.userId === existing.applicantId) continue;
@@ -8496,14 +8514,10 @@ const handleSubscriptionWebhook = async (c: any) => {
     }
     
     // Verify webhook signature
-    const hash = c.req.header('x-paystack-signature');
+    const signature = c.req.header('x-paystack-signature');
     const body = await c.req.text();
-    
-    const crypto = await import('node:crypto');
-    const hmac = crypto.createHmac('sha512', paystackSecretKey);
-    const expectedHash = hmac.update(body).digest('hex');
-    
-    if (hash !== expectedHash) {
+
+    if (!(await verifyPaystackSignature(body, paystackSecretKey, signature))) {
       console.error('Invalid webhook signature');
       return c.json({ error: 'Invalid signature' }, 401);
     }
