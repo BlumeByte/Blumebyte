@@ -22,9 +22,14 @@ export function useDarkMode() {
 
 /** Dashboard routes where dark mode should be applied. */
 const DASHBOARD_PATHS = ['/admin', '/manager', '/employee', '/superadmin', '/notifications', '/developer', '/support', '/customer-care'];
+const AUTHENTICATED_NON_DASHBOARD_PATHS = ['/subscription', '/payment-verify', '/payment-verify-license'];
 
 function isDashboardPath(pathname: string): boolean {
   return DASHBOARD_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
+}
+
+function isAuthenticatedAppPath(pathname: string): boolean {
+  return isDashboardPath(pathname) || AUTHENTICATED_NON_DASHBOARD_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
 }
 
 function prefersSystemDarkMode(): boolean {
@@ -84,7 +89,7 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
     applyDarkMode(darkMode, curr);
 
     // Auto-logout when navigating FROM a dashboard route TO a public route.
-    if (accessToken && isDashboardPath(prev) && !isDashboardPath(curr)) {
+    if (accessToken && isDashboardPath(prev) && !isAuthenticatedAppPath(curr)) {
       logout().catch(() => {});
     }
 
