@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Blumebyte</string>
+    <string name="title_activity_main">Blumebyte</string>
+    <string name="package_name">com.blumebyte.prosme</string>
+    <string name="custom_url_scheme">com.blumebyte.prosme</string>
+    <string name="admob_app_id">ca-app-pub-3851492633678585~9436720475</string>
+    <string name="admob_native_ad_unit_id">ca-app-pub-3851492633678585/4922760393</string>
+</resources>

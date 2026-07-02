@@ -57,6 +57,9 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@tailwindcss/vite": "4.1.12",
     "@types/node": "^20.10.0",
     "@types/qrcode": "^1.5.6",
@@ -74,6 +77,9 @@
     "dev": "vite",
     "build": "vite build",
     "vercel-build": "vite build",
+    "android:add": "cap add android",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
     "deploy:functions": "npx supabase functions deploy make-server-a35148f0 --project-ref ivohczdtuxasyfoiphqu --no-verify-jwt --use-api"
   }
 }
