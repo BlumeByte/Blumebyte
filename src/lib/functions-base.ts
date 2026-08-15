@@ -11,9 +11,8 @@ const SUPABASE_BASE_URL = trimTrailingSlash(
 export const SUPABASE_FUNCTION_NAME_CANDIDATES = Array.from(
   new Set(
     [
-      trimSlashes(import.meta.env.VITE_SUPABASE_FUNCTION_NAME || ''),
-      'server',
       'make-server-a35148f0',
+      trimSlashes(import.meta.env.VITE_SUPABASE_FUNCTION_NAME || ''),
       'make-server',
     ].filter(Boolean),
   ),

@@ -258,10 +258,7 @@ app.get(`${PREFIX}/health`, (c) => {
 // Sync company stats endpoint (SuperAdmin only)
 app.post(`${PREFIX}/admin/sync-company-stats`, async (c) => {
   try {
-    const authUser = await getAuthUser(c);
-    if (!authUser) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    const { user: authUser } = await requireSuperAdmin(c);
     
     const employeeRecord = await kv.get(`employee:${authUser.id}`);
     const companyId = employeeRecord?.companyId || employeeRecord?.company;
@@ -285,7 +282,7 @@ app.post(`${PREFIX}/admin/sync-all-stats`, async (c) => {
     const authUser = await getAuthUser(c);
     if (!authUser) return c.json({ error: 'Unauthorized' }, 401);
     const profile = await kv.get(`employee:${authUser.id}`);
-    const role = normalizeCareRole(profile?.role || authUser.user_metadata?.role || '');
+    const role = getTrustedRole(authUser, profile);
     if (!['superadmin', 'developer'].includes(role)) {
       return c.json({ error: 'Forbidden' }, 403);
     }
@@ -300,6 +297,7 @@ app.post(`${PREFIX}/admin/sync-all-stats`, async (c) => {
 // Simple test endpoint for payment flow
 app.post(`${PREFIX}/company/test-payment`, async (c) => {
   try {
+    await requireSuperAdmin(c);
     const body = await c.req.json();
     return c.json({ 
       success: true, 
@@ -410,6 +408,10 @@ async function getAuthUser(c: any) {
   return data.user;
 }
 
+function getTrustedRole(user: any, profile?: any): string {
+  return normalizeCareRole(String(profile?.role || user?.app_metadata?.role || 'employee'));
+}
+
 // Helper to get SuperAdmin user for a specific company
 async function getSuperAdmin(companyId?: string) {
   const allUsers = await kv.getByPrefix('employee:');
@@ -472,7 +474,6 @@ function isSubscriptionBypassPath(c: any): boolean {
     '/paystack',
     '/company/init-payment',
     '/company/payment-status',
-    '/company/test-payment',
     '/support-agent',
   ].some((segment) => pathname.includes(segment));
 }
@@ -535,8 +536,7 @@ async function requireAuth(c: any) {
   const user = await getAuthUser(c);
   if (!user) throw new Error("Unauthorized");
   const kvData = await kv.get(`employee:${user.id}`);
-  const rawRole = kvData?.role || user.user_metadata?.role || "employee";
-  const role = normalizeCareRole(String(rawRole || ""));
+  const role = getTrustedRole(user, kvData);
 
   if (role === 'developer' || role === 'customer_care') {
     if (role === 'customer_care' && !(await isCustomerCareLoginAllowed(user.id))) {
@@ -656,16 +656,15 @@ async function resolveCompanyScope(userId: string): Promise<string[] | null> {
     scope.push(...kvData.assignedCompanies);
   }
   
-  // 2. Check auth metadata assignedCompanies (backup)
+  // 2. Check server-managed auth metadata assignedCompanies (backup)
   if (scope.length === 0) {
     const sb = supabaseAdmin();
     const { data } = await sb.auth.admin.getUserById(userId);
-    if (data?.user?.user_metadata?.assignedCompanies?.length) {
-      scope.push(...data.user.user_metadata.assignedCompanies);
+    if (data?.user?.app_metadata?.assignedCompanies?.length) {
+      scope.push(...data.user.app_metadata.assignedCompanies);
     }
-    // Also check companyId in auth metadata (set during registration)
-    if (data?.user?.user_metadata?.companyId && !scope.includes(data.user.user_metadata.companyId)) {
-      scope.push(data.user.user_metadata.companyId);
+    if (data?.user?.app_metadata?.companyId && !scope.includes(data.user.app_metadata.companyId)) {
+      scope.push(data.user.app_metadata.companyId);
     }
   }
   
@@ -12393,7 +12392,7 @@ const reportClientError = async (c: any) => {
       addRecipient({
         id: su?.id,
         email: su?.email,
-        role: su?.user_metadata?.role,
+        role: su?.app_metadata?.role,
         name: su?.user_metadata?.name,
       });
     }
@@ -12627,9 +12626,8 @@ async function verifyCareAccess(c: any): Promise<{ user: any; profile: any; isDe
   const { data, error } = await sb.auth.getUser(token);
   if (error || !data?.user) return null;
   const profile = await kv.get(`employee:${data.user.id}`);
-  const isDeveloper = profile?.role === 'developer' || profile?.isPlatformAdmin === true;
-  const role = profile?.role || data.user.user_metadata?.role || '';
-  const normalizedRole = normalizeCareRole(role);
+  const normalizedRole = getTrustedRole(data.user, profile);
+  const isDeveloper = normalizedRole === 'developer' || profile?.isPlatformAdmin === true;
   const isCare = normalizedRole === 'customer_care';
   if (!isDeveloper && !isCare) return null;
   return { user: data.user, profile, isDeveloper };
@@ -12937,13 +12935,13 @@ async function getDynamicPlatformAgents() {
 
   const employeePlatformUsers = allEmployees.filter((u: any) => isPlatformSupportRole(u?.role || ''));
   const supabasePlatformUsers = supabaseUsers
-    .filter((u: any) => isPlatformSupportRole(u?.user_metadata?.role || ''))
+    .filter((u: any) => isPlatformSupportRole(u?.app_metadata?.role || ''))
     .map((u: any) => ({
       id: u.id,
       userId: u.id,
       name: u.user_metadata?.name || u.email || '',
       email: u.email || '',
-      role: normalizeCareRole(u.user_metadata?.role || ''),
+      role: normalizeCareRole(u.app_metadata?.role || ''),
       status: 'active',
       assignedTenants: [],
       createdAt: u.created_at || '',
@@ -12997,7 +12995,7 @@ async function verifyDeveloperAccess(c: any): Promise<{ user: any; profile: any;
   if (error || !data?.user) return null;
   const profile = await kv.get(`employee:${data.user.id}`);
   const profileRole = normalizeCareRole(profile?.role || '');
-  const metadataRole = normalizeCareRole(data.user.user_metadata?.role || '');
+  const metadataRole = normalizeCareRole(data.user.app_metadata?.role || '');
   const isPlatformAdmin = profile?.isPlatformAdmin === true;
   // Prevent stale KV roles from downgrading platform owners.
   const normalizedRole =
@@ -13831,6 +13829,7 @@ const setDeveloperPlatformUser = async (c: any) => {
     // Update Supabase auth metadata (fixes the Supabase dashboard display)
     await sb.auth.admin.updateUserById(userId, {
       user_metadata: { ...authData.user.user_metadata, name: resolvedName, role: normalizedRole },
+      app_metadata: { ...authData.user.app_metadata, role: normalizedRole },
     });
     // Upsert KV employee record so the server role check always resolves correctly
     const existing = await kv.get(`employee:${userId}`) || {};
@@ -14094,10 +14093,11 @@ async function setAnyUserPassword(identifier: string, body: any, actor: any) {
   const authUser = await resolveAnyAuthUser(identifier, body?.email || existing?.email || '');
   if (!authUser) throw new Error('User not found');
   const password = body?.password || generateTempPassword();
-  const role = normalizeCareRole(body?.role || existing?.role || authUser.user_metadata?.role || 'employee');
+  const role = normalizeCareRole(body?.role || existing?.role || authUser.app_metadata?.role || 'employee');
   const name = body?.name || existing?.name || authUser.user_metadata?.name || authUser.email;
   const { error } = await supabaseAdmin().auth.admin.updateUserById(authUser.id, {
     password,
+    app_metadata: { ...(authUser.app_metadata || {}), role },
     user_metadata: {
       ...(authUser.user_metadata || {}),
       role,
@@ -14549,6 +14549,7 @@ async function ensurePlatformAuthUser(body: any, role: string) {
       email,
       password,
       user_metadata: { role, name: body.name },
+      app_metadata: { role },
       email_confirm: true,
     });
     if (error) throw new Error(error.message);
@@ -14557,6 +14558,7 @@ async function ensurePlatformAuthUser(body: any, role: string) {
   }
   const updatePayload: any = {
     user_metadata: { ...(authUser.user_metadata || {}), role, name: body.name || authUser.user_metadata?.name || email },
+    app_metadata: { ...(authUser.app_metadata || {}), role },
   };
   if (body.password) updatePayload.password = body.password;
   const { data, error } = await sb.auth.admin.updateUserById(authUser.id, updatePayload);

@@ -44,9 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const buildSessionFallbackUser = useCallback((session: Session): User => {
     const meta = session.user?.user_metadata || {};
     const resolvedRole = [
-      meta.role,
-      (meta as any).userRole,
-      (meta as any).user_role,
       session.user?.app_metadata?.role,
       (session.user?.app_metadata as any)?.userRole,
       (session.user?.app_metadata as any)?.user_role,

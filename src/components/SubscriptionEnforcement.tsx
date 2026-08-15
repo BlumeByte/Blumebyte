@@ -51,7 +51,7 @@ export function SubscriptionEnforcement({ children }: SubscriptionEnforcementPro
       let sessionRole: string | null = null;
       try {
         const { data: sessionData } = await supabase.auth.getSession();
-        sessionRole = normalizeRole(sessionData?.session?.user?.user_metadata?.role) || null;
+        sessionRole = normalizeRole(sessionData?.session?.user?.app_metadata?.role) || null;
       } catch { /* ignore */ }
 
       if (!user && !sessionRole) {
