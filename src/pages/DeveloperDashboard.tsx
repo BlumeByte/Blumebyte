@@ -378,12 +378,13 @@ interface Tenant {
   id: string; name: string; industry?: string; licenseStatus?: string;
   activeUsers: number; totalUsers: number; purchasedLicenses: number;
   plan?: string; lastActivity?: string; createdAt?: string;
+  assignedAgentId?: string; assignedAgentName?: string;
 }
 
 interface Ticket {
   id: string; tenantId: string; tenantName: string; issueType: string;
   priority: string; subject: string; description: string; status: string;
-  assignedAgentId?: string; assignedAgentName?: string;
+  assignedAgentId?: string; assignedAgentName?: string; autoAssignedAgent?: boolean;
   createdAt: string; updatedAt: string; notes?: { text: string; authorEmail: string; timestamp: string }[];
 }
 
@@ -499,13 +500,13 @@ function MetricsCards({ metrics }: { metrics: Metrics }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 gap-3">
       {cards.map(card => (
-        <Card key={card.label} className="p-4">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${card.color}`}>
-            <card.icon className="h-4 w-4" />
+        <div key={card.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 p-4 hover:shadow-md transition-shadow">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.color}`}>
+            <card.icon className="h-4.5 w-4.5" />
           </div>
-          <p className="text-2xl font-bold">{card.value}</p>
+          <p className="text-2xl font-bold text-gray-900">{card.value}</p>
           <p className="text-xs text-gray-500 mt-0.5">{card.label}</p>
-        </Card>
+        </div>
       ))}
     </div>
   );
@@ -529,6 +530,233 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Detail Banner (shared full-page header for tenant/ticket detail views) ───
+function DetailBanner({ icon: Icon, title, subtitle, badges, onBack, actions }: {
+  icon: React.ComponentType<{ className?: string }>; title: string; subtitle?: string;
+  badges?: React.ReactNode; onBack: () => void; actions?: React.ReactNode;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white p-5 md:p-6 mb-4">
+      <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10" />
+      <button onClick={onBack} className="relative z-10 flex items-center gap-1.5 text-blue-100 hover:text-white text-sm mb-4 transition-colors">
+        <ChevronLeft className="h-4 w-4" /> Back
+      </button>
+      <div className="relative z-10 flex items-start justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+            <Icon className="h-6 w-6 text-white" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-xl md:text-2xl font-bold truncate">{title}</h2>
+            {subtitle && <p className="text-blue-100 text-sm mt-0.5 truncate">{subtitle}</p>}
+            {badges && <div className="flex items-center gap-2 mt-2 flex-wrap">{badges}</div>}
+          </div>
+        </div>
+        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Agent Assignment Field (load-balanced auto-assign, developer can override) ──
+function AgentAssignField({ assignedAgentId, assignedAgentName, autoAssigned, onReassign }: {
+  assignedAgentId?: string; assignedAgentName?: string; autoAssigned?: boolean;
+  onReassign: (agentId: string, agentName: string) => Promise<void> | void;
+}) {
+  const { getToken } = useAuth();
+  const [agents, setAgents] = useState<{ id: string; userId?: string; name: string; email: string }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
+
+  const ensureLoaded = async () => {
+    if (loaded) return;
+    try {
+      const token = await getToken();
+      const data = await loadSupportAgentsWithFallback(token);
+      setAgents(Array.isArray(data) ? data : []);
+    } catch { /* ignore — reassign list just stays empty */ }
+    setLoaded(true);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Users className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+      <span className="text-xs text-gray-500 shrink-0">Assigned to:</span>
+      <Select
+        value={assignedAgentId || 'unassigned'}
+        onOpenChange={(open) => { if (open) ensureLoaded(); }}
+        onValueChange={async (agentId) => {
+          const agent = agents.find(a => (a.userId || a.id) === agentId);
+          setReassigning(true);
+          try { await onReassign(agentId, agent?.name || agent?.email || ''); }
+          finally { setReassigning(false); }
+        }}
+        disabled={reassigning}
+      >
+        <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[220px] border-none bg-gray-50 hover:bg-gray-100">
+          <SelectValue placeholder="Unassigned">
+            {assignedAgentName || 'Unassigned'}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {agents.length === 0 && <div className="px-2 py-1.5 text-xs text-gray-400">Loading agents…</div>}
+          {agents.map(a => (
+            <SelectItem key={a.userId || a.id} value={a.userId || a.id}>{a.name || a.email}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {autoAssigned && (
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full shrink-0">
+          <Zap className="h-2.5 w-2.5" />AI-assigned
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Tenant Detail View (replaces the old Users/License popups) ──────────────
+function TenantDetailView({
+  tenant, users, defaultTab, onBack, actionLoading, onToggleSuspend,
+  licenseForm, setLicenseForm, onUpdateLicense, onAddUser, onReassign,
+}: {
+  tenant: Tenant; users: any[]; defaultTab: string; onBack: () => void;
+  actionLoading: string | null; onToggleSuspend: () => void;
+  licenseForm: { purchasedLicenses: string; status: string; expiresAt: string; durationAmount: string; durationUnit: string; plan: string };
+  setLicenseForm: React.Dispatch<React.SetStateAction<{ purchasedLicenses: string; status: string; expiresAt: string; durationAmount: string; durationUnit: string; plan: string }>>;
+  onUpdateLicense: () => void;
+  onAddUser: () => void;
+  onReassign: (agentId: string, agentName: string) => void;
+}) {
+  const isSuspended = tenant.licenseStatus === 'suspended';
+  return (
+    <div>
+      <DetailBanner
+        icon={Building2}
+        title={tenant.name}
+        subtitle={tenant.industry || 'No industry set'}
+        badges={
+          <>
+            <StatusBadge status={tenant.licenseStatus || 'unknown'} />
+            <span className="text-xs text-blue-100">{tenant.purchasedLicenses} seats · {tenant.activeUsers}/{tenant.totalUsers} users</span>
+          </>
+        }
+        onBack={onBack}
+        actions={
+          <Button size="sm" variant="secondary" className="bg-white/15 hover:bg-white/25 text-white border-0"
+            onClick={onToggleSuspend} disabled={actionLoading === tenant.id}>
+            {actionLoading === tenant.id
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+              : isSuspended ? <Unlock className="h-3.5 w-3.5 mr-1" /> : <Lock className="h-3.5 w-3.5 mr-1" />}
+            {isSuspended ? 'Restore' : 'Suspend'}
+          </Button>
+        }
+      />
+      <div className="mb-4 bg-white rounded-xl border border-gray-100 px-4 py-2.5 inline-flex">
+        <AgentAssignField
+          assignedAgentId={tenant.assignedAgentId}
+          assignedAgentName={tenant.assignedAgentName}
+          onReassign={onReassign}
+        />
+      </div>
+      <Tabs defaultValue={defaultTab}>
+        <TabsList className="bg-gray-100 rounded-xl p-1">
+          <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Overview</TabsTrigger>
+          <TabsTrigger value="license" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">License</TabsTrigger>
+          <TabsTrigger value="users" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Users ({users.length || tenant.totalUsers})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Tenant Information</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              {[
+                { label: 'Plan', value: tenant.plan || '—' },
+                { label: 'License Status', value: tenant.licenseStatus || 'unknown' },
+                { label: 'Seats', value: String(tenant.purchasedLicenses) },
+                { label: 'Users', value: `${tenant.activeUsers}/${tenant.totalUsers}` },
+                { label: 'Industry', value: tenant.industry || '—' },
+                { label: 'Tenant ID', value: tenant.id },
+                { label: 'Created', value: tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : '—' },
+                { label: 'Last Activity', value: tenant.lastActivity ? new Date(tenant.lastActivity).toLocaleDateString() : '—' },
+              ].map(f => (
+                <div key={f.label} className="min-w-0">
+                  <p className="text-xs text-gray-400">{f.label}</p>
+                  <p className="text-sm font-medium text-gray-900 mt-0.5 truncate" title={f.value}>{f.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="license" className="mt-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 p-5 space-y-3 max-w-lg">
+            <div><Label>Purchased Seats</Label><Input type="number" value={licenseForm.purchasedLicenses} onChange={e => setLicenseForm(f => ({ ...f, purchasedLicenses: e.target.value }))} /></div>
+            <div>
+              <Label>Plan</Label>
+              <Input value={licenseForm.plan} placeholder="e.g. basic, pro, enterprise, custom" onChange={e => setLicenseForm(f => ({ ...f, plan: e.target.value }))} />
+            </div>
+            <div>
+              <Label>License Status</Label>
+              <Select value={licenseForm.status} onValueChange={v => setLicenseForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                <SelectContent>
+                  {['active', 'expired', 'suspended', 'trial'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>License Duration (no payment required)</Label>
+              <div className="flex gap-2 mt-1">
+                <Input type="number" placeholder="30" value={licenseForm.durationAmount} className="w-24"
+                  onChange={e => setLicenseForm(f => ({ ...f, durationAmount: e.target.value, expiresAt: '' }))} />
+                <Select value={licenseForm.durationUnit} onValueChange={v => setLicenseForm(f => ({ ...f, durationUnit: v, expiresAt: '' }))}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                    <SelectItem value="years">Years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Or set a specific expiry date below (overrides duration):</p>
+            </div>
+            <div><Label>Specific Expiry Date</Label><Input type="date" value={licenseForm.expiresAt} onChange={e => setLicenseForm(f => ({ ...f, expiresAt: e.target.value, durationAmount: '' }))} /></div>
+            <Button onClick={onUpdateLicense} disabled={actionLoading === 'license'}>
+              {actionLoading === 'license' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Apply License
+            </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 overflow-hidden">
+            <div className="flex justify-end p-3 border-b border-gray-100">
+              <Button size="sm" onClick={onAddUser}><UserPlus className="h-3.5 w-3.5 mr-1" />Add User</Button>
+            </div>
+            <div className="overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell className="text-sm">{u.name}</TableCell>
+                      <TableCell className="text-sm">{u.email}</TableCell>
+                      <TableCell><StatusBadge status={u.role} /></TableCell>
+                      <TableCell><StatusBadge status={u.status} /></TableCell>
+                    </TableRow>
+                  ))}
+                  {users.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-4">No users found</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
 // ─── Tenants Panel ─────────────────────────────────────────────────────────────
 function TenantsPanel() {
   const { getToken } = useAuth();
@@ -536,10 +764,9 @@ function TenantsPanel() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Tenant | null>(null);
+  const [detailTab, setDetailTab] = useState('overview');
   const [tenantUsers, setTenantUsers] = useState<any[]>([]);
-  const [showUsers, setShowUsers] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [licenseDialog, setLicenseDialog] = useState(false);
   const [licenseForm, setLicenseForm] = useState({ purchasedLicenses: '', status: '', expiresAt: '', durationAmount: '', durationUnit: 'days', plan: '' });
   const [createDialog, setCreateDialog] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', industry: '', plan: 'custom', purchasedLicenses: '0', durationAmount: '30', durationUnit: 'days' });
@@ -568,25 +795,42 @@ function TenantsPanel() {
   // Auto-refresh every 30 seconds so new users/tenants appear without manual reload
   useEffect(() => {
     const interval = setInterval(() => {
-      const isRefreshPaused = saving || actionLoading || createDialog || createUserDialog || licenseDialog || showUsers;
+      const isRefreshPaused = saving || actionLoading || createDialog || createUserDialog || !!selected;
       if (isRefreshPaused || document.visibilityState !== 'visible') return;
       load({ silent: true });
     }, 30_000);
     return () => clearInterval(interval);
-  }, [load, saving, actionLoading, createDialog, createUserDialog, licenseDialog, showUsers]);
+  }, [load, saving, actionLoading, createDialog, createUserDialog, selected]);
 
-  const loadUsers = async (tenant: Tenant) => {
+  const openDetail = async (tenant: Tenant, tab: string) => {
     setSelected(tenant);
+    setDetailTab(tab);
+    setLicenseForm({ purchasedLicenses: String(tenant.purchasedLicenses), status: tenant.licenseStatus || '', expiresAt: '', durationAmount: '30', durationUnit: 'days', plan: tenant.plan || '' });
     try {
       const token = await getToken();
       const data = await loadSupportTenantUsersWithFallback(tenant.id, token);
       setTenantUsers(Array.isArray(data) ? data : []);
-      setShowUsers(true);
     } catch (e: any) {
       if (!isRouteNotFoundError(e)) {
         toast.error('Failed to load users: ' + (e.message || ''));
       }
     }
+  };
+
+  const reassignTenant = async (agentId: string, agentName: string) => {
+    if (!selected) return;
+    try {
+      const token = await getToken();
+      const existing = await apiWithRouteFallback('/developer/assignments', { token }, []).catch(() => []);
+      const toRevoke = Array.isArray(existing) ? existing.filter((r: any) => r.tenantId === selected.id && r.careAgentId !== agentId) : [];
+      for (const r of toRevoke) {
+        await apiWithRouteFallback(`/developer/assignments/${r.id}`, { method: 'DELETE', token }, []).catch(() => {});
+      }
+      await apiWithRouteFallback('/developer/assignments', { method: 'POST', token, body: { careAgentId: agentId, tenantId: selected.id } }, []);
+      toast.success(`Reassigned to ${agentName || 'agent'}`);
+      setSelected(s => s ? { ...s, assignedAgentId: agentId, assignedAgentName: agentName } : s);
+      load();
+    } catch (e: any) { toast.error('Reassign failed: ' + (e.message || '')); }
   };
 
   const toggleSuspend = async (tenant: Tenant) => {
@@ -636,7 +880,6 @@ function TenantsPanel() {
         await api(`/developer/tenants/${selected.id}/license`, { method: 'PUT', token, body: legacyBody });
       }
       toast.success('License updated');
-      setLicenseDialog(false);
       load();
     } catch (e: any) { toast.error('License update failed: ' + (e.message || '')); }
     finally { setActionLoading(null); }
@@ -670,7 +913,7 @@ function TenantsPanel() {
       toast.success(`User created${result.tempPassword ? ` — temp password: ${result.tempPassword}` : ''}`);
       setCreateUserDialog(false);
       setCreateUserForm({ name: '', email: '', role: 'superadmin', password: '' });
-      loadUsers(selected);
+      openDetail(selected, 'users');
     } catch (e: any) { toast.error(e.message || 'Failed to create user'); }
     finally { setSaving(false); }
   };
@@ -679,6 +922,51 @@ function TenantsPanel() {
     t.name.toLowerCase().includes(search.toLowerCase()) ||
     t.id.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (selected) {
+    return (
+      <div className="space-y-4">
+        <TenantDetailView
+          tenant={selected}
+          users={tenantUsers}
+          defaultTab={detailTab}
+          onBack={() => setSelected(null)}
+          actionLoading={actionLoading}
+          onToggleSuspend={() => toggleSuspend(selected)}
+          licenseForm={licenseForm}
+          setLicenseForm={setLicenseForm}
+          onUpdateLicense={updateLicense}
+          onAddUser={() => setCreateUserDialog(true)}
+          onReassign={reassignTenant}
+        />
+
+        {/* Create User Dialog */}
+        <Dialog open={createUserDialog} onOpenChange={setCreateUserDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add User to {selected?.name}</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><Label>Full Name *</Label><Input value={createUserForm.name} onChange={e => setCreateUserForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div><Label>Email *</Label><Input type="email" value={createUserForm.email} onChange={e => setCreateUserForm(f => ({ ...f, email: e.target.value }))} /></div>
+              <div>
+                <Label>Role</Label>
+                <Select value={createUserForm.role} onValueChange={v => setCreateUserForm(f => ({ ...f, role: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['superadmin', 'admin', 'manager', 'employee'].map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label>Password (leave blank for auto-generated)</Label><Input type="password" value={createUserForm.password} onChange={e => setCreateUserForm(f => ({ ...f, password: e.target.value }))} placeholder="Auto-generated if empty" /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateUserDialog(false)}>Cancel</Button>
+              <Button onClick={createUser} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Create User</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -696,7 +984,7 @@ function TenantsPanel() {
       {loading ? (
         <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
       ) : (
-        <div className="border rounded-lg overflow-auto">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 overflow-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -705,15 +993,16 @@ function TenantsPanel() {
                 <TableHead>Plan</TableHead>
                 <TableHead>License</TableHead>
                 <TableHead>Users</TableHead>
+                <TableHead>Assigned</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-gray-400 py-8">No tenants found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-gray-400 py-8">No tenants found</TableCell></TableRow>
               )}
               {filtered.map(t => (
-                <TableRow key={t.id}>
+                <TableRow key={t.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openDetail(t, 'overview')}>
                   <TableCell>
                     <div>
                       <p className="font-medium text-sm">{t.name}</p>
@@ -727,16 +1016,13 @@ function TenantsPanel() {
                     <p className="text-xs text-gray-400 mt-0.5">{t.purchasedLicenses} seats</p>
                   </TableCell>
                   <TableCell className="text-sm">{t.activeUsers}/{t.totalUsers}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-sm text-gray-600">{t.assignedAgentName || <span className="text-gray-300">Unassigned</span>}</TableCell>
+                  <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => loadUsers(t)} title="View/Add Users">
+                      <Button size="sm" variant="ghost" onClick={() => openDetail(t, 'overview')} title="View">
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => {
-                        setSelected(t);
-                        setLicenseDialog(true);
-                        setLicenseForm({ purchasedLicenses: String(t.purchasedLicenses), status: t.licenseStatus || '', expiresAt: '', durationAmount: '30', durationUnit: 'days', plan: t.plan || '' });
-                      }} title="Manage License">
+                      <Button size="sm" variant="ghost" onClick={() => openDetail(t, 'license')} title="Manage License">
                         <Key className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="sm" variant="ghost" className={t.licenseStatus === 'suspended' ? 'text-green-600' : 'text-orange-600'}
@@ -751,85 +1037,6 @@ function TenantsPanel() {
           </Table>
         </div>
       )}
-
-      {/* Users Dialog */}
-      <Dialog open={showUsers} onOpenChange={setShowUsers}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Users — {selected?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="flex justify-end mb-2">
-            <Button size="sm" onClick={() => { setCreateUserDialog(true); }}>
-              <UserPlus className="h-3.5 w-3.5 mr-1" />Add User
-            </Button>
-          </div>
-          <div className="border rounded-lg overflow-auto max-h-96">
-            <Table>
-              <TableHeader>
-                <TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead></TableRow>
-              </TableHeader>
-              <TableBody>
-                {tenantUsers.map(u => (
-                  <TableRow key={u.id}>
-                    <TableCell className="text-sm">{u.name}</TableCell>
-                    <TableCell className="text-sm">{u.email}</TableCell>
-                    <TableCell><StatusBadge status={u.role} /></TableCell>
-                    <TableCell><StatusBadge status={u.status} /></TableCell>
-                  </TableRow>
-                ))}
-                {tenantUsers.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-4">No users found</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowUsers(false)}>Close</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* License Dialog */}
-      <Dialog open={licenseDialog} onOpenChange={setLicenseDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Manage License — {selected?.name}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Purchased Seats</Label><Input type="number" value={licenseForm.purchasedLicenses} onChange={e => setLicenseForm(f => ({ ...f, purchasedLicenses: e.target.value }))} /></div>
-            <div>
-              <Label>Plan</Label>
-              <Input value={licenseForm.plan} placeholder="e.g. basic, pro, enterprise, custom" onChange={e => setLicenseForm(f => ({ ...f, plan: e.target.value }))} />
-            </div>
-            <div>
-              <Label>License Status</Label>
-              <Select value={licenseForm.status} onValueChange={v => setLicenseForm(f => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                <SelectContent>
-                  {['active', 'expired', 'suspended', 'trial'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>License Duration (no payment required)</Label>
-              <div className="flex gap-2 mt-1">
-                <Input type="number" placeholder="30" value={licenseForm.durationAmount} className="w-24"
-                  onChange={e => setLicenseForm(f => ({ ...f, durationAmount: e.target.value, expiresAt: '' }))} />
-                <Select value={licenseForm.durationUnit} onValueChange={v => setLicenseForm(f => ({ ...f, durationUnit: v, expiresAt: '' }))}>
-                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="days">Days</SelectItem>
-                    <SelectItem value="months">Months</SelectItem>
-                    <SelectItem value="years">Years</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Or set a specific expiry date below (overrides duration):</p>
-            </div>
-            <div><Label>Specific Expiry Date</Label><Input type="date" value={licenseForm.expiresAt} onChange={e => setLicenseForm(f => ({ ...f, expiresAt: e.target.value, durationAmount: '' }))} /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLicenseDialog(false)}>Cancel</Button>
-            <Button onClick={updateLicense} disabled={actionLoading === 'license'}>
-              {actionLoading === 'license' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Apply License
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Create Tenant Dialog */}
       <Dialog open={createDialog} onOpenChange={setCreateDialog}>
@@ -862,31 +1069,6 @@ function TenantsPanel() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialog(false)}>Cancel</Button>
             <Button onClick={createTenant} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Create Tenant</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create User Dialog */}
-      <Dialog open={createUserDialog} onOpenChange={setCreateUserDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add User to {selected?.name}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Full Name *</Label><Input value={createUserForm.name} onChange={e => setCreateUserForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div><Label>Email *</Label><Input type="email" value={createUserForm.email} onChange={e => setCreateUserForm(f => ({ ...f, email: e.target.value }))} /></div>
-            <div>
-              <Label>Role</Label>
-              <Select value={createUserForm.role} onValueChange={v => setCreateUserForm(f => ({ ...f, role: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['superadmin', 'admin', 'manager', 'employee'].map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div><Label>Password (leave blank for auto-generated)</Label><Input type="password" value={createUserForm.password} onChange={e => setCreateUserForm(f => ({ ...f, password: e.target.value }))} placeholder="Auto-generated if empty" /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateUserDialog(false)}>Cancel</Button>
-            <Button onClick={createUser} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Create User</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -938,14 +1120,23 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     finally { setSaving(false); }
   };
 
-  const updateTicket = async (id: string, patch: any) => {
+  // Keeps the detail view open after an update (status/priority/reassign) instead
+  // of bouncing back to the list — only note-adding and explicit "Back" navigate away.
+  const updateTicket = async (id: string, patch: any, options?: { closeAfter?: boolean; silent?: boolean }) => {
     try {
       const token = await getToken();
       await apiWithRouteFallback(`/developer/support/tickets/${id}`, { method: 'PUT', token, body: patch }, [`/support/tickets/${id}`]);
-      toast.success('Ticket updated');
-      load();
-      setSelected(null);
+      if (!options?.silent) toast.success('Ticket updated');
+      setTickets(list => list.map(t => t.id === id ? { ...t, ...patch } : t));
+      setSelected(s => (s && s.id === id) ? { ...s, ...patch } : s);
+      if (options?.closeAfter) setSelected(null);
     } catch (e: any) { toast.error('Update failed: ' + (e.message || '')); }
+  };
+
+  const reassignTicket = (agentId: string, agentName: string) => {
+    if (!selected) return;
+    updateTicket(selected.id, { assignedAgentId: agentId, assignedAgentName: agentName, autoAssignedAgent: false }, { silent: true });
+    toast.success(`Reassigned to ${agentName || 'agent'}`);
   };
 
   const addNote = async () => {
@@ -953,11 +1144,11 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     setSaving(true);
     try {
       const token = await getToken();
-      await apiWithRouteFallback(`/developer/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } }, [`/support/tickets/${selected.id}`]);
+      const updated = await apiWithRouteFallback(`/developer/support/tickets/${selected.id}`, { method: 'PUT', token, body: { note: noteText } }, [`/support/tickets/${selected.id}`]);
       toast.success('Note added');
       setNoteText('');
+      if (updated && updated.id) setSelected(updated);
       load();
-      setSelected(null);
     } catch (e: any) { toast.error('Failed to add note: ' + (e.message || '')); }
     finally { setSaving(false); }
   };
@@ -969,6 +1160,92 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
     const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
     return matchSearch && matchStatus && matchPriority;
   });
+
+  if (selected) {
+    return (
+      <div className="space-y-4">
+        <DetailBanner
+          icon={Ticket}
+          title={selected.subject}
+          subtitle={selected.tenantName || 'No tenant'}
+          badges={<>
+            <StatusBadge status={selected.priority} />
+            <StatusBadge status={selected.status} />
+          </>}
+          onBack={() => setSelected(null)}
+        />
+        <div className="mb-4 bg-white rounded-xl border border-gray-100 px-4 py-2.5 inline-flex">
+          <AgentAssignField
+            assignedAgentId={selected.assignedAgentId}
+            assignedAgentName={selected.assignedAgentName}
+            autoAssigned={selected.autoAssignedAgent}
+            onReassign={reassignTicket}
+          />
+        </div>
+        <Tabs defaultValue="details">
+          <TabsList className="bg-gray-100 rounded-xl p-1">
+            <TabsTrigger value="details" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Details</TabsTrigger>
+            <TabsTrigger value="notes" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Notes ({(selected.notes || []).length})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="mt-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 p-5 space-y-4 max-w-2xl">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-400">Tenant</p>
+                  <p className="text-sm font-medium text-gray-900 mt-0.5">{selected.tenantName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Type</p>
+                  <p className="text-sm font-medium text-gray-900 mt-0.5">{selected.issueType}</p>
+                </div>
+              </div>
+              {selected.description && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Description</p>
+                  <p className="text-sm bg-gray-50 p-3 rounded-xl">{selected.description}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <Label className="shrink-0 text-xs">Status:</Label>
+                  <Select value={selected.status} onValueChange={v => updateTicket(selected.id, { status: v })}>
+                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="shrink-0 text-xs">Priority:</Label>
+                  <Select value={selected.priority} onValueChange={v => updateTicket(selected.id, { priority: v })}>
+                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="notes" className="mt-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 p-5 max-w-2xl">
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {(selected.notes || []).map((n, i) => (
+                  <div key={i} className="bg-blue-50 p-3 rounded-xl text-sm">
+                    <p>{n.text}</p>
+                    <p className="text-xs text-gray-500 mt-1">{n.authorEmail} · {new Date(n.timestamp).toLocaleString()}</p>
+                  </div>
+                ))}
+                {(selected.notes || []).length === 0 && <p className="text-sm text-gray-400 text-center py-6">No notes yet</p>}
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Input placeholder="Add a note…" value={noteText} onChange={e => setNoteText(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} />
+                <Button size="sm" onClick={addNote} disabled={saving}>Add</Button>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -999,7 +1276,7 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
       ) : (
-        <div className="border rounded-lg overflow-auto">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm shadow-gray-100 overflow-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -1008,21 +1285,27 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
                 <TableHead>Type</TableHead>
                 <TableHead>Priority</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Assigned</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-gray-400 py-8">No tickets found</TableCell></TableRow>}
+              {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-gray-400 py-8">No tickets found</TableCell></TableRow>}
               {filtered.map(t => (
-                <TableRow key={t.id}>
+                <TableRow key={t.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelected(t)}>
                   <TableCell className="font-medium text-sm max-w-[200px] truncate">{t.subject}</TableCell>
                   <TableCell className="text-sm">{t.tenantName || '—'}</TableCell>
                   <TableCell className="text-sm">{t.issueType}</TableCell>
                   <TableCell><StatusBadge status={t.priority} /></TableCell>
                   <TableCell><StatusBadge status={t.status} /></TableCell>
+                  <TableCell className="text-sm text-gray-600">
+                    {t.assignedAgentName
+                      ? <span className="inline-flex items-center gap-1">{t.assignedAgentName}{t.autoAssignedAgent && <Zap className="h-3 w-3 text-blue-500" />}</span>
+                      : <span className="text-gray-300">Unassigned</span>}
+                  </TableCell>
                   <TableCell className="text-xs text-gray-500">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => setSelected(t)}><Eye className="h-3.5 w-3.5" /></Button>
                       <Button size="sm" variant="ghost" className="text-red-500" onClick={async () => {
@@ -1082,56 +1365,6 @@ function TicketsPanel({ tenants }: { tenants: Tenant[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Ticket Detail Dialog */}
-      {selected && (
-        <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{selected.subject}</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div><span className="text-gray-500">Tenant:</span> <span className="font-medium">{selected.tenantName || '—'}</span></div>
-                <div><span className="text-gray-500">Type:</span> <span className="font-medium">{selected.issueType}</span></div>
-                <div><span className="text-gray-500">Priority:</span> <StatusBadge status={selected.priority} /></div>
-              </div>
-              {selected.description && <p className="text-sm bg-gray-50 p-3 rounded-lg">{selected.description}</p>}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-2">
-                  <Label className="shrink-0 text-xs">Status:</Label>
-                  <Select defaultValue={selected.status} onValueChange={v => updateTicket(selected.id, { status: v })}>
-                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>{TICKET_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label className="shrink-0 text-xs">Priority:</Label>
-                  <Select defaultValue={selected.priority} onValueChange={v => updateTicket(selected.id, { priority: v })}>
-                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>{TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-              {/* Notes */}
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Notes ({(selected.notes || []).length})</h4>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {(selected.notes || []).map((n, i) => (
-                    <div key={i} className="bg-blue-50 p-2 rounded text-sm">
-                      <p>{n.text}</p>
-                      <p className="text-xs text-gray-500 mt-1">{n.authorEmail} · {new Date(n.timestamp).toLocaleString()}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <Input placeholder="Add a note…" value={noteText} onChange={e => setNoteText(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} />
-                  <Button size="sm" onClick={addNote} disabled={saving}>Add</Button>
-                </div>
-              </div>
-            </div>
-            <DialogFooter><Button variant="outline" onClick={() => setSelected(null)}>Close</Button></DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
@@ -2577,31 +2810,31 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
   const supabaseStatusText = getSupabaseStatusText(supabaseConnected, backgroundRefreshing);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-[#F3F6FB] flex">
       {/* Mobile overlay backdrop */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={`
-        ${sidebarCollapsed ? 'w-16' : 'w-56'}
-        transition-all duration-200 bg-gray-950 text-gray-200 flex flex-col shrink-0
+        ${sidebarCollapsed ? 'w-16' : 'w-60'}
+        transition-all duration-200 bg-white border-r border-gray-100 text-gray-500 flex flex-col shrink-0
         fixed md:relative h-screen z-50 md:z-auto
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-800">
-          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
-            <Shield className="h-4 w-4 text-gray-900" />
+        <div className="flex items-center gap-2 px-4 py-5">
+          <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
+            <Shield className="h-4 w-4 text-white" />
           </div>
-          {!sidebarCollapsed && <span className="font-semibold text-sm text-white leading-tight">Developer</span>}
+          {!sidebarCollapsed && <span className="font-bold text-base text-gray-900 leading-tight">Developer</span>}
           {/* Close button on mobile */}
           {!sidebarCollapsed && (
             <button
-              className="ml-auto md:hidden text-gray-400 hover:text-white"
+              className="ml-auto md:hidden text-gray-400 hover:text-gray-700"
               onClick={() => setMobileMenuOpen(false)}
               aria-label="Close menu"
             >
@@ -2610,12 +2843,12 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
           )}
         </div>
 
-        <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
+        <nav className="flex-1 py-2 space-y-0.5 px-3 overflow-y-auto">
           {visibleSidebarItems.map(item => (
             <button
               key={item.id}
               onClick={() => { setActiveSection(item.id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${activeSection === item.id ? 'bg-white text-gray-900 font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${activeSection === item.id ? 'bg-blue-600 text-white font-medium shadow-sm shadow-blue-200' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
             >
               <item.icon className="h-4 w-4 shrink-0" />
               {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
@@ -2623,17 +2856,17 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
           ))}
         </nav>
 
-        <div className="border-t border-gray-800 p-2 space-y-1">
+        <div className="border-t border-gray-100 p-2 space-y-1">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden md:flex w-full items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white text-sm"
+            className="hidden md:flex w-full items-center gap-3 px-3 py-2 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-700 text-sm"
           >
             {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             {!sidebarCollapsed && <span>Collapse</span>}
           </button>
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-950 hover:text-red-300 text-sm"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-red-500 hover:bg-red-50 text-sm"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span>Sign Out</span>}
@@ -2643,7 +2876,7 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto min-w-0">
-        <header className="bg-white border-b px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+        <header className="bg-white/80 backdrop-blur border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-3">
             {/* Hamburger on mobile */}
             <button
@@ -2678,6 +2911,18 @@ function SupportDashboard({ onLogout, role }: { onLogout: () => void; role: stri
             <>
               {activeSection === 'overview' && (
                 <div className="space-y-6">
+                  {/* Welcome banner */}
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 md:p-8">
+                    <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-white/10" />
+                    <div className="absolute right-16 bottom-[-40px] w-32 h-32 rounded-full bg-white/10" />
+                    <div className="relative">
+                      <h2 className="text-2xl md:text-3xl font-bold">Welcome, {(myProfile?.name || myProfile?.email || 'Developer').split(' ')[0].split('@')[0]}</h2>
+                      <p className="text-blue-100 mt-1 text-sm">
+                        {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                      <p className="text-blue-200/80 text-xs mt-3">// Developer — Overview</p>
+                    </div>
+                  </div>
                   {/* Backend-not-deployed notice */}
                   {backendUnavailable && (
                     <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4">

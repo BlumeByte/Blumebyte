@@ -955,7 +955,7 @@ function GlobalHiringApplicationsPanel({ accessToken }: { accessToken: string | 
 
 // ========== DASHBOARD ==========
 function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const { selectedCompanyId, selectedCompanyName } = useSelectedCompany();
   const [stats, setStats] = useState<any>({});
   const [loading, setLoading] = useState(true);
@@ -1155,9 +1155,16 @@ function DashboardView({ onNavigate }: { onNavigate: (id: string) => void }) {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Welcome back! Here's your organization overview.</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 md:p-8 mb-6">
+        <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-white/10" />
+        <div className="absolute right-16 bottom-[-40px] w-32 h-32 rounded-full bg-white/10" />
+        <div className="relative">
+          <h1 className="text-2xl md:text-3xl font-bold">Welcome, {(user?.name || user?.email || 'there').split(' ')[0].split('@')[0]}</h1>
+          <p className="text-blue-100 mt-1 text-sm">
+            {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+          <p className="text-blue-200/80 text-xs mt-3">// Home — Dashboard</p>
+        </div>
       </div>
 
       {/* License Status Banner */}

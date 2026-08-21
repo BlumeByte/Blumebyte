@@ -1010,8 +1010,7 @@ export function addLicenseRoutes(app: Hono, kv: any, requireAuth: any, requireSu
       subscription.lastPaymentDate = new Date().toISOString();
       subscription.lastPaymentAmount = amount;
       subscription.lastPaymentReference = paystackData.data.reference;
-      
-      const writeUserId = ownerUserId || user.id;
+
       await kv.set(`subscription:${writeUserId}`, subscription);
       await syncCompanySubscriptionMirror(writeUserId, subscription);
       

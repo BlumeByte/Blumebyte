@@ -213,6 +213,9 @@ const _allowedOrigins = (() => {
     /^https:\/\/.*\.vercel\.app$/,
     /^https:\/\/blumebyte\.com$/,
     /^https:\/\/.*\.blumebyte\.com$/,
+    // Local development (Vite default ports)
+    /^http:\/\/localhost:\d+$/,
+    /^http:\/\/127\.0\.0\.1:\d+$/,
   ];
 })();
 
@@ -979,10 +982,12 @@ async function syncCompanySubscriptionMirror(userId: string, subscription: any) 
 async function findCompanySuperAdminUserId(companyId: string) {
   if (!companyId) return null;
   const employees = await kv.getByPrefix('employee:');
-  const aliases = await getCompanyAliasSet(companyId);
+  // Exact companyId match only. Name/slug aliases are ambiguous across tenants
+  // that happen to share a similar display name, and this lookup determines
+  // which account's subscription record gets written to.
   const owner = employees.find((employee: any) =>
     normalizeCareRole(employee?.role || '') === 'superadmin' &&
-    employeeMatchesCompanyAliases(employee, aliases)
+    String(employee?.companyId || '') === String(companyId)
   );
   return owner?.userId || owner?.id || null;
 }
@@ -12270,26 +12275,14 @@ const reportClientError = async (c: any) => {
     const extractNormalizedRole = (candidate: any) =>
       normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
     const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
-    // Wrap getDynamicPlatformAgents in try/catch so a Supabase admin-API failure
-    // doesn't abort ticket creation — the ticket is more important than agent assignment.
-    let activeCareAgents: any[] = [];
+    // Wrap in try/catch so a Supabase admin-API failure doesn't abort ticket
+    // creation — the ticket is more important than agent assignment.
+    let selectedCareAgent: any = null;
     try {
-      activeCareAgents = (await getDynamicPlatformAgents())
-        .filter((agent: any) =>
-          normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
-          String(agent?.status || 'active').toLowerCase() === 'active'
-        );
+      selectedCareAgent = await pickLoadBalancedAgent(companyId, 'customer_care');
     } catch (agentErr: any) {
-      console.warn('reportClientError: getDynamicPlatformAgents failed, continuing without agent assignment:', agentErr?.message || agentErr);
+      console.warn('reportClientError: pickLoadBalancedAgent failed, continuing without agent assignment:', agentErr?.message || agentErr);
     }
-    const tenantAssignedCareAgents = companyId
-      ? activeCareAgents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
-      : [];
-    const selectedCareAgent = [...(tenantAssignedCareAgents.length > 0 ? tenantAssignedCareAgents : activeCareAgents)]
-      .sort((a: any, b: any) =>
-        Number(a?.openTickets || 0) - Number(b?.openTickets || 0) ||
-        new Date(a?.createdAt || Date.now()).getTime() - new Date(b?.createdAt || Date.now()).getTime()
-      )[0] || null;
 
     const ticketId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -12304,6 +12297,7 @@ const reportClientError = async (c: any) => {
       status: 'open',
       assignedAgentId: selectedCareAgent?.userId || selectedCareAgent?.id || '',
       assignedAgentName: selectedCareAgent?.name || selectedCareAgent?.email || '',
+      autoAssignedAgent: !!selectedCareAgent,
       creatorId: user.id,
       creatorEmail: user.email,
       createdAt: now,
@@ -12322,6 +12316,10 @@ const reportClientError = async (c: any) => {
 
     // Persist into canonical support ticket stores so all dashboard variants can read it.
     await saveSupportTicket(ticket);
+    if (selectedCareAgent && companyId) {
+      const agentId = selectedCareAgent.userId || selectedCareAgent.id;
+      await grantCareTenantAssignment(agentId, companyId, { id: 'system', email: 'auto-assign' }, 'ticket_auto_assign').catch(() => {});
+    }
 
     // Seed ticket comments with the reported error so it appears in ticket message threads.
     const initialComment = {
@@ -12989,6 +12987,27 @@ async function getDynamicPlatformAgents() {
   );
 }
 
+// Load-balanced auto-assignment: picks the active agent/developer with the
+// fewest current open tickets (ties broken by fewest assigned tenants, then
+// earliest account) so work spreads evenly. Prefers an agent already
+// assigned to the tenant, if one exists, before falling back to the full pool.
+async function pickLoadBalancedAgent(companyId: string, role: 'customer_care' | 'developer' = 'customer_care') {
+  const agents = (await getDynamicPlatformAgents()).filter((agent: any) =>
+    normalizeCareRole(String(agent?.role || '')) === role &&
+    String(agent?.status || 'active').toLowerCase() === 'active'
+  );
+  if (agents.length === 0) return null;
+  const tenantAssigned = companyId
+    ? agents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
+    : [];
+  const pool = tenantAssigned.length > 0 ? tenantAssigned : agents;
+  return [...pool].sort((a: any, b: any) =>
+    Number(a?.openTickets || 0) - Number(b?.openTickets || 0) ||
+    Number(a?.assignedTenants?.length || 0) - Number(b?.assignedTenants?.length || 0) ||
+    new Date(a?.createdAt || Date.now()).getTime() - new Date(b?.createdAt || Date.now()).getTime()
+  )[0] || null;
+}
+
 async function verifyDeveloperAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
   const token = extractUserToken(c);
   if (!token) return null;
@@ -13276,12 +13295,21 @@ const listDeveloperSupportTenants = async (c: any) => {
     const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
-    const [allEmployees, allSubscriptions, allCompanies, supabaseUsers] = await Promise.all([
+    const [allEmployees, allSubscriptions, allCompanies, supabaseUsers, allAgentsForTenants] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
       getAllCompanyRecords(),
       listSupabasePlatformUsers(),
+      getDynamicPlatformAgents().catch(() => []),
     ]);
+    const tenantAgentMap = new Map<string, { id: string; name: string }>();
+    for (const agent of allAgentsForTenants) {
+      for (const tid of (agent?.assignedTenants || [])) {
+        if (!tenantAgentMap.has(tid)) {
+          tenantAgentMap.set(tid, { id: agent.userId || agent.id, name: agent.name || agent.email || '' });
+        }
+      }
+    }
 
     const aliasToCompanyId = new Map<string, string>();
     const companyMap = new Map<string, any>();
@@ -13420,12 +13448,15 @@ const listDeveloperSupportTenants = async (c: any) => {
         0;
       const purchasedLicensesNumber = Number(purchasedLicensesRaw);
       const purchasedLicenses = Number.isFinite(purchasedLicensesNumber) ? purchasedLicensesNumber : 0;
+      const assignedAgent = tenantAgentMap.get(cid);
       return {
         ...t,
         licenseStatus: inferredStatus !== 'unknown' ? inferredStatus : (companyRecord?.subscriptionStatus || companyRecord?.status || 'unknown'),
         purchasedLicenses,
         plan: sub?.plan || sub?.planName || companyRecord?.subscriptionPlan || companyRecord?.plan || 'unknown',
         lastActivity: sub?.updatedAt || companyRecord?.updatedAt || t.createdAt || '',
+        assignedAgentId: assignedAgent?.id || '',
+        assignedAgentName: assignedAgent?.name || '',
       };
     });
 
@@ -13626,17 +13657,35 @@ const createDeveloperSupportTicket = async (c: any) => {
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.json();
     const id = crypto.randomUUID();
+    const tenantId = body.tenantId || '';
+    let assignedAgentId = body.assignedAgentId || '';
+    let assignedAgentName = body.assignedAgentName || '';
+    let autoAssignedAgent = false;
+    if (!assignedAgentId) {
+      try {
+        const picked = await pickLoadBalancedAgent(tenantId, 'customer_care');
+        if (picked) {
+          assignedAgentId = picked.userId || picked.id || '';
+          assignedAgentName = picked.name || picked.email || '';
+          autoAssignedAgent = true;
+        }
+      } catch (agentErr: any) {
+        console.warn('createDeveloperSupportTicket: auto-assign failed, continuing unassigned:', agentErr?.message || agentErr);
+      }
+    }
     const ticket = {
-      id, tenantId: body.tenantId || '', tenantName: body.tenantName || '',
+      id, tenantId, tenantName: body.tenantName || '',
       issueType: body.issueType || 'general', priority: body.priority || 'medium',
       subject: body.subject || '', description: body.description || '',
-      status: 'open', assignedAgentId: body.assignedAgentId || '',
-      assignedAgentName: body.assignedAgentName || '',
+      status: 'open', assignedAgentId, assignedAgentName, autoAssignedAgent,
       creatorId: access.user.id, creatorEmail: access.user.email,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       notes: [],
     };
     await kv.set(`support-ticket:${id}`, ticket);
+    if (autoAssignedAgent && assignedAgentId && tenantId) {
+      await grantCareTenantAssignment(assignedAgentId, tenantId, access.user, 'ticket_auto_assign').catch(() => {});
+    }
     return c.json(ticket);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
@@ -13897,6 +13946,17 @@ const repairDeveloperTenant = async (c: any) => {
     const tenantId = c.req.param('tenantId');
     const body = await c.req.json().catch(() => ({}));
     const action = body.action || 'refresh_permissions';
+    let detail: any = null;
+
+    if (action === 'repair_records') {
+      const company = await kv.get(`company:${tenantId}`);
+      if (!company) return c.json({ error: 'Tenant not found' }, 404);
+      const fixedCompany = { ...company, companyId: tenantId, company: tenantId, updatedAt: new Date().toISOString() };
+      await kv.set(`company:${tenantId}`, fixedCompany);
+      const byId = await kv.get(`company_by_id:${tenantId}`);
+      if (byId) await kv.set(`company_by_id:${tenantId}`, { ...byId, companyId: tenantId, company: tenantId, updatedAt: new Date().toISOString() });
+      detail = { previousCompanyId: company.companyId, previousCompany: company.company, fixedTo: tenantId };
+    }
 
     // Log the repair action
     const auditId = crypto.randomUUID();
@@ -13904,9 +13964,10 @@ const repairDeveloperTenant = async (c: any) => {
       id: auditId, actorId: access.user.id, actorEmail: access.user.email,
       actionType: `repair_${action}`, tenantId, timestamp: new Date().toISOString(),
       description: `Repair action '${action}' executed for tenant ${tenantId} by ${access.user.email}`,
+      detail,
     });
 
-    return c.json({ success: true, action, tenantId, executedBy: access.user.email, timestamp: new Date().toISOString() });
+    return c.json({ success: true, action, tenantId, detail, executedBy: access.user.email, timestamp: new Date().toISOString() });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
@@ -13950,13 +14011,26 @@ const createDeveloperSupportTenant = async (c: any) => {
     };
     await kv.set(`subscription:${tenantId}`, sub);
 
+    let assignedAgentId = '';
+    let assignedAgentName = '';
+    try {
+      const picked = await pickLoadBalancedAgent(tenantId, 'customer_care');
+      if (picked) {
+        assignedAgentId = picked.userId || picked.id || '';
+        assignedAgentName = picked.name || picked.email || '';
+        if (assignedAgentId) await grantCareTenantAssignment(assignedAgentId, tenantId, access.user, 'tenant_auto_assign').catch(() => {});
+      }
+    } catch (agentErr: any) {
+      console.warn('createDeveloperSupportTenant: auto-assign failed, continuing unassigned:', agentErr?.message || agentErr);
+    }
+
     const auditId = crypto.randomUUID();
     await kv.set(`support-audit:${auditId}`, {
       id: auditId, actorId: access.user.id, actorEmail: access.user.email,
       actionType: 'tenant_create', tenantId, timestamp: now,
       description: `Tenant "${body.name}" created by ${access.user.email} (no payment)`,
     });
-    return c.json({ success: true, id: tenantId, ...company, subscription: sub });
+    return c.json({ success: true, id: tenantId, ...company, subscription: sub, assignedAgentId, assignedAgentName });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
