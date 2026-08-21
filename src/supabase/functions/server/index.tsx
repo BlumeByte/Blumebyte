@@ -13576,6 +13576,117 @@ const suspendDeveloperSupportTenant = async (c: any) => {
 };
 for (const route of compatibleRoutePathsForAliases('/developer/support/tenants/:id/suspend', '/support/tenants/:id/suspend')) app.post(route, suspendDeveloperSupportTenant);
 
+// All KV prefixes that hold data scoped to a single tenant/company. Deliberately
+// excludes audit/log prefixes (support-audit:, audit:, developer_audit_log:,
+// system_health_log:) so a deletion event stays in the trail, and excludes
+// platform-level agent/user registries (platform_user:, support-agent:,
+// customer_care_users:) which are not owned by any one tenant.
+const TENANT_SCOPED_DATA_PREFIXES = [
+  'announcement:', 'approval_req:', 'asset-category:', 'asset:', 'attendance:',
+  'automation_rule:', 'automation_task:', 'automation_template:', 'automation_workflow:',
+  'benefit-plan:', 'benefit:', 'branch:', 'compliance:', 'department:', 'disciplinary:',
+  'document:', 'emp-feedback:', 'expense:', 'feedback:', 'financial-year:', 'holiday:',
+  'job-application:', 'job-posting:', 'leave-type:', 'leave:', 'meeting:', 'message:',
+  'notification:', 'onboard-checklist:', 'overtime:', 'paygrade:', 'payroll-run:',
+  'perf-review:', 'profile-change:', 'public-job-application:', 'support-ticket:',
+  'support_tickets:', 'survey-response:', 'survey:', 'task:', 'tax-bracket:',
+  'tax-configuration:', 'training-enrollment:', 'training-program:', 'training:',
+  'vacation:', 'workflow:',
+];
+
+// DELETE /developer/tenants/:id — permanently and completely remove a tenant:
+// its company record(s), subscription, every employee (KV profile + Supabase
+// Auth account), and every piece of tenant-scoped operational data. Requires
+// the caller to echo back the tenant's exact name as a confirmation guard.
+const deleteDeveloperTenant = async (c: any) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const tenantId = await canonicalizeTenantId(c.req.param('id'));
+    const company = await kv.get(`company:${tenantId}`) || await kv.get(`company_by_id:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+
+    const body = await c.req.json().catch(() => ({}));
+    const confirmName = String(body?.confirmName || '').trim().toLowerCase();
+    const actualName = String(company.name || '').trim().toLowerCase();
+    if (!confirmName || confirmName !== actualName) {
+      return c.json({ error: 'Confirmation name does not match. Deletion cancelled.' }, 400);
+    }
+
+    const removed = { employees: 0, authUsers: 0, dataRecords: 0 };
+    const sb = supabaseAdmin();
+
+    // 1. Employees — delete both the KV profile and the Supabase Auth account.
+    const allEmployees = await kv.getByPrefix('employee:');
+    const tenantEmployees = allEmployees.filter((e: any) => recordBelongsToTenant(e, tenantId));
+    for (const emp of tenantEmployees) {
+      const userId = emp.userId || emp.id;
+      if (userId) {
+        await kv.del(`employee:${userId}`);
+        removed.employees++;
+        try {
+          await sb.auth.admin.deleteUser(userId);
+          removed.authUsers++;
+        } catch (authErr: any) {
+          console.warn(`deleteDeveloperTenant: failed to delete auth user ${userId}:`, authErr?.message || authErr);
+        }
+      }
+    }
+
+    // 2. Generic tenant-scoped data across every known prefix.
+    for (const prefix of TENANT_SCOPED_DATA_PREFIXES) {
+      try {
+        const items = await kv.getByPrefix(prefix);
+        const matching = items.filter((item: any) => recordBelongsToTenant(item, tenantId));
+        for (const item of matching) {
+          const id = item.id || item.userId || item.reference;
+          if (!id) continue;
+          await kv.del(`${prefix}${id}`);
+          removed.dataRecords++;
+        }
+      } catch (scanErr: any) {
+        console.warn(`deleteDeveloperTenant: failed scanning prefix ${prefix}:`, scanErr?.message || scanErr);
+      }
+    }
+
+    // 3. Subscriptions — the canonical companyId-keyed record plus any
+    // owner-keyed duplicates pointing at this tenant.
+    await kv.del(`subscription:${tenantId}`);
+    const allSubscriptions = await kv.getByPrefix('subscription:');
+    for (const sub of allSubscriptions) {
+      if (sub?.companyId === tenantId && sub?.userId) {
+        await kv.del(`subscription:${sub.userId}`);
+      }
+    }
+
+    // 4. Care-agent assignments referencing this tenant.
+    const assignmentRecords = await kv.getByPrefix('care_assignments_record:');
+    for (const rec of assignmentRecords) {
+      if (rec?.tenantId === tenantId) {
+        await kv.del(`care_assignments_record:${rec.id}`);
+        if (rec.careAgentId) {
+          const current = await getCareAssignmentsForAgent(rec.careAgentId);
+          await kv.set(`care_assignments:${rec.careAgentId}`, current.filter((t: string) => t !== tenantId));
+        }
+      }
+    }
+
+    // 5. The company record itself, last.
+    await kv.del(`company:${tenantId}`);
+    await kv.del(`company_by_id:${tenantId}`);
+
+    await writeDeveloperAudit(access.user, 'developer_tenant_delete', {
+      tenantId, tenantName: company.name, removed,
+    });
+
+    return c.json({ success: true, tenantId, tenantName: company.name, removed });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+};
+for (const route of compatibleRoutePathsForAliases('/developer/tenants/:id', '/developer/support/tenants/:id')) app.delete(route, deleteDeveloperTenant);
+
 // PUT /developer/support/tenants/:id/license
 const updateDeveloperSupportTenantLicense = async (c: any) => {
   try {

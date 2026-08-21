@@ -616,11 +616,11 @@ function AgentAssignField({ assignedAgentId, assignedAgentName, autoAssigned, on
 
 // ─── Tenant Detail View (replaces the old Users/License popups) ──────────────
 function TenantDetailView({
-  tenant, users, defaultTab, onBack, actionLoading, onToggleSuspend,
+  tenant, users, defaultTab, onBack, actionLoading, onToggleSuspend, onDelete,
   licenseForm, setLicenseForm, onUpdateLicense, onAddUser, onReassign,
 }: {
   tenant: Tenant; users: any[]; defaultTab: string; onBack: () => void;
-  actionLoading: string | null; onToggleSuspend: () => void;
+  actionLoading: string | null; onToggleSuspend: () => void; onDelete: () => void;
   licenseForm: { purchasedLicenses: string; status: string; expiresAt: string; durationAmount: string; durationUnit: string; plan: string };
   setLicenseForm: React.Dispatch<React.SetStateAction<{ purchasedLicenses: string; status: string; expiresAt: string; durationAmount: string; durationUnit: string; plan: string }>>;
   onUpdateLicense: () => void;
@@ -642,13 +642,18 @@ function TenantDetailView({
         }
         onBack={onBack}
         actions={
-          <Button size="sm" variant="secondary" className="bg-white/15 hover:bg-white/25 text-white border-0"
-            onClick={onToggleSuspend} disabled={actionLoading === tenant.id}>
-            {actionLoading === tenant.id
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-              : isSuspended ? <Unlock className="h-3.5 w-3.5 mr-1" /> : <Lock className="h-3.5 w-3.5 mr-1" />}
-            {isSuspended ? 'Restore' : 'Suspend'}
-          </Button>
+          <>
+            <Button size="sm" variant="secondary" className="bg-white/15 hover:bg-white/25 text-white border-0"
+              onClick={onToggleSuspend} disabled={actionLoading === tenant.id}>
+              {actionLoading === tenant.id
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                : isSuspended ? <Unlock className="h-3.5 w-3.5 mr-1" /> : <Lock className="h-3.5 w-3.5 mr-1" />}
+              {isSuspended ? 'Restore' : 'Suspend'}
+            </Button>
+            <Button size="sm" variant="secondary" className="bg-red-500/20 hover:bg-red-500/30 text-white border-0" onClick={onDelete}>
+              <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+            </Button>
+          </>
         }
       />
       <div className="mb-4 bg-white rounded-xl border border-gray-100 px-4 py-2.5 inline-flex">
@@ -773,6 +778,9 @@ function TenantsPanel() {
   const [createUserDialog, setCreateUserDialog] = useState(false);
   const [createUserForm, setCreateUserForm] = useState({ name: '', email: '', role: 'superadmin', password: '' });
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent === true;
@@ -831,6 +839,27 @@ function TenantsPanel() {
       setSelected(s => s ? { ...s, assignedAgentId: agentId, assignedAgentName: agentName } : s);
       load();
     } catch (e: any) { toast.error('Reassign failed: ' + (e.message || '')); }
+  };
+
+  const confirmDeleteTenant = async () => {
+    if (!deleteTarget) return;
+    if (deleteConfirmText.trim() !== deleteTarget.name) {
+      toast.error('Type the exact company name to confirm');
+      return;
+    }
+    setDeleting(true);
+    try {
+      const token = await getToken();
+      const result = await apiWithRouteFallback(`/developer/tenants/${deleteTarget.id}`, {
+        method: 'DELETE', token, body: { confirmName: deleteTarget.name },
+      }, [`/developer/support/tenants/${deleteTarget.id}`]);
+      toast.success(`"${deleteTarget.name}" deleted — ${result?.removed?.employees ?? 0} employees, ${result?.removed?.dataRecords ?? 0} records removed`);
+      setDeleteTarget(null);
+      setDeleteConfirmText('');
+      setSelected(null);
+      load();
+    } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
+    finally { setDeleting(false); }
   };
 
   const toggleSuspend = async (tenant: Tenant) => {
@@ -923,6 +952,38 @@ function TenantsPanel() {
     t.id.toLowerCase().includes(search.toLowerCase())
   );
 
+  const deleteDialog = (
+    <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmText(''); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="text-red-600">Permanently delete "{deleteTarget?.name}"?</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-700">
+            This deletes the company record, its subscription, every employee's profile <strong>and Supabase Auth account</strong>,
+            and all of its operational data (attendance, payroll, leave, tickets, and more) — everywhere, permanently.
+            This cannot be undone.
+          </div>
+          <div>
+            <Label>Type <span className="font-mono font-semibold">{deleteTarget?.name}</span> to confirm</Label>
+            <Input value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder={deleteTarget?.name} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteConfirmText(''); }}>Cancel</Button>
+          <Button
+            className="bg-red-600 hover:bg-red-700 text-white"
+            disabled={deleting || deleteConfirmText.trim() !== deleteTarget?.name}
+            onClick={confirmDeleteTenant}
+          >
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-3.5 w-3.5 mr-2" />}
+            Delete Permanently
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (selected) {
     return (
       <div className="space-y-4">
@@ -933,6 +994,7 @@ function TenantsPanel() {
           onBack={() => setSelected(null)}
           actionLoading={actionLoading}
           onToggleSuspend={() => toggleSuspend(selected)}
+          onDelete={() => { setDeleteTarget(selected); setDeleteConfirmText(''); }}
           licenseForm={licenseForm}
           setLicenseForm={setLicenseForm}
           onUpdateLicense={updateLicense}
@@ -964,6 +1026,7 @@ function TenantsPanel() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {deleteDialog}
       </div>
     );
   }
@@ -1029,6 +1092,9 @@ function TenantsPanel() {
                         onClick={() => toggleSuspend(t)} disabled={actionLoading === t.id} title={t.licenseStatus === 'suspended' ? 'Restore' : 'Suspend'}>
                         {actionLoading === t.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t.licenseStatus === 'suspended' ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                       </Button>
+                      <Button size="sm" variant="ghost" className="text-red-500" onClick={() => { setDeleteTarget(t); setDeleteConfirmText(''); }} title="Delete permanently">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1072,6 +1138,7 @@ function TenantsPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {deleteDialog}
     </div>
   );
 }
