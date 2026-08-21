@@ -20,7 +20,7 @@ import {
   BarChart3, Briefcase, Ticket, Key, Activity, FileText, UserPlus,
   ChevronRight, ChevronLeft, Wrench, Bell, Lock, Unlock, PanelLeftClose,
   PanelLeftOpen, AlertTriangle, BookOpen, MessageSquare, Server, Zap,
-  TrendingUp, Menu, X as XIcon, Printer
+  TrendingUp, Menu, X as XIcon, Printer, Pencil
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -616,11 +616,11 @@ function AgentAssignField({ assignedAgentId, assignedAgentName, autoAssigned, on
 
 // ─── Tenant Detail View (replaces the old Users/License popups) ──────────────
 function TenantDetailView({
-  tenant, users, defaultTab, onBack, actionLoading, onToggleSuspend, onDelete,
+  tenant, users, defaultTab, onBack, actionLoading, onToggleSuspend, onDelete, onEditDetails,
   licenseForm, setLicenseForm, onUpdateLicense, onAddUser, onReassign,
 }: {
   tenant: Tenant; users: any[]; defaultTab: string; onBack: () => void;
-  actionLoading: string | null; onToggleSuspend: () => void; onDelete: () => void;
+  actionLoading: string | null; onToggleSuspend: () => void; onDelete: () => void; onEditDetails: () => void;
   licenseForm: { purchasedLicenses: string; status: string; expiresAt: string; durationAmount: string; durationUnit: string; plan: string };
   setLicenseForm: React.Dispatch<React.SetStateAction<{ purchasedLicenses: string; status: string; expiresAt: string; durationAmount: string; durationUnit: string; plan: string }>>;
   onUpdateLicense: () => void;
@@ -643,6 +643,9 @@ function TenantDetailView({
         onBack={onBack}
         actions={
           <>
+            <Button size="sm" variant="secondary" className="bg-white/15 hover:bg-white/25 text-white border-0" onClick={onEditDetails}>
+              <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+            </Button>
             <Button size="sm" variant="secondary" className="bg-white/15 hover:bg-white/25 text-white border-0"
               onClick={onToggleSuspend} disabled={actionLoading === tenant.id}>
               {actionLoading === tenant.id
@@ -781,6 +784,9 @@ function TenantsPanel() {
   const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [editDetailsDialog, setEditDetailsDialog] = useState(false);
+  const [editDetailsForm, setEditDetailsForm] = useState({ name: '', industry: '' });
+  const [savingDetails, setSavingDetails] = useState(false);
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent === true;
@@ -860,6 +866,29 @@ function TenantsPanel() {
       load();
     } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
     finally { setDeleting(false); }
+  };
+
+  const openEditDetails = () => {
+    if (!selected) return;
+    setEditDetailsForm({ name: selected.name, industry: selected.industry || '' });
+    setEditDetailsDialog(true);
+  };
+
+  const saveTenantDetails = async () => {
+    if (!selected) return;
+    if (!editDetailsForm.name.trim()) return toast.error('Company name required');
+    setSavingDetails(true);
+    try {
+      const token = await getToken();
+      await apiWithRouteFallback(`/developer/tenants/${selected.id}`, {
+        method: 'PUT', token, body: editDetailsForm,
+      }, [`/developer/support/tenants/${selected.id}`]);
+      toast.success('Tenant details updated');
+      setSelected(s => s ? { ...s, name: editDetailsForm.name, industry: editDetailsForm.industry } : s);
+      setEditDetailsDialog(false);
+      load();
+    } catch (e: any) { toast.error('Update failed: ' + (e.message || '')); }
+    finally { setSavingDetails(false); }
   };
 
   const toggleSuspend = async (tenant: Tenant) => {
@@ -995,6 +1024,7 @@ function TenantsPanel() {
           actionLoading={actionLoading}
           onToggleSuspend={() => toggleSuspend(selected)}
           onDelete={() => { setDeleteTarget(selected); setDeleteConfirmText(''); }}
+          onEditDetails={openEditDetails}
           licenseForm={licenseForm}
           setLicenseForm={setLicenseForm}
           onUpdateLicense={updateLicense}
@@ -1023,6 +1053,21 @@ function TenantsPanel() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateUserDialog(false)}>Cancel</Button>
               <Button onClick={createUser} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Create User</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Tenant Details Dialog */}
+        <Dialog open={editDetailsDialog} onOpenChange={setEditDetailsDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Tenant Details</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><Label>Company Name *</Label><Input value={editDetailsForm.name} onChange={e => setEditDetailsForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div><Label>Industry</Label><Input value={editDetailsForm.industry} onChange={e => setEditDetailsForm(f => ({ ...f, industry: e.target.value }))} placeholder="Technology, Healthcare, etc." /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDetailsDialog(false)}>Cancel</Button>
+              <Button onClick={saveTenantDetails} disabled={savingDetails}>{savingDetails ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Save Changes</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2101,6 +2146,12 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
   const [overridePassword, setOverridePassword] = useState('');
   const [overrideResult, setOverrideResult] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [editTarget, setEditTarget] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ name: '', role: 'employee', status: 'active', companyId: '' });
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const normalizedSupportRole = canonicalPlatformRole(authUser?.role);
   const isDeveloperAdmin = normalizedSupportRole === 'developer';
 
@@ -2151,6 +2202,46 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
       setOverridePassword('');
     } catch (e: any) { toast.error('Failed to update password: ' + (e.message || '')); }
     finally { setResetting(false); }
+  };
+
+  const openEdit = (u: any) => {
+    setEditTarget(u);
+    setEditForm({ name: u.name || '', role: u.role || 'employee', status: u.status || 'active', companyId: u.companyId || '' });
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try {
+      const token = await getToken();
+      await apiWithRouteFallback(`/developer/users/${editTarget.id}`, {
+        method: 'PUT', token, body: { ...editForm, email: editTarget.email },
+      }, [`/support/users/${editTarget.id}`]);
+      toast.success('User updated');
+      setEditTarget(null);
+      load();
+    } catch (e: any) { toast.error('Failed to update user: ' + (e.message || '')); }
+    finally { setSaving(false); }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteTarget) return;
+    if (deleteConfirmText.trim().toLowerCase() !== (deleteTarget.email || '').toLowerCase()) {
+      toast.error('Type the exact email to confirm');
+      return;
+    }
+    setDeleting(true);
+    try {
+      const token = await getToken();
+      await apiWithRouteFallback(`/developer/users/${deleteTarget.id}`, {
+        method: 'DELETE', token, body: { confirmEmail: deleteTarget.email },
+      }, [`/support/users/${deleteTarget.id}`]);
+      toast.success(`"${deleteTarget.email}" deleted`);
+      setDeleteTarget(null);
+      setDeleteConfirmText('');
+      load();
+    } catch (e: any) { toast.error('Delete failed: ' + (e.message || '')); }
+    finally { setDeleting(false); }
   };
 
   const filtered = users.filter(u => {
@@ -2206,10 +2297,19 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
                   <TableCell><StatusBadge status={u.status || 'active'} /></TableCell>
                   {isDeveloperAdmin && (
                     <TableCell>
-                      <Button size="sm" variant="ghost" title="Generate Password Reset Link"
-                        onClick={() => { setResetTarget({ id: u.id || u.userId, email: u.email }); setResetLink(null); setOverridePassword(''); setOverrideResult(null); }}>
-                        <Key className="h-3.5 w-3.5 text-blue-500" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" title="Generate Password Reset Link"
+                          onClick={() => { setResetTarget({ id: u.id || u.userId, email: u.email }); setResetLink(null); setOverridePassword(''); setOverrideResult(null); }}>
+                          <Key className="h-3.5 w-3.5 text-blue-500" />
+                        </Button>
+                        <Button size="sm" variant="ghost" title="Edit user" onClick={() => openEdit(u)}>
+                          <Pencil className="h-3.5 w-3.5 text-gray-500" />
+                        </Button>
+                        <Button size="sm" variant="ghost" title="Delete permanently" className="text-red-500"
+                          onClick={() => { setDeleteTarget(u); setDeleteConfirmText(''); }}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -2262,6 +2362,76 @@ function AllUsersPanel({ tenants }: { tenants: Tenant[] }) {
             <Button onClick={generateReset} disabled={resetting}>
               {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Key className="h-4 w-4 mr-2" />}
               Generate Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={open => { if (!open) setEditTarget(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit {editTarget?.email}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Full Name</Label><Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div>
+              <Label>Role</Label>
+              <Select value={editForm.role} onValueChange={v => setEditForm(f => ({ ...f, role: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['superadmin', 'admin', 'manager', 'employee', 'developer', 'customer_care'].map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={v => setEditForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['active', 'inactive', 'suspended'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Company</Label>
+              <Select value={editForm.companyId || 'none'} onValueChange={v => setEditForm(f => ({ ...f, companyId: v === 'none' ? '' : v }))}>
+                <SelectTrigger><SelectValue placeholder="No company" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No company</SelectItem>
+                  {tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={open => { if (!open) { setDeleteTarget(null); setDeleteConfirmText(''); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="text-red-600">Permanently delete this user?</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-700">
+              This deletes <strong>{deleteTarget?.email}</strong>'s profile and Supabase Auth account — they will
+              immediately lose access. This cannot be undone.
+            </div>
+            <div>
+              <Label>Type <span className="font-mono font-semibold">{deleteTarget?.email}</span> to confirm</Label>
+              <Input value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder={deleteTarget?.email} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteTarget(null); setDeleteConfirmText(''); }}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleting || deleteConfirmText.trim().toLowerCase() !== (deleteTarget?.email || '').toLowerCase()}
+              onClick={confirmDeleteUser}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-3.5 w-3.5 mr-2" />}
+              Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>

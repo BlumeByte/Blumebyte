@@ -13687,6 +13687,36 @@ const deleteDeveloperTenant = async (c: any) => {
 };
 for (const route of compatibleRoutePathsForAliases('/developer/tenants/:id', '/developer/support/tenants/:id')) app.delete(route, deleteDeveloperTenant);
 
+// PUT /developer/tenants/:id — edit a tenant's basic details (name, industry).
+// Separate from the license endpoint, which only manages plan/seats/expiry.
+const editDeveloperTenant = async (c: any) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const tenantId = await canonicalizeTenantId(c.req.param('id'));
+    const company = await kv.get(`company:${tenantId}`) || await kv.get(`company_by_id:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+
+    const body = await c.req.json().catch(() => ({}));
+    const updated = {
+      ...company,
+      name: body.name !== undefined ? String(body.name).trim() : company.name,
+      industry: body.industry !== undefined ? String(body.industry).trim() : company.industry,
+      updatedAt: new Date().toISOString(),
+    };
+    if (!updated.name) return c.json({ error: 'Company name cannot be empty' }, 400);
+    await kv.set(`company:${tenantId}`, updated);
+    await kv.set(`company_by_id:${tenantId}`, updated);
+
+    await writeDeveloperAudit(access.user, 'developer_tenant_edit', { tenantId, changes: body });
+    return c.json({ success: true, tenant: updated });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+};
+for (const route of compatibleRoutePathsForAliases('/developer/tenants/:id', '/developer/support/tenants/:id')) app.put(route, editDeveloperTenant);
+
 // PUT /developer/support/tenants/:id/license
 const updateDeveloperSupportTenantLicense = async (c: any) => {
   try {
@@ -14350,6 +14380,88 @@ for (const route of compatibleRoutePathsForAliases('/developer/users/password', 
     return c.json({ success: true, ...result });
   } catch (e: any) {
     if (e.message === 'User not found') return c.json({ error: 'User not found' }, 404);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// PUT /developer/users/:id — edit a user's name, role, status, or company
+// assignment. Works for any user (tenant employee or platform user).
+for (const route of compatibleRoutePathsForAliases('/developer/users/:id', '/support/users/:id')) app.put(route, async (c) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const identifier = c.req.param('id');
+    const body = await c.req.json().catch(() => ({}));
+    const existing = await kv.get(`employee:${identifier}`);
+    const authUser = await resolveAnyAuthUser(identifier, body?.email || existing?.email || '');
+    if (!authUser && !existing) return c.json({ error: 'User not found' }, 404);
+    const userId = authUser?.id || existing?.id || identifier;
+
+    const updated = {
+      ...(existing || {}),
+      id: userId,
+      userId,
+      email: body.email ?? existing?.email ?? authUser?.email ?? '',
+      name: body.name ?? existing?.name ?? authUser?.user_metadata?.name ?? '',
+      role: body.role ? normalizeCareRole(body.role) : (existing?.role || normalizeCareRole(authUser?.app_metadata?.role || 'employee')),
+      status: body.status ?? existing?.status ?? 'active',
+      companyId: body.companyId !== undefined ? body.companyId : (existing?.companyId ?? existing?.company ?? ''),
+      company: body.companyId !== undefined ? body.companyId : (existing?.company ?? existing?.companyId ?? ''),
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`employee:${userId}`, updated);
+
+    if (authUser) {
+      await supabaseAdmin().auth.admin.updateUserById(authUser.id, {
+        app_metadata: { ...(authUser.app_metadata || {}), role: updated.role },
+        user_metadata: { ...(authUser.user_metadata || {}), name: updated.name, role: updated.role, companyId: updated.companyId, company: updated.company },
+      }).catch((err: any) => console.warn('developer user edit: auth metadata update failed:', err?.message || err));
+    }
+
+    await writeDeveloperAudit(access.user, 'developer_user_edit', { targetId: userId, targetEmail: updated.email, changes: body });
+    return c.json({ success: true, user: updated });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// DELETE /developer/users/:id — permanently remove a user: KV profile and
+// Supabase Auth account. Requires the caller to echo the user's exact email
+// as a confirmation guard.
+for (const route of compatibleRoutePathsForAliases('/developer/users/:id', '/support/users/:id')) app.delete(route, async (c) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const identifier = c.req.param('id');
+    const body = await c.req.json().catch(() => ({}));
+    const existing = await kv.get(`employee:${identifier}`);
+    const authUser = await resolveAnyAuthUser(identifier, body?.email || existing?.email || '');
+    if (!authUser && !existing) return c.json({ error: 'User not found' }, 404);
+    const userId = authUser?.id || existing?.id || identifier;
+    const email = existing?.email || authUser?.email || '';
+
+    const confirmEmail = String(body?.confirmEmail || '').trim().toLowerCase();
+    if (!confirmEmail || confirmEmail !== email.toLowerCase()) {
+      return c.json({ error: 'Confirmation email does not match. Deletion cancelled.' }, 400);
+    }
+    if (userId === access.user.id) {
+      return c.json({ error: 'You cannot delete your own account' }, 400);
+    }
+
+    await kv.del(`employee:${userId}`);
+    await kv.del(`platform_user:${userId}`);
+    await kv.del(`customer_care_users:${userId}`);
+    await kv.del(`support-agent:${userId}`);
+    if (authUser) {
+      await supabaseAdmin().auth.admin.deleteUser(authUser.id).catch((err: any) =>
+        console.warn(`developer user delete: failed to delete auth user ${authUser.id}:`, err?.message || err));
+    }
+
+    await writeDeveloperAudit(access.user, 'developer_user_delete', { targetId: userId, targetEmail: email });
+    return c.json({ success: true, userId, email });
+  } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
 });
