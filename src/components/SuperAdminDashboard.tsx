@@ -4207,6 +4207,84 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
     id: `status-${name}-${idx}`, name, value, color: CHART_COLORS[idx % CHART_COLORS.length],
   }));
 
+  if (viewItem) {
+    const openEditFromView = () => {
+      setViewItem(null); setEditItem(viewItem); setFormData({ ...viewItem });
+      const ot: Record<string, string> = {};
+      config.fields.forEach(f => {
+        if (f.type === 'select' && f.options?.some(o => optionValue(o) === 'other') && viewItem[f.key] && !f.options.some(o => optionValue(o) === viewItem[f.key])) {
+          ot[f.key] = viewItem[f.key];
+        }
+      });
+      setOtherTexts(ot);
+      setDialogOpen(true);
+    };
+    return (
+      <div className="p-4 md:p-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white p-5 md:p-6 mb-6">
+          <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10" />
+          <button onClick={() => setViewItem(null)} className="relative z-10 flex items-center gap-1.5 text-blue-100 hover:text-white text-sm mb-4 transition-colors">
+            <ChevronLeft className="h-4 w-4" /> Back
+          </button>
+          <div className="relative z-10 flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-blue-200">{singularTitle}</p>
+              <h2 className="text-xl md:text-2xl font-bold">{getDisplayValue(viewItem, config.fields[0])}</h2>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button size="sm" variant="secondary" className="bg-white/15 hover:bg-white/25 text-white border-0" onClick={openEditFromView}>
+                <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+              </Button>
+              <Button size="sm" variant="secondary" className="bg-red-500/20 hover:bg-red-500/30 text-white border-0"
+                onClick={() => { setViewItem(null); handleDelete(viewItem.id); }}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-5 space-y-3">
+            {config.fields.map(f => (
+              <div key={f.key} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
+                <span className="text-sm text-gray-500 font-medium">{f.label}</span>
+                <span className="text-sm text-right max-w-[60%]">
+                  {f.type === 'questions' && Array.isArray(viewItem[f.key]) ? (
+                    <div className="text-left space-y-1.5 max-w-full">
+                      {viewItem[f.key].map((q: string, idx: number) => (
+                        <div key={idx} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                          <span className="text-gray-400 font-mono mr-1">Q{idx + 1}.</span> {q}
+                        </div>
+                      ))}
+                    </div>
+                  ) : f.key === 'rating' ? (
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: parseInt(viewItem[f.key] || '0') }).map((_, i) => (
+                        <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      ))}
+                    </div>
+                  ) : f.key === 'progress' ? (
+                    <div className="flex items-center gap-2">
+                      <Progress value={parseInt(viewItem[f.key] || '0')} className="h-2 w-20" />
+                      <span>{viewItem[f.key]}%</span>
+                    </div>
+                  ) : (
+                    getDisplayValue(viewItem, f) || '—'
+                  )}
+                </span>
+              </div>
+            ))}
+            {viewItem.createdAt && (
+              <div className="flex justify-between items-start py-2">
+                <span className="text-sm text-gray-500 font-medium">Created</span>
+                <span className="text-sm">{new Date(viewItem.createdAt).toLocaleString()}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
@@ -4382,66 +4460,6 @@ function EntityCrud({ entityKey, config, filterFn }: { entityKey: string; config
           )}
         </CardContent>
       </Card>
-
-      {/* View Detail Dialog */}
-      <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>View {singularTitle}</DialogTitle></DialogHeader>
-          {viewItem && (
-            <div className="space-y-3 py-2">
-              {config.fields.map(f => (
-                <div key={f.key} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
-                  <span className="text-sm text-gray-500 font-medium">{f.label}</span>
-                  <span className="text-sm text-right max-w-[60%]">
-                    {f.type === 'questions' && Array.isArray(viewItem[f.key]) ? (
-                      <div className="text-left space-y-1.5 max-w-full">
-                        {viewItem[f.key].map((q: string, idx: number) => (
-                          <div key={idx} className="text-xs bg-gray-50 rounded px-2 py-1.5">
-                            <span className="text-gray-400 font-mono mr-1">Q{idx + 1}.</span> {q}
-                          </div>
-                        ))}
-                      </div>
-                    ) : f.key === 'rating' ? (
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: parseInt(viewItem[f.key] || '0') }).map((_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                        ))}
-                      </div>
-                    ) : f.key === 'progress' ? (
-                      <div className="flex items-center gap-2">
-                        <Progress value={parseInt(viewItem[f.key] || '0')} className="h-2 w-20" />
-                        <span>{viewItem[f.key]}%</span>
-                      </div>
-                    ) : (
-                      getDisplayValue(viewItem, f) || '\u2014'
-                    )}
-                  </span>
-                </div>
-              ))}
-              {viewItem.createdAt && (
-                <div className="flex justify-between items-start py-2">
-                  <span className="text-sm text-gray-500 font-medium">Created</span>
-                  <span className="text-sm">{new Date(viewItem.createdAt).toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewItem(null)}>Close</Button>
-            <Button onClick={() => {
-              setViewItem(null); setEditItem(viewItem); setFormData({ ...viewItem });
-              const ot: Record<string, string> = {};
-              config.fields.forEach(f => {
-                if (f.type === 'select' && f.options?.some(o => optionValue(o) === 'other') && viewItem[f.key] && !f.options.some(o => optionValue(o) === viewItem[f.key])) {
-                  ot[f.key] = viewItem[f.key];
-                }
-              });
-              setOtherTexts(ot);
-              setDialogOpen(true);
-            }}>Edit</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
