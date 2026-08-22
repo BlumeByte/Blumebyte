@@ -885,10 +885,12 @@ async function resolveBillingSubscriptionContext(userId: string): Promise<{
 
   if (companyId) {
     const allEmployees = await kv.getByPrefix('employee:');
-    const aliases = await getCompanyAliasSet(companyId);
+    // Exact companyId match only — see findCompanySuperAdminUserId for why
+    // name/alias matching is unsafe here (it can resolve to a different
+    // tenant's superadmin when two companies share a similar display name).
     const companySuperAdmin = allEmployees.find((emp: any) =>
       normalizeCareRole(String(emp?.role || '')) === 'superadmin' &&
-      employeeMatchesCompanyAliases(emp, aliases)
+      String(emp?.companyId || '') === companyId
     );
     ownerUserId = String(companySuperAdmin?.userId || companySuperAdmin?.id || userId || '').trim() || null;
   }
@@ -7793,12 +7795,13 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     
     // For non-superadmins, they're covered under the superadmin's subscription
     if (role !== 'superadmin') {
-      // CRITICAL: Find the superadmin from the SAME company only
+      // CRITICAL: Find the superadmin from the SAME company only. Exact
+      // companyId match — alias/name matching can resolve to a different
+      // tenant's superadmin when two companies share a similar display name.
       const companyId = await getCompanyId(user.id);
       const allEmployees = await kv.getByPrefix('employee:');
-      const aliases = await getCompanyAliasSet(companyId || null);
-      const superadmin = companyId 
-        ? allEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin' && employeeMatchesCompanyAliases(emp, aliases))
+      const superadmin = companyId
+        ? allEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin' && String(emp?.companyId || '') === companyId)
         : null;
 
       const superadminId = superadmin?.userId || superadmin?.id || null;
@@ -7920,10 +7923,11 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
       }, 200);
     }
     
-    // Get all employees in the same company
+    // Get all employees in the same company. Exact companyId match only —
+    // alias/name matching can pull in another tenant's employees when two
+    // companies share a similar display name.
     const allEmployees = await kv.getByPrefix('employee:');
-    const aliases = await getCompanyAliasSet(companyId);
-    const companyEmployees = allEmployees.filter((emp: any) => employeeMatchesCompanyAliases(emp, aliases));
+    const companyEmployees = allEmployees.filter((emp: any) => String(emp?.companyId || '') === companyId);
     
     // Find superadmin in this company
     const superadmin = companyEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin');
