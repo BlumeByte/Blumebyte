@@ -34,6 +34,38 @@ jobs:
           test -f dist/index.html
           echo "Production build output verified."
 
+      - name: Verify role dashboard surfaces
+        run: |
+          set -euo pipefail
+
+          test -f src/components/EmployeeDashboard.tsx
+          test -f src/components/ManagerDashboard.tsx
+          test -f src/components/ManagerCrudPanel.tsx
+          test -f src/components/AdminDashboard.tsx
+          test -f src/components/AdminPeopleOperations.tsx
+
+          grep -q "path: '/employee'" src/routes.tsx
+          grep -q "path: '/manager'" src/routes.tsx
+          grep -q "path: '/admin'" src/routes.tsx
+          grep -q "path: '/admin/people-operations'" src/routes.tsx
+          grep -q "allowedRoles={\['employee'\]}" src/routes.tsx
+          grep -q "allowedRoles={\['manager'\]}" src/routes.tsx
+          grep -q "allowedRoles={\['admin'\]}" src/routes.tsx
+
+          echo "Employee, Manager, and Admin dashboard routes are present and role protected."
+
+      - name: Verify manager scope safeguards
+        run: |
+          set -euo pipefail
+
+          grep -q "managerDepartments" src/components/ManagerCrudPanel.tsx
+          grep -q "teamIds" src/components/ManagerCrudPanel.tsx
+          grep -q "belongsToTeam" src/components/ManagerCrudPanel.tsx
+          grep -q "validateTargets" src/components/ManagerCrudPanel.tsx
+          grep -q "outside your team scope" src/components/ManagerCrudPanel.tsx
+
+          echo "Manager CRUD contains explicit department/team scope checks."
+
       - name: Verify protected commercial routes are preserved
         run: |
           set -euo pipefail
