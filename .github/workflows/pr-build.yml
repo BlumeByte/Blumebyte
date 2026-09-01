@@ -33,3 +33,30 @@ jobs:
           test -d dist
           test -f dist/index.html
           echo "Production build output verified."
+
+      - name: Verify protected commercial routes are preserved
+        run: |
+          set -euo pipefail
+
+          test -f src/routes.tsx
+          test -f src/components/SubscriptionPage.tsx
+          test -f src/components/PaymentVerification.tsx
+          test -f src/components/LicensePaymentVerification.tsx
+          test -f src/components/LicenseManagement.tsx
+
+          grep -q "path: '/subscription'" src/routes.tsx
+          grep -q "path: '/payment-verify'" src/routes.tsx
+          grep -q "path: '/payment-verify-license'" src/routes.tsx
+          grep -q "allowedRoles={\['superadmin'\]}" src/routes.tsx
+
+          echo "Protected subscription and payment surfaces are present."
+
+      - name: Verify license and payment backend surfaces are preserved
+        run: |
+          set -euo pipefail
+
+          test -f supabase/functions/make-server-a35148f0/license-routes.ts
+          grep -q "pending-license" supabase/functions/make-server-a35148f0/license-routes.ts
+          grep -q "renewal" supabase/functions/make-server-a35148f0/license-routes.ts
+
+          echo "License purchase and renewal backend surfaces are present."
