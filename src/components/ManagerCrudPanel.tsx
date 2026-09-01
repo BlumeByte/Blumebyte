@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api-client';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -10,11 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Textarea } from './ui/textarea';
-import { toast } from 'sonner@2.0.3';
-import { Loader2, Plus, Pencil, Trash2, Eye, FileText, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { Loader2, Plus, Pencil, Trash2, Eye, RefreshCw } from 'lucide-react';
 import { ListControls, exportToCSV, exportToPDF } from './ListControls';
 import { useBranding } from '../lib/branding-context';
-import { MultiEmployeeSelect } from './MultiEmployeeSelect';
 
 interface ManagerCrudPanelProps {
   resourceType: 'workflows' | 'performance' | 'disciplinary' | 'compliance' | 'tasks' | 'feedback';
@@ -23,575 +22,215 @@ interface ManagerCrudPanelProps {
   icon: any;
 }
 
-const RESOURCE_CONFIGS = {
-  workflows: {
-    endpoint: '/workflows',
-    kvPrefix: 'workflow:',
-    fields: [
-      { key: 'name', label: 'Workflow Name', type: 'text', required: true },
-      { key: 'description', label: 'Description', type: 'textarea', required: true },
-      { key: 'status', label: 'Status', type: 'select', options: ['active', 'inactive', 'completed'], required: true },
-      { key: 'assignedTo', label: 'Assigned Employees', type: 'multiselect', required: false },
-      { key: 'dueDate', label: 'Due Date', type: 'date', required: false },
-    ],
-    tableColumns: ['name', 'description', 'status', 'assignedTo', 'dueDate'],
-    displayColumns: { name: 'Name', description: 'Description', status: 'Status', assignedTo: 'Assigned To', dueDate: 'Due Date' },
-  },
-  performance: {
-    endpoint: '/performance-reviews',
-    kvPrefix: 'performance:',
-    fields: [
-      { key: 'employeeIds', label: 'Employees', type: 'multiselect', required: true },
-      { key: 'reviewPeriod', label: 'Review Period', type: 'text', required: true },
-      { key: 'rating', label: 'Rating', type: 'select', options: ['Excellent', 'Good', 'Satisfactory', 'Needs Improvement'], required: true },
-      { key: 'comments', label: 'Comments', type: 'textarea', required: false },
-      { key: 'goals', label: 'Goals', type: 'textarea', required: false },
-      { key: 'reviewDate', label: 'Review Date', type: 'date', required: true },
-    ],
-    tableColumns: ['employeeIds', 'reviewPeriod', 'rating', 'reviewDate'],
-    displayColumns: { employeeIds: 'Employees', reviewPeriod: 'Period', rating: 'Rating', reviewDate: 'Review Date' },
-  },
-  disciplinary: {
-    endpoint: '/disciplinary-actions',
-    kvPrefix: 'disciplinary:',
-    fields: [
-      { key: 'employeeIds', label: 'Employees', type: 'multiselect', required: true },
-      { key: 'actionType', label: 'Action Type', type: 'select', options: ['Verbal Warning', 'Written Warning', 'Suspension', 'Termination'], required: true },
-      { key: 'reason', label: 'Reason', type: 'textarea', required: true },
-      { key: 'actionDate', label: 'Action Date', type: 'date', required: true },
-      { key: 'status', label: 'Status', type: 'select', options: ['pending', 'active', 'resolved'], required: true },
-      { key: 'notes', label: 'Notes', type: 'textarea', required: false },
-    ],
-    tableColumns: ['employeeIds', 'actionType', 'reason', 'actionDate', 'status'],
-    displayColumns: { employeeIds: 'Employees', actionType: 'Action Type', reason: 'Reason', actionDate: 'Date', status: 'Status' },
-  },
-  compliance: {
-    endpoint: '/compliance-records',
-    kvPrefix: 'compliance:',
-    fields: [
-      { key: 'title', label: 'Compliance Item', type: 'text', required: true },
-      { key: 'category', label: 'Category', type: 'select', options: ['Labour Law', 'Safety', 'Documentation', 'Training', 'Other'], required: true },
-      { key: 'status', label: 'Status', type: 'select', options: ['compliant', 'non-compliant', 'in-progress'], required: true },
-      { key: 'dueDate', label: 'Due Date', type: 'date', required: false },
-      { key: 'assignedTo', label: 'Assigned Employees', type: 'multiselect', required: false },
-      { key: 'notes', label: 'Notes', type: 'textarea', required: false },
-    ],
-    tableColumns: ['title', 'category', 'status', 'dueDate'],
-    displayColumns: { title: 'Item', category: 'Category', status: 'Status', dueDate: 'Due Date' },
-  },
-  tasks: {
-    endpoint: '/task-assignments',
-    kvPrefix: 'task:',
-    fields: [
-      { key: 'taskName', label: 'Task Name', type: 'text', required: true },
-      { key: 'description', label: 'Description', type: 'textarea', required: true },
-      { key: 'assignedTo', label: 'Assigned Employees', type: 'multiselect', required: true },
-      { key: 'priority', label: 'Priority', type: 'select', options: ['low', 'medium', 'high', 'urgent'], required: true },
-      { key: 'status', label: 'Status', type: 'select', options: ['pending', 'in-progress', 'completed', 'cancelled'], required: true },
-      { key: 'dueDate', label: 'Due Date', type: 'date', required: false },
-    ],
-    tableColumns: ['taskName', 'description', 'assignedTo', 'priority', 'status', 'dueDate'],
-    displayColumns: { taskName: 'Task', description: 'Description', assignedTo: 'Assigned To', priority: 'Priority', status: 'Status', dueDate: 'Due Date' },
-  },
-  feedback: {
-    endpoint: '/360-feedback',
-    kvPrefix: 'feedback:',
-    fields: [
-      { key: 'employeeIds', label: 'Employees', type: 'multiselect', required: true },
-      { key: 'feedbackType', label: 'Feedback Type', type: 'select', options: ['Peer', 'Manager', 'Self', 'Subordinate'], required: true },
-      { key: 'strengths', label: 'Strengths', type: 'textarea', required: true },
-      { key: 'improvements', label: 'Areas for Improvement', type: 'textarea', required: true },
-      { key: 'rating', label: 'Overall Rating', type: 'select', options: ['1', '2', '3', '4', '5'], required: true },
-      { key: 'feedbackDate', label: 'Feedback Date', type: 'date', required: true },
-    ],
-    tableColumns: ['employeeIds', 'feedbackType', 'rating', 'feedbackDate'],
-    displayColumns: { employeeIds: 'Employees', feedbackType: 'Type', rating: 'Rating', feedbackDate: 'Date' },
-  },
+type Field = { key: string; label: string; type: 'text' | 'textarea' | 'select' | 'date' | 'employees'; required?: boolean; options?: string[] };
+
+const RESOURCE_CONFIGS: Record<ManagerCrudPanelProps['resourceType'], { endpoint: string; fields: Field[]; columns: string[] }> = {
+  workflows: { endpoint: '/workflows', fields: [
+    { key: 'name', label: 'Workflow Name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea', required: true },
+    { key: 'status', label: 'Status', type: 'select', options: ['active', 'inactive', 'completed'], required: true },
+    { key: 'assignedTo', label: 'Assigned Employees', type: 'employees' },
+    { key: 'dueDate', label: 'Due Date', type: 'date' },
+  ], columns: ['name', 'status', 'assignedTo', 'dueDate'] },
+  performance: { endpoint: '/performance-reviews', fields: [
+    { key: 'employeeIds', label: 'Employees', type: 'employees', required: true },
+    { key: 'reviewPeriod', label: 'Review Period', type: 'text', required: true },
+    { key: 'rating', label: 'Rating', type: 'select', options: ['Excellent', 'Good', 'Satisfactory', 'Needs Improvement'], required: true },
+    { key: 'comments', label: 'Comments', type: 'textarea' },
+    { key: 'goals', label: 'Goals', type: 'textarea' },
+    { key: 'reviewDate', label: 'Review Date', type: 'date', required: true },
+  ], columns: ['employeeIds', 'reviewPeriod', 'rating', 'reviewDate'] },
+  disciplinary: { endpoint: '/disciplinary-actions', fields: [
+    { key: 'employeeIds', label: 'Employees', type: 'employees', required: true },
+    { key: 'actionType', label: 'Action Type', type: 'select', options: ['Verbal Warning', 'Written Warning', 'Suspension'], required: true },
+    { key: 'reason', label: 'Reason', type: 'textarea', required: true },
+    { key: 'actionDate', label: 'Action Date', type: 'date', required: true },
+    { key: 'status', label: 'Status', type: 'select', options: ['pending', 'active', 'resolved'], required: true },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ], columns: ['employeeIds', 'actionType', 'actionDate', 'status'] },
+  compliance: { endpoint: '/compliance-records', fields: [
+    { key: 'title', label: 'Compliance Item', type: 'text', required: true },
+    { key: 'category', label: 'Category', type: 'select', options: ['Labour Law', 'Safety', 'Documentation', 'Training', 'Other'], required: true },
+    { key: 'status', label: 'Status', type: 'select', options: ['compliant', 'non-compliant', 'in-progress'], required: true },
+    { key: 'dueDate', label: 'Due Date', type: 'date' },
+    { key: 'assignedTo', label: 'Assigned Employees', type: 'employees' },
+    { key: 'notes', label: 'Notes', type: 'textarea' },
+  ], columns: ['title', 'category', 'status', 'dueDate'] },
+  tasks: { endpoint: '/task-assignments', fields: [
+    { key: 'taskName', label: 'Task Name', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea', required: true },
+    { key: 'assignedTo', label: 'Assigned Employees', type: 'employees', required: true },
+    { key: 'priority', label: 'Priority', type: 'select', options: ['low', 'medium', 'high', 'urgent'], required: true },
+    { key: 'status', label: 'Status', type: 'select', options: ['pending', 'in-progress', 'completed', 'cancelled'], required: true },
+    { key: 'dueDate', label: 'Due Date', type: 'date' },
+  ], columns: ['taskName', 'assignedTo', 'priority', 'status', 'dueDate'] },
+  feedback: { endpoint: '/360-feedback', fields: [
+    { key: 'employeeIds', label: 'Employees', type: 'employees', required: true },
+    { key: 'feedbackType', label: 'Feedback Type', type: 'select', options: ['Peer', 'Manager', 'Self', 'Subordinate'], required: true },
+    { key: 'strengths', label: 'Strengths', type: 'textarea', required: true },
+    { key: 'improvements', label: 'Areas for Improvement', type: 'textarea', required: true },
+    { key: 'rating', label: 'Overall Rating', type: 'select', options: ['1', '2', '3', '4', '5'], required: true },
+    { key: 'feedbackDate', label: 'Feedback Date', type: 'date', required: true },
+  ], columns: ['employeeIds', 'feedbackType', 'rating', 'feedbackDate'] },
+};
+
+const asArray = (value: any): string[] => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (!value) return [];
+  if (typeof value === 'string') return value.split(',').map(v => v.trim()).filter(Boolean);
+  return [String(value)];
 };
 
 export function ManagerCrudPanel({ resourceType, title, description, icon: Icon }: ManagerCrudPanelProps) {
   const { accessToken } = useAuth();
   const { branding } = useBranding();
+  const config = RESOURCE_CONFIGS[resourceType];
   const [items, setItems] = useState<any[]>([]);
+  const [team, setTeam] = useState<any[]>([]);
+  const [managerDepartments, setManagerDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState('createdAt');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sortField, setSortField] = useState(config.columns[0]);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [editItem, setEditItem] = useState<any>(null);
   const [viewItem, setViewItem] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [managerDepartment, setManagerDepartment] = useState('');
-  const [departmentEmployees, setDepartmentEmployees] = useState<any[]>([]);
 
-  const config = RESOURCE_CONFIGS[resourceType];
+  const teamIds = useMemo(() => new Set(team.flatMap(u => [u.id, u.userId, u.email].filter(Boolean).map(String))), [team]);
 
-  const loadManagerProfile = useCallback(async () => {
-    try {
-      const profile = await api('/profile', { token: accessToken });
-      setManagerDepartment(profile?.department || '');
-    } catch (e) {
-      console.log('Failed to load manager profile:', e);
-    }
-  }, [accessToken]);
-
-  const loadDepartmentEmployees = useCallback(async () => {
-    try {
-      const users = await api('/users', { token: accessToken });
-      const profile = await api('/profile', { token: accessToken });
-      const dept = profile?.department || '';
-      const deptEmps = Array.isArray(users) 
-        ? users.filter((u: any) => u.department === dept && u.role === 'employee')
-        : [];
-      setDepartmentEmployees(deptEmps);
-    } catch (e) {
-      console.log('Failed to load department employees:', e);
-    }
-  }, [accessToken]);
+  const belongsToTeam = useCallback((item: any) => {
+    if (!item) return false;
+    const itemDepts = asArray(item.departments || item.department);
+    if (itemDepts.some(d => managerDepartments.includes(d))) return true;
+    const targetIds = [
+      ...asArray(item.assignedTo), ...asArray(item.employeeIds), ...asArray(item.userIds),
+      ...asArray(item.employeeId), ...asArray(item.userId), ...asArray(item.targetUsers),
+    ];
+    return targetIds.some(id => teamIds.has(String(id)));
+  }, [managerDepartments, teamIds]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, profile] = await Promise.all([
+      const [profile, users, data] = await Promise.all([
+        api('/profile', { token: accessToken }),
+        api('/users', { token: accessToken }),
         api(config.endpoint, { token: accessToken }),
-        api('/profile', { token: accessToken })
       ]);
-      const dept = profile?.department || '';
-      setManagerDepartment(dept);
-      
-      // Filter items to only show those related to manager's department employees
-      const filtered = Array.isArray(data) 
-        ? data.filter((item: any) => {
-            // Check if item has department field
-            if (item.department) {
-              return item.department === dept;
-            }
-            // Check if item has assignedTo field (array of employee IDs or names)
-            if (item.assignedTo) {
-              // This is a simplified check - in production you'd match against actual employee IDs
-              return true; // For now, show all if we can't determine department
-            }
-            return true; // Default: show all
-          })
-        : [];
-      
-      setItems(filtered);
-    } catch (e) {
-      console.log(`Failed to load ${resourceType}:`, e);
+      const depts = asArray(profile?.departments || profile?.department);
+      setManagerDepartments(depts);
+      const teamUsers = Array.isArray(users) ? users.filter((u: any) => {
+        const userDepts = asArray(u.departments || u.department);
+        return u.role === 'employee' && userDepts.some(d => depts.includes(d));
+      }) : [];
+      setTeam(teamUsers);
+
+      const ids = new Set(teamUsers.flatMap((u: any) => [u.id, u.userId, u.email].filter(Boolean).map(String)));
+      const scoped = Array.isArray(data) ? data.filter((item: any) => {
+        const itemDepts = asArray(item.departments || item.department);
+        if (itemDepts.some(d => depts.includes(d))) return true;
+        const targetIds = [...asArray(item.assignedTo), ...asArray(item.employeeIds), ...asArray(item.userIds), ...asArray(item.employeeId), ...asArray(item.userId), ...asArray(item.targetUsers)];
+        return targetIds.some(id => ids.has(String(id)));
+      }) : [];
+      setItems(scoped);
+    } catch (e: any) {
+      console.error(`Failed to load manager ${resourceType}:`, e);
       setItems([]);
+      toast.error(e?.message || `Failed to load ${title.toLowerCase()}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [accessToken, config.endpoint, resourceType]);
+  }, [accessToken, config.endpoint, resourceType, title]);
 
-  useEffect(() => { loadManagerProfile(); }, [loadManagerProfile]);
-  useEffect(() => { loadDepartmentEmployees(); }, [loadDepartmentEmployees]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const iv = setInterval(load, 20000); return () => clearInterval(iv); }, [load]);
+  useEffect(() => { const id = setInterval(load, 60000); return () => clearInterval(id); }, [load]);
 
-  const handleCreate = () => {
+  const openCreate = () => {
     setEditItem(null);
-    setFormData({ 
-      status: 'pending',
-      department: managerDepartment, // Auto-assign manager's department
-      createdBy: 'manager',
-    });
+    setFormData({ status: 'pending', department: managerDepartments[0] || '', departments: managerDepartments });
     setDialogOpen(true);
   };
 
-  const handleEdit = (item: any) => {
-    // Check if item belongs to manager's department
-    if (item.department && item.department !== managerDepartment) {
-      toast.error('You can only edit items in your department');
-      return;
-    }
+  const openEdit = (item: any) => {
+    if (!belongsToTeam(item)) return toast.error('This record is outside your team scope');
     setEditItem(item);
     setFormData({ ...item });
     setDialogOpen(true);
   };
 
-  const handleView = (item: any) => {
-    setViewItem(item);
-    setViewDialogOpen(true);
+  const validateTargets = (payload: any) => {
+    const targets = [...asArray(payload.assignedTo), ...asArray(payload.employeeIds), ...asArray(payload.userIds), ...asArray(payload.employeeId), ...asArray(payload.userId)];
+    return targets.length === 0 || targets.every(id => teamIds.has(String(id)));
   };
 
-  const handleSave = async () => {
+  const save = async () => {
+    const missing = config.fields.filter(f => f.required && asArray(formData[f.key]).length === 0).map(f => f.label);
+    if (missing.length) return toast.error(`Required: ${missing.join(', ')}`);
+    const payload = { ...formData, department: managerDepartments[0] || '', departments: managerDepartments };
+    if (!validateTargets(payload)) return toast.error('You can only assign records to employees in your team');
     setSaving(true);
     try {
-      // Validate required fields
-      const missingFields = config.fields
-        .filter(f => f.required && !formData[f.key])
-        .map(f => f.label);
-      
-      if (missingFields.length > 0) {
-        toast.error(`Missing required fields: ${missingFields.join(', ')}`);
-        setSaving(false);
-        return;
-      }
-
-      // Ensure department is set
-      const payload = {
-        ...formData,
-        department: managerDepartment,
-      };
-
       if (editItem) {
-        await api(`${config.endpoint}/${editItem.id}`, {
-          method: 'PUT',
-          body: payload,
-          token: accessToken,
-        });
-        toast.success('Updated successfully');
+        if (!belongsToTeam(editItem)) throw new Error('This record is outside your team scope');
+        await api(`${config.endpoint}/${editItem.id}`, { method: 'PUT', body: payload, token: accessToken });
       } else {
-        await api(config.endpoint, {
-          method: 'POST',
-          body: payload,
-          token: accessToken,
-        });
-        toast.success('Created successfully');
+        await api(config.endpoint, { method: 'POST', body: payload, token: accessToken });
       }
+      toast.success(editItem ? 'Updated successfully' : 'Created successfully');
       setDialogOpen(false);
-      load();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to save');
-    }
-    setSaving(false);
+      await load();
+    } catch (e: any) { toast.error(e?.message || 'Unable to save'); }
+    finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+  const remove = async (item: any) => {
+    if (!belongsToTeam(item)) return toast.error('This record is outside your team scope');
+    if (!confirm('Delete this record?')) return;
     try {
-      await api(`${config.endpoint}/${id}`, { method: 'DELETE', token: accessToken });
-      toast.success('Deleted successfully');
-      load();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete');
-    }
+      await api(`${config.endpoint}/${item.id}`, { method: 'DELETE', token: accessToken });
+      toast.success('Deleted');
+      await load();
+    } catch (e: any) { toast.error(e?.message || 'Unable to delete'); }
   };
 
-  // Apply filtering and sorting
-  const filteredAndSorted = items
-    .filter(item => {
-      if (!searchTerm) return true;
-      const searchLower = searchTerm.toLowerCase();
-      return Object.values(item).some(val => 
-        String(val).toLowerCase().includes(searchLower)
-      );
-    })
-    .sort((a, b) => {
-      let aVal = a[sortField] || '';
-      let bVal = b[sortField] || '';
-      
-      // Handle date sorting
-      if (sortField.includes('Date') || sortField === 'createdAt') {
-        aVal = new Date(aVal).getTime();
-        bVal = new Date(bVal).getTime();
-        return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-      
-      const comparison = String(aVal).localeCompare(String(bVal));
-      return sortDir === 'asc' ? comparison : -comparison;
-    });
+  const filtered = items.filter(item => !searchTerm || JSON.stringify(item).toLowerCase().includes(searchTerm.toLowerCase())).sort((a, b) => {
+    const cmp = String(a?.[sortField] ?? '').localeCompare(String(b?.[sortField] ?? ''));
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
 
-  const sortOptions = config.tableColumns.map(col => ({
-    value: col,
-    label: config.displayColumns[col as keyof typeof config.displayColumns],
-  }));
+  const renderField = (field: Field) => {
+    const value = formData[field.key] ?? '';
+    if (field.type === 'textarea') return <Textarea value={value} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} />;
+    if (field.type === 'select') return <Select value={String(value || field.options?.[0] || '')} onValueChange={v => setFormData({ ...formData, [field.key]: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{field.options?.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select>;
+    if (field.type === 'employees') {
+      const selected = asArray(value);
+      return <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">{team.length === 0 ? <p className="text-xs text-muted-foreground">No employees in your assigned departments.</p> : team.map(emp => {
+        const id = String(emp.userId || emp.id || emp.email);
+        const checked = selected.includes(id);
+        return <label key={id} className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={checked} onChange={() => setFormData({ ...formData, [field.key]: checked ? selected.filter(x => x !== id) : [...selected, id] })} /> <span>{emp.name || emp.email}</span></label>;
+      })}</div>;
+    }
+    return <Input type={field.type === 'date' ? 'date' : 'text'} value={value} onChange={e => setFormData({ ...formData, [field.key]: e.target.value })} />;
+  };
 
-  return (
-    <div className="space-y-4">
-      {/* Info Banner */}
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <div className="flex items-start gap-3">
-          <Icon className="w-5 h-5 text-blue-600 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-blue-900">{title}</h3>
-            <p className="text-sm text-blue-700 mt-1">{description}</p>
-            <p className="text-xs text-blue-600 mt-2">
-              Department: <span className="font-medium">{managerDepartment || 'Loading...'}</span> • 
-              Showing items for your department only
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex-1">
-          <ListControls
-            searchValue={searchTerm}
-            onSearchChange={setSearchTerm}
-            sortField={sortField}
-            sortDir={sortDir}
-            sortOptions={sortOptions}
-            onSortChange={setSortField}
-            onToggleSortDir={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-            onExportCSV={() => exportToCSV(
-              filteredAndSorted.map(item => {
-                const row: any = {};
-                config.tableColumns.forEach(col => {
-                  row[config.displayColumns[col as keyof typeof config.displayColumns]] = item[col] || '';
-                });
-                return row;
-              }),
-              resourceType
-            )}
-            onExportPDF={() => exportToPDF(
-              title,
-              filteredAndSorted,
-              config.tableColumns,
-              branding.companyName
-            )}
-            placeholder={`Search ${title.toLowerCase()}...`}
-          />
-        </div>
-        <Button onClick={handleCreate}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create New
-        </Button>
-      </div>
-
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="py-16 flex justify-center">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-            </div>
-          ) : filteredAndSorted.length === 0 ? (
-            <div className="py-16 text-center">
-              <Icon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-gray-500">No {title.toLowerCase()} found</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={handleCreate}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create First Item
-              </Button>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {config.tableColumns.map(col => (
-                    <TableHead key={col}>
-                      {config.displayColumns[col as keyof typeof config.displayColumns]}
-                    </TableHead>
-                  ))}
-                  <TableHead className="w-32">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAndSorted.map(item => (
-                  <TableRow key={item.id}>
-                    {config.tableColumns.map(col => (
-                      <TableCell key={col} className="max-w-[200px] truncate">
-                        {col === 'status' ? (
-                          <Badge
-                            className={
-                              item[col] === 'active' || item[col] === 'completed' || item[col] === 'compliant'
-                                ? 'bg-green-100 text-green-800'
-                                : item[col] === 'pending' || item[col] === 'in-progress'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-red-100 text-red-800'
-                            }
-                          >
-                            {item[col]}
-                          </Badge>
-                        ) : col === 'priority' ? (
-                          <Badge
-                            className={
-                              item[col] === 'urgent' || item[col] === 'high'
-                                ? 'bg-red-100 text-red-800'
-                                : item[col] === 'medium'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }
-                          >
-                            {item[col]}
-                          </Badge>
-                        ) : col === 'rating' ? (
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">{item[col]}</span>
-                            {item[col] === 'Excellent' || item[col] === '5' ? '⭐⭐⭐⭐⭐' : 
-                             item[col] === 'Good' || item[col] === '4' ? '⭐⭐⭐⭐' :
-                             item[col] === 'Satisfactory' || item[col] === '3' ? '⭐⭐⭐' : '⭐⭐'}
-                          </div>
-                        ) : col.includes('Date') ? (
-                          item[col] ? new Date(item[col]).toLocaleDateString() : '—'
-                        ) : col === 'assignedTo' || col === 'employeeIds' ? (
-                          Array.isArray(item[col]) ? (
-                            item[col].length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {item[col].slice(0, 2).map((id: string, idx: number) => {
-                                  const emp = departmentEmployees.find(e => (e.userId || e.id) === id);
-                                  return (
-                                    <Badge key={idx} variant="outline" className="text-xs">
-                                      {emp?.name || id}
-                                    </Badge>
-                                  );
-                                })}
-                                {item[col].length > 2 && (
-                                  <Badge variant="outline" className="text-xs bg-gray-100">
-                                    +{item[col].length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : '—'
-                          ) : item[col] || '—'
-                        ) : (
-                          item[col] || '—'
-                        )}
-                      </TableCell>
-                    ))}
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          onClick={() => handleView(item)}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          onClick={() => handleEdit(item)}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0 text-red-600"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editItem ? 'Edit' : 'Create'} {title}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {config.fields.map(field => (
-              <div key={field.key}>
-                <Label>
-                  {field.label}
-                  {field.required && <span className="text-red-500 ml-1">*</span>}
-                </Label>
-                {field.type === 'text' && (
-                  <Input
-                    value={formData[field.key] || ''}
-                    onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                  />
-                )}
-                {field.type === 'textarea' && (
-                  <Textarea
-                    value={formData[field.key] || ''}
-                    onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    rows={3}
-                  />
-                )}
-                {field.type === 'select' && (
-                  <Select
-                    value={formData[field.key] || ''}
-                    onValueChange={v => setFormData({ ...formData, [field.key]: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {field.options?.map(opt => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {field.type === 'date' && (
-                  <Input
-                    type="date"
-                    value={formData[field.key] || ''}
-                    onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
-                  />
-                )}
-                {field.type === 'multiselect' && (
-                  <MultiEmployeeSelect
-                    employees={departmentEmployees}
-                    selectedIds={formData[field.key] || []}
-                    onChange={ids => setFormData({ ...formData, [field.key]: ids })}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              {editItem ? 'Save Changes' : 'Create'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* View Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>View {title}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {viewItem && config.fields.map(field => (
-              <div key={field.key} className="border-b pb-2">
-                <Label className="text-xs text-gray-500">{field.label}</Label>
-                <p className="mt-1 text-sm">
-                  {field.type === 'date' && viewItem[field.key]
-                    ? new Date(viewItem[field.key]).toLocaleDateString()
-                    : Array.isArray(viewItem[field.key])
-                    ? viewItem[field.key].join(', ')
-                    : viewItem[field.key] || '—'}
-                </p>
-              </div>
-            ))}
-            <div className="border-b pb-2">
-              <Label className="text-xs text-gray-500">Created At</Label>
-              <p className="mt-1 text-sm">
-                {viewItem?.createdAt ? new Date(viewItem.createdAt).toLocaleString() : '—'}
-              </p>
-            </div>
-            <div className="border-b pb-2">
-              <Label className="text-xs text-gray-500">Updated At</Label>
-              <p className="mt-1 text-sm">
-                {viewItem?.updatedAt ? new Date(viewItem.updatedAt).toLocaleString() : '—'}
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+  return <div className="space-y-4">
+    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
+      <Icon className="w-5 h-5 text-blue-600 mt-0.5" />
+      <div className="flex-1"><h3 className="font-semibold text-blue-900">{title}</h3><p className="text-sm text-blue-700">{description}</p><p className="text-xs text-blue-600 mt-1">Strict scope: {managerDepartments.join(', ') || 'No assigned department'} • {team.length} team member(s)</p></div>
+      <Button variant="ghost" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
     </div>
-  );
+    <div className="flex gap-3 items-start">
+      <div className="flex-1"><ListControls searchValue={searchTerm} onSearchChange={setSearchTerm} sortField={sortField} sortDir={sortDir} sortOptions={config.columns.map(c => ({ value: c, label: c }))} onSortChange={setSortField} onToggleSortDir={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')} onExportCSV={() => exportToCSV(filtered, `manager-${resourceType}`)} onExportPDF={() => exportToPDF(title, filtered, config.columns, branding.companyName)} placeholder={`Search ${title.toLowerCase()}...`} /></div>
+      <Button onClick={openCreate} disabled={managerDepartments.length === 0}><Plus className="w-4 h-4 mr-1" />New</Button>
+    </div>
+    <Card><CardContent className="p-0">{loading ? <div className="py-14 flex justify-center"><Loader2 className="w-6 h-6 animate-spin" /></div> : filtered.length === 0 ? <div className="py-14 text-center text-sm text-muted-foreground">No team-scoped records found.</div> : <Table><TableHeader><TableRow>{config.columns.map(c => <TableHead key={c}>{c}</TableHead>)}<TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{filtered.map((item, idx) => <TableRow key={item.id || idx}>{config.columns.map(c => <TableCell key={c}>{Array.isArray(item[c]) ? item[c].join(', ') : String(item[c] ?? '—')}</TableCell>)}<TableCell><div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => { setViewItem(item); setViewDialogOpen(true); }}><Eye className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => openEdit(item)}><Pencil className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => remove(item)}><Trash2 className="w-4 h-4 text-red-500" /></Button></div></TableCell></TableRow>)}</TableBody></Table>}</CardContent></Card>
+
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{editItem ? 'Edit' : 'Create'} {title}</DialogTitle></DialogHeader><div className="space-y-4">{config.fields.map(field => <div key={field.key}><Label>{field.label}{field.required ? ' *' : ''}</Label>{renderField(field)}</div>)}</div><DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button onClick={save} disabled={saving}>{saving && <Loader2 className="w-4 h-4 animate-spin mr-1" />}{editItem ? 'Save changes' : 'Create'}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}><DialogContent><DialogHeader><DialogTitle>{title} details</DialogTitle></DialogHeader><div className="space-y-2">{viewItem && Object.entries(viewItem).filter(([k]) => !['companyId','company'].includes(k)).map(([k,v]) => <div key={k} className="grid grid-cols-3 gap-2 text-sm"><span className="font-medium">{k}</span><span className="col-span-2 break-words">{Array.isArray(v) ? v.join(', ') : String(v ?? '—')}</span></div>)}</div></DialogContent></Dialog>
+  </div>;
 }
+
+export default ManagerCrudPanel;

@@ -1,0 +1,94 @@
+name: PR Build Validation
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Verify production output
+        run: |
+          test -d dist
+          test -f dist/index.html
+          echo "Production build output verified."
+
+      - name: Verify role dashboard surfaces
+        run: |
+          set -euo pipefail
+
+          test -f src/components/EmployeeDashboard.tsx
+          test -f src/components/ManagerDashboard.tsx
+          test -f src/components/ManagerCrudPanel.tsx
+          test -f src/components/AdminDashboard.tsx
+          test -f src/components/AdminPeopleOperations.tsx
+
+          grep -q "path: '/employee'" src/routes.tsx
+          grep -q "path: '/manager'" src/routes.tsx
+          grep -q "path: '/admin'" src/routes.tsx
+          grep -q "path: '/admin/people-operations'" src/routes.tsx
+          grep -q "allowedRoles={\['employee'\]}" src/routes.tsx
+          grep -q "allowedRoles={\['manager'\]}" src/routes.tsx
+          grep -q "allowedRoles={\['admin'\]}" src/routes.tsx
+
+          echo "Employee, Manager, and Admin dashboard routes are present and role protected."
+
+      - name: Verify manager scope safeguards
+        run: |
+          set -euo pipefail
+
+          grep -q "managerDepartments" src/components/ManagerCrudPanel.tsx
+          grep -q "teamIds" src/components/ManagerCrudPanel.tsx
+          grep -q "belongsToTeam" src/components/ManagerCrudPanel.tsx
+          grep -q "validateTargets" src/components/ManagerCrudPanel.tsx
+          grep -q "outside your team scope" src/components/ManagerCrudPanel.tsx
+
+          echo "Manager CRUD contains explicit department/team scope checks."
+
+      - name: Verify protected commercial routes are preserved
+        run: |
+          set -euo pipefail
+
+          test -f src/routes.tsx
+          test -f src/components/SubscriptionPage.tsx
+          test -f src/components/PaymentVerification.tsx
+          test -f src/components/LicensePaymentVerification.tsx
+          test -f src/components/LicenseManagement.tsx
+
+          grep -q "path: '/subscription'" src/routes.tsx
+          grep -q "path: '/payment-verify'" src/routes.tsx
+          grep -q "path: '/payment-verify-license'" src/routes.tsx
+          grep -q "allowedRoles={\['superadmin'\]}" src/routes.tsx
+
+          echo "Protected subscription and payment surfaces are present."
+
+      - name: Verify license and payment backend surfaces are preserved
+        run: |
+          set -euo pipefail
+
+          test -f supabase/functions/make-server-a35148f0/license-routes.ts
+          grep -q "pending-license" supabase/functions/make-server-a35148f0/license-routes.ts
+          grep -q "renewal" supabase/functions/make-server-a35148f0/license-routes.ts
+
+          echo "License purchase and renewal backend surfaces are present."
