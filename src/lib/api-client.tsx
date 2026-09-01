@@ -12,7 +12,8 @@ type ApiOptions = Omit<RequestInit, 'body'> & {
 
 export function authHeaders(userToken?: string | null, json = true): Record<string, string> {
   const h: Record<string, string> = {
-    Authorization: `Bearer ${publicAnonKey}`,
+    apikey: publicAnonKey,
+    Authorization: `Bearer ${userToken || publicAnonKey}`,
   };
   if (userToken) h['X-User-Token'] = userToken;
   if (json) h['Content-Type'] = 'application/json';
@@ -118,7 +119,8 @@ export async function apiUpload(path: string, formData: FormData, token?: string
   const res = await fetchFunctionsUrl(path, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${publicAnonKey}`,
+      apikey: publicAnonKey,
+      Authorization: `Bearer ${token || publicAnonKey}`,
       ...(token ? { 'X-User-Token': token } : {}),
     },
     body: formData,

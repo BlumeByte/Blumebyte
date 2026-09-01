@@ -715,7 +715,17 @@ export function ManagerDashboard() {
           
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold">Welcome, {user?.name}</h2>
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 md:p-8">
+                <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-white/10" />
+                <div className="absolute right-16 bottom-[-40px] w-32 h-32 rounded-full bg-white/10" />
+                <div className="relative">
+                  <h2 className="text-2xl md:text-3xl font-bold">Welcome, {(user?.name || 'there').split(' ')[0]}</h2>
+                  <p className="text-blue-100 mt-1 text-sm">
+                    {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                  <p className="text-blue-200/80 text-xs mt-3">// Home — Dashboard</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                   <CardHeader>

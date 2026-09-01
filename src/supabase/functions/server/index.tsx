@@ -213,6 +213,9 @@ const _allowedOrigins = (() => {
     /^https:\/\/.*\.vercel\.app$/,
     /^https:\/\/blumebyte\.com$/,
     /^https:\/\/.*\.blumebyte\.com$/,
+    // Local development (Vite default ports)
+    /^http:\/\/localhost:\d+$/,
+    /^http:\/\/127\.0\.0\.1:\d+$/,
   ];
 })();
 
@@ -882,10 +885,12 @@ async function resolveBillingSubscriptionContext(userId: string): Promise<{
 
   if (companyId) {
     const allEmployees = await kv.getByPrefix('employee:');
-    const aliases = await getCompanyAliasSet(companyId);
+    // Exact companyId match only — see findCompanySuperAdminUserId for why
+    // name/alias matching is unsafe here (it can resolve to a different
+    // tenant's superadmin when two companies share a similar display name).
     const companySuperAdmin = allEmployees.find((emp: any) =>
       normalizeCareRole(String(emp?.role || '')) === 'superadmin' &&
-      employeeMatchesCompanyAliases(emp, aliases)
+      String(emp?.companyId || '') === companyId
     );
     ownerUserId = String(companySuperAdmin?.userId || companySuperAdmin?.id || userId || '').trim() || null;
   }
@@ -979,10 +984,12 @@ async function syncCompanySubscriptionMirror(userId: string, subscription: any) 
 async function findCompanySuperAdminUserId(companyId: string) {
   if (!companyId) return null;
   const employees = await kv.getByPrefix('employee:');
-  const aliases = await getCompanyAliasSet(companyId);
+  // Exact companyId match only. Name/slug aliases are ambiguous across tenants
+  // that happen to share a similar display name, and this lookup determines
+  // which account's subscription record gets written to.
   const owner = employees.find((employee: any) =>
     normalizeCareRole(employee?.role || '') === 'superadmin' &&
-    employeeMatchesCompanyAliases(employee, aliases)
+    String(employee?.companyId || '') === String(companyId)
   );
   return owner?.userId || owner?.id || null;
 }
@@ -7788,12 +7795,13 @@ app.get(`${PREFIX}/subscription/status`, async (c) => {
     
     // For non-superadmins, they're covered under the superadmin's subscription
     if (role !== 'superadmin') {
-      // CRITICAL: Find the superadmin from the SAME company only
+      // CRITICAL: Find the superadmin from the SAME company only. Exact
+      // companyId match — alias/name matching can resolve to a different
+      // tenant's superadmin when two companies share a similar display name.
       const companyId = await getCompanyId(user.id);
       const allEmployees = await kv.getByPrefix('employee:');
-      const aliases = await getCompanyAliasSet(companyId || null);
-      const superadmin = companyId 
-        ? allEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin' && employeeMatchesCompanyAliases(emp, aliases))
+      const superadmin = companyId
+        ? allEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin' && String(emp?.companyId || '') === companyId)
         : null;
 
       const superadminId = superadmin?.userId || superadmin?.id || null;
@@ -7915,10 +7923,11 @@ for (const route of subscriptionRoutePaths('/subscription/license-info')) app.ge
       }, 200);
     }
     
-    // Get all employees in the same company
+    // Get all employees in the same company. Exact companyId match only —
+    // alias/name matching can pull in another tenant's employees when two
+    // companies share a similar display name.
     const allEmployees = await kv.getByPrefix('employee:');
-    const aliases = await getCompanyAliasSet(companyId);
-    const companyEmployees = allEmployees.filter((emp: any) => employeeMatchesCompanyAliases(emp, aliases));
+    const companyEmployees = allEmployees.filter((emp: any) => String(emp?.companyId || '') === companyId);
     
     // Find superadmin in this company
     const superadmin = companyEmployees.find((emp: any) => normalizeCareRole(String(emp.role || '')) === 'superadmin');
@@ -12270,26 +12279,14 @@ const reportClientError = async (c: any) => {
     const extractNormalizedRole = (candidate: any) =>
       normalizeCareRole(String(candidate?.role || candidate?.user_metadata?.role || ''));
     const reporterRole = extractNormalizedRole(profile) || extractNormalizedRole(user) || 'user';
-    // Wrap getDynamicPlatformAgents in try/catch so a Supabase admin-API failure
-    // doesn't abort ticket creation — the ticket is more important than agent assignment.
-    let activeCareAgents: any[] = [];
+    // Wrap in try/catch so a Supabase admin-API failure doesn't abort ticket
+    // creation — the ticket is more important than agent assignment.
+    let selectedCareAgent: any = null;
     try {
-      activeCareAgents = (await getDynamicPlatformAgents())
-        .filter((agent: any) =>
-          normalizeCareRole(String(agent?.role || '')) === 'customer_care' &&
-          String(agent?.status || 'active').toLowerCase() === 'active'
-        );
+      selectedCareAgent = await pickLoadBalancedAgent(companyId, 'customer_care');
     } catch (agentErr: any) {
-      console.warn('reportClientError: getDynamicPlatformAgents failed, continuing without agent assignment:', agentErr?.message || agentErr);
+      console.warn('reportClientError: pickLoadBalancedAgent failed, continuing without agent assignment:', agentErr?.message || agentErr);
     }
-    const tenantAssignedCareAgents = companyId
-      ? activeCareAgents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
-      : [];
-    const selectedCareAgent = [...(tenantAssignedCareAgents.length > 0 ? tenantAssignedCareAgents : activeCareAgents)]
-      .sort((a: any, b: any) =>
-        Number(a?.openTickets || 0) - Number(b?.openTickets || 0) ||
-        new Date(a?.createdAt || Date.now()).getTime() - new Date(b?.createdAt || Date.now()).getTime()
-      )[0] || null;
 
     const ticketId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -12304,6 +12301,7 @@ const reportClientError = async (c: any) => {
       status: 'open',
       assignedAgentId: selectedCareAgent?.userId || selectedCareAgent?.id || '',
       assignedAgentName: selectedCareAgent?.name || selectedCareAgent?.email || '',
+      autoAssignedAgent: !!selectedCareAgent,
       creatorId: user.id,
       creatorEmail: user.email,
       createdAt: now,
@@ -12322,6 +12320,10 @@ const reportClientError = async (c: any) => {
 
     // Persist into canonical support ticket stores so all dashboard variants can read it.
     await saveSupportTicket(ticket);
+    if (selectedCareAgent && companyId) {
+      const agentId = selectedCareAgent.userId || selectedCareAgent.id;
+      await grantCareTenantAssignment(agentId, companyId, { id: 'system', email: 'auto-assign' }, 'ticket_auto_assign').catch(() => {});
+    }
 
     // Seed ticket comments with the reported error so it appears in ticket message threads.
     const initialComment = {
@@ -12989,6 +12991,27 @@ async function getDynamicPlatformAgents() {
   );
 }
 
+// Load-balanced auto-assignment: picks the active agent/developer with the
+// fewest current open tickets (ties broken by fewest assigned tenants, then
+// earliest account) so work spreads evenly. Prefers an agent already
+// assigned to the tenant, if one exists, before falling back to the full pool.
+async function pickLoadBalancedAgent(companyId: string, role: 'customer_care' | 'developer' = 'customer_care') {
+  const agents = (await getDynamicPlatformAgents()).filter((agent: any) =>
+    normalizeCareRole(String(agent?.role || '')) === role &&
+    String(agent?.status || 'active').toLowerCase() === 'active'
+  );
+  if (agents.length === 0) return null;
+  const tenantAssigned = companyId
+    ? agents.filter((agent: any) => Array.isArray(agent?.assignedTenants) && agent.assignedTenants.includes(companyId))
+    : [];
+  const pool = tenantAssigned.length > 0 ? tenantAssigned : agents;
+  return [...pool].sort((a: any, b: any) =>
+    Number(a?.openTickets || 0) - Number(b?.openTickets || 0) ||
+    Number(a?.assignedTenants?.length || 0) - Number(b?.assignedTenants?.length || 0) ||
+    new Date(a?.createdAt || Date.now()).getTime() - new Date(b?.createdAt || Date.now()).getTime()
+  )[0] || null;
+}
+
 async function verifyDeveloperAccess(c: any): Promise<{ user: any; profile: any; role: string } | null> {
   const token = extractUserToken(c);
   if (!token) return null;
@@ -13276,12 +13299,21 @@ const listDeveloperSupportTenants = async (c: any) => {
     const access = await verifyDeveloperAccess(c);
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
 
-    const [allEmployees, allSubscriptions, allCompanies, supabaseUsers] = await Promise.all([
+    const [allEmployees, allSubscriptions, allCompanies, supabaseUsers, allAgentsForTenants] = await Promise.all([
       kv.getByPrefix('employee:'),
       kv.getByPrefix('subscription:'),
       getAllCompanyRecords(),
       listSupabasePlatformUsers(),
+      getDynamicPlatformAgents().catch(() => []),
     ]);
+    const tenantAgentMap = new Map<string, { id: string; name: string }>();
+    for (const agent of allAgentsForTenants) {
+      for (const tid of (agent?.assignedTenants || [])) {
+        if (!tenantAgentMap.has(tid)) {
+          tenantAgentMap.set(tid, { id: agent.userId || agent.id, name: agent.name || agent.email || '' });
+        }
+      }
+    }
 
     const aliasToCompanyId = new Map<string, string>();
     const companyMap = new Map<string, any>();
@@ -13420,12 +13452,15 @@ const listDeveloperSupportTenants = async (c: any) => {
         0;
       const purchasedLicensesNumber = Number(purchasedLicensesRaw);
       const purchasedLicenses = Number.isFinite(purchasedLicensesNumber) ? purchasedLicensesNumber : 0;
+      const assignedAgent = tenantAgentMap.get(cid);
       return {
         ...t,
         licenseStatus: inferredStatus !== 'unknown' ? inferredStatus : (companyRecord?.subscriptionStatus || companyRecord?.status || 'unknown'),
         purchasedLicenses,
         plan: sub?.plan || sub?.planName || companyRecord?.subscriptionPlan || companyRecord?.plan || 'unknown',
         lastActivity: sub?.updatedAt || companyRecord?.updatedAt || t.createdAt || '',
+        assignedAgentId: assignedAgent?.id || '',
+        assignedAgentName: assignedAgent?.name || '',
       };
     });
 
@@ -13545,6 +13580,147 @@ const suspendDeveloperSupportTenant = async (c: any) => {
 };
 for (const route of compatibleRoutePathsForAliases('/developer/support/tenants/:id/suspend', '/support/tenants/:id/suspend')) app.post(route, suspendDeveloperSupportTenant);
 
+// All KV prefixes that hold data scoped to a single tenant/company. Deliberately
+// excludes audit/log prefixes (support-audit:, audit:, developer_audit_log:,
+// system_health_log:) so a deletion event stays in the trail, and excludes
+// platform-level agent/user registries (platform_user:, support-agent:,
+// customer_care_users:) which are not owned by any one tenant.
+const TENANT_SCOPED_DATA_PREFIXES = [
+  'announcement:', 'approval_req:', 'asset-category:', 'asset:', 'attendance:',
+  'automation_rule:', 'automation_task:', 'automation_template:', 'automation_workflow:',
+  'benefit-plan:', 'benefit:', 'branch:', 'compliance:', 'department:', 'disciplinary:',
+  'document:', 'emp-feedback:', 'expense:', 'feedback:', 'financial-year:', 'holiday:',
+  'job-application:', 'job-posting:', 'leave-type:', 'leave:', 'meeting:', 'message:',
+  'notification:', 'onboard-checklist:', 'overtime:', 'paygrade:', 'payroll-run:',
+  'perf-review:', 'profile-change:', 'public-job-application:', 'support-ticket:',
+  'support_tickets:', 'survey-response:', 'survey:', 'task:', 'tax-bracket:',
+  'tax-configuration:', 'training-enrollment:', 'training-program:', 'training:',
+  'vacation:', 'workflow:',
+];
+
+// DELETE /developer/tenants/:id — permanently and completely remove a tenant:
+// its company record(s), subscription, every employee (KV profile + Supabase
+// Auth account), and every piece of tenant-scoped operational data. Requires
+// the caller to echo back the tenant's exact name as a confirmation guard.
+const deleteDeveloperTenant = async (c: any) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const tenantId = await canonicalizeTenantId(c.req.param('id'));
+    const company = await kv.get(`company:${tenantId}`) || await kv.get(`company_by_id:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+
+    const body = await c.req.json().catch(() => ({}));
+    const confirmName = String(body?.confirmName || '').trim().toLowerCase();
+    const actualName = String(company.name || '').trim().toLowerCase();
+    if (!confirmName || confirmName !== actualName) {
+      return c.json({ error: 'Confirmation name does not match. Deletion cancelled.' }, 400);
+    }
+
+    const removed = { employees: 0, authUsers: 0, dataRecords: 0 };
+    const sb = supabaseAdmin();
+
+    // 1. Employees — delete both the KV profile and the Supabase Auth account.
+    const allEmployees = await kv.getByPrefix('employee:');
+    const tenantEmployees = allEmployees.filter((e: any) => recordBelongsToTenant(e, tenantId));
+    for (const emp of tenantEmployees) {
+      const userId = emp.userId || emp.id;
+      if (userId) {
+        await kv.del(`employee:${userId}`);
+        removed.employees++;
+        try {
+          await sb.auth.admin.deleteUser(userId);
+          removed.authUsers++;
+        } catch (authErr: any) {
+          console.warn(`deleteDeveloperTenant: failed to delete auth user ${userId}:`, authErr?.message || authErr);
+        }
+      }
+    }
+
+    // 2. Generic tenant-scoped data across every known prefix.
+    for (const prefix of TENANT_SCOPED_DATA_PREFIXES) {
+      try {
+        const items = await kv.getByPrefix(prefix);
+        const matching = items.filter((item: any) => recordBelongsToTenant(item, tenantId));
+        for (const item of matching) {
+          const id = item.id || item.userId || item.reference;
+          if (!id) continue;
+          await kv.del(`${prefix}${id}`);
+          removed.dataRecords++;
+        }
+      } catch (scanErr: any) {
+        console.warn(`deleteDeveloperTenant: failed scanning prefix ${prefix}:`, scanErr?.message || scanErr);
+      }
+    }
+
+    // 3. Subscriptions — the canonical companyId-keyed record plus any
+    // owner-keyed duplicates pointing at this tenant.
+    await kv.del(`subscription:${tenantId}`);
+    const allSubscriptions = await kv.getByPrefix('subscription:');
+    for (const sub of allSubscriptions) {
+      if (sub?.companyId === tenantId && sub?.userId) {
+        await kv.del(`subscription:${sub.userId}`);
+      }
+    }
+
+    // 4. Care-agent assignments referencing this tenant.
+    const assignmentRecords = await kv.getByPrefix('care_assignments_record:');
+    for (const rec of assignmentRecords) {
+      if (rec?.tenantId === tenantId) {
+        await kv.del(`care_assignments_record:${rec.id}`);
+        if (rec.careAgentId) {
+          const current = await getCareAssignmentsForAgent(rec.careAgentId);
+          await kv.set(`care_assignments:${rec.careAgentId}`, current.filter((t: string) => t !== tenantId));
+        }
+      }
+    }
+
+    // 5. The company record itself, last.
+    await kv.del(`company:${tenantId}`);
+    await kv.del(`company_by_id:${tenantId}`);
+
+    await writeDeveloperAudit(access.user, 'developer_tenant_delete', {
+      tenantId, tenantName: company.name, removed,
+    });
+
+    return c.json({ success: true, tenantId, tenantName: company.name, removed });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+};
+for (const route of compatibleRoutePathsForAliases('/developer/tenants/:id', '/developer/support/tenants/:id')) app.delete(route, deleteDeveloperTenant);
+
+// PUT /developer/tenants/:id — edit a tenant's basic details (name, industry).
+// Separate from the license endpoint, which only manages plan/seats/expiry.
+const editDeveloperTenant = async (c: any) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const tenantId = await canonicalizeTenantId(c.req.param('id'));
+    const company = await kv.get(`company:${tenantId}`) || await kv.get(`company_by_id:${tenantId}`);
+    if (!company) return c.json({ error: 'Tenant not found' }, 404);
+
+    const body = await c.req.json().catch(() => ({}));
+    const updated = {
+      ...company,
+      name: body.name !== undefined ? String(body.name).trim() : company.name,
+      industry: body.industry !== undefined ? String(body.industry).trim() : company.industry,
+      updatedAt: new Date().toISOString(),
+    };
+    if (!updated.name) return c.json({ error: 'Company name cannot be empty' }, 400);
+    await kv.set(`company:${tenantId}`, updated);
+    await kv.set(`company_by_id:${tenantId}`, updated);
+
+    await writeDeveloperAudit(access.user, 'developer_tenant_edit', { tenantId, changes: body });
+    return c.json({ success: true, tenant: updated });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+};
+for (const route of compatibleRoutePathsForAliases('/developer/tenants/:id', '/developer/support/tenants/:id')) app.put(route, editDeveloperTenant);
+
 // PUT /developer/support/tenants/:id/license
 const updateDeveloperSupportTenantLicense = async (c: any) => {
   try {
@@ -13626,17 +13802,35 @@ const createDeveloperSupportTicket = async (c: any) => {
     if (!access) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.json();
     const id = crypto.randomUUID();
+    const tenantId = body.tenantId || '';
+    let assignedAgentId = body.assignedAgentId || '';
+    let assignedAgentName = body.assignedAgentName || '';
+    let autoAssignedAgent = false;
+    if (!assignedAgentId) {
+      try {
+        const picked = await pickLoadBalancedAgent(tenantId, 'customer_care');
+        if (picked) {
+          assignedAgentId = picked.userId || picked.id || '';
+          assignedAgentName = picked.name || picked.email || '';
+          autoAssignedAgent = true;
+        }
+      } catch (agentErr: any) {
+        console.warn('createDeveloperSupportTicket: auto-assign failed, continuing unassigned:', agentErr?.message || agentErr);
+      }
+    }
     const ticket = {
-      id, tenantId: body.tenantId || '', tenantName: body.tenantName || '',
+      id, tenantId, tenantName: body.tenantName || '',
       issueType: body.issueType || 'general', priority: body.priority || 'medium',
       subject: body.subject || '', description: body.description || '',
-      status: 'open', assignedAgentId: body.assignedAgentId || '',
-      assignedAgentName: body.assignedAgentName || '',
+      status: 'open', assignedAgentId, assignedAgentName, autoAssignedAgent,
       creatorId: access.user.id, creatorEmail: access.user.email,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       notes: [],
     };
     await kv.set(`support-ticket:${id}`, ticket);
+    if (autoAssignedAgent && assignedAgentId && tenantId) {
+      await grantCareTenantAssignment(assignedAgentId, tenantId, access.user, 'ticket_auto_assign').catch(() => {});
+    }
     return c.json(ticket);
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
@@ -13897,6 +14091,17 @@ const repairDeveloperTenant = async (c: any) => {
     const tenantId = c.req.param('tenantId');
     const body = await c.req.json().catch(() => ({}));
     const action = body.action || 'refresh_permissions';
+    let detail: any = null;
+
+    if (action === 'repair_records') {
+      const company = await kv.get(`company:${tenantId}`);
+      if (!company) return c.json({ error: 'Tenant not found' }, 404);
+      const fixedCompany = { ...company, companyId: tenantId, company: tenantId, updatedAt: new Date().toISOString() };
+      await kv.set(`company:${tenantId}`, fixedCompany);
+      const byId = await kv.get(`company_by_id:${tenantId}`);
+      if (byId) await kv.set(`company_by_id:${tenantId}`, { ...byId, companyId: tenantId, company: tenantId, updatedAt: new Date().toISOString() });
+      detail = { previousCompanyId: company.companyId, previousCompany: company.company, fixedTo: tenantId };
+    }
 
     // Log the repair action
     const auditId = crypto.randomUUID();
@@ -13904,9 +14109,10 @@ const repairDeveloperTenant = async (c: any) => {
       id: auditId, actorId: access.user.id, actorEmail: access.user.email,
       actionType: `repair_${action}`, tenantId, timestamp: new Date().toISOString(),
       description: `Repair action '${action}' executed for tenant ${tenantId} by ${access.user.email}`,
+      detail,
     });
 
-    return c.json({ success: true, action, tenantId, executedBy: access.user.email, timestamp: new Date().toISOString() });
+    return c.json({ success: true, action, tenantId, detail, executedBy: access.user.email, timestamp: new Date().toISOString() });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
@@ -13950,13 +14156,26 @@ const createDeveloperSupportTenant = async (c: any) => {
     };
     await kv.set(`subscription:${tenantId}`, sub);
 
+    let assignedAgentId = '';
+    let assignedAgentName = '';
+    try {
+      const picked = await pickLoadBalancedAgent(tenantId, 'customer_care');
+      if (picked) {
+        assignedAgentId = picked.userId || picked.id || '';
+        assignedAgentName = picked.name || picked.email || '';
+        if (assignedAgentId) await grantCareTenantAssignment(assignedAgentId, tenantId, access.user, 'tenant_auto_assign').catch(() => {});
+      }
+    } catch (agentErr: any) {
+      console.warn('createDeveloperSupportTenant: auto-assign failed, continuing unassigned:', agentErr?.message || agentErr);
+    }
+
     const auditId = crypto.randomUUID();
     await kv.set(`support-audit:${auditId}`, {
       id: auditId, actorId: access.user.id, actorEmail: access.user.email,
       actionType: 'tenant_create', tenantId, timestamp: now,
       description: `Tenant "${body.name}" created by ${access.user.email} (no payment)`,
     });
-    return c.json({ success: true, id: tenantId, ...company, subscription: sub });
+    return c.json({ success: true, id: tenantId, ...company, subscription: sub, assignedAgentId, assignedAgentName });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
@@ -14165,6 +14384,88 @@ for (const route of compatibleRoutePathsForAliases('/developer/users/password', 
     return c.json({ success: true, ...result });
   } catch (e: any) {
     if (e.message === 'User not found') return c.json({ error: 'User not found' }, 404);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// PUT /developer/users/:id — edit a user's name, role, status, or company
+// assignment. Works for any user (tenant employee or platform user).
+for (const route of compatibleRoutePathsForAliases('/developer/users/:id', '/support/users/:id')) app.put(route, async (c) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const identifier = c.req.param('id');
+    const body = await c.req.json().catch(() => ({}));
+    const existing = await kv.get(`employee:${identifier}`);
+    const authUser = await resolveAnyAuthUser(identifier, body?.email || existing?.email || '');
+    if (!authUser && !existing) return c.json({ error: 'User not found' }, 404);
+    const userId = authUser?.id || existing?.id || identifier;
+
+    const updated = {
+      ...(existing || {}),
+      id: userId,
+      userId,
+      email: body.email ?? existing?.email ?? authUser?.email ?? '',
+      name: body.name ?? existing?.name ?? authUser?.user_metadata?.name ?? '',
+      role: body.role ? normalizeCareRole(body.role) : (existing?.role || normalizeCareRole(authUser?.app_metadata?.role || 'employee')),
+      status: body.status ?? existing?.status ?? 'active',
+      companyId: body.companyId !== undefined ? body.companyId : (existing?.companyId ?? existing?.company ?? ''),
+      company: body.companyId !== undefined ? body.companyId : (existing?.company ?? existing?.companyId ?? ''),
+      updatedAt: new Date().toISOString(),
+    };
+    await kv.set(`employee:${userId}`, updated);
+
+    if (authUser) {
+      await supabaseAdmin().auth.admin.updateUserById(authUser.id, {
+        app_metadata: { ...(authUser.app_metadata || {}), role: updated.role },
+        user_metadata: { ...(authUser.user_metadata || {}), name: updated.name, role: updated.role, companyId: updated.companyId, company: updated.company },
+      }).catch((err: any) => console.warn('developer user edit: auth metadata update failed:', err?.message || err));
+    }
+
+    await writeDeveloperAudit(access.user, 'developer_user_edit', { targetId: userId, targetEmail: updated.email, changes: body });
+    return c.json({ success: true, user: updated });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// DELETE /developer/users/:id — permanently remove a user: KV profile and
+// Supabase Auth account. Requires the caller to echo the user's exact email
+// as a confirmation guard.
+for (const route of compatibleRoutePathsForAliases('/developer/users/:id', '/support/users/:id')) app.delete(route, async (c) => {
+  try {
+    const access = await verifyDeveloperAccess(c);
+    if (!access) return c.json({ error: 'Unauthorized' }, 401);
+    if (access.role !== 'developer') return c.json({ error: 'Forbidden' }, 403);
+    const identifier = c.req.param('id');
+    const body = await c.req.json().catch(() => ({}));
+    const existing = await kv.get(`employee:${identifier}`);
+    const authUser = await resolveAnyAuthUser(identifier, body?.email || existing?.email || '');
+    if (!authUser && !existing) return c.json({ error: 'User not found' }, 404);
+    const userId = authUser?.id || existing?.id || identifier;
+    const email = existing?.email || authUser?.email || '';
+
+    const confirmEmail = String(body?.confirmEmail || '').trim().toLowerCase();
+    if (!confirmEmail || confirmEmail !== email.toLowerCase()) {
+      return c.json({ error: 'Confirmation email does not match. Deletion cancelled.' }, 400);
+    }
+    if (userId === access.user.id) {
+      return c.json({ error: 'You cannot delete your own account' }, 400);
+    }
+
+    await kv.del(`employee:${userId}`);
+    await kv.del(`platform_user:${userId}`);
+    await kv.del(`customer_care_users:${userId}`);
+    await kv.del(`support-agent:${userId}`);
+    if (authUser) {
+      await supabaseAdmin().auth.admin.deleteUser(authUser.id).catch((err: any) =>
+        console.warn(`developer user delete: failed to delete auth user ${authUser.id}:`, err?.message || err));
+    }
+
+    await writeDeveloperAudit(access.user, 'developer_user_delete', { targetId: userId, targetEmail: email });
+    return c.json({ success: true, userId, email });
+  } catch (e: any) {
     return c.json({ error: e.message }, 500);
   }
 });
